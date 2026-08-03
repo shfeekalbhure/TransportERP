@@ -5,8 +5,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// شريط الحالة الموحد لنظام TransportERP.
-/// يعرض بيانات بيئة العمل الحالية مثل الشركة والفرع والسنة والفترة والمستخدم والدور
-/// وحالة الاتصال وإصدار النظام، ويستخدم أسفل النوافذ الرئيسية بشكل ثابت.
+/// يعرض بيانات بيئة العمل الحالية، ويدعم وضعًا مختصرًا خاصًا بشاشة الدخول.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportStatusBar : UserControl
@@ -31,12 +30,6 @@ public sealed class TransportStatusBar : UserControl
         ApplyDefaultValues();
     }
 
-    /// <summary>
-    /// اسم الشركة الحالية المعروض في شريط الحالة.
-    /// تُحدَّث وقت التشغيل ولا يحفظها مصمم WinForms داخل ملف Designer.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("اسم الشركة الحالية.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CompanyName
     {
@@ -44,11 +37,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_companyLabel, "الشركة", value);
     }
 
-    /// <summary>
-    /// اسم الفرع الحالي المعروض في شريط الحالة.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("اسم الفرع الحالي.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string BranchName
     {
@@ -56,11 +44,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_branchLabel, "الفرع", value);
     }
 
-    /// <summary>
-    /// السنة المالية الحالية.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("السنة المالية الحالية.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string FiscalYear
     {
@@ -68,11 +51,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_fiscalYearLabel, "السنة", value);
     }
 
-    /// <summary>
-    /// الفترة المالية الحالية.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("الفترة المالية الحالية.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string FinancialPeriod
     {
@@ -80,11 +58,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_financialPeriodLabel, "الفترة", value);
     }
 
-    /// <summary>
-    /// اسم المستخدم الحالي.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("اسم المستخدم الحالي.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CurrentUser
     {
@@ -92,11 +65,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_userLabel, "المستخدم", value);
     }
 
-    /// <summary>
-    /// الدور الحالي للمستخدم.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("الدور الحالي للمستخدم.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CurrentRole
     {
@@ -104,11 +72,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_roleLabel, "الدور", value);
     }
 
-    /// <summary>
-    /// اسم الخادم أو البيئة الحالية.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("اسم الخادم أو البيئة الحالية.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string EnvironmentName
     {
@@ -116,11 +79,6 @@ public sealed class TransportStatusBar : UserControl
         set => SetValue(_environmentLabel, "البيئة", value);
     }
 
-    /// <summary>
-    /// إصدار النظام الحالي.
-    /// </summary>
-    [Category("TransportERP")]
-    [Description("إصدار النظام الحالي.")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SystemVersion
     {
@@ -129,10 +87,31 @@ public sealed class TransportStatusBar : UserControl
     }
 
     /// <summary>
+    /// تحويل الشريط إلى الوضع المختصر الخاص بشاشة الدخول.
+    /// يعرض الشركة والفرع والسنة والاتصال والإصدار فقط.
+    /// </summary>
+    public void UseLoginCompactMode()
+    {
+        _financialPeriodLabel.Visible = false;
+        _userLabel.Visible = false;
+        _roleLabel.Visible = false;
+        _environmentLabel.Visible = false;
+
+        _layout.ColumnStyles.Clear();
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
+        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F));
+    }
+
+    /// <summary>
     /// تحديث حالة الاتصال مع الخادم.
     /// </summary>
-    /// <param name="isConnected">صحيح عندما يكون الاتصال متاحًا.</param>
-    /// <param name="details">تفاصيل اختيارية عن حالة الاتصال.</param>
     public void SetConnectionStatus(bool isConnected, string? details = null)
     {
         var statusText = isConnected ? "متصل" : "غير متصل";
@@ -171,9 +150,6 @@ public sealed class TransportStatusBar : UserControl
         SetConnectionStatus(isConnected);
     }
 
-    /// <summary>
-    /// تهيئة بنية شريط الحالة وترتيب عناصره من اليمين إلى اليسار.
-    /// </summary>
     private void InitializeLayout()
     {
         AutoSize = false;
@@ -211,9 +187,6 @@ public sealed class TransportStatusBar : UserControl
         Controls.Add(_layout);
     }
 
-    /// <summary>
-    /// وضع قيم ابتدائية واضحة قبل تحميل سياق المستخدم الحقيقي.
-    /// </summary>
     private void ApplyDefaultValues()
     {
         CompanyName = "غير محددة";
@@ -227,9 +200,6 @@ public sealed class TransportStatusBar : UserControl
         SetConnectionStatus(false);
     }
 
-    /// <summary>
-    /// إنشاء عنصر نص موحد لعرض قيمة داخل شريط الحالة.
-    /// </summary>
     private static Label CreateStatusLabel()
     {
         return new Label
@@ -243,21 +213,12 @@ public sealed class TransportStatusBar : UserControl
         };
     }
 
-    /// <summary>
-    /// تعيين قيمة في عنصر شريط الحالة مع الحفاظ على عنوانها العربي.
-    /// </summary>
     private static void SetValue(Label label, string title, string? value)
     {
-        var displayValue = string.IsNullOrWhiteSpace(value)
-            ? "-"
-            : value.Trim();
-
+        var displayValue = string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
         label.Text = $"{title}: {displayValue}";
     }
 
-    /// <summary>
-    /// استخراج القيمة الحالية من نص عنصر شريط الحالة.
-    /// </summary>
     private static string GetValue(Label label, string title)
     {
         var prefix = $"{title}: ";
