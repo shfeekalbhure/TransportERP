@@ -33,9 +33,11 @@ public sealed class TransportStatusBar : UserControl
 
     /// <summary>
     /// اسم الشركة الحالية المعروض في شريط الحالة.
+    /// تُحدَّث وقت التشغيل ولا يحفظها مصمم WinForms داخل ملف Designer.
     /// </summary>
     [Category("TransportERP")]
     [Description("اسم الشركة الحالية.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CompanyName
     {
         get => GetValue(_companyLabel, "الشركة");
@@ -47,6 +49,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("اسم الفرع الحالي.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string BranchName
     {
         get => GetValue(_branchLabel, "الفرع");
@@ -58,6 +61,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("السنة المالية الحالية.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string FiscalYear
     {
         get => GetValue(_fiscalYearLabel, "السنة");
@@ -69,6 +73,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("الفترة المالية الحالية.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string FinancialPeriod
     {
         get => GetValue(_financialPeriodLabel, "الفترة");
@@ -80,6 +85,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("اسم المستخدم الحالي.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CurrentUser
     {
         get => GetValue(_userLabel, "المستخدم");
@@ -91,6 +97,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("الدور الحالي للمستخدم.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string CurrentRole
     {
         get => GetValue(_roleLabel, "الدور");
@@ -102,6 +109,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("اسم الخادم أو البيئة الحالية.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string EnvironmentName
     {
         get => GetValue(_environmentLabel, "البيئة");
@@ -113,6 +121,7 @@ public sealed class TransportStatusBar : UserControl
     /// </summary>
     [Category("TransportERP")]
     [Description("إصدار النظام الحالي.")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SystemVersion
     {
         get => GetValue(_versionLabel, "الإصدار");
