@@ -96,28 +96,21 @@ namespace TransportERP.Desktop
         }
 
         /// <summary>
-        /// معالجة الضغط على زر الدخول الرئيسي.
-        /// تنفذ تحققًا أوليًا فقط ولا تنفذ مصادقة حقيقية في هذه المرحلة.
+        /// فتح الشاشة الرئيسية مباشرة أثناء مرحلة التطوير دون التحقق من بيانات الدخول.
+        /// هذا السلوك مؤقت ويستبدل لاحقًا بالمصادقة الحقيقية عبر API.
         /// </summary>
         private void btnLogin_Click(object? sender, EventArgs e)
         {
-            if (!ValidateLoginInputs())
-            {
-                return;
-            }
+            using var dashboard = new FrmDashboard();
 
-            statusBar.CurrentUser = txtUserName.Text.Trim();
-            statusBar.SetConnectionStatus(false, "المصادقة غير مرتبطة بعد");
-
-            MessageBox.Show(
-                "تم تجهيز شاشة تسجيل الدخول، وسيتم ربطها بخدمة المصادقة عبر API في المرحلة التالية.",
-                "TransportERP",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            Hide();
+            dashboard.ShowDialog(this);
+            Show();
         }
 
         /// <summary>
         /// التحقق من الحقول الإلزامية باستخدام وظائف عناصر CoreUI نفسها.
+        /// ستستخدم هذه الدالة عند تفعيل المصادقة الحقيقية لاحقًا.
         /// </summary>
         /// <returns>صحيح عندما تكون جميع بيانات الدخول مكتملة؛ وإلا يعيد خطأ.</returns>
         private bool ValidateLoginInputs()
@@ -138,9 +131,7 @@ namespace TransportERP.Desktop
             statusBar.BranchName = cmbBranch.SelectedItem?.ToString() ?? "قبل تسجيل الدخول";
             statusBar.FiscalYear = cmbFiscalYear.SelectedItem?.ToString() ?? DateTime.Today.Year.ToString();
             statusBar.FinancialPeriod = "-";
-            statusBar.CurrentUser = string.IsNullOrWhiteSpace(txtUserName.Text)
-                ? "غير مسجل"
-                : txtUserName.Text.Trim();
+            statusBar.CurrentUser = "غير مسجل";
             statusBar.CurrentRole = "-";
             statusBar.EnvironmentName = "TransportERP API";
             statusBar.SystemVersion = "1.0.0";
