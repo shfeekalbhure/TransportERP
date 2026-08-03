@@ -1,26 +1,17 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop
 {
     /// <summary>
     /// نافذة تسجيل الدخول الرئيسية لنظام TransportERP.
-    /// تعرض حقول اختيار الشركة والفرع والسنة المالية، وتتحقق مبدئيًا من بيانات المستخدم
-    /// قبل الانتقال لاحقًا إلى عملية المصادقة الفعلية عبر واجهة API.
+    /// تمثل النسخة المجمعة المعتمدة لشاشة LOGIN-001، وتستخدم عناصر CoreUI
+    /// للحقول الإلزامية وقوائم الاختيار وزر الدخول وشريط الحالة.
     /// </summary>
     public partial class FrmLogin : Form
     {
         /// <summary>
-        /// لون زر الدخول في حالته الطبيعية.
-        /// </summary>
-        private readonly Color _loginButtonColor = Color.FromArgb(35, 111, 229);
-
-        /// <summary>
-        /// لون زر الدخول عند مرور مؤشر الفأرة فوقه.
-        /// </summary>
-        private readonly Color _loginButtonHoverColor = Color.FromArgb(24, 88, 197);
-
-        /// <summary>
-        /// إنشاء نافذة تسجيل الدخول وتهيئة عناصرها وقيمها الافتراضية.
+        /// إنشاء نافذة تسجيل الدخول وتهيئة بياناتها ومظهرها وأحداثها.
         /// </summary>
         public FrmLogin()
         {
@@ -28,30 +19,24 @@ namespace TransportERP.Desktop
             InitializeLoginData();
             ApplyVisualStyle();
             RegisterInteractionEvents();
+            UpdateStatusBarContext();
         }
 
         /// <summary>
-        /// تعبئة قوائم الاختيار بقيم مؤقتة إلى حين ربطها بواجهات النظام الفعلية.
+        /// تعبئة قوائم الاختيار بقيم مؤقتة إلى حين ربطها بخدمات API الفعلية.
         /// </summary>
         private void InitializeLoginData()
         {
-            cmbCompany.Items.Clear();
-            cmbCompany.Items.Add("شركة النقل الرئيسية");
-            cmbCompany.SelectedIndex = 0;
-
-            cmbBranch.Items.Clear();
-            cmbBranch.Items.Add("الفرع الرئيسي");
-            cmbBranch.SelectedIndex = 0;
-
-            cmbFiscalYear.Items.Clear();
-            cmbFiscalYear.Items.Add(DateTime.Today.Year.ToString());
-            cmbFiscalYear.SelectedIndex = 0;
+            cmbCompany.BindItems(new[] { "شركة النقل الرئيسية" });
+            cmbBranch.BindItems(new[] { "الفرع الرئيسي" });
+            cmbFiscalYear.BindItems(new[] { DateTime.Today.Year.ToString() });
 
             txtUserName.Focus();
         }
 
         /// <summary>
-        /// تطبيق الهوية البصرية المعتمدة على بطاقة تسجيل الدخول ولوحة تعريف النظام.
+        /// تطبيق الخصائص البصرية الخاصة ببطاقة الدخول ولوحة تعريف النظام.
+        /// عناصر الإدخال والزر وشريط الحالة تحصل على هويتها من CoreUI وUiTheme.
         /// </summary>
         private void ApplyVisualStyle()
         {
@@ -60,40 +45,25 @@ namespace TransportERP.Desktop
 
             pnlLoginCard.Resize += (_, _) => ApplyRoundedRegion(pnlLoginCard, 24);
             pnlBrand.Resize += (_, _) => ApplyRoundedRegion(pnlBrand, 24);
-            btnLogin.Resize += (_, _) => ApplyRoundedRegion(btnLogin, 12);
-
             pnlBrand.Paint += DrawBrandGradient;
 
             ApplyRoundedRegion(pnlLoginCard, 24);
             ApplyRoundedRegion(pnlBrand, 24);
-            ApplyRoundedRegion(btnLogin, 12);
-
-            txtUserName.BorderStyle = BorderStyle.FixedSingle;
-            txtPassword.BorderStyle = BorderStyle.FixedSingle;
-
-            cmbCompany.FlatStyle = FlatStyle.Flat;
-            cmbBranch.FlatStyle = FlatStyle.Flat;
-            cmbFiscalYear.FlatStyle = FlatStyle.Flat;
         }
 
         /// <summary>
-        /// تسجيل الأحداث البصرية والتفاعلية لعناصر شاشة الدخول.
+        /// تسجيل الأحداث التفاعلية التي تخص شاشة تسجيل الدخول.
         /// </summary>
         private void RegisterInteractionEvents()
         {
-            btnLogin.MouseEnter += (_, _) => btnLogin.BackColor = _loginButtonHoverColor;
-            btnLogin.MouseLeave += (_, _) => btnLogin.BackColor = _loginButtonColor;
-
-            txtUserName.Enter += HighlightInput;
-            txtPassword.Enter += HighlightInput;
-            txtUserName.Leave += RestoreInput;
-            txtPassword.Leave += RestoreInput;
-
             lnkForgotPassword.LinkClicked += lnkForgotPassword_LinkClicked;
+            cmbCompany.SelectedIndexChanged += (_, _) => UpdateStatusBarContext();
+            cmbBranch.SelectedIndexChanged += (_, _) => UpdateStatusBarContext();
+            cmbFiscalYear.SelectedIndexChanged += (_, _) => UpdateStatusBarContext();
         }
 
         /// <summary>
-        /// رسم خلفية متدرجة للوحة تعريف النظام بدل اللون الثابت.
+        /// رسم خلفية متدرجة للوحة تعريف النظام باستخدام ألوان الهوية المعتمدة.
         /// </summary>
         private void DrawBrandGradient(object? sender, PaintEventArgs e)
         {
@@ -104,34 +74,12 @@ namespace TransportERP.Desktop
 
             using var brush = new LinearGradientBrush(
                 pnlBrand.ClientRectangle,
-                Color.FromArgb(17, 58, 140),
-                Color.FromArgb(38, 132, 232),
+                UiTheme.BrandGradientStart,
+                UiTheme.BrandGradientEnd,
                 35F);
 
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.FillRectangle(brush, pnlBrand.ClientRectangle);
-        }
-
-        /// <summary>
-        /// تمييز حقل النص النشط بخلفية فاتحة لتوضيح موضع الإدخال للمستخدم.
-        /// </summary>
-        private static void HighlightInput(object? sender, EventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                textBox.BackColor = Color.FromArgb(245, 249, 255);
-            }
-        }
-
-        /// <summary>
-        /// إعادة لون حقل النص إلى حالته الطبيعية بعد مغادرة الحقل.
-        /// </summary>
-        private static void RestoreInput(object? sender, EventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                textBox.BackColor = Color.White;
-            }
         }
 
         /// <summary>
@@ -149,7 +97,7 @@ namespace TransportERP.Desktop
 
         /// <summary>
         /// معالجة الضغط على زر الدخول الرئيسي.
-        /// تنفذ تحققًا أوليًا من الحقول المطلوبة فقط، ولا تنفذ مصادقة حقيقية حاليًا.
+        /// تنفذ تحققًا أوليًا فقط ولا تنفذ مصادقة حقيقية في هذه المرحلة.
         /// </summary>
         private void btnLogin_Click(object? sender, EventArgs e)
         {
@@ -157,6 +105,9 @@ namespace TransportERP.Desktop
             {
                 return;
             }
+
+            statusBar.CurrentUser = txtUserName.Text.Trim();
+            statusBar.SetConnectionStatus(false, "المصادقة غير مرتبطة بعد");
 
             MessageBox.Show(
                 "تم تجهيز شاشة تسجيل الدخول، وسيتم ربطها بخدمة المصادقة عبر API في المرحلة التالية.",
@@ -166,58 +117,34 @@ namespace TransportERP.Desktop
         }
 
         /// <summary>
-        /// التحقق من إدخال اسم المستخدم وكلمة المرور واختيار بيانات بيئة العمل.
+        /// التحقق من الحقول الإلزامية باستخدام وظائف عناصر CoreUI نفسها.
         /// </summary>
-        /// <returns>صحيح عندما تكون جميع البيانات المطلوبة مكتملة؛ وإلا يعيد خطأ.</returns>
+        /// <returns>صحيح عندما تكون جميع بيانات الدخول مكتملة؛ وإلا يعيد خطأ.</returns>
         private bool ValidateLoginInputs()
         {
-            if (string.IsNullOrWhiteSpace(txtUserName.Text))
-            {
-                ShowValidationMessage("يرجى إدخال اسم المستخدم.", txtUserName);
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(txtPassword.Text))
-            {
-                ShowValidationMessage("يرجى إدخال كلمة المرور.", txtPassword);
-                return false;
-            }
-
-            if (cmbCompany.SelectedIndex < 0)
-            {
-                ShowValidationMessage("يرجى اختيار الشركة.", cmbCompany);
-                return false;
-            }
-
-            if (cmbBranch.SelectedIndex < 0)
-            {
-                ShowValidationMessage("يرجى اختيار الفرع.", cmbBranch);
-                return false;
-            }
-
-            if (cmbFiscalYear.SelectedIndex < 0)
-            {
-                ShowValidationMessage("يرجى اختيار السنة المالية.", cmbFiscalYear);
-                return false;
-            }
-
-            return true;
+            return txtUserName.ValidateRequired()
+                && txtPassword.ValidateRequired()
+                && cmbCompany.ValidateSelection()
+                && cmbBranch.ValidateSelection()
+                && cmbFiscalYear.ValidateSelection();
         }
 
         /// <summary>
-        /// عرض رسالة تحقق موحدة ثم نقل التركيز إلى العنصر الذي يحتاج إلى إدخال.
+        /// تحديث شريط الحالة بقيم الشركة والفرع والسنة المحددة حاليًا.
         /// </summary>
-        /// <param name="message">نص رسالة التحقق المعروضة للمستخدم.</param>
-        /// <param name="control">العنصر المطلوب نقل التركيز إليه.</param>
-        private static void ShowValidationMessage(string message, Control control)
+        private void UpdateStatusBarContext()
         {
-            MessageBox.Show(
-                message,
-                "تنبيه",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-
-            control.Focus();
+            statusBar.CompanyName = cmbCompany.SelectedItem?.ToString() ?? "قبل تسجيل الدخول";
+            statusBar.BranchName = cmbBranch.SelectedItem?.ToString() ?? "قبل تسجيل الدخول";
+            statusBar.FiscalYear = cmbFiscalYear.SelectedItem?.ToString() ?? DateTime.Today.Year.ToString();
+            statusBar.FinancialPeriod = "-";
+            statusBar.CurrentUser = string.IsNullOrWhiteSpace(txtUserName.Text)
+                ? "غير مسجل"
+                : txtUserName.Text.Trim();
+            statusBar.CurrentRole = "-";
+            statusBar.EnvironmentName = "TransportERP API";
+            statusBar.SystemVersion = "1.0.0";
+            statusBar.SetConnectionStatus(false, "لم يتم الفحص");
         }
 
         /// <summary>
