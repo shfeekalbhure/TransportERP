@@ -55,8 +55,10 @@ public sealed class SearchBox : UserControl
 
     /// <summary>
     /// قيمة البحث الحالية بدون النص الإرشادي.
+    /// هذه قيمة تشغيلية ولا يحفظها مصمم WinForms داخل ملف Designer.
     /// </summary>
     [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SearchText
     {
         get => _isShowingPlaceholder ? string.Empty : _searchTextBox.Text.Trim();
