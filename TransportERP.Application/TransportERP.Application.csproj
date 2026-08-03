@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
+    <ProjectReference Include="..\TransportERP\TransportERP.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
