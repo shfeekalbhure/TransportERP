@@ -1,4 +1,8 @@
-﻿namespace TransportERP.Desktop
+﻿using TransportERP.Desktop.Controls;
+using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.Themes;
+
+namespace TransportERP.Desktop
 {
     partial class FrmLogin
     {
@@ -17,19 +21,19 @@
         private Label lblCompany = null!;
         private Label lblBranch = null!;
         private Label lblFiscalYear = null!;
-        private TextBox txtUserName = null!;
-        private TextBox txtPassword = null!;
-        private ComboBox cmbCompany = null!;
-        private ComboBox cmbBranch = null!;
-        private ComboBox cmbFiscalYear = null!;
+        private RequiredTextBox txtUserName = null!;
+        private RequiredTextBox txtPassword = null!;
+        private LookupComboBox cmbCompany = null!;
+        private LookupComboBox cmbBranch = null!;
+        private LookupComboBox cmbFiscalYear = null!;
         private CheckBox chkRememberMe = null!;
         private LinkLabel lnkForgotPassword = null!;
-        private Button btnLogin = null!;
+        private PrimaryButton btnLogin = null!;
         private Label lblLanguage = null!;
         private Label lblBrandName = null!;
         private Label lblBrandDescription = null!;
         private Label lblBrandFeatures = null!;
-        private Label lblStatus = null!;
+        private TransportStatusBar statusBar = null!;
 
         /// <summary>
         /// تحرير الموارد المستخدمة بواسطة النافذة.
@@ -47,7 +51,7 @@
         #region Windows Form Designer generated code
 
         /// <summary>
-        /// إنشاء عناصر واجهة تسجيل الدخول وترتيبها.
+        /// إنشاء عناصر واجهة تسجيل الدخول وترتيبها باستخدام مكتبة CoreUI المعتمدة.
         /// </summary>
         private void InitializeComponent()
         {
@@ -62,32 +66,32 @@
             lblCompany = new Label();
             lblBranch = new Label();
             lblFiscalYear = new Label();
-            txtUserName = new TextBox();
-            txtPassword = new TextBox();
-            cmbCompany = new ComboBox();
-            cmbBranch = new ComboBox();
-            cmbFiscalYear = new ComboBox();
+            txtUserName = new RequiredTextBox();
+            txtPassword = new RequiredTextBox();
+            cmbCompany = new LookupComboBox();
+            cmbBranch = new LookupComboBox();
+            cmbFiscalYear = new LookupComboBox();
             chkRememberMe = new CheckBox();
             lnkForgotPassword = new LinkLabel();
-            btnLogin = new Button();
+            btnLogin = new PrimaryButton();
             lblLanguage = new Label();
             lblBrandName = new Label();
             lblBrandDescription = new Label();
             lblBrandFeatures = new Label();
-            lblStatus = new Label();
+            statusBar = new TransportStatusBar();
 
             SuspendLayout();
 
-            // الحاوية الرئيسية تقسم الشاشة إلى بطاقة دخول ولوحة تعريف بالنظام.
+            // الحاوية الرئيسية تقسم الشاشة إلى بطاقة دخول ولوحة تعريف بالنظام وشريط حالة سفلي.
             tblRoot.Dock = DockStyle.Fill;
             tblRoot.ColumnCount = 2;
             tblRoot.RowCount = 2;
             tblRoot.Padding = new Padding(28);
-            tblRoot.BackColor = Color.FromArgb(239, 245, 252);
+            tblRoot.BackColor = UiTheme.WindowBackground;
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             tblRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
 
             // بطاقة إدخال بيانات المستخدم.
             pnlLoginCard.Dock = DockStyle.Fill;
@@ -96,65 +100,61 @@
             pnlLoginCard.BackColor = Color.White;
 
             lblTitle.Text = "تسجيل الدخول";
-            lblTitle.Font = new Font("Segoe UI", 24F, FontStyle.Bold);
-            lblTitle.ForeColor = Color.FromArgb(17, 43, 78);
+            lblTitle.Font = UiTheme.CreateBoldFont(24F);
+            lblTitle.ForeColor = UiTheme.HeadingText;
             lblTitle.Location = new Point(54, 38);
             lblTitle.Size = new Size(470, 50);
             lblTitle.TextAlign = ContentAlignment.MiddleRight;
 
             lblSubtitle.Text = "أدخل بياناتك للوصول إلى النظام";
-            lblSubtitle.Font = new Font("Segoe UI", 11F);
-            lblSubtitle.ForeColor = Color.FromArgb(104, 122, 147);
+            lblSubtitle.Font = UiTheme.CreateRegularFont(11F);
+            lblSubtitle.ForeColor = UiTheme.SecondaryText;
             lblSubtitle.Location = new Point(54, 88);
             lblSubtitle.Size = new Size(470, 32);
             lblSubtitle.TextAlign = ContentAlignment.MiddleRight;
 
             ConfigureLabel(lblUserName, "اسم المستخدم", 142);
-            ConfigureTextBox(txtUserName, 174);
+            ConfigureRequiredTextBox(txtUserName, 174, "يرجى إدخال اسم المستخدم.");
 
             ConfigureLabel(lblPassword, "كلمة المرور", 232);
-            ConfigureTextBox(txtPassword, 264);
+            ConfigureRequiredTextBox(txtPassword, 264, "يرجى إدخال كلمة المرور.");
             txtPassword.UseSystemPasswordChar = true;
 
             ConfigureLabel(lblCompany, "الشركة", 322);
-            ConfigureComboBox(cmbCompany, 354);
+            ConfigureLookupComboBox(cmbCompany, 354, "يرجى اختيار الشركة.");
 
             ConfigureLabel(lblBranch, "الفرع", 412);
-            ConfigureComboBox(cmbBranch, 444);
+            ConfigureLookupComboBox(cmbBranch, 444, "يرجى اختيار الفرع.");
 
             ConfigureLabel(lblFiscalYear, "السنة المالية", 502);
-            ConfigureComboBox(cmbFiscalYear, 534);
+            ConfigureLookupComboBox(cmbFiscalYear, 534, "يرجى اختيار السنة المالية.");
 
             chkRememberMe.Text = "تذكرني";
-            chkRememberMe.Font = new Font("Segoe UI", 10F);
-            chkRememberMe.ForeColor = Color.FromArgb(50, 67, 91);
+            chkRememberMe.Font = UiTheme.CreateRegularFont(10F);
+            chkRememberMe.ForeColor = UiTheme.HeadingText;
             chkRememberMe.Location = new Point(54, 590);
             chkRememberMe.Size = new Size(180, 30);
             chkRememberMe.TextAlign = ContentAlignment.MiddleRight;
 
             lnkForgotPassword.Text = "نسيت كلمة المرور؟";
-            lnkForgotPassword.Font = new Font("Segoe UI", 10F);
-            lnkForgotPassword.LinkColor = Color.FromArgb(35, 111, 229);
-            lnkForgotPassword.ActiveLinkColor = Color.FromArgb(23, 78, 170);
+            lnkForgotPassword.Font = UiTheme.CreateRegularFont(10F);
+            lnkForgotPassword.LinkColor = UiTheme.PrimaryBlue;
+            lnkForgotPassword.ActiveLinkColor = UiTheme.PrimaryBlueHover;
             lnkForgotPassword.Location = new Point(334, 590);
             lnkForgotPassword.Size = new Size(190, 30);
             lnkForgotPassword.TextAlign = ContentAlignment.MiddleLeft;
 
-            // زر الإجراء الرئيسي الوحيد في الشاشة.
+            // زر الإجراء الرئيسي الوحيد في الشاشة ويستخدم العنصر الموحد PrimaryButton.
             btnLogin.Text = "دخول";
-            btnLogin.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnLogin.ForeColor = Color.White;
-            btnLogin.BackColor = Color.FromArgb(35, 111, 229);
-            btnLogin.FlatStyle = FlatStyle.Flat;
-            btnLogin.FlatAppearance.BorderSize = 0;
-            btnLogin.Cursor = Cursors.Hand;
+            btnLogin.CornerRadius = 12;
+            btnLogin.Font = UiTheme.CreateBoldFont(12F);
             btnLogin.Location = new Point(54, 638);
             btnLogin.Size = new Size(470, 52);
             btnLogin.Click += btnLogin_Click;
 
             lblLanguage.Text = "العربية  |  English";
-            lblLanguage.Font = new Font("Segoe UI", 9F);
-            lblLanguage.ForeColor = Color.FromArgb(91, 111, 139);
+            lblLanguage.Font = UiTheme.CreateRegularFont(9F);
+            lblLanguage.ForeColor = UiTheme.SecondaryText;
             lblLanguage.Location = new Point(54, 704);
             lblLanguage.Size = new Size(470, 28);
             lblLanguage.TextAlign = ContentAlignment.MiddleCenter;
@@ -170,24 +170,24 @@
             pnlBrand.Dock = DockStyle.Fill;
             pnlBrand.Margin = new Padding(14, 0, 0, 0);
             pnlBrand.Padding = new Padding(56);
-            pnlBrand.BackColor = Color.FromArgb(28, 91, 190);
+            pnlBrand.BackColor = UiTheme.BrandGradientStart;
 
             lblBrandName.Text = "TransportERP";
-            lblBrandName.Font = new Font("Segoe UI", 30F, FontStyle.Bold);
+            lblBrandName.Font = UiTheme.CreateBoldFont(30F);
             lblBrandName.ForeColor = Color.White;
             lblBrandName.Location = new Point(56, 90);
             lblBrandName.Size = new Size(560, 64);
             lblBrandName.TextAlign = ContentAlignment.MiddleRight;
 
             lblBrandDescription.Text = "نظام النقل والخدمات اللوجستية المتكامل";
-            lblBrandDescription.Font = new Font("Segoe UI", 15F);
+            lblBrandDescription.Font = UiTheme.CreateRegularFont(15F);
             lblBrandDescription.ForeColor = Color.FromArgb(220, 235, 255);
             lblBrandDescription.Location = new Point(56, 160);
             lblBrandDescription.Size = new Size(560, 54);
             lblBrandDescription.TextAlign = ContentAlignment.MiddleRight;
 
             lblBrandFeatures.Text = "إدارة الشركات والفروع والحسابات من منصة موحدة وآمنة.\r\n\r\n✓ واجهة عربية حديثة\r\n✓ متعدد الشركات والفروع\r\n✓ اتصال مركزي عبر API\r\n✓ قابل للتوسع لتطبيقات الجوال";
-            lblBrandFeatures.Font = new Font("Segoe UI", 13F);
+            lblBrandFeatures.Font = UiTheme.CreateRegularFont(13F);
             lblBrandFeatures.ForeColor = Color.White;
             lblBrandFeatures.Location = new Point(56, 250);
             lblBrandFeatures.Size = new Size(560, 360);
@@ -195,24 +195,30 @@
 
             pnlBrand.Controls.AddRange(new Control[] { lblBrandName, lblBrandDescription, lblBrandFeatures });
 
-            // شريط الحالة السفلي.
-            lblStatus.Text = "الإصدار 1.0.0     •     متصل     •     الخادم: TransportERP API";
-            lblStatus.Dock = DockStyle.Fill;
-            lblStatus.Font = new Font("Segoe UI", 9F);
-            lblStatus.ForeColor = Color.FromArgb(91, 111, 139);
-            lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+            // شريط الحالة الموحد لشاشة الدخول.
+            statusBar.Dock = DockStyle.Fill;
+            statusBar.Margin = new Padding(0);
+            statusBar.CompanyName = "قبل تسجيل الدخول";
+            statusBar.BranchName = "قبل تسجيل الدخول";
+            statusBar.FiscalYear = DateTime.Today.Year.ToString();
+            statusBar.FinancialPeriod = "-";
+            statusBar.CurrentUser = "غير مسجل";
+            statusBar.CurrentRole = "-";
+            statusBar.EnvironmentName = "TransportERP API";
+            statusBar.SystemVersion = "1.0.0";
+            statusBar.SetConnectionStatus(false, "لم يتم الفحص");
 
             tblRoot.Controls.Add(pnlLoginCard, 0, 0);
             tblRoot.Controls.Add(pnlBrand, 1, 0);
-            tblRoot.Controls.Add(lblStatus, 0, 1);
-            tblRoot.SetColumnSpan(lblStatus, 2);
+            tblRoot.Controls.Add(statusBar, 0, 1);
+            tblRoot.SetColumnSpan(statusBar, 2);
 
             // خصائص النافذة الرئيسية.
             AutoScaleMode = AutoScaleMode.Font;
-            BackColor = Color.FromArgb(239, 245, 252);
+            BackColor = UiTheme.WindowBackground;
             ClientSize = new Size(1360, 820);
             Controls.Add(tblRoot);
-            Font = new Font("Segoe UI", 10F);
+            Font = UiTheme.CreateRegularFont(10F);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             MinimumSize = new Size(1180, 720);
@@ -231,33 +237,42 @@
         private static void ConfigureLabel(Label label, string text, int top)
         {
             label.Text = text;
-            label.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            label.ForeColor = Color.FromArgb(50, 67, 91);
+            label.Font = UiTheme.CreateBoldFont(10F);
+            label.ForeColor = UiTheme.HeadingText;
             label.Location = new Point(54, top);
             label.Size = new Size(470, 28);
             label.TextAlign = ContentAlignment.MiddleRight;
         }
 
         /// <summary>
-        /// توحيد خصائص حقول النص في الشاشة.
+        /// توحيد خصائص الحقول الإلزامية باستخدام RequiredTextBox.
         /// </summary>
-        private static void ConfigureTextBox(TextBox textBox, int top)
+        private static void ConfigureRequiredTextBox(
+            RequiredTextBox textBox,
+            int top,
+            string requiredMessage)
         {
-            textBox.Font = new Font("Segoe UI", 11F);
+            textBox.Font = UiTheme.CreateRegularFont(11F);
             textBox.Location = new Point(54, top);
             textBox.Size = new Size(470, 32);
+            textBox.IsRequired = true;
+            textBox.RequiredMessage = requiredMessage;
             textBox.RightToLeft = RightToLeft.Yes;
         }
 
         /// <summary>
-        /// توحيد خصائص قوائم الاختيار في الشاشة.
+        /// توحيد خصائص قوائم الاختيار باستخدام LookupComboBox.
         /// </summary>
-        private static void ConfigureComboBox(ComboBox comboBox, int top)
+        private static void ConfigureLookupComboBox(
+            LookupComboBox comboBox,
+            int top,
+            string requiredMessage)
         {
-            comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            comboBox.Font = new Font("Segoe UI", 11F);
+            comboBox.Font = UiTheme.CreateRegularFont(11F);
             comboBox.Location = new Point(54, top);
             comboBox.Size = new Size(470, 33);
+            comboBox.IsRequired = true;
+            comboBox.RequiredMessage = requiredMessage;
             comboBox.RightToLeft = RightToLeft.Yes;
         }
 
