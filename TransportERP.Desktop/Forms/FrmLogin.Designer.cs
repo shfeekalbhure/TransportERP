@@ -1,4 +1,4 @@
-﻿using TransportERP.Desktop.Controls;
+using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
 using TransportERP.Desktop.Themes;
 
@@ -22,7 +22,7 @@ namespace TransportERP.Desktop
         private Label lblBranch = null!;
         private Label lblFiscalYear = null!;
         private RequiredTextBox txtUserName = null!;
-        private RequiredTextBox txtPassword = null!;
+        private PasswordTextBox txtPassword = null!;
         private LookupComboBox cmbCompany = null!;
         private LookupComboBox cmbBranch = null!;
         private LookupComboBox cmbFiscalYear = null!;
@@ -67,7 +67,7 @@ namespace TransportERP.Desktop
             lblBranch = new Label();
             lblFiscalYear = new Label();
             txtUserName = new RequiredTextBox();
-            txtPassword = new RequiredTextBox();
+            txtPassword = new PasswordTextBox();
             cmbCompany = new LookupComboBox();
             cmbBranch = new LookupComboBox();
             cmbFiscalYear = new LookupComboBox();
@@ -83,20 +83,21 @@ namespace TransportERP.Desktop
             SuspendLayout();
 
             // الحاوية الرئيسية تقسم الشاشة إلى بطاقة دخول ولوحة تعريف بالنظام وشريط حالة سفلي.
+            // أزيل الهامش السفلي حتى يثبت شريط الحالة ملاصقًا لحافة النافذة.
             tblRoot.Dock = DockStyle.Fill;
             tblRoot.ColumnCount = 2;
             tblRoot.RowCount = 2;
-            tblRoot.Padding = new Padding(28);
+            tblRoot.Padding = new Padding(28, 28, 28, 0);
             tblRoot.BackColor = UiTheme.WindowBackground;
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             tblRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
 
             // بطاقة إدخال بيانات المستخدم.
             pnlLoginCard.Dock = DockStyle.Fill;
-            pnlLoginCard.Margin = new Padding(0, 0, 14, 0);
-            pnlLoginCard.Padding = new Padding(54, 38, 54, 34);
+            pnlLoginCard.Margin = new Padding(0, 0, 14, 10);
+            pnlLoginCard.Padding = new Padding(54, 38, 54, 24);
             pnlLoginCard.BackColor = Color.White;
 
             lblTitle.Text = "تسجيل الدخول";
@@ -117,8 +118,7 @@ namespace TransportERP.Desktop
             ConfigureRequiredTextBox(txtUserName, 174, "يرجى إدخال اسم المستخدم.");
 
             ConfigureLabel(lblPassword, "كلمة المرور", 232);
-            ConfigureRequiredTextBox(txtPassword, 264, "يرجى إدخال كلمة المرور.");
-            txtPassword.UseSystemPasswordChar = true;
+            ConfigurePasswordTextBox(txtPassword, 264, "يرجى إدخال كلمة المرور.");
 
             ConfigureLabel(lblCompany, "الشركة", 322);
             ConfigureLookupComboBox(cmbCompany, 354, "يرجى اختيار الشركة.");
@@ -168,7 +168,7 @@ namespace TransportERP.Desktop
 
             // لوحة تعريف النظام وهوية المنتج.
             pnlBrand.Dock = DockStyle.Fill;
-            pnlBrand.Margin = new Padding(14, 0, 0, 0);
+            pnlBrand.Margin = new Padding(14, 0, 0, 10);
             pnlBrand.Padding = new Padding(56);
             pnlBrand.BackColor = UiTheme.BrandGradientStart;
 
@@ -195,18 +195,15 @@ namespace TransportERP.Desktop
 
             pnlBrand.Controls.AddRange(new Control[] { lblBrandName, lblBrandDescription, lblBrandFeatures });
 
-            // شريط الحالة الموحد لشاشة الدخول.
+            // شريط حالة مختصر خاص بشاشة الدخول، مثبت في أسفل النافذة.
             statusBar.Dock = DockStyle.Fill;
             statusBar.Margin = new Padding(0);
             statusBar.CompanyName = "قبل تسجيل الدخول";
             statusBar.BranchName = "قبل تسجيل الدخول";
             statusBar.FiscalYear = DateTime.Today.Year.ToString();
-            statusBar.FinancialPeriod = "-";
-            statusBar.CurrentUser = "غير مسجل";
-            statusBar.CurrentRole = "-";
-            statusBar.EnvironmentName = "TransportERP API";
             statusBar.SystemVersion = "1.0.0";
             statusBar.SetConnectionStatus(false, "لم يتم الفحص");
+            statusBar.UseLoginCompactMode();
 
             tblRoot.Controls.Add(pnlLoginCard, 0, 0);
             tblRoot.Controls.Add(pnlBrand, 1, 0);
@@ -256,6 +253,21 @@ namespace TransportERP.Desktop
             textBox.Location = new Point(54, top);
             textBox.Size = new Size(470, 32);
             textBox.IsRequired = true;
+            textBox.RequiredMessage = requiredMessage;
+            textBox.RightToLeft = RightToLeft.Yes;
+        }
+
+        /// <summary>
+        /// توحيد خصائص حقل كلمة المرور مع زر الإظهار والإخفاء.
+        /// </summary>
+        private static void ConfigurePasswordTextBox(
+            PasswordTextBox textBox,
+            int top,
+            string requiredMessage)
+        {
+            textBox.Font = UiTheme.CreateRegularFont(11F);
+            textBox.Location = new Point(54, top);
+            textBox.Size = new Size(470, 38);
             textBox.RequiredMessage = requiredMessage;
             textBox.RightToLeft = RightToLeft.Yes;
         }
