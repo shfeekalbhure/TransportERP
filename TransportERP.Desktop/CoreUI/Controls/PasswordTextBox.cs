@@ -48,6 +48,17 @@ public sealed class PasswordTextBox : UserControl
     }
 
     /// <summary>
+    /// محاذاة النص داخل مربع كلمة المرور الداخلي.
+    /// </summary>
+    [Category("TransportERP")]
+    [DefaultValue(HorizontalAlignment.Right)]
+    public HorizontalAlignment TextAlign
+    {
+        get => _textBox.TextAlign;
+        set => _textBox.TextAlign = value;
+    }
+
+    /// <summary>
     /// التحقق من إدخال كلمة المرور.
     /// </summary>
     public bool ValidateRequired(bool showMessage = true) => _textBox.ValidateRequired(showMessage);
@@ -67,6 +78,7 @@ public sealed class PasswordTextBox : UserControl
         BackColor = Color.White;
         RightToLeft = RightToLeft.Yes;
 
+        // يبقى زر الإظهار في يسار الحقل حتى تبدأ الكتابة العربية من اليمين دون تزاحم.
         _toggleButton.Dock = DockStyle.Left;
         _toggleButton.Width = 42;
         _toggleButton.FlatStyle = FlatStyle.Flat;
@@ -88,6 +100,7 @@ public sealed class PasswordTextBox : UserControl
         _textBox.RequiredMessage = "يرجى إدخال كلمة المرور.";
         _textBox.Font = UiTheme.CreateRegularFont(11F);
         _textBox.RightToLeft = RightToLeft.Yes;
+        _textBox.TextAlign = HorizontalAlignment.Right;
 
         Controls.Add(_textBox);
         Controls.Add(_toggleButton);
@@ -99,6 +112,8 @@ public sealed class PasswordTextBox : UserControl
     private void UpdatePasswordVisibility()
     {
         _textBox.UseSystemPasswordChar = !_isPasswordVisible;
+        _textBox.RightToLeft = RightToLeft.Yes;
+        _textBox.TextAlign = HorizontalAlignment.Right;
         _toggleButton.Text = _isPasswordVisible ? "◉" : "○";
         _toolTip.SetToolTip(
             _toggleButton,
