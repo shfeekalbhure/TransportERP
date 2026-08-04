@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace TransportERP.Desktop.Controls;
 
 /// <summary>
@@ -154,22 +156,31 @@ public sealed class ScreenHeaderControl : UserControl
     public event EventHandler? RefreshClicked;
     public event EventHandler? CloseClicked;
 
+    [Category("بيانات الشاشة")]
+    [DefaultValue("")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string ScreenTitle
     {
         get => _titleLabel.Text;
-        set => _titleLabel.Text = value;
+        set => _titleLabel.Text = value ?? string.Empty;
     }
 
+    [Category("بيانات الشاشة")]
+    [DefaultValue("")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string Breadcrumb
     {
         get => _breadcrumbLabel.Text;
-        set => _breadcrumbLabel.Text = value;
+        set => _breadcrumbLabel.Text = value ?? string.Empty;
     }
 
+    [Category("التنقل")]
+    [DefaultValue("0 / 0")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string RecordPosition
     {
         get => _recordLabel.Text;
-        set => _recordLabel.Text = value;
+        set => _recordLabel.Text = string.IsNullOrWhiteSpace(value) ? "0 / 0" : value;
     }
 
     public void SetNavigationState(bool hasRecords, bool isFirst, bool isLast)
