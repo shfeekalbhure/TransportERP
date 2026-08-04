@@ -137,13 +137,8 @@ public partial class FrmDashboard : Form
             return;
         }
 
-        var countriesForm = new FrmCountries
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill,
-            WindowState = FormWindowState.Normal
-        };
+        var countriesForm = new FrmCountries();
+        countriesForm.ConfigureForTabHosting();
 
         var countriesPage = new TabPage
         {
