@@ -3,41 +3,28 @@ using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop
 {
-    partial class FrmDashboard
+    public partial class FrmDashboard
     {
         private System.ComponentModel.IContainer? components = null;
 
         private TableLayoutPanel tblRoot = null!;
-        private TableLayoutPanel tblMain = null!;
-        private TableLayoutPanel tblHeader = null!;
-        private TableLayoutPanel tblCards = null!;
-        private TableLayoutPanel tblBody = null!;
-        private FlowLayoutPanel flpQuickActions = null!;
+        private TableLayoutPanel tblWorkspace = null!;
+        private TableLayoutPanel tblTopBar = null!;
+        private TableLayoutPanel tblPageHeader = null!;
+        private TableLayoutPanel tblKpis = null!;
+        private TableLayoutPanel tblAnalytics = null!;
+        private TableLayoutPanel tblShortcuts = null!;
         private Panel pnlSidebar = null!;
-        private Panel pnlHeader = null!;
-        private Panel pnlCards = null!;
-        private Panel pnlRecent = null!;
-        private Panel pnlAlerts = null!;
-        private Label lblLogo = null!;
-        private Label lblAppName = null!;
+        private Panel pnlTopBar = null!;
+        private Panel pnlPageHeader = null!;
+        private Panel pnlTransactions = null!;
+        private Panel pnlRevenueCard = null!;
+        private Panel pnlActivityCard = null!;
+        private Panel pnlRevenueChart = null!;
+        private Panel pnlActivityChart = null!;
+        private DataGridView dgvRecentTransactions = null!;
         private Label lblPageTitle = null!;
-        private Label lblWelcome = null!;
-        private Label lblRecentTitle = null!;
-        private Label lblAlertsTitle = null!;
-        private Label lblAlert1 = null!;
-        private Label lblAlert2 = null!;
-        private Button btnDashboard = null!;
-        private Button btnGeneralSetup = null!;
-        private Button btnSecurity = null!;
-        private Button btnAccounting = null!;
-        private Button btnReports = null!;
-        private Button btnSettings = null!;
-        private Button btnLogout = null!;
-        private Button btnNewReceipt = null!;
-        private Button btnNewPayment = null!;
-        private Button btnJournalEntry = null!;
-        private Button btnUsers = null!;
-        private DataGridView dgvRecentOperations = null!;
+        private Label lblPageSubtitle = null!;
         private TransportStatusBar statusBar = null!;
 
         protected override void Dispose(bool disposing)
@@ -56,65 +43,52 @@ namespace TransportERP.Desktop
         {
             components = new System.ComponentModel.Container();
             tblRoot = new TableLayoutPanel();
-            tblMain = new TableLayoutPanel();
-            tblHeader = new TableLayoutPanel();
-            tblCards = new TableLayoutPanel();
-            tblBody = new TableLayoutPanel();
-            flpQuickActions = new FlowLayoutPanel();
+            tblWorkspace = new TableLayoutPanel();
+            tblTopBar = new TableLayoutPanel();
+            tblPageHeader = new TableLayoutPanel();
+            tblKpis = new TableLayoutPanel();
+            tblAnalytics = new TableLayoutPanel();
+            tblShortcuts = new TableLayoutPanel();
             pnlSidebar = new Panel();
-            pnlHeader = new Panel();
-            pnlCards = new Panel();
-            pnlRecent = new Panel();
-            pnlAlerts = new Panel();
-            lblLogo = new Label();
-            lblAppName = new Label();
+            pnlTopBar = new Panel();
+            pnlPageHeader = new Panel();
+            pnlTransactions = new Panel();
+            pnlRevenueCard = new Panel();
+            pnlActivityCard = new Panel();
+            pnlRevenueChart = new Panel();
+            pnlActivityChart = new Panel();
+            dgvRecentTransactions = new DataGridView();
             lblPageTitle = new Label();
-            lblWelcome = new Label();
-            lblRecentTitle = new Label();
-            lblAlertsTitle = new Label();
-            lblAlert1 = new Label();
-            lblAlert2 = new Label();
-            btnDashboard = new Button();
-            btnGeneralSetup = new Button();
-            btnSecurity = new Button();
-            btnAccounting = new Button();
-            btnReports = new Button();
-            btnSettings = new Button();
-            btnLogout = new Button();
-            btnNewReceipt = new Button();
-            btnNewPayment = new Button();
-            btnJournalEntry = new Button();
-            btnUsers = new Button();
-            dgvRecentOperations = new DataGridView();
+            lblPageSubtitle = new Label();
             statusBar = new TransportStatusBar();
 
             SuspendLayout();
 
             tblRoot.ColumnCount = 2;
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250F));
+            tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 238F));
             tblRoot.Dock = DockStyle.Fill;
             tblRoot.RowCount = 2;
             tblRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
-            tblRoot.BackColor = UiTheme.WindowBackground;
-            tblRoot.RightToLeft = RightToLeft.Yes;
+            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            tblRoot.BackColor = Color.FromArgb(247, 249, 252);
+            tblRoot.RightToLeft = RightToLeft.No;
 
             ConfigureSidebar();
-            ConfigureMainArea();
+            ConfigureWorkspace();
             ConfigureStatusBar();
 
+            tblRoot.Controls.Add(tblWorkspace, 0, 0);
             tblRoot.Controls.Add(pnlSidebar, 1, 0);
-            tblRoot.Controls.Add(tblMain, 0, 0);
             tblRoot.Controls.Add(statusBar, 0, 1);
             tblRoot.SetColumnSpan(statusBar, 2);
 
             AutoScaleMode = AutoScaleMode.Font;
-            BackColor = UiTheme.WindowBackground;
-            ClientSize = new Size(1600, 920);
+            BackColor = Color.FromArgb(247, 249, 252);
+            ClientSize = new Size(1600, 1000);
             Controls.Add(tblRoot);
             Font = UiTheme.CreateRegularFont(10F);
-            MinimumSize = new Size(1280, 760);
+            MinimumSize = new Size(1366, 820);
             Name = "FrmDashboard";
             RightToLeft = RightToLeft.Yes;
             RightToLeftLayout = true;
@@ -127,257 +101,365 @@ namespace TransportERP.Desktop
 
         private void ConfigureSidebar()
         {
-            pnlSidebar.BackColor = Color.FromArgb(17, 41, 84);
+            pnlSidebar.BackColor = Color.FromArgb(21, 57, 99);
             pnlSidebar.Dock = DockStyle.Fill;
-            pnlSidebar.Padding = new Padding(18, 24, 18, 18);
+            pnlSidebar.Padding = new Padding(12, 18, 12, 18);
+            pnlSidebar.RightToLeft = RightToLeft.Yes;
 
-            var sidebarLayout = new TableLayoutPanel
+            var layout = new TableLayoutPanel
             {
-                ColumnCount = 1,
                 Dock = DockStyle.Fill,
-                RowCount = 10,
+                ColumnCount = 1,
+                RowCount = 15,
                 BackColor = Color.Transparent,
                 Margin = Padding.Empty
             };
 
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            for (var i = 0; i < 6; i++)
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 10F));
+            for (var i = 0; i < 12; i++)
             {
-                sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
             }
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            lblLogo.Dock = DockStyle.Fill;
-            lblLogo.Text = "TransportERP";
-            lblLogo.ForeColor = Color.White;
-            lblLogo.Font = UiTheme.CreateBoldFont(19F);
-            lblLogo.TextAlign = ContentAlignment.MiddleCenter;
-
-            lblAppName.Dock = DockStyle.Fill;
-            lblAppName.Text = "نظام النقل والخدمات اللوجستية";
-            lblAppName.ForeColor = Color.FromArgb(196, 214, 244);
-            lblAppName.Font = UiTheme.CreateRegularFont(9F);
-            lblAppName.TextAlign = ContentAlignment.MiddleCenter;
-
-            ConfigureMenuButton(btnDashboard, "⌂  لوحة المعلومات", true);
-            ConfigureMenuButton(btnGeneralSetup, "⚙  التهيئة العامة", false);
-            ConfigureMenuButton(btnSecurity, "◈  الأمن والإدارة", false);
-            ConfigureMenuButton(btnAccounting, "▣  المحاسبة", false);
-            ConfigureMenuButton(btnReports, "▤  التقارير", false);
-            ConfigureMenuButton(btnSettings, "☰  الإعدادات", false);
-            ConfigureMenuButton(btnLogout, "↪  تسجيل الخروج", false);
-            btnLogout.Click += btnLogout_Click;
-
-            sidebarLayout.Controls.Add(lblLogo, 0, 0);
-            sidebarLayout.Controls.Add(lblAppName, 0, 1);
-            sidebarLayout.Controls.Add(btnDashboard, 0, 2);
-            sidebarLayout.Controls.Add(btnGeneralSetup, 0, 3);
-            sidebarLayout.Controls.Add(btnSecurity, 0, 4);
-            sidebarLayout.Controls.Add(btnAccounting, 0, 5);
-            sidebarLayout.Controls.Add(btnReports, 0, 6);
-            sidebarLayout.Controls.Add(btnSettings, 0, 7);
-            sidebarLayout.Controls.Add(btnLogout, 0, 9);
-            pnlSidebar.Controls.Add(sidebarLayout);
-        }
-
-        private void ConfigureMainArea()
-        {
-            tblMain.ColumnCount = 1;
-            tblMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tblMain.Dock = DockStyle.Fill;
-            tblMain.Padding = new Padding(24, 20, 24, 14);
-            tblMain.RowCount = 4;
-            tblMain.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
-            tblMain.RowStyles.Add(new RowStyle(SizeType.Absolute, 168F));
-            tblMain.RowStyles.Add(new RowStyle(SizeType.Absolute, 104F));
-            tblMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tblMain.BackColor = UiTheme.WindowBackground;
-
-            ConfigureHeader();
-            ConfigureCards();
-            ConfigureQuickActions();
-            ConfigureBody();
-
-            tblMain.Controls.Add(pnlHeader, 0, 0);
-            tblMain.Controls.Add(pnlCards, 0, 1);
-            tblMain.Controls.Add(flpQuickActions, 0, 2);
-            tblMain.Controls.Add(tblBody, 0, 3);
-        }
-
-        private void ConfigureHeader()
-        {
-            pnlHeader.BackColor = Color.White;
-            pnlHeader.Dock = DockStyle.Fill;
-            pnlHeader.Padding = new Padding(20, 12, 20, 12);
-            pnlHeader.Margin = new Padding(0, 0, 0, 12);
-
-            tblHeader.ColumnCount = 2;
-            tblHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F));
-            tblHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
-            tblHeader.Dock = DockStyle.Fill;
-            tblHeader.RowCount = 2;
-            tblHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 58F));
-            tblHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 42F));
-
-            lblPageTitle.Dock = DockStyle.Fill;
-            lblPageTitle.Text = "لوحة المعلومات";
-            lblPageTitle.ForeColor = UiTheme.HeadingText;
-            lblPageTitle.Font = UiTheme.CreateBoldFont(22F);
-            lblPageTitle.TextAlign = ContentAlignment.BottomRight;
-
-            lblWelcome.Dock = DockStyle.Fill;
-            lblWelcome.Text = "مرحبًا بك، إليك ملخص حالة النظام اليوم";
-            lblWelcome.ForeColor = UiTheme.SecondaryText;
-            lblWelcome.Font = UiTheme.CreateRegularFont(10F);
-            lblWelcome.TextAlign = ContentAlignment.TopRight;
-
-            var dateLabel = new Label
+            var brand = new Label
             {
                 Dock = DockStyle.Fill,
-                Text = DateTime.Today.ToString("yyyy/MM/dd"),
-                ForeColor = UiTheme.SecondaryText,
+                Text = "🚚  TransportERP",
+                ForeColor = Color.White,
+                Font = UiTheme.CreateBoldFont(17F),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            layout.Controls.Add(brand, 0, 0);
+
+            var menus = new[]
+            {
+                "⌂  الرئيسية",
+                "◈  الإدارة والأمن",
+                "⚙  التهيئة العامة",
+                "▣  المحاسبة",
+                "▤  السقوف والميزانيات",
+                "🛒  المبيعات",
+                "▱  المشتريات",
+                "▦  المخزون",
+                "🚚  النقل والشحن",
+                "▧  التذاكر والسفريات",
+                "▥  المركبات والصيانة",
+                "▤  التقارير والتحليلات",
+                "⚙  الإعدادات"
+            };
+
+            for (var i = 0; i < menus.Length; i++)
+            {
+                var button = new Button();
+                ConfigureMenuButton(button, menus[i], i == 0);
+                layout.Controls.Add(button, 0, i + 2);
+            }
+
+            pnlSidebar.Controls.Add(layout);
+        }
+
+        private void ConfigureWorkspace()
+        {
+            tblWorkspace.ColumnCount = 1;
+            tblWorkspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tblWorkspace.Dock = DockStyle.Fill;
+            tblWorkspace.RowCount = 6;
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 176F));
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 132F));
+            tblWorkspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));
+            tblWorkspace.BackColor = Color.FromArgb(247, 249, 252);
+            tblWorkspace.Padding = new Padding(18, 0, 18, 0);
+            tblWorkspace.RightToLeft = RightToLeft.Yes;
+
+            ConfigureTopBar();
+            ConfigurePageHeader();
+            ConfigureKpis();
+            ConfigureAnalytics();
+            ConfigureShortcuts();
+
+            tblWorkspace.Controls.Add(pnlTopBar, 0, 0);
+            tblWorkspace.Controls.Add(pnlPageHeader, 0, 1);
+            tblWorkspace.Controls.Add(tblKpis, 0, 2);
+            tblWorkspace.Controls.Add(tblAnalytics, 0, 3);
+            tblWorkspace.Controls.Add(tblShortcuts, 0, 4);
+        }
+
+        private void ConfigureTopBar()
+        {
+            pnlTopBar.Dock = DockStyle.Fill;
+            pnlTopBar.BackColor = Color.White;
+            pnlTopBar.Margin = new Padding(-18, 0, -18, 10);
+            pnlTopBar.Padding = new Padding(24, 12, 24, 12);
+
+            tblTopBar.ColumnCount = 4;
+            tblTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33F));
+            tblTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tblTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
+            tblTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tblTopBar.Dock = DockStyle.Fill;
+            tblTopBar.RowCount = 1;
+            tblTopBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblTopBar.RightToLeft = RightToLeft.Yes;
+
+            var systemBrand = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "🚚  TransportERP",
+                ForeColor = Color.FromArgb(21, 57, 99),
+                Font = UiTheme.CreateBoldFont(18F),
+                TextAlign = ContentAlignment.MiddleRight
+            };
+
+            var user = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "●   مرحبًا بك في النظام\r\n     أحمد محمد\r\n     مدير النظام",
+                ForeColor = Color.FromArgb(37, 48, 67),
                 Font = UiTheme.CreateRegularFont(10F),
+                TextAlign = ContentAlignment.MiddleRight
+            };
+
+            var date = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "📅  السبت\r\n03 مايو 2026 م\r\n06 ذو القعدة 1447 هـ",
+                ForeColor = Color.FromArgb(65, 78, 99),
+                Font = UiTheme.CreateRegularFont(9.5F),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            var tools = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "🔔     ✉     ◐     ⛶",
+                ForeColor = Color.FromArgb(21, 57, 99),
+                Font = UiTheme.CreateRegularFont(15F),
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
-            tblHeader.Controls.Add(lblPageTitle, 0, 0);
-            tblHeader.Controls.Add(lblWelcome, 0, 1);
-            tblHeader.Controls.Add(dateLabel, 1, 0);
-            tblHeader.SetRowSpan(dateLabel, 2);
-            pnlHeader.Controls.Add(tblHeader);
+            tblTopBar.Controls.Add(systemBrand, 0, 0);
+            tblTopBar.Controls.Add(user, 1, 0);
+            tblTopBar.Controls.Add(date, 2, 0);
+            tblTopBar.Controls.Add(tools, 3, 0);
+            pnlTopBar.Controls.Add(tblTopBar);
         }
 
-        private void ConfigureCards()
+        private void ConfigurePageHeader()
         {
-            pnlCards.BackColor = Color.Transparent;
-            pnlCards.Dock = DockStyle.Fill;
-            pnlCards.Margin = Padding.Empty;
+            pnlPageHeader.Dock = DockStyle.Fill;
+            pnlPageHeader.BackColor = Color.Transparent;
+            pnlPageHeader.Padding = new Padding(0, 8, 0, 8);
 
-            tblCards.ColumnCount = 4;
-            for (var i = 0; i < 4; i++)
+            tblPageHeader.ColumnCount = 2;
+            tblPageHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
+            tblPageHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
+            tblPageHeader.Dock = DockStyle.Fill;
+            tblPageHeader.RowCount = 2;
+            tblPageHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 58F));
+            tblPageHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 42F));
+
+            lblPageTitle.Dock = DockStyle.Fill;
+            lblPageTitle.Text = "الرئيسية";
+            lblPageTitle.ForeColor = Color.FromArgb(30, 42, 60);
+            lblPageTitle.Font = UiTheme.CreateBoldFont(21F);
+            lblPageTitle.TextAlign = ContentAlignment.BottomRight;
+
+            lblPageSubtitle.Dock = DockStyle.Fill;
+            lblPageSubtitle.Text = "نظرة عامة على نشاط النظام اليوم";
+            lblPageSubtitle.ForeColor = Color.FromArgb(104, 116, 135);
+            lblPageSubtitle.Font = UiTheme.CreateRegularFont(10F);
+            lblPageSubtitle.TextAlign = ContentAlignment.TopRight;
+
+            var customize = new Button
             {
-                tblCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+                Dock = DockStyle.Fill,
+                Text = "⚙  تخصيص الشاشة",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(47, 65, 91),
+                Font = UiTheme.CreateRegularFont(10F),
+                Margin = new Padding(0, 12, 0, 12)
+            };
+            customize.FlatAppearance.BorderColor = Color.FromArgb(222, 228, 237);
+
+            tblPageHeader.Controls.Add(lblPageTitle, 0, 0);
+            tblPageHeader.Controls.Add(lblPageSubtitle, 0, 1);
+            tblPageHeader.Controls.Add(customize, 1, 0);
+            tblPageHeader.SetRowSpan(customize, 2);
+            pnlPageHeader.Controls.Add(tblPageHeader);
+        }
+
+        private void ConfigureKpis()
+        {
+            tblKpis.ColumnCount = 5;
+            for (var i = 0; i < 5; i++)
+            {
+                tblKpis.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
             }
-            tblCards.Dock = DockStyle.Fill;
-            tblCards.RowCount = 1;
-            tblCards.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblKpis.Dock = DockStyle.Fill;
+            tblKpis.RowCount = 1;
+            tblKpis.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblKpis.BackColor = Color.Transparent;
 
-            tblCards.Controls.Add(CreateSummaryCard("إجمالي الشركات", "12", "+2 هذا الشهر"), 0, 0);
-            tblCards.Controls.Add(CreateSummaryCard("الفروع النشطة", "34", "جميعها متصلة"), 1, 0);
-            tblCards.Controls.Add(CreateSummaryCard("المستخدمون", "86", "72 مستخدمًا نشطًا"), 2, 0);
-            tblCards.Controls.Add(CreateSummaryCard("عمليات اليوم", "248", "+18% عن الأمس"), 3, 0);
-
-            pnlCards.Controls.Add(tblCards);
+            tblKpis.Controls.Add(CreateKpiCard("إجمالي الإيرادات", "1,250,000", "ريال يمني", "+12.5% ↑", Color.FromArgb(47, 128, 237)), 0, 0);
+            tblKpis.Controls.Add(CreateKpiCard("إجمالي المصروفات", "860,500", "ريال يمني", "+8.3% ↑", Color.FromArgb(76, 175, 80)), 1, 0);
+            tblKpis.Controls.Add(CreateKpiCard("إجمالي المعاملات", "342", "معاملة", "+15.7% ↑", Color.FromArgb(155, 81, 224)), 2, 0);
+            tblKpis.Controls.Add(CreateKpiCard("العملاء النشطون", "125", "عميل", "+9.6% ↑", Color.FromArgb(242, 153, 74)), 3, 0);
+            tblKpis.Controls.Add(CreateKpiCard("البوالص النشطة", "78", "بوليصة", "+6.8% ↑", Color.FromArgb(86, 204, 200)), 4, 0);
         }
 
-        private void ConfigureQuickActions()
+        private void ConfigureAnalytics()
         {
-            flpQuickActions.Dock = DockStyle.Fill;
-            flpQuickActions.FlowDirection = FlowDirection.RightToLeft;
-            flpQuickActions.WrapContents = false;
-            flpQuickActions.Padding = new Padding(0, 10, 0, 10);
-            flpQuickActions.BackColor = Color.Transparent;
-            flpQuickActions.Margin = Padding.Empty;
+            tblAnalytics.ColumnCount = 3;
+            tblAnalytics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 31F));
+            tblAnalytics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+            tblAnalytics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 31F));
+            tblAnalytics.Dock = DockStyle.Fill;
+            tblAnalytics.RowCount = 1;
+            tblAnalytics.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblAnalytics.BackColor = Color.Transparent;
 
-            ConfigureQuickButton(btnNewReceipt, "سند قبض جديد");
-            ConfigureQuickButton(btnNewPayment, "سند صرف جديد");
-            ConfigureQuickButton(btnJournalEntry, "قيد يومي");
-            ConfigureQuickButton(btnUsers, "إدارة المستخدمين");
+            ConfigureTransactionsCard();
+            ConfigureRevenueCard();
+            ConfigureActivityCard();
 
-            flpQuickActions.Controls.Add(btnNewReceipt);
-            flpQuickActions.Controls.Add(btnNewPayment);
-            flpQuickActions.Controls.Add(btnJournalEntry);
-            flpQuickActions.Controls.Add(btnUsers);
+            tblAnalytics.Controls.Add(pnlTransactions, 0, 0);
+            tblAnalytics.Controls.Add(pnlRevenueCard, 1, 0);
+            tblAnalytics.Controls.Add(pnlActivityCard, 2, 0);
         }
 
-        private void ConfigureBody()
+        private void ConfigureTransactionsCard()
         {
-            tblBody.ColumnCount = 2;
-            tblBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F));
-            tblBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F));
-            tblBody.Dock = DockStyle.Fill;
-            tblBody.RowCount = 1;
-            tblBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            pnlTransactions.Dock = DockStyle.Fill;
+            pnlTransactions.BackColor = Color.White;
+            pnlTransactions.Margin = new Padding(0, 8, 8, 8);
+            pnlTransactions.Padding = new Padding(14);
 
-            ConfigureRecentPanel();
-            ConfigureAlertsPanel();
+            var title = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 42,
+                Text = "آخر المعاملات  ☷",
+                ForeColor = Color.FromArgb(30, 42, 60),
+                Font = UiTheme.CreateBoldFont(13F),
+                TextAlign = ContentAlignment.MiddleRight
+            };
 
-            tblBody.Controls.Add(pnlRecent, 0, 0);
-            tblBody.Controls.Add(pnlAlerts, 1, 0);
+            dgvRecentTransactions.Dock = DockStyle.Fill;
+            dgvRecentTransactions.AllowUserToAddRows = false;
+            dgvRecentTransactions.AllowUserToDeleteRows = false;
+            dgvRecentTransactions.AllowUserToResizeRows = false;
+            dgvRecentTransactions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvRecentTransactions.BackgroundColor = Color.White;
+            dgvRecentTransactions.BorderStyle = BorderStyle.None;
+            dgvRecentTransactions.ColumnHeadersVisible = false;
+            dgvRecentTransactions.RowHeadersVisible = false;
+            dgvRecentTransactions.ReadOnly = true;
+            dgvRecentTransactions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvRecentTransactions.RightToLeft = RightToLeft.Yes;
+            dgvRecentTransactions.DefaultCellStyle.Font = UiTheme.CreateRegularFont(9F);
+            dgvRecentTransactions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(240, 246, 255);
+            dgvRecentTransactions.DefaultCellStyle.SelectionForeColor = Color.FromArgb(30, 42, 60);
+            dgvRecentTransactions.Columns.Add("Transaction", "المعاملة");
+            dgvRecentTransactions.Columns.Add("Amount", "المبلغ");
+            dgvRecentTransactions.Columns.Add("Status", "الحالة");
+
+            pnlTransactions.Controls.Add(dgvRecentTransactions);
+            pnlTransactions.Controls.Add(title);
         }
 
-        private void ConfigureRecentPanel()
+        private void ConfigureRevenueCard()
         {
-            pnlRecent.BackColor = Color.White;
-            pnlRecent.Dock = DockStyle.Fill;
-            pnlRecent.Padding = new Padding(18);
-            pnlRecent.Margin = new Padding(0, 0, 10, 0);
+            pnlRevenueCard.Dock = DockStyle.Fill;
+            pnlRevenueCard.BackColor = Color.White;
+            pnlRevenueCard.Margin = new Padding(8);
+            pnlRevenueCard.Padding = new Padding(14);
 
-            lblRecentTitle.Dock = DockStyle.Top;
-            lblRecentTitle.Height = 38;
-            lblRecentTitle.Text = "آخر العمليات";
-            lblRecentTitle.ForeColor = UiTheme.HeadingText;
-            lblRecentTitle.Font = UiTheme.CreateBoldFont(14F);
-            lblRecentTitle.TextAlign = ContentAlignment.MiddleRight;
+            var title = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 42,
+                Text = "الإيرادات والمصروفات - آخر 6 أشهر  📈",
+                ForeColor = Color.FromArgb(30, 42, 60),
+                Font = UiTheme.CreateBoldFont(13F),
+                TextAlign = ContentAlignment.MiddleRight
+            };
 
-            dgvRecentOperations.Dock = DockStyle.Fill;
-            dgvRecentOperations.AllowUserToAddRows = false;
-            dgvRecentOperations.AllowUserToDeleteRows = false;
-            dgvRecentOperations.AllowUserToResizeRows = false;
-            dgvRecentOperations.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvRecentOperations.BackgroundColor = Color.White;
-            dgvRecentOperations.BorderStyle = BorderStyle.None;
-            dgvRecentOperations.ColumnHeadersHeight = 40;
-            dgvRecentOperations.RowHeadersVisible = false;
-            dgvRecentOperations.ReadOnly = true;
-            dgvRecentOperations.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgvRecentOperations.RightToLeft = RightToLeft.Yes;
-            dgvRecentOperations.Columns.Add("OperationType", "نوع العملية");
-            dgvRecentOperations.Columns.Add("Reference", "المرجع");
-            dgvRecentOperations.Columns.Add("Entity", "الجهة");
-            dgvRecentOperations.Columns.Add("Amount", "المبلغ");
-            dgvRecentOperations.Columns.Add("Status", "الحالة");
+            pnlRevenueChart.Dock = DockStyle.Fill;
+            pnlRevenueChart.BackColor = Color.White;
+            pnlRevenueChart.Paint += pnlRevenueChart_Paint;
 
-            pnlRecent.Controls.Add(dgvRecentOperations);
-            pnlRecent.Controls.Add(lblRecentTitle);
+            pnlRevenueCard.Controls.Add(pnlRevenueChart);
+            pnlRevenueCard.Controls.Add(title);
         }
 
-        private void ConfigureAlertsPanel()
+        private void ConfigureActivityCard()
         {
-            pnlAlerts.BackColor = Color.White;
-            pnlAlerts.Dock = DockStyle.Fill;
-            pnlAlerts.Padding = new Padding(18);
-            pnlAlerts.Margin = new Padding(10, 0, 0, 0);
+            pnlActivityCard.Dock = DockStyle.Fill;
+            pnlActivityCard.BackColor = Color.White;
+            pnlActivityCard.Margin = new Padding(8, 8, 0, 8);
+            pnlActivityCard.Padding = new Padding(14);
 
-            lblAlertsTitle.Dock = DockStyle.Top;
-            lblAlertsTitle.Height = 38;
-            lblAlertsTitle.Text = "التنبيهات";
-            lblAlertsTitle.ForeColor = UiTheme.HeadingText;
-            lblAlertsTitle.Font = UiTheme.CreateBoldFont(14F);
-            lblAlertsTitle.TextAlign = ContentAlignment.MiddleRight;
+            var title = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 42,
+                Text = "توزيع الإيرادات حسب النشاط  ◔",
+                ForeColor = Color.FromArgb(30, 42, 60),
+                Font = UiTheme.CreateBoldFont(13F),
+                TextAlign = ContentAlignment.MiddleRight
+            };
 
-            lblAlert1.Dock = DockStyle.Top;
-            lblAlert1.Height = 74;
-            lblAlert1.Padding = new Padding(10);
-            lblAlert1.Text = "• لم يتم ربط واجهة API بعد.\r\n  تعمل الشاشة ببيانات معاينة.";
-            lblAlert1.ForeColor = Color.FromArgb(157, 98, 0);
-            lblAlert1.BackColor = Color.FromArgb(255, 248, 225);
-            lblAlert1.TextAlign = ContentAlignment.MiddleRight;
+            pnlActivityChart.Dock = DockStyle.Fill;
+            pnlActivityChart.BackColor = Color.White;
+            pnlActivityChart.Paint += pnlActivityChart_Paint;
 
-            lblAlert2.Dock = DockStyle.Top;
-            lblAlert2.Height = 74;
-            lblAlert2.Padding = new Padding(10);
-            lblAlert2.Margin = new Padding(0, 10, 0, 0);
-            lblAlert2.Text = "• توجد 3 مهام إعداد تحتاج مراجعة قبل التشغيل الفعلي.";
-            lblAlert2.ForeColor = Color.FromArgb(33, 85, 122);
-            lblAlert2.BackColor = Color.FromArgb(232, 244, 253);
-            lblAlert2.TextAlign = ContentAlignment.MiddleRight;
+            pnlActivityCard.Controls.Add(pnlActivityChart);
+            pnlActivityCard.Controls.Add(title);
+        }
 
-            pnlAlerts.Controls.Add(lblAlert2);
-            pnlAlerts.Controls.Add(lblAlert1);
-            pnlAlerts.Controls.Add(lblAlertsTitle);
+        private void ConfigureShortcuts()
+        {
+            tblShortcuts.ColumnCount = 10;
+            for (var i = 0; i < 10; i++)
+            {
+                tblShortcuts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10F));
+            }
+            tblShortcuts.Dock = DockStyle.Fill;
+            tblShortcuts.RowCount = 1;
+            tblShortcuts.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tblShortcuts.BackColor = Color.White;
+            tblShortcuts.Margin = new Padding(0, 10, 0, 0);
+            tblShortcuts.Padding = new Padding(8);
+
+            var shortcuts = new[]
+            {
+                "🚚\r\nالمركبات", "📦\r\nالمخزون", "📗\r\nالحسابات", "👔\r\nالموردون", "👥\r\nالعملاء",
+                "📊\r\nالتقارير", "🚛\r\nالبوالص", "📄\r\nقيد يومي", "⬆\r\nسند صرف", "⬇\r\nسند قبض"
+            };
+
+            for (var i = 0; i < shortcuts.Length; i++)
+            {
+                var button = new Button
+                {
+                    Dock = DockStyle.Fill,
+                    Text = shortcuts[i],
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = Color.White,
+                    ForeColor = Color.FromArgb(47, 65, 91),
+                    Font = UiTheme.CreateRegularFont(9.5F),
+                    Margin = new Padding(5),
+                    Cursor = Cursors.Hand
+                };
+                button.FlatAppearance.BorderColor = Color.FromArgb(229, 233, 240);
+                button.Click += QuickAction_Click;
+                tblShortcuts.Controls.Add(button, i, 0);
+            }
         }
 
         private void ConfigureStatusBar()
@@ -386,48 +468,59 @@ namespace TransportERP.Desktop
             statusBar.Margin = Padding.Empty;
         }
 
-        private static Panel CreateSummaryCard(string title, string value, string note)
+        private static Panel CreateKpiCard(string title, string value, string unit, string growth, Color accent)
         {
             var card = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
-                Margin = new Padding(8),
-                Padding = new Padding(16)
+                Margin = new Padding(6),
+                Padding = new Padding(14)
             };
 
-            var lblTitle = new Label
+            var titleLabel = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 28,
+                Height = 30,
                 Text = title,
-                ForeColor = UiTheme.SecondaryText,
-                Font = UiTheme.CreateRegularFont(10F),
+                ForeColor = accent,
+                Font = UiTheme.CreateBoldFont(9.5F),
                 TextAlign = ContentAlignment.MiddleRight
             };
 
-            var lblValue = new Label
+            var valueLabel = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 52,
+                Height = 48,
                 Text = value,
-                ForeColor = UiTheme.PrimaryBlue,
-                Font = UiTheme.CreateBoldFont(24F),
+                ForeColor = Color.FromArgb(25, 32, 44),
+                Font = UiTheme.CreateBoldFont(20F),
                 TextAlign = ContentAlignment.MiddleRight
             };
 
-            var lblNote = new Label
+            var unitLabel = new Label
             {
-                Dock = DockStyle.Fill,
-                Text = note,
-                ForeColor = UiTheme.SecondaryText,
+                Dock = DockStyle.Top,
+                Height = 24,
+                Text = unit,
+                ForeColor = Color.FromArgb(104, 116, 135),
                 Font = UiTheme.CreateRegularFont(9F),
                 TextAlign = ContentAlignment.MiddleRight
             };
 
-            card.Controls.Add(lblNote);
-            card.Controls.Add(lblValue);
-            card.Controls.Add(lblTitle);
+            var growthLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = $"{growth}    عن الشهر الماضي",
+                ForeColor = Color.FromArgb(39, 174, 96),
+                Font = UiTheme.CreateRegularFont(8.5F),
+                TextAlign = ContentAlignment.BottomRight
+            };
+
+            card.Controls.Add(growthLabel);
+            card.Controls.Add(unitLabel);
+            card.Controls.Add(valueLabel);
+            card.Controls.Add(titleLabel);
             return card;
         }
 
@@ -441,23 +534,9 @@ namespace TransportERP.Desktop
             button.Padding = new Padding(12, 0, 12, 0);
             button.Font = UiTheme.CreateRegularFont(10.5F);
             button.ForeColor = Color.White;
-            button.BackColor = selected ? Color.FromArgb(28, 92, 190) : Color.Transparent;
+            button.BackColor = selected ? Color.FromArgb(34, 111, 216) : Color.Transparent;
             button.Cursor = Cursors.Hand;
-        }
-
-        private void ConfigureQuickButton(Button button, string text)
-        {
-            button.Width = 190;
-            button.Height = 54;
-            button.Margin = new Padding(8);
-            button.Text = text;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderSize = 0;
-            button.BackColor = UiTheme.PrimaryBlue;
-            button.ForeColor = Color.White;
-            button.Font = UiTheme.CreateBoldFont(10F);
-            button.Cursor = Cursors.Hand;
-            button.Click += QuickAction_Click;
+            button.Margin = new Padding(0, 2, 0, 2);
         }
 
         #endregion
