@@ -75,17 +75,20 @@ public sealed class PasswordTextBox : UserControl
     {
         Height = 38;
         MinimumSize = new Size(180, 38);
-        BackColor = Color.White;
+        BackColor = Color.FromArgb(255, 250, 214);
+        BorderStyle = BorderStyle.FixedSingle;
+        Padding = new Padding(6, 4, 6, 4);
         RightToLeft = RightToLeft.Yes;
 
-        // يبقى زر الإظهار في يسار الحقل حتى تبدأ الكتابة العربية من اليمين دون تزاحم.
+        // يبقى زر الإظهار داخل يسار الحقل حتى تبدأ الكتابة العربية من اليمين دون تزاحم.
         _toggleButton.Dock = DockStyle.Left;
-        _toggleButton.Width = 42;
+        _toggleButton.Width = 34;
+        _toggleButton.Margin = Padding.Empty;
         _toggleButton.FlatStyle = FlatStyle.Flat;
         _toggleButton.FlatAppearance.BorderSize = 0;
         _toggleButton.BackColor = Color.Transparent;
         _toggleButton.ForeColor = UiTheme.SecondaryText;
-        _toggleButton.Font = UiTheme.CreateRegularFont(12F);
+        _toggleButton.Font = UiTheme.CreateRegularFont(11F);
         _toggleButton.Cursor = Cursors.Hand;
         _toggleButton.TabStop = false;
         _toggleButton.Click += (_, _) =>
@@ -96,6 +99,8 @@ public sealed class PasswordTextBox : UserControl
         };
 
         _textBox.Dock = DockStyle.Fill;
+        _textBox.BorderStyle = BorderStyle.None;
+        _textBox.Margin = Padding.Empty;
         _textBox.IsRequired = true;
         _textBox.RequiredMessage = "يرجى إدخال كلمة المرور.";
         _textBox.Font = UiTheme.CreateRegularFont(11F);
