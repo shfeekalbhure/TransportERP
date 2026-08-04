@@ -2,6 +2,7 @@ namespace TransportERP.Desktop;
 
 /// <summary>
 /// ربط شاشة GEN-004 — المحافظات بقائمة البيانات الجغرافية وتبويبات Dashboard.
+/// يدعم موقع الشاشة القديم والجديد أثناء إعادة تنظيم مجلدات Forms.
 /// </summary>
 public partial class FrmDashboard
 {
@@ -57,8 +58,18 @@ public partial class FrmDashboard
             return;
         }
 
-        var governoratesForm = new FrmGovernorates();
-        governoratesForm.ConfigureForTabHosting();
+        var governoratesForm = CreateGovernoratesForm();
+        if (governoratesForm is null)
+        {
+            MessageBox.Show(
+                "تعذر العثور على شاشة المحافظات. تأكد من وجود FrmGovernorates داخل مجلد Forms/Setup/Geographic.",
+                "المحافظات",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return;
+        }
+
+        ConfigureFormForTabHosting(governoratesForm);
 
         var governoratesPage = new TabPage
         {
@@ -83,5 +94,36 @@ public partial class FrmDashboard
         _workspaceTabs.TabPages.Add(governoratesPage);
         _workspaceTabs.SelectedTab = governoratesPage;
         governoratesForm.Show();
+    }
+
+    private static Form? CreateGovernoratesForm()
+    {
+        var assembly = typeof(FrmDashboard).Assembly;
+        var type = assembly.GetType("TransportERP.Desktop.Forms.Setup.Geographic.FrmGovernorates", throwOnError: false)
+            ?? assembly.GetType("TransportERP.Desktop.FrmGovernorates", throwOnError: false);
+
+        return type is not null && typeof(Form).IsAssignableFrom(type)
+            ? Activator.CreateInstance(type) as Form
+            : null;
+    }
+
+    private static void ConfigureFormForTabHosting(Form form)
+    {
+        var configureMethod = form.GetType().GetMethod(
+            "ConfigureForTabHosting",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+
+        if (configureMethod is not null)
+        {
+            configureMethod.Invoke(form, null);
+            return;
+        }
+
+        form.TopLevel = false;
+        form.FormBorderStyle = FormBorderStyle.None;
+        form.Dock = DockStyle.Fill;
+        form.WindowState = FormWindowState.Normal;
+        form.ShowInTaskbar = false;
+        form.ControlBox = false;
     }
 }
