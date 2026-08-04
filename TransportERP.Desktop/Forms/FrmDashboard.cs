@@ -4,22 +4,70 @@ namespace TransportERP.Desktop;
 
 /// <summary>
 /// الشاشة الرئيسية لنظام TransportERP.
-/// تعرض مؤشرات الأداء والاختصارات والرسوم وآخر المعاملات ضمن واجهة عربية RTL.
+/// تعرض مؤشرات الأداء وتستضيف شاشات النظام داخل تبويبات متعددة.
 /// </summary>
 public partial class FrmDashboard : Form
 {
+    private const string DashboardTabKey = "DASHBOARD";
+    private const string CountriesTabKey = "GEN-003";
+
+    private TabControl? _workspaceTabs;
+    private ContextMenuStrip? _generalSetupMenu;
+
     public FrmDashboard()
     {
         InitializeComponent();
-        BindCountriesScreen();
+        ConfigureTabbedWorkspace();
+        ConfigureGeneralSetupMenu();
         LoadDevelopmentPreviewData();
     }
 
     /// <summary>
-    /// ربط عنصر التهيئة العامة في القائمة الجانبية بفتح شاشة الدول الحالية.
-    /// هذا الربط مؤقت إلى أن تُبنى القائمة الفرعية الكاملة للبيانات الجغرافية.
+    /// تحويل مساحة العمل الحالية إلى نظام تبويبات، مع إبقاء الرئيسية تبويبًا ثابتًا.
     /// </summary>
-    private void BindCountriesScreen()
+    private void ConfigureTabbedWorkspace()
+    {
+        if (_workspaceTabs is not null)
+        {
+            return;
+        }
+
+        tblRoot.SuspendLayout();
+        tblRoot.Controls.Remove(tblWorkspace);
+
+        _workspaceTabs = new TabControl
+        {
+            Name = "tabWorkspace",
+            Dock = DockStyle.Fill,
+            RightToLeft = RightToLeft.Yes,
+            RightToLeftLayout = true,
+            Font = new Font(Font.FontFamily, 10F, FontStyle.Bold),
+            Padding = new Point(18, 7),
+            HotTrack = true
+        };
+        _workspaceTabs.MouseDoubleClick += WorkspaceTabs_MouseDoubleClick;
+
+        var dashboardPage = new TabPage
+        {
+            Name = DashboardTabKey,
+            Text = "الرئيسية",
+            BackColor = Color.FromArgb(247, 249, 252),
+            RightToLeft = RightToLeft.Yes,
+            Padding = Padding.Empty
+        };
+
+        tblWorkspace.Dock = DockStyle.Fill;
+        dashboardPage.Controls.Add(tblWorkspace);
+        _workspaceTabs.TabPages.Add(dashboardPage);
+
+        tblRoot.Controls.Add(_workspaceTabs, 0, 0);
+        tblRoot.ResumeLayout(true);
+    }
+
+    /// <summary>
+    /// إعداد قائمة التهيئة العامة المتفرعة وربط شاشة الدول بها.
+    /// </summary>
+    private void ConfigureGeneralSetupMenu()
     {
         var generalSetupButton = FindButtonByText(this, "التهيئة العامة");
         if (generalSetupButton is null)
@@ -27,8 +75,136 @@ public partial class FrmDashboard : Form
             return;
         }
 
+        _generalSetupMenu?.Dispose();
+        _generalSetupMenu = new ContextMenuStrip
+        {
+            RightToLeft = RightToLeft.Yes,
+            Font = new Font(Font.FontFamily, 10F),
+            ShowImageMargin = false,
+            AutoSize = true
+        };
+
+        var geographicDataItem = new ToolStripMenuItem("البيانات الجغرافية")
+        {
+            RightToLeft = RightToLeft.Yes
+        };
+
+        var countriesItem = new ToolStripMenuItem("الدول")
+        {
+            Name = "mnuCountries",
+            ToolTipText = "GEN-003 — الدول"
+        };
+        countriesItem.Click += (_, _) => OpenCountriesTab();
+
+        geographicDataItem.DropDownItems.Add(countriesItem);
+        _generalSetupMenu.Items.Add(geographicDataItem);
+
         generalSetupButton.Click -= GeneralSetupButton_Click;
         generalSetupButton.Click += GeneralSetupButton_Click;
+    }
+
+    /// <summary>
+    /// إظهار قائمة شاشات التهيئة العامة بمحاذاة الزر الجانبي.
+    /// </summary>
+    private void GeneralSetupButton_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button button || _generalSetupMenu is null)
+        {
+            return;
+        }
+
+        _generalSetupMenu.Show(button, new Point(0, button.Height));
+    }
+
+    /// <summary>
+    /// فتح شاشة الدول داخل تبويب واحد ومنع فتح نسخة مكررة منها.
+    /// </summary>
+    private void OpenCountriesTab()
+    {
+        if (_workspaceTabs is null)
+        {
+            return;
+        }
+
+        var existingPage = _workspaceTabs.TabPages
+            .Cast<TabPage>()
+            .FirstOrDefault(page => string.Equals(page.Name, CountriesTabKey, StringComparison.Ordinal));
+
+        if (existingPage is not null)
+        {
+            _workspaceTabs.SelectedTab = existingPage;
+            existingPage.Focus();
+            return;
+        }
+
+        var countriesForm = new FrmCountries
+        {
+            TopLevel = false,
+            FormBorderStyle = FormBorderStyle.None,
+            Dock = DockStyle.Fill,
+            WindowState = FormWindowState.Normal
+        };
+
+        var countriesPage = new TabPage
+        {
+            Name = CountriesTabKey,
+            Text = "الدول  ×",
+            BackColor = Color.FromArgb(239, 245, 252),
+            RightToLeft = RightToLeft.Yes,
+            Padding = Padding.Empty,
+            Tag = countriesForm
+        };
+
+        countriesForm.FormClosed += (_, _) =>
+        {
+            if (_workspaceTabs.TabPages.Contains(countriesPage))
+            {
+                _workspaceTabs.TabPages.Remove(countriesPage);
+                countriesPage.Dispose();
+            }
+        };
+
+        countriesPage.Controls.Add(countriesForm);
+        _workspaceTabs.TabPages.Add(countriesPage);
+        _workspaceTabs.SelectedTab = countriesPage;
+        countriesForm.Show();
+    }
+
+    /// <summary>
+    /// إغلاق تبويب شاشة الأعمال بالنقر المزدوج، مع حماية تبويب الرئيسية من الإغلاق.
+    /// </summary>
+    private void WorkspaceTabs_MouseDoubleClick(object? sender, MouseEventArgs e)
+    {
+        if (_workspaceTabs is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < _workspaceTabs.TabPages.Count; index++)
+        {
+            if (!_workspaceTabs.GetTabRect(index).Contains(e.Location))
+            {
+                continue;
+            }
+
+            var page = _workspaceTabs.TabPages[index];
+            if (string.Equals(page.Name, DashboardTabKey, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (page.Tag is Form hostedForm && !hostedForm.IsDisposed)
+            {
+                hostedForm.Close();
+            }
+            else
+            {
+                _workspaceTabs.TabPages.Remove(page);
+                page.Dispose();
+            }
+
+            return;
+        }
     }
 
     /// <summary>
@@ -51,15 +227,6 @@ public partial class FrmDashboard : Form
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// فتح شاشة GEN-003 — الدول من القائمة الرئيسية.
-    /// </summary>
-    private void GeneralSetupButton_Click(object? sender, EventArgs e)
-    {
-        using var countriesForm = new FrmCountries();
-        countriesForm.ShowDialog(this);
     }
 
     /// <summary>
@@ -153,9 +320,7 @@ public partial class FrmDashboard : Form
         var size = Math.Min(pnlActivityChart.ClientSize.Width - 170, pnlActivityChart.ClientSize.Height - 70);
         size = Math.Max(140, size);
 
-        // إنزال الرسم الدائري فقط بمقدار يقارب 1 سم (38 بكسل عند مقياس 96 DPI).
         var donut = new Rectangle(28, 86, size, size);
-
         var values = new[] { 35F, 25F, 20F, 10F, 10F };
         var colors = new[]
         {
