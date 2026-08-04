@@ -22,11 +22,9 @@ public sealed class LookupComboBox : ComboBox
         Enter += HandleEnter;
         Leave += HandleLeave;
         SelectedIndexChanged += (_, _) => UpdateVisualState();
+        DrawItem += DrawArabicItem;
     }
 
-    /// <summary>
-    /// يحدد هل اختيار قيمة من القائمة إلزامي.
-    /// </summary>
     [Category("TransportERP")]
     [Description("يحدد هل يجب اختيار قيمة من القائمة قبل الحفظ أو المتابعة.")]
     [DefaultValue(true)]
@@ -40,9 +38,6 @@ public sealed class LookupComboBox : ComboBox
         }
     }
 
-    /// <summary>
-    /// رسالة التحقق العربية التي تظهر عند عدم اختيار قيمة إلزامية.
-    /// </summary>
     [Category("TransportERP")]
     [Description("رسالة التحقق المعروضة عندما لا يتم اختيار قيمة من القائمة الإلزامية.")]
     [DefaultValue("يرجى اختيار قيمة من القائمة.")]
@@ -54,12 +49,6 @@ public sealed class LookupComboBox : ComboBox
             : value.Trim();
     }
 
-    /// <summary>
-    /// تعبئة القائمة بمجموعة عناصر مع تحديد العنصر الأول اختياريًا.
-    /// </summary>
-    /// <typeparam name="TItem">نوع العناصر المضافة إلى القائمة.</typeparam>
-    /// <param name="items">العناصر المطلوب عرضها.</param>
-    /// <param name="selectFirstItem">يحدد هل يتم اختيار أول عنصر تلقائيًا.</param>
     public void BindItems<TItem>(IEnumerable<TItem> items, bool selectFirstItem = true)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -75,22 +64,16 @@ public sealed class LookupComboBox : ComboBox
                 Items.Add(item);
             }
 
-            SelectedIndex = selectFirstItem && Items.Count > 0
-                ? 0
-                : -1;
+            SelectedIndex = selectFirstItem && Items.Count > 0 ? 0 : -1;
         }
         finally
         {
             EndUpdate();
             UpdateVisualState();
+            Invalidate();
         }
     }
 
-    /// <summary>
-    /// التحقق من اختيار قيمة عندما تكون القائمة إلزامية.
-    /// </summary>
-    /// <param name="showMessage">يحدد هل تعرض رسالة للمستخدم عند فشل التحقق.</param>
-    /// <returns>صحيح إذا كانت القائمة صالحة؛ وإلا يعيد خطأ.</returns>
     public bool ValidateSelection(bool showMessage = true)
     {
         if (!_isRequired || SelectedIndex >= 0)
@@ -114,21 +97,24 @@ public sealed class LookupComboBox : ComboBox
         return false;
     }
 
-    /// <summary>
-    /// إعادة القائمة إلى حالة عدم الاختيار.
-    /// </summary>
     public void ResetSelection()
     {
         SelectedIndex = -1;
         UpdateVisualState();
     }
 
-    /// <summary>
-    /// تطبيق التنسيق الافتراضي للقائمة.
-    /// </summary>
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        RightToLeft = RightToLeft.Yes;
+        Invalidate();
+    }
+
     private void ApplyDefaultStyle()
     {
         DropDownStyle = ComboBoxStyle.DropDownList;
+        DrawMode = DrawMode.OwnerDrawFixed;
+        ItemHeight = 28;
         FlatStyle = FlatStyle.Flat;
         Font = UiTheme.CreateRegularFont(10.5F);
         ForeColor = UiTheme.HeadingText;
@@ -137,24 +123,48 @@ public sealed class LookupComboBox : ComboBox
     }
 
     /// <summary>
-    /// تمييز القائمة عند حصولها على التركيز.
+    /// رسم العنصر المختار وعناصر القائمة بمحاذاة عربية إلى أقصى اليمين.
     /// </summary>
+    private void DrawArabicItem(object? sender, DrawItemEventArgs e)
+    {
+        e.DrawBackground();
+
+        if (e.Index < 0 || e.Index >= Items.Count)
+        {
+            return;
+        }
+
+        var text = GetItemText(Items[e.Index]);
+        var textColor = (e.State & DrawItemState.Selected) == DrawItemState.Selected
+            ? SystemColors.HighlightText
+            : ForeColor;
+        var textBounds = Rectangle.Inflate(e.Bounds, -8, 0);
+
+        TextRenderer.DrawText(
+            e.Graphics,
+            text,
+            Font,
+            textBounds,
+            textColor,
+            TextFormatFlags.Right |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.RightToLeft |
+            TextFormatFlags.EndEllipsis |
+            TextFormatFlags.NoPrefix);
+
+        e.DrawFocusRectangle();
+    }
+
     private void HandleEnter(object? sender, EventArgs e)
     {
         BackColor = UiTheme.FocusedInputBackground;
     }
 
-    /// <summary>
-    /// إعادة لون القائمة بعد مغادرتها وفق حالة الإلزام والاختيار.
-    /// </summary>
     private void HandleLeave(object? sender, EventArgs e)
     {
         UpdateVisualState();
     }
 
-    /// <summary>
-    /// تحديث لون القائمة لتمييز الحقول الإلزامية وحالة الإدخال.
-    /// </summary>
     private void UpdateVisualState()
     {
         if (Focused)
