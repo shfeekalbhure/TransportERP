@@ -24,9 +24,6 @@ public sealed class RequiredTextBox : TextBox
         TextChanged += (_, _) => UpdateVisualState();
     }
 
-    /// <summary>
-    /// يحدد هل الحقل إلزامي أم اختياري.
-    /// </summary>
     [Category("TransportERP")]
     [Description("يحدد هل يجب إدخال قيمة في الحقل قبل الحفظ أو المتابعة.")]
     [DefaultValue(true)]
@@ -40,9 +37,6 @@ public sealed class RequiredTextBox : TextBox
         }
     }
 
-    /// <summary>
-    /// رسالة التحقق العربية التي تظهر عند ترك الحقل الإلزامي فارغًا.
-    /// </summary>
     [Category("TransportERP")]
     [Description("رسالة التحقق المعروضة عندما يكون الحقل الإلزامي فارغًا.")]
     [DefaultValue("هذا الحقل إلزامي.")]
@@ -54,11 +48,6 @@ public sealed class RequiredTextBox : TextBox
             : value.Trim();
     }
 
-    /// <summary>
-    /// التحقق من أن الحقل يحتوي على قيمة عندما يكون إلزاميًا.
-    /// </summary>
-    /// <param name="showMessage">يحدد هل تعرض رسالة للمستخدم عند فشل التحقق.</param>
-    /// <returns>صحيح إذا كان الحقل صالحًا؛ وإلا يعيد خطأ.</returns>
     public bool ValidateRequired(bool showMessage = true)
     {
         if (!_isRequired || !string.IsNullOrWhiteSpace(Text))
@@ -82,9 +71,6 @@ public sealed class RequiredTextBox : TextBox
         return false;
     }
 
-    /// <summary>
-    /// إعادة الحقل إلى حالته الطبيعية وحذف القيمة الحالية.
-    /// </summary>
     public void ResetField()
     {
         Clear();
@@ -92,37 +78,53 @@ public sealed class RequiredTextBox : TextBox
     }
 
     /// <summary>
-    /// تطبيق التنسيق الافتراضي للحقل.
+    /// إعادة فرض اتجاه ومحاذاة النص بعد إنشاء مقبض WinForms.
+    /// يمنع رجوع الكتابة إلى اليسار بسبب وراثة اتجاه الحاويات.
     /// </summary>
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ApplyArabicAlignment();
+    }
+
+    /// <summary>
+    /// إعادة تطبيق المحاذاة عند تغير اتجاه العنصر أو الحاوية الأب.
+    /// </summary>
+    protected override void OnRightToLeftChanged(EventArgs e)
+    {
+        base.OnRightToLeftChanged(e);
+        ApplyArabicAlignment();
+    }
+
     private void ApplyDefaultStyle()
     {
         BorderStyle = BorderStyle.FixedSingle;
         Font = UiTheme.CreateRegularFont(10.5F);
         ForeColor = UiTheme.HeadingText;
-        RightToLeft = RightToLeft.Yes;
-        TextAlign = HorizontalAlignment.Right;
+        ApplyArabicAlignment();
         UpdateVisualState();
     }
 
     /// <summary>
-    /// تمييز الحقل النشط أثناء إدخال المستخدم للبيانات.
+    /// تثبيت الكتابة العربية من اليمين ومحاذاة النص إلى اليمين.
     /// </summary>
+    private void ApplyArabicAlignment()
+    {
+        RightToLeft = RightToLeft.Yes;
+        TextAlign = HorizontalAlignment.Right;
+    }
+
     private void HandleEnter(object? sender, EventArgs e)
     {
+        ApplyArabicAlignment();
         BackColor = UiTheme.FocusedInputBackground;
     }
 
-    /// <summary>
-    /// إعادة لون الحقل بعد مغادرته بحسب كونه إلزاميًا وحالته الحالية.
-    /// </summary>
     private void HandleLeave(object? sender, EventArgs e)
     {
         UpdateVisualState();
     }
 
-    /// <summary>
-    /// تحديث لون الحقل لتمييز الإلزامية وحالة الإدخال.
-    /// </summary>
     private void UpdateVisualState()
     {
         if (Focused)
