@@ -104,7 +104,10 @@ public partial class FrmDashboard : Form
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var size = Math.Min(pnlActivityChart.ClientSize.Width - 170, pnlActivityChart.ClientSize.Height - 70);
         size = Math.Max(140, size);
-        var donut = new Rectangle(28, 48, size, size);
+
+        // إنزال الرسم الدائري فقط بمقدار يقارب 1 سم (38 بكسل عند مقياس 96 DPI).
+        var donut = new Rectangle(28, 86, size, size);
+
         var values = new[] { 35F, 25F, 20F, 10F, 10F };
         var colors = new[]
         {
