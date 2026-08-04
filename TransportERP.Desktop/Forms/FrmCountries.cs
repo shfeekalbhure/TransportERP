@@ -5,10 +5,39 @@ namespace TransportERP.Desktop;
 /// </summary>
 public partial class FrmCountries : Form
 {
+    private bool _isHostedInsideDashboard;
+
     public FrmCountries()
     {
         InitializeComponent();
         LoadPreviewData();
+    }
+
+    /// <summary>
+    /// تهيئة الشاشة للعمل داخل تبويب الشاشة الرئيسية بدل نافذة مستقلة.
+    /// يخفي شريط الحالة الداخلي لأن Dashboard تعرض شريط حالة ثابتًا واحدًا.
+    /// </summary>
+    public void ConfigureForTabHosting()
+    {
+        if (_isHostedInsideDashboard)
+        {
+            return;
+        }
+
+        _isHostedInsideDashboard = true;
+        TopLevel = false;
+        FormBorderStyle = FormBorderStyle.None;
+        Dock = DockStyle.Fill;
+        WindowState = FormWindowState.Normal;
+        ShowInTaskbar = false;
+        ControlBox = false;
+        MinimizeBox = false;
+        MaximizeBox = false;
+
+        statusBar.Visible = false;
+        tblRoot.RowStyles[1].SizeType = SizeType.Absolute;
+        tblRoot.RowStyles[1].Height = 0F;
+        tblRoot.Padding = new Padding(14, 10, 14, 0);
     }
 
     private void LoadPreviewData()
