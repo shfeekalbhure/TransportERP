@@ -14,9 +14,6 @@ public sealed class RequiredTextBox : TextBox
     private string _requiredMessage = "هذا الحقل إلزامي.";
     private bool _isApplyingArabicAlignment;
 
-    /// <summary>
-    /// إنشاء حقل نص بالهوية البصرية المعتمدة للنظام.
-    /// </summary>
     public RequiredTextBox()
     {
         ApplyDefaultStyle();
@@ -82,9 +79,6 @@ public sealed class RequiredTextBox : TextBox
         UpdateVisualState();
     }
 
-    /// <summary>
-    /// إعادة فرض الاتجاه والمحاذاة بعد إنشاء مقبض WinForms.
-    /// </summary>
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
@@ -96,32 +90,24 @@ public sealed class RequiredTextBox : TextBox
         }
     }
 
-    /// <summary>
-    /// تثبيت المحاذاة عند إضافة الحقل إلى أي حاوية.
-    /// </summary>
     protected override void OnParentChanged(EventArgs e)
     {
         base.OnParentChanged(e);
         ApplyArabicAlignment();
     }
 
-    /// <summary>
-    /// تثبيت المحاذاة عند تغير الخط أو القياس.
-    /// </summary>
     protected override void OnFontChanged(EventArgs e)
     {
         base.OnFontChanged(e);
         ApplyArabicAlignment();
     }
 
-    /// <summary>
-    /// منع المصمم أو الحاوية من إعادة النص إلى اليسار.
-    /// </summary>
     protected override void OnTextAlignChanged(EventArgs e)
     {
         base.OnTextAlignChanged(e);
 
-        if (!_isApplyingArabicAlignment && TextAlign != HorizontalAlignment.Right)
+        // في WinForms تنعكس المحاذاة مع RightToLeft.Yes؛ لذلك Left تُعرض بصريًا من اليمين.
+        if (!_isApplyingArabicAlignment && TextAlign != HorizontalAlignment.Left)
         {
             ApplyArabicAlignment();
         }
@@ -147,7 +133,7 @@ public sealed class RequiredTextBox : TextBox
     }
 
     /// <summary>
-    /// فرض الكتابة العربية ومحاذاة النص إلى أقصى اليمين.
+    /// فرض اتجاه عربي ومحاذاة بصرية إلى أقصى اليمين وفق سلوك WinForms.
     /// </summary>
     private void ApplyArabicAlignment()
     {
@@ -160,7 +146,7 @@ public sealed class RequiredTextBox : TextBox
         {
             _isApplyingArabicAlignment = true;
             RightToLeft = RightToLeft.Yes;
-            TextAlign = HorizontalAlignment.Right;
+            TextAlign = HorizontalAlignment.Left;
         }
         finally
         {
