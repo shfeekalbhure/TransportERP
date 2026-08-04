@@ -42,11 +42,14 @@ public partial class FrmCountries : Form
     }
 
     /// <summary>
-    /// منع قص عنوان الدول والمسار التعريفي أعلى الشاشة.
+    /// تثبيت عنوان الدول والمسار التعريفي في أقصى يمين الحاوية ومنع قصهما.
     /// </summary>
     private void ConfigureHeaderVisibility()
     {
+        pnlHeader.SuspendLayout();
         pnlHeader.Padding = new Padding(18, 12, 18, 8);
+        pnlHeader.RightToLeft = RightToLeft.No;
+
         foreach (Control control in pnlHeader.Controls)
         {
             if (control is not Label label)
@@ -57,13 +60,21 @@ public partial class FrmCountries : Form
             label.AutoEllipsis = false;
             label.RightToLeft = RightToLeft.Yes;
             label.TextAlign = ContentAlignment.MiddleRight;
+            label.Dock = DockStyle.Top;
+            label.Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Left;
 
             if (string.Equals(label.Text.Trim(), "الدول", StringComparison.Ordinal))
             {
                 label.Height = 44;
-                label.Dock = DockStyle.Top;
+                label.BringToFront();
+            }
+            else
+            {
+                label.Height = 28;
             }
         }
+
+        pnlHeader.ResumeLayout(true);
     }
 
     /// <summary>
@@ -77,20 +88,7 @@ public partial class FrmCountries : Form
         pnlActions.Padding = new Padding(10, 6, 10, 6);
         pnlActions.Margin = new Padding(0, 0, 0, 8);
 
-        var root = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            RightToLeft = RightToLeft.Yes,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty,
-            BackColor = Color.White
-        };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 66F));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F));
-
-        var operations = new FlowLayoutPanel
+        var flow = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.RightToLeft,
@@ -98,31 +96,20 @@ public partial class FrmCountries : Form
             RightToLeft = RightToLeft.Yes,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
-            BackColor = Color.White
+            BackColor = Color.White,
+            AutoScroll = true
         };
 
-        // ترتيب الإضافة هنا هو نفسه الترتيب الظاهر من اليمين إلى اليسار.
-        operations.Controls.AddRange(new Control[]
-        {
-            btnNew, btnSave, btnEdit, btnDelete, btnPrint, btnRefresh, btnClose
-        });
+        var btnToolbarSearch = CreateToolbarButton("بحث", Color.FromArgb(28, 105, 225), Color.White);
+        btnToolbarSearch.Click += (_, _) => txtSearchAll.Focus();
 
-        var navigation = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
-            RightToLeft = RightToLeft.Yes,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 1, 0, 0),
-            BackColor = Color.White
-        };
-
-        var btnFirst = CreateNavigationButton("الأول");
-        var btnPrevious = CreateNavigationButton("السابق");
+        var btnFirst = CreateNavigationButton("|◀");
+        btnFirst.AccessibleName = "الأول";
+        var btnPrevious = CreateNavigationButton("◀");
+        btnPrevious.AccessibleName = "السابق";
         _lblCurrentRecord = new Label
         {
-            Width = 54,
+            Width = 72,
             Height = 38,
             Margin = new Padding(4, 0, 4, 0),
             Text = "1 / 5",
@@ -132,37 +119,67 @@ public partial class FrmCountries : Form
             ForeColor = Color.FromArgb(33, 45, 65),
             Font = new Font(Font.FontFamily, 9F, FontStyle.Bold)
         };
-        var btnNext = CreateNavigationButton("التالي");
-        var btnLast = CreateNavigationButton("الأخير");
+        var btnNext = CreateNavigationButton("▶");
+        btnNext.AccessibleName = "التالي";
+        var btnLast = CreateNavigationButton("▶|");
+        btnLast.AccessibleName = "الأخير";
 
         btnFirst.Click += (_, _) => SelectCountryRow(0);
         btnPrevious.Click += (_, _) => SelectCountryRow(Math.Max(0, GetSelectedCountryRowIndex() - 1));
         btnNext.Click += (_, _) => SelectCountryRow(Math.Min(dgvCountries.Rows.Count - 1, GetSelectedCountryRowIndex() + 1));
         btnLast.Click += (_, _) => SelectCountryRow(dgvCountries.Rows.Count - 1);
 
-        navigation.Controls.AddRange(new Control[]
+        // الترتيب الظاهر من أقصى اليمين إلى اليسار:
+        // جديد، حفظ، تعديل، بحث، الأول، السابق، رقم السجل، التالي، الأخير، حذف، طباعة، تحديث، إغلاق.
+        flow.Controls.AddRange(new Control[]
         {
-            btnFirst, btnPrevious, _lblCurrentRecord, btnNext, btnLast
+            btnNew,
+            btnSave,
+            btnEdit,
+            btnToolbarSearch,
+            btnFirst,
+            btnPrevious,
+            _lblCurrentRecord,
+            btnNext,
+            btnLast,
+            btnDelete,
+            btnPrint,
+            btnRefresh,
+            btnClose
         });
 
-        root.Controls.Add(operations, 0, 0);
-        root.Controls.Add(navigation, 1, 0);
-        pnlActions.Controls.Add(root);
+        pnlActions.Controls.Add(flow);
         pnlActions.ResumeLayout(true);
+    }
+
+    private Button CreateToolbarButton(string text, Color backColor, Color foreColor)
+    {
+        return new Button
+        {
+            Width = 86,
+            Height = 38,
+            Margin = new Padding(4, 0, 4, 0),
+            Text = text,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = backColor,
+            ForeColor = foreColor,
+            Font = new Font(Font.FontFamily, 9F, FontStyle.Bold),
+            UseVisualStyleBackColor = false
+        };
     }
 
     private Button CreateNavigationButton(string text)
     {
         return new Button
         {
-            Width = 72,
+            Width = 52,
             Height = 38,
             Margin = new Padding(4, 0, 4, 0),
             Text = text,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.White,
             ForeColor = Color.FromArgb(33, 45, 65),
-            Font = new Font(Font.FontFamily, 9F),
+            Font = new Font(Font.FontFamily, 10F, FontStyle.Bold),
             UseVisualStyleBackColor = false
         };
     }
