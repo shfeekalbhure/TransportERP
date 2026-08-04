@@ -12,6 +12,7 @@ public sealed class RequiredTextBox : TextBox
 {
     private bool _isRequired = true;
     private string _requiredMessage = "هذا الحقل إلزامي.";
+    private bool _isApplyingArabicAlignment;
 
     /// <summary>
     /// إنشاء حقل نص بالهوية البصرية المعتمدة للنظام.
@@ -21,7 +22,11 @@ public sealed class RequiredTextBox : TextBox
         ApplyDefaultStyle();
         Enter += HandleEnter;
         Leave += HandleLeave;
-        TextChanged += (_, _) => UpdateVisualState();
+        TextChanged += (_, _) =>
+        {
+            ApplyArabicAlignment();
+            UpdateVisualState();
+        };
     }
 
     [Category("TransportERP")]
@@ -78,22 +83,58 @@ public sealed class RequiredTextBox : TextBox
     }
 
     /// <summary>
-    /// إعادة فرض اتجاه ومحاذاة النص بعد إنشاء مقبض WinForms.
-    /// يمنع رجوع الكتابة إلى اليسار بسبب وراثة اتجاه الحاويات.
+    /// إعادة فرض الاتجاه والمحاذاة بعد إنشاء مقبض WinForms.
     /// </summary>
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         ApplyArabicAlignment();
+
+        if (IsHandleCreated)
+        {
+            BeginInvoke(ApplyArabicAlignment);
+        }
     }
 
     /// <summary>
-    /// إعادة تطبيق المحاذاة عند تغير اتجاه العنصر أو الحاوية الأب.
+    /// تثبيت المحاذاة عند إضافة الحقل إلى أي حاوية.
     /// </summary>
+    protected override void OnParentChanged(EventArgs e)
+    {
+        base.OnParentChanged(e);
+        ApplyArabicAlignment();
+    }
+
+    /// <summary>
+    /// تثبيت المحاذاة عند تغير الخط أو القياس.
+    /// </summary>
+    protected override void OnFontChanged(EventArgs e)
+    {
+        base.OnFontChanged(e);
+        ApplyArabicAlignment();
+    }
+
+    /// <summary>
+    /// منع المصمم أو الحاوية من إعادة النص إلى اليسار.
+    /// </summary>
+    protected override void OnTextAlignChanged(EventArgs e)
+    {
+        base.OnTextAlignChanged(e);
+
+        if (!_isApplyingArabicAlignment && TextAlign != HorizontalAlignment.Right)
+        {
+            ApplyArabicAlignment();
+        }
+    }
+
     protected override void OnRightToLeftChanged(EventArgs e)
     {
         base.OnRightToLeftChanged(e);
-        ApplyArabicAlignment();
+
+        if (!_isApplyingArabicAlignment && RightToLeft != RightToLeft.Yes)
+        {
+            ApplyArabicAlignment();
+        }
     }
 
     private void ApplyDefaultStyle()
@@ -106,12 +147,25 @@ public sealed class RequiredTextBox : TextBox
     }
 
     /// <summary>
-    /// تثبيت الكتابة العربية من اليمين ومحاذاة النص إلى اليمين.
+    /// فرض الكتابة العربية ومحاذاة النص إلى أقصى اليمين.
     /// </summary>
     private void ApplyArabicAlignment()
     {
-        RightToLeft = RightToLeft.Yes;
-        TextAlign = HorizontalAlignment.Right;
+        if (_isApplyingArabicAlignment)
+        {
+            return;
+        }
+
+        try
+        {
+            _isApplyingArabicAlignment = true;
+            RightToLeft = RightToLeft.Yes;
+            TextAlign = HorizontalAlignment.Right;
+        }
+        finally
+        {
+            _isApplyingArabicAlignment = false;
+        }
     }
 
     private void HandleEnter(object? sender, EventArgs e)
@@ -122,6 +176,7 @@ public sealed class RequiredTextBox : TextBox
 
     private void HandleLeave(object? sender, EventArgs e)
     {
+        ApplyArabicAlignment();
         UpdateVisualState();
     }
 
