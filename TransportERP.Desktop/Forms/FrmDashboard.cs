@@ -1,152 +1,50 @@
-using TransportERP.Desktop.Themes;
+using System.Drawing.Drawing2D;
 
 namespace TransportERP.Desktop;
 
 /// <summary>
 /// الشاشة الرئيسية لنظام TransportERP.
-/// تعرض مؤشرات الأداء والاختصارات وآخر العمليات والتنبيهات ضمن واجهة عربية RTL.
+/// تعرض مؤشرات الأداء والاختصارات والرسوم وآخر المعاملات ضمن واجهة عربية RTL.
 /// </summary>
 public partial class FrmDashboard : Form
 {
-    /// <summary>
-    /// إنشاء الشاشة الرئيسية وتهيئة مكوناتها المصممة بصريًا.
-    /// </summary>
     public FrmDashboard()
     {
         InitializeComponent();
-        ApplyApprovedReferenceLayout();
         LoadDevelopmentPreviewData();
     }
 
     /// <summary>
-    /// تطبيق توزيع الصورة المرجعية المعتمدة:
-    /// حاوية النظام في يمين الشاشة وشريط بحث أعلى مساحة العمل.
-    /// </summary>
-    private void ApplyApprovedReferenceLayout()
-    {
-        // عدم عكس أعمدة الحاوية الجذرية؛ العمود الأخير يبقى فعليًا في يمين النافذة.
-        tblRoot.RightToLeft = RightToLeft.No;
-        pnlSidebar.RightToLeft = RightToLeft.Yes;
-        tblMain.RightToLeft = RightToLeft.Yes;
-
-        // منع إضافة شريط البحث مرتين عند إعادة فتح المصمم أو إعادة تهيئة النموذج.
-        if (tblMain.Controls.ContainsKey("pnlGlobalSearch"))
-        {
-            return;
-        }
-
-        tblMain.SuspendLayout();
-
-        // إضافة صف جديد أعلى جميع حاويات Dashboard.
-        tblMain.RowCount += 1;
-        tblMain.RowStyles.Insert(0, new RowStyle(SizeType.Absolute, 64F));
-
-        // تحريك العناصر الحالية صفًا واحدًا إلى الأسفل.
-        foreach (Control control in tblMain.Controls)
-        {
-            var currentRow = tblMain.GetRow(control);
-            tblMain.SetRow(control, currentRow + 1);
-        }
-
-        var searchContainer = new Panel
-        {
-            Name = "pnlGlobalSearch",
-            Dock = DockStyle.Fill,
-            BackColor = Color.White,
-            Margin = new Padding(0, 0, 0, 12),
-            Padding = new Padding(18, 10, 18, 10),
-            RightToLeft = RightToLeft.Yes
-        };
-
-        var searchLayout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 1,
-            BackColor = Color.Transparent,
-            Margin = Padding.Empty,
-            RightToLeft = RightToLeft.Yes
-        };
-        searchLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42F));
-        searchLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        searchLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 230F));
-
-        var searchIcon = new Label
-        {
-            Dock = DockStyle.Fill,
-            Text = "⌕",
-            ForeColor = UiTheme.PrimaryBlue,
-            Font = UiTheme.CreateBoldFont(18F),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
-        var searchTextBox = new TextBox
-        {
-            Name = "txtGlobalSearch",
-            Dock = DockStyle.Fill,
-            BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.FromArgb(248, 250, 253),
-            ForeColor = UiTheme.HeadingText,
-            Font = UiTheme.CreateRegularFont(11F),
-            RightToLeft = RightToLeft.Yes,
-            TextAlign = HorizontalAlignment.Left,
-            PlaceholderText = "ابحث في الشاشات، العمليات، العملاء، الحسابات...",
-            Margin = new Padding(0, 3, 12, 3)
-        };
-
-        var systemContainerTitle = new Label
-        {
-            Dock = DockStyle.Fill,
-            Text = "حاوية النظام",
-            ForeColor = UiTheme.HeadingText,
-            Font = UiTheme.CreateBoldFont(12F),
-            TextAlign = ContentAlignment.MiddleRight,
-            Padding = new Padding(8, 0, 8, 0)
-        };
-
-        searchLayout.Controls.Add(searchIcon, 0, 0);
-        searchLayout.Controls.Add(searchTextBox, 1, 0);
-        searchLayout.Controls.Add(systemContainerTitle, 2, 0);
-        searchContainer.Controls.Add(searchLayout);
-
-        tblMain.Controls.Add(searchContainer, 0, 0);
-        tblMain.ResumeLayout(true);
-    }
-
-    /// <summary>
-    /// تحميل بيانات معاينة مؤقتة أثناء مرحلة تطوير الواجهات فقط.
-    /// تُستبدل لاحقًا ببيانات الخدمات وواجهة API.
+    /// تحميل بيانات معاينة مؤقتة إلى أن يتم ربط الشاشة بخدمات النظام وواجهة API.
     /// </summary>
     private void LoadDevelopmentPreviewData()
     {
-        dgvRecentOperations.Rows.Clear();
-        dgvRecentOperations.Rows.Add("سند قبض", "RV-000125", "شركة النقل الرئيسية", "125,000", "معلق");
-        dgvRecentOperations.Rows.Add("قيد يومي", "JV-000084", "الفرع الرئيسي", "75,500", "معتمد");
-        dgvRecentOperations.Rows.Add("سند صرف", "PV-000041", "الصندوق الرئيسي", "32,000", "مراجع");
-        dgvRecentOperations.Rows.Add("تحديث مستخدم", "USR-000012", "إدارة النظام", "—", "مكتمل");
+        dgvRecentTransactions.Rows.Clear();
+        dgvRecentTransactions.Rows.Add("سند قبض رقم CP-000123", "25,000 ريال", "مكتمل");
+        dgvRecentTransactions.Rows.Add("سند صرف رقم PV-000455", "15,750 ريال", "معتمد");
+        dgvRecentTransactions.Rows.Add("قيد يومي رقم JV-000799", "8,900 ريال", "معلق");
+        dgvRecentTransactions.Rows.Add("تحويل بنكي رقم TR-000321", "12,600 ريال", "مكتمل");
+        dgvRecentTransactions.Rows.Add("سند قبض رقم CP-000122", "7,250 ريال", "ملغي");
 
         statusBar.CompanyName = "شركة النقل الرئيسية";
-        statusBar.BranchName = "الفرع الرئيسي";
-        statusBar.FiscalYear = DateTime.Today.Year.ToString();
-        statusBar.FinancialPeriod = "الفترة الحالية";
-        statusBar.CurrentUser = "مستخدم تجريبي";
+        statusBar.BranchName = "الرئيسي";
+        statusBar.FiscalYear = "2026";
+        statusBar.FinancialPeriod = "مايو - 2026";
+        statusBar.CurrentUser = "أحمد محمد";
         statusBar.CurrentRole = "مدير النظام";
-        statusBar.EnvironmentName = "بيئة التطوير";
-        statusBar.SystemVersion = "1.0.0";
-        statusBar.SetConnectionStatus(false, "لم يتم ربط API بعد");
+        statusBar.EnvironmentName = "التطوير";
+        statusBar.SystemVersion = "1.0.0.0";
+        statusBar.SetConnectionStatus(true, "متصل");
+
+        pnlRevenueChart.Invalidate();
+        pnlActivityChart.Invalidate();
     }
 
-    /// <summary>
-    /// إغلاق الشاشة الرئيسية والعودة إلى شاشة الدخول في وضع التطوير.
-    /// </summary>
     private void btnLogout_Click(object? sender, EventArgs e)
     {
         Close();
     }
 
-    /// <summary>
-    /// عرض رسالة مؤقتة عند الضغط على اختصار لم تُربط شاشته بعد.
-    /// </summary>
     private void QuickAction_Click(object? sender, EventArgs e)
     {
         if (sender is not Button button)
@@ -159,5 +57,74 @@ public partial class FrmDashboard : Form
             "TransportERP",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
+    }
+
+    /// <summary>
+    /// رسم مخطط الإيرادات والمصروفات لآخر ستة أشهر.
+    /// </summary>
+    private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var area = new Rectangle(54, 48, Math.Max(220, pnlRevenueChart.ClientSize.Width - 84), Math.Max(150, pnlRevenueChart.ClientSize.Height - 92));
+        var months = new[] { "ديسمبر", "يناير", "فبراير", "مارس", "أبريل", "مايو" };
+        var revenues = new[] { 0.62F, 0.68F, 0.73F, 0.79F, 0.86F, 0.94F };
+        var expenses = new[] { 0.42F, 0.47F, 0.51F, 0.56F, 0.61F, 0.67F };
+
+        using var gridPen = new Pen(Color.FromArgb(230, 234, 241), 1F);
+        using var revenueBrush = new SolidBrush(Color.FromArgb(47, 128, 237));
+        using var expenseBrush = new SolidBrush(Color.FromArgb(235, 87, 87));
+        using var textBrush = new SolidBrush(Color.FromArgb(70, 78, 93));
+        using var labelFont = new Font(Font.FontFamily, 8.5F);
+
+        for (var i = 0; i <= 5; i++)
+        {
+            var y = area.Bottom - (area.Height * i / 5F);
+            e.Graphics.DrawLine(gridPen, area.Left, y, area.Right, y);
+        }
+
+        var groupWidth = area.Width / 6F;
+        for (var i = 0; i < 6; i++)
+        {
+            var baseX = area.Left + (i * groupWidth) + (groupWidth * 0.2F);
+            var barWidth = groupWidth * 0.22F;
+            var revenueHeight = area.Height * revenues[i];
+            var expenseHeight = area.Height * expenses[i];
+            e.Graphics.FillRectangle(revenueBrush, baseX, area.Bottom - revenueHeight, barWidth, revenueHeight);
+            e.Graphics.FillRectangle(expenseBrush, baseX + barWidth + 5F, area.Bottom - expenseHeight, barWidth, expenseHeight);
+            var labelSize = e.Graphics.MeasureString(months[i], labelFont);
+            e.Graphics.DrawString(months[i], labelFont, textBrush, baseX + barWidth - (labelSize.Width / 2F), area.Bottom + 8F);
+        }
+    }
+
+    /// <summary>
+    /// رسم مخطط دائري لتوزيع الإيرادات حسب النشاط.
+    /// </summary>
+    private void pnlActivityChart_Paint(object? sender, PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var size = Math.Min(pnlActivityChart.ClientSize.Width - 170, pnlActivityChart.ClientSize.Height - 70);
+        size = Math.Max(140, size);
+        var donut = new Rectangle(28, 48, size, size);
+        var values = new[] { 35F, 25F, 20F, 10F, 10F };
+        var colors = new[]
+        {
+            Color.FromArgb(47, 128, 237),
+            Color.FromArgb(111, 207, 151),
+            Color.FromArgb(242, 153, 74),
+            Color.FromArgb(155, 81, 224),
+            Color.FromArgb(86, 204, 200)
+        };
+        var startAngle = -90F;
+        for (var i = 0; i < values.Length; i++)
+        {
+            var sweep = values[i] * 3.6F;
+            using var brush = new SolidBrush(colors[i]);
+            e.Graphics.FillPie(brush, donut, startAngle, sweep);
+            startAngle += sweep;
+        }
+
+        var inner = Rectangle.Inflate(donut, -(int)(size * 0.28F), -(int)(size * 0.28F));
+        using var centerBrush = new SolidBrush(Color.White);
+        e.Graphics.FillEllipse(centerBrush, inner);
     }
 }
