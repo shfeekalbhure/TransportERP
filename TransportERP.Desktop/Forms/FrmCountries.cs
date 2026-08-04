@@ -47,8 +47,11 @@ public partial class FrmCountries : Form
     private void ConfigureHeaderVisibility()
     {
         pnlHeader.SuspendLayout();
-        pnlHeader.Padding = new Padding(18, 12, 18, 8);
+        pnlHeader.Padding = new Padding(18, 8, 18, 6);
         pnlHeader.RightToLeft = RightToLeft.No;
+
+        Label? titleLabel = null;
+        Label? trailLabel = null;
 
         foreach (Control control in pnlHeader.Controls)
         {
@@ -57,28 +60,50 @@ public partial class FrmCountries : Form
                 continue;
             }
 
+            label.Dock = DockStyle.None;
+            label.AutoSize = false;
             label.AutoEllipsis = false;
             label.RightToLeft = RightToLeft.Yes;
             label.TextAlign = ContentAlignment.MiddleRight;
-            label.Dock = DockStyle.Top;
-            label.Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Left;
+            label.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             if (string.Equals(label.Text.Trim(), "الدول", StringComparison.Ordinal))
             {
-                label.Height = 44;
-                label.BringToFront();
+                titleLabel = label;
             }
             else
             {
-                label.Height = 28;
+                trailLabel = label;
             }
         }
 
+        void ApplyHeaderBounds()
+        {
+            var width = Math.Max(100, pnlHeader.ClientSize.Width - pnlHeader.Padding.Horizontal);
+            var left = pnlHeader.Padding.Left;
+
+            if (titleLabel is not null)
+            {
+                titleLabel.SetBounds(left, 4, width, 44);
+                titleLabel.TextAlign = ContentAlignment.MiddleRight;
+                titleLabel.BringToFront();
+            }
+
+            if (trailLabel is not null)
+            {
+                trailLabel.SetBounds(left, 48, width, 28);
+                trailLabel.TextAlign = ContentAlignment.MiddleRight;
+                trailLabel.BringToFront();
+            }
+        }
+
+        ApplyHeaderBounds();
+        pnlHeader.Resize += (_, _) => ApplyHeaderBounds();
         pnlHeader.ResumeLayout(true);
     }
 
     /// <summary>
-    /// إعادة بناء حاوية الأزرار مع ترتيب العمليات من اليمين وإضافة أزرار التنقل.
+    /// بناء شريط الأدوات بترتيب ثابت من أقصى اليمين دون الاعتماد على انعكاس FlowLayoutPanel.
     /// </summary>
     private void ConfigureActionAndNavigationBars()
     {
@@ -88,17 +113,34 @@ public partial class FrmCountries : Form
         pnlActions.Padding = new Padding(10, 6, 10, 6);
         pnlActions.Margin = new Padding(0, 0, 0, 8);
 
-        var flow = new FlowLayoutPanel
+        var toolbar = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
-            RightToLeft = RightToLeft.Yes,
+            ColumnCount = 14,
+            RowCount = 1,
+            RightToLeft = RightToLeft.No,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
             BackColor = Color.White,
-            AutoScroll = true
+            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
         };
+
+        // العمود صفر مساحة مرنة في اليسار، ثم تبدأ الأزرار حتى يصل زر جديد إلى أقصى اليمين.
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // إغلاق
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // تحديث
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // طباعة
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // حذف
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));  // الأخير
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));  // التالي
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76F));  // رقم السجل
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));  // السابق
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));  // الأول
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // بحث
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // تعديل
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // حفظ
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94F));  // جديد
+        toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         var btnToolbarSearch = CreateToolbarButton("بحث", Color.FromArgb(28, 105, 225), Color.White);
         btnToolbarSearch.Click += (_, _) => txtSearchAll.Focus();
@@ -109,8 +151,7 @@ public partial class FrmCountries : Form
         btnPrevious.AccessibleName = "السابق";
         _lblCurrentRecord = new Label
         {
-            Width = 72,
-            Height = 38,
+            Dock = DockStyle.Fill,
             Margin = new Padding(4, 0, 4, 0),
             Text = "1 / 5",
             TextAlign = ContentAlignment.MiddleCenter,
@@ -129,35 +170,50 @@ public partial class FrmCountries : Form
         btnNext.Click += (_, _) => SelectCountryRow(Math.Min(dgvCountries.Rows.Count - 1, GetSelectedCountryRowIndex() + 1));
         btnLast.Click += (_, _) => SelectCountryRow(dgvCountries.Rows.Count - 1);
 
-        // الترتيب الظاهر من أقصى اليمين إلى اليسار:
-        // جديد، حفظ، تعديل، بحث، الأول، السابق، رقم السجل، التالي، الأخير، حذف، طباعة، تحديث، إغلاق.
-        flow.Controls.AddRange(new Control[]
-        {
-            btnNew,
-            btnSave,
-            btnEdit,
-            btnToolbarSearch,
-            btnFirst,
-            btnPrevious,
-            _lblCurrentRecord,
-            btnNext,
-            btnLast,
-            btnDelete,
-            btnPrint,
-            btnRefresh,
-            btnClose
-        });
+        PrepareToolbarControl(btnNew);
+        PrepareToolbarControl(btnSave);
+        PrepareToolbarControl(btnEdit);
+        PrepareToolbarControl(btnDelete);
+        PrepareToolbarControl(btnPrint);
+        PrepareToolbarControl(btnRefresh);
+        PrepareToolbarControl(btnClose);
+        PrepareToolbarControl(btnToolbarSearch);
+        PrepareToolbarControl(btnFirst);
+        PrepareToolbarControl(btnPrevious);
+        PrepareToolbarControl(btnNext);
+        PrepareToolbarControl(btnLast);
 
-        pnlActions.Controls.Add(flow);
+        // الترتيب من أقصى اليمين إلى اليسار:
+        // جديد، حفظ، تعديل، بحث، الأول، السابق، رقم السجل، التالي، الأخير، حذف، طباعة، تحديث، إغلاق.
+        toolbar.Controls.Add(btnClose, 1, 0);
+        toolbar.Controls.Add(btnRefresh, 2, 0);
+        toolbar.Controls.Add(btnPrint, 3, 0);
+        toolbar.Controls.Add(btnDelete, 4, 0);
+        toolbar.Controls.Add(btnLast, 5, 0);
+        toolbar.Controls.Add(btnNext, 6, 0);
+        toolbar.Controls.Add(_lblCurrentRecord, 7, 0);
+        toolbar.Controls.Add(btnPrevious, 8, 0);
+        toolbar.Controls.Add(btnFirst, 9, 0);
+        toolbar.Controls.Add(btnToolbarSearch, 10, 0);
+        toolbar.Controls.Add(btnEdit, 11, 0);
+        toolbar.Controls.Add(btnSave, 12, 0);
+        toolbar.Controls.Add(btnNew, 13, 0);
+
+        pnlActions.Controls.Add(toolbar);
         pnlActions.ResumeLayout(true);
+    }
+
+    private static void PrepareToolbarControl(Control control)
+    {
+        control.Dock = DockStyle.Fill;
+        control.Margin = new Padding(4, 0, 4, 0);
     }
 
     private Button CreateToolbarButton(string text, Color backColor, Color foreColor)
     {
         return new Button
         {
-            Width = 86,
-            Height = 38,
+            Dock = DockStyle.Fill,
             Margin = new Padding(4, 0, 4, 0),
             Text = text,
             FlatStyle = FlatStyle.Flat,
@@ -172,8 +228,7 @@ public partial class FrmCountries : Form
     {
         return new Button
         {
-            Width = 52,
-            Height = 38,
+            Dock = DockStyle.Fill,
             Margin = new Padding(4, 0, 4, 0),
             Text = text,
             FlatStyle = FlatStyle.Flat,
