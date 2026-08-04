@@ -83,56 +83,56 @@ namespace TransportERP.Desktop
             SuspendLayout();
 
             // الحاوية الرئيسية تقسم الشاشة إلى بطاقة دخول ولوحة تعريف بالنظام وشريط حالة سفلي.
-            // أزيل الهامش السفلي حتى يثبت شريط الحالة ملاصقًا لحافة النافذة.
+            // تم تقليل الهامش العلوي ورفع الحاويتين بصريًا مع إبقاء شريط الحالة ملاصقًا لأسفل النافذة.
             tblRoot.Dock = DockStyle.Fill;
             tblRoot.ColumnCount = 2;
             tblRoot.RowCount = 2;
-            tblRoot.Padding = new Padding(28, 28, 28, 0);
+            tblRoot.Padding = new Padding(28, 16, 28, 0);
             tblRoot.BackColor = UiTheme.WindowBackground;
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             tblRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             tblRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
+            tblRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
 
             // بطاقة إدخال بيانات المستخدم.
             pnlLoginCard.Dock = DockStyle.Fill;
-            pnlLoginCard.Margin = new Padding(0, 0, 14, 10);
-            pnlLoginCard.Padding = new Padding(54, 38, 54, 24);
+            pnlLoginCard.Margin = new Padding(0, 0, 14, 4);
+            pnlLoginCard.Padding = new Padding(54, 28, 54, 16);
             pnlLoginCard.BackColor = Color.White;
 
             lblTitle.Text = "تسجيل الدخول";
             lblTitle.Font = UiTheme.CreateBoldFont(24F);
             lblTitle.ForeColor = UiTheme.HeadingText;
-            lblTitle.Location = new Point(54, 38);
+            lblTitle.Location = new Point(54, 26);
             lblTitle.Size = new Size(470, 50);
             lblTitle.TextAlign = ContentAlignment.MiddleRight;
 
             lblSubtitle.Text = "أدخل بياناتك للوصول إلى النظام";
             lblSubtitle.Font = UiTheme.CreateRegularFont(11F);
             lblSubtitle.ForeColor = UiTheme.SecondaryText;
-            lblSubtitle.Location = new Point(54, 88);
+            lblSubtitle.Location = new Point(54, 76);
             lblSubtitle.Size = new Size(470, 32);
             lblSubtitle.TextAlign = ContentAlignment.MiddleRight;
 
-            ConfigureLabel(lblUserName, "اسم المستخدم", 142);
-            ConfigureRequiredTextBox(txtUserName, 174, "يرجى إدخال اسم المستخدم.");
+            ConfigureLabel(lblUserName, "اسم المستخدم", 130);
+            ConfigureRequiredTextBox(txtUserName, 162, "يرجى إدخال اسم المستخدم.");
 
-            ConfigureLabel(lblPassword, "كلمة المرور", 232);
-            ConfigurePasswordTextBox(txtPassword, 264, "يرجى إدخال كلمة المرور.");
+            ConfigureLabel(lblPassword, "كلمة المرور", 220);
+            ConfigurePasswordTextBox(txtPassword, 252, "يرجى إدخال كلمة المرور.");
 
-            ConfigureLabel(lblCompany, "الشركة", 322);
-            ConfigureLookupComboBox(cmbCompany, 354, "يرجى اختيار الشركة.");
+            ConfigureLabel(lblCompany, "الشركة", 310);
+            ConfigureLookupComboBox(cmbCompany, 342, "يرجى اختيار الشركة.");
 
-            ConfigureLabel(lblBranch, "الفرع", 412);
-            ConfigureLookupComboBox(cmbBranch, 444, "يرجى اختيار الفرع.");
+            ConfigureLabel(lblBranch, "الفرع", 400);
+            ConfigureLookupComboBox(cmbBranch, 432, "يرجى اختيار الفرع.");
 
-            ConfigureLabel(lblFiscalYear, "السنة المالية", 502);
-            ConfigureLookupComboBox(cmbFiscalYear, 534, "يرجى اختيار السنة المالية.");
+            ConfigureLabel(lblFiscalYear, "السنة المالية", 490);
+            ConfigureLookupComboBox(cmbFiscalYear, 522, "يرجى اختيار السنة المالية.");
 
             chkRememberMe.Text = "تذكرني";
             chkRememberMe.Font = UiTheme.CreateRegularFont(10F);
             chkRememberMe.ForeColor = UiTheme.HeadingText;
-            chkRememberMe.Location = new Point(54, 590);
+            chkRememberMe.Location = new Point(54, 578);
             chkRememberMe.Size = new Size(180, 30);
             chkRememberMe.TextAlign = ContentAlignment.MiddleRight;
 
@@ -140,7 +140,7 @@ namespace TransportERP.Desktop
             lnkForgotPassword.Font = UiTheme.CreateRegularFont(10F);
             lnkForgotPassword.LinkColor = UiTheme.PrimaryBlue;
             lnkForgotPassword.ActiveLinkColor = UiTheme.PrimaryBlueHover;
-            lnkForgotPassword.Location = new Point(334, 590);
+            lnkForgotPassword.Location = new Point(334, 578);
             lnkForgotPassword.Size = new Size(190, 30);
             lnkForgotPassword.TextAlign = ContentAlignment.MiddleLeft;
 
@@ -148,14 +148,14 @@ namespace TransportERP.Desktop
             btnLogin.Text = "دخول";
             btnLogin.CornerRadius = 12;
             btnLogin.Font = UiTheme.CreateBoldFont(12F);
-            btnLogin.Location = new Point(54, 638);
+            btnLogin.Location = new Point(54, 626);
             btnLogin.Size = new Size(470, 52);
             btnLogin.Click += btnLogin_Click;
 
             lblLanguage.Text = "العربية  |  English";
             lblLanguage.Font = UiTheme.CreateRegularFont(9F);
             lblLanguage.ForeColor = UiTheme.SecondaryText;
-            lblLanguage.Location = new Point(54, 704);
+            lblLanguage.Location = new Point(54, 686);
             lblLanguage.Size = new Size(470, 28);
             lblLanguage.TextAlign = ContentAlignment.MiddleCenter;
 
@@ -168,28 +168,28 @@ namespace TransportERP.Desktop
 
             // لوحة تعريف النظام وهوية المنتج.
             pnlBrand.Dock = DockStyle.Fill;
-            pnlBrand.Margin = new Padding(14, 0, 0, 10);
+            pnlBrand.Margin = new Padding(14, 0, 0, 4);
             pnlBrand.Padding = new Padding(56);
             pnlBrand.BackColor = UiTheme.BrandGradientStart;
 
             lblBrandName.Text = "TransportERP";
             lblBrandName.Font = UiTheme.CreateBoldFont(30F);
             lblBrandName.ForeColor = Color.White;
-            lblBrandName.Location = new Point(56, 90);
+            lblBrandName.Location = new Point(56, 70);
             lblBrandName.Size = new Size(560, 64);
             lblBrandName.TextAlign = ContentAlignment.MiddleRight;
 
             lblBrandDescription.Text = "نظام النقل والخدمات اللوجستية المتكامل";
             lblBrandDescription.Font = UiTheme.CreateRegularFont(15F);
             lblBrandDescription.ForeColor = Color.FromArgb(220, 235, 255);
-            lblBrandDescription.Location = new Point(56, 160);
+            lblBrandDescription.Location = new Point(56, 140);
             lblBrandDescription.Size = new Size(560, 54);
             lblBrandDescription.TextAlign = ContentAlignment.MiddleRight;
 
             lblBrandFeatures.Text = "إدارة الشركات والفروع والحسابات من منصة موحدة وآمنة.\r\n\r\n✓ واجهة عربية حديثة\r\n✓ متعدد الشركات والفروع\r\n✓ اتصال مركزي عبر API\r\n✓ قابل للتوسع لتطبيقات الجوال";
             lblBrandFeatures.Font = UiTheme.CreateRegularFont(13F);
             lblBrandFeatures.ForeColor = Color.White;
-            lblBrandFeatures.Location = new Point(56, 250);
+            lblBrandFeatures.Location = new Point(56, 230);
             lblBrandFeatures.Size = new Size(560, 360);
             lblBrandFeatures.TextAlign = ContentAlignment.TopRight;
 
@@ -238,6 +238,7 @@ namespace TransportERP.Desktop
             label.ForeColor = UiTheme.HeadingText;
             label.Location = new Point(54, top);
             label.Size = new Size(470, 28);
+            label.RightToLeft = RightToLeft.Yes;
             label.TextAlign = ContentAlignment.MiddleRight;
         }
 
@@ -255,6 +256,7 @@ namespace TransportERP.Desktop
             textBox.IsRequired = true;
             textBox.RequiredMessage = requiredMessage;
             textBox.RightToLeft = RightToLeft.Yes;
+            textBox.TextAlign = HorizontalAlignment.Right;
         }
 
         /// <summary>
