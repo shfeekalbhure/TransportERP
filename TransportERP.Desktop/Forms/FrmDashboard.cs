@@ -11,7 +11,55 @@ public partial class FrmDashboard : Form
     public FrmDashboard()
     {
         InitializeComponent();
+        BindCountriesScreen();
         LoadDevelopmentPreviewData();
+    }
+
+    /// <summary>
+    /// ربط عنصر التهيئة العامة في القائمة الجانبية بفتح شاشة الدول الحالية.
+    /// هذا الربط مؤقت إلى أن تُبنى القائمة الفرعية الكاملة للبيانات الجغرافية.
+    /// </summary>
+    private void BindCountriesScreen()
+    {
+        var generalSetupButton = FindButtonByText(this, "التهيئة العامة");
+        if (generalSetupButton is null)
+        {
+            return;
+        }
+
+        generalSetupButton.Click -= GeneralSetupButton_Click;
+        generalSetupButton.Click += GeneralSetupButton_Click;
+    }
+
+    /// <summary>
+    /// البحث داخل عناصر النموذج عن زر يحتوي نصًا محددًا.
+    /// </summary>
+    private static Button? FindButtonByText(Control parent, string text)
+    {
+        foreach (Control control in parent.Controls)
+        {
+            if (control is Button button && button.Text.Contains(text, StringComparison.Ordinal))
+            {
+                return button;
+            }
+
+            var nestedButton = FindButtonByText(control, text);
+            if (nestedButton is not null)
+            {
+                return nestedButton;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// فتح شاشة GEN-003 — الدول من القائمة الرئيسية.
+    /// </summary>
+    private void GeneralSetupButton_Click(object? sender, EventArgs e)
+    {
+        using var countriesForm = new FrmCountries();
+        countriesForm.ShowDialog(this);
     }
 
     /// <summary>
