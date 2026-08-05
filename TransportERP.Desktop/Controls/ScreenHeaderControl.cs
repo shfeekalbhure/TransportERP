@@ -1,3 +1,7 @@
+using System.ComponentModel;
+using System.Drawing;
+using System.Windows.Forms;
+
 namespace TransportERP.Desktop.Controls;
 
 /// <summary>
@@ -9,6 +13,7 @@ public sealed class ScreenHeaderControl : UserControl
     private readonly Label _titleLabel;
     private readonly Label _breadcrumbLabel;
     private readonly Label _recordLabel;
+
     private readonly Button _btnNew;
     private readonly Button _btnSave;
     private readonly Button _btnEdit;
@@ -40,6 +45,7 @@ public sealed class ScreenHeaderControl : UserControl
             Padding = Padding.Empty,
             RightToLeft = RightToLeft.Yes
         };
+
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
@@ -68,7 +74,7 @@ public sealed class ScreenHeaderControl : UserControl
         {
             AutoSize = true,
             Text = "المسار التعريفي",
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+            Font = new Font("Segoe UI", 10F),
             ForeColor = Color.FromArgb(100, 110, 125),
             TextAlign = ContentAlignment.MiddleRight,
             Margin = new Padding(0, 13, 8, 0)
@@ -93,6 +99,7 @@ public sealed class ScreenHeaderControl : UserControl
         _btnSave = CreateActionButton("حفظ", Color.FromArgb(45, 157, 83), Color.White);
         _btnEdit = CreateActionButton("تعديل", Color.FromArgb(245, 145, 20), Color.White);
         _btnSearch = CreateActionButton("بحث", Color.FromArgb(28, 105, 225), Color.White);
+
         _btnFirst = CreateNavigationButton("|◀", "الأول");
         _btnPrevious = CreateNavigationButton("◀", "السابق");
 
@@ -111,6 +118,7 @@ public sealed class ScreenHeaderControl : UserControl
 
         _btnNext = CreateNavigationButton("▶", "التالي");
         _btnLast = CreateNavigationButton("▶|", "الأخير");
+
         _btnDelete = CreateActionButton("حذف", Color.FromArgb(225, 55, 55), Color.White);
         _btnPrint = CreateActionButton("طباعة", Color.White, Color.FromArgb(33, 45, 65));
         _btnRefresh = CreateActionButton("تحديث", Color.White, Color.FromArgb(33, 45, 65));
@@ -129,16 +137,19 @@ public sealed class ScreenHeaderControl : UserControl
         _btnRefresh.Click += (_, e) => RefreshClicked?.Invoke(this, e);
         _btnClose.Click += (_, e) => CloseClicked?.Invoke(this, e);
 
-        toolbar.Controls.AddRange(new Control[]
-        {
+        toolbar.Controls.AddRange(
+        [
             _btnNew, _btnSave, _btnEdit, _btnSearch,
             _btnFirst, _btnPrevious, _recordLabel, _btnNext, _btnLast,
             _btnDelete, _btnPrint, _btnRefresh, _btnClose
-        });
+        ]);
 
         root.Controls.Add(titleRow, 0, 0);
         root.Controls.Add(toolbar, 0, 1);
+
         Controls.Add(root);
+
+        SetNavigationState(false, true, true);
     }
 
     public event EventHandler? NewClicked;
@@ -154,22 +165,34 @@ public sealed class ScreenHeaderControl : UserControl
     public event EventHandler? RefreshClicked;
     public event EventHandler? CloseClicked;
 
+    [Category("TransportERP")]
+    [Description("اسم الشاشة الظاهر في رأس النافذة.")]
+    [DefaultValue("اسم الشاشة")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string ScreenTitle
     {
         get => _titleLabel.Text;
-        set => _titleLabel.Text = value;
+        set => _titleLabel.Text = value ?? string.Empty;
     }
 
+    [Category("TransportERP")]
+    [Description("المسار التعريفي للشاشة.")]
+    [DefaultValue("المسار التعريفي")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string Breadcrumb
     {
         get => _breadcrumbLabel.Text;
-        set => _breadcrumbLabel.Text = value;
+        set => _breadcrumbLabel.Text = value ?? string.Empty;
     }
 
+    [Category("TransportERP")]
+    [Description("موضع السجل الحالي، مثال: 1 / 25.")]
+    [DefaultValue("0 / 0")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string RecordPosition
     {
         get => _recordLabel.Text;
-        set => _recordLabel.Text = value;
+        set => _recordLabel.Text = value ?? string.Empty;
     }
 
     public void SetNavigationState(bool hasRecords, bool isFirst, bool isLast)

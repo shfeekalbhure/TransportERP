@@ -1,3 +1,8 @@
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using TransportERP.Desktop.Forms.Setup.Geographic;
+
 namespace TransportERP.Desktop;
 
 /// <summary>
@@ -22,9 +27,11 @@ public partial class FrmDashboard
 
         var geographicDataItem = _generalSetupMenu.Items
             .OfType<ToolStripMenuItem>()
-            .FirstOrDefault(item => string.Equals(item.Text, "البيانات الجغرافية", StringComparison.Ordinal));
+            .FirstOrDefault(item =>
+                string.Equals(item.Text, "البيانات الجغرافية", StringComparison.Ordinal));
 
-        if (geographicDataItem is null || geographicDataItem.DropDownItems.ContainsKey("mnuGovernorates"))
+        if (geographicDataItem is null ||
+            geographicDataItem.DropDownItems.ContainsKey("mnuGovernorates"))
         {
             return;
         }
@@ -35,7 +42,9 @@ public partial class FrmDashboard
             ToolTipText = "GEN-004 — المحافظات",
             RightToLeft = RightToLeft.Yes
         };
+
         governoratesItem.Click += (_, _) => OpenGovernoratesTab();
+
         geographicDataItem.DropDownItems.Add(governoratesItem);
     }
 
@@ -48,7 +57,8 @@ public partial class FrmDashboard
 
         var existingPage = _workspaceTabs.TabPages
             .Cast<TabPage>()
-            .FirstOrDefault(page => string.Equals(page.Name, GovernoratesTabKey, StringComparison.Ordinal));
+            .FirstOrDefault(page =>
+                string.Equals(page.Name, GovernoratesTabKey, StringComparison.Ordinal));
 
         if (existingPage is not null)
         {
@@ -58,7 +68,7 @@ public partial class FrmDashboard
         }
 
         var governoratesForm = new FrmGovernorates();
-        governoratesForm.ConfigureForTabHosting();
+        ConfigureForTabHosting(governoratesForm);
 
         var governoratesPage = new TabPage
         {
@@ -82,6 +92,23 @@ public partial class FrmDashboard
         governoratesPage.Controls.Add(governoratesForm);
         _workspaceTabs.TabPages.Add(governoratesPage);
         _workspaceTabs.SelectedTab = governoratesPage;
+
         governoratesForm.Show();
+    }
+
+    /// <summary>
+    /// يهيئ أي Form لعرضه داخل تبويب Dashboard.
+    /// </summary>
+    private static void ConfigureForTabHosting(Form form)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+
+        form.TopLevel = false;
+        form.FormBorderStyle = FormBorderStyle.None;
+        form.Dock = DockStyle.Fill;
+        form.ShowInTaskbar = false;
+        form.StartPosition = FormStartPosition.Manual;
+        form.RightToLeft = RightToLeft.Yes;
+        form.RightToLeftLayout = true;
     }
 }

@@ -13,12 +13,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controls\" />
     <Folder Include="Helpers\" />
     <Folder Include="Models\" />
     <Folder Include="Services\" />
     <Folder Include="Resources\" />
     <Folder Include="Themes\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Forms\Setup\Geographic\FrmAreas.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\Setup\Geographic\FrmDirectorates.cs">
+      <SubType>Form</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>
