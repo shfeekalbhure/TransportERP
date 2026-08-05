@@ -68,7 +68,7 @@ public partial class FrmDashboard
         }
 
         var governoratesForm = new FrmGovernorates();
-        ConfigureForTabHosting(governoratesForm);
+        ConfigureFormForTabHosting(governoratesForm);
 
         var governoratesPage = new TabPage
         {
@@ -96,18 +96,16 @@ public partial class FrmDashboard
         governoratesForm.Show();
     }
 
-    /// <summary>
-    /// يهيئ أي Form لعرضه داخل تبويب Dashboard.
-    /// </summary>
-    private static void ConfigureForTabHosting(Form form)
+    private static void ConfigureFormForTabHosting(Form form)
     {
         ArgumentNullException.ThrowIfNull(form);
 
         form.TopLevel = false;
         form.FormBorderStyle = FormBorderStyle.None;
         form.Dock = DockStyle.Fill;
+        form.WindowState = FormWindowState.Normal;
         form.ShowInTaskbar = false;
-        form.StartPosition = FormStartPosition.Manual;
+        form.ControlBox = false;
         form.RightToLeft = RightToLeft.Yes;
         form.RightToLeftLayout = true;
     }

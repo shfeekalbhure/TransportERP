@@ -137,12 +137,12 @@ public sealed class ScreenHeaderControl : UserControl
         _btnRefresh.Click += (_, e) => RefreshClicked?.Invoke(this, e);
         _btnClose.Click += (_, e) => CloseClicked?.Invoke(this, e);
 
-        toolbar.Controls.AddRange(
-        [
+        toolbar.Controls.AddRange(new Control[]
+        {
             _btnNew, _btnSave, _btnEdit, _btnSearch,
             _btnFirst, _btnPrevious, _recordLabel, _btnNext, _btnLast,
             _btnDelete, _btnPrint, _btnRefresh, _btnClose
-        ]);
+        });
 
         root.Controls.Add(titleRow, 0, 0);
         root.Controls.Add(toolbar, 0, 1);
@@ -165,7 +165,7 @@ public sealed class ScreenHeaderControl : UserControl
     public event EventHandler? RefreshClicked;
     public event EventHandler? CloseClicked;
 
-    [Category("TransportERP")]
+    [Category("بيانات الشاشة")]
     [Description("اسم الشاشة الظاهر في رأس النافذة.")]
     [DefaultValue("اسم الشاشة")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -175,7 +175,7 @@ public sealed class ScreenHeaderControl : UserControl
         set => _titleLabel.Text = value ?? string.Empty;
     }
 
-    [Category("TransportERP")]
+    [Category("بيانات الشاشة")]
     [Description("المسار التعريفي للشاشة.")]
     [DefaultValue("المسار التعريفي")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -185,14 +185,14 @@ public sealed class ScreenHeaderControl : UserControl
         set => _breadcrumbLabel.Text = value ?? string.Empty;
     }
 
-    [Category("TransportERP")]
+    [Category("التنقل")]
     [Description("موضع السجل الحالي، مثال: 1 / 25.")]
     [DefaultValue("0 / 0")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string RecordPosition
     {
         get => _recordLabel.Text;
-        set => _recordLabel.Text = value ?? string.Empty;
+        set => _recordLabel.Text = string.IsNullOrWhiteSpace(value) ? "0 / 0" : value;
     }
 
     public void SetNavigationState(bool hasRecords, bool isFirst, bool isLast)
