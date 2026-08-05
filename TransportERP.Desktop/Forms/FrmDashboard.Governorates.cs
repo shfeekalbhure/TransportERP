@@ -6,19 +6,21 @@ using TransportERP.Desktop.Forms.Setup.Geographic;
 namespace TransportERP.Desktop;
 
 /// <summary>
-/// ربط شاشة GEN-004 — المحافظات بقائمة البيانات الجغرافية وتبويبات Dashboard.
+/// ربط شاشات البيانات الجغرافية الحالية بقائمة التهيئة العامة وتبويبات Dashboard.
 /// </summary>
 public partial class FrmDashboard
 {
     private const string GovernoratesTabKey = "GEN-004";
+    private const string DirectoratesTabKey = "GEN-005";
+    private const string AreasTabKey = "GEN-007";
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        EnsureGovernoratesMenuItem();
+        EnsureGeographicMenuItems();
     }
 
-    private void EnsureGovernoratesMenuItem()
+    private void EnsureGeographicMenuItems()
     {
         if (_generalSetupMenu is null)
         {
@@ -30,70 +32,111 @@ public partial class FrmDashboard
             .FirstOrDefault(item =>
                 string.Equals(item.Text, "البيانات الجغرافية", StringComparison.Ordinal));
 
-        if (geographicDataItem is null ||
-            geographicDataItem.DropDownItems.ContainsKey("mnuGovernorates"))
+        if (geographicDataItem is null)
         {
             return;
         }
 
-        var governoratesItem = new ToolStripMenuItem("المحافظات")
+        AddMenuItemIfMissing(
+            geographicDataItem,
+            "mnuGovernorates",
+            "المحافظات",
+            "GEN-004 — المحافظات",
+            OpenGovernoratesTab);
+
+        AddMenuItemIfMissing(
+            geographicDataItem,
+            "mnuDirectorates",
+            "المديريات",
+            "GEN-005 — المديريات",
+            OpenDirectoratesTab);
+
+        AddMenuItemIfMissing(
+            geographicDataItem,
+            "mnuAreas",
+            "المناطق",
+            "GEN-007 — المناطق",
+            OpenAreasTab);
+    }
+
+    private static void AddMenuItemIfMissing(
+        ToolStripMenuItem parent,
+        string name,
+        string text,
+        string toolTipText,
+        Action clickAction)
+    {
+        if (parent.DropDownItems.ContainsKey(name))
         {
-            Name = "mnuGovernorates",
-            ToolTipText = "GEN-004 — المحافظات",
+            return;
+        }
+
+        var menuItem = new ToolStripMenuItem(text)
+        {
+            Name = name,
+            ToolTipText = toolTipText,
             RightToLeft = RightToLeft.Yes
         };
 
-        governoratesItem.Click += (_, _) => OpenGovernoratesTab();
-
-        geographicDataItem.DropDownItems.Add(governoratesItem);
+        menuItem.Click += (_, _) => clickAction();
+        parent.DropDownItems.Add(menuItem);
     }
 
-    private void OpenGovernoratesTab()
+    private void OpenGovernoratesTab() =>
+        OpenGeographicTab(GovernoratesTabKey, "المحافظات", new FrmGovernorates());
+
+    private void OpenDirectoratesTab() =>
+        OpenGeographicTab(DirectoratesTabKey, "المديريات", new FrmDirectorates());
+
+    private void OpenAreasTab() =>
+        OpenGeographicTab(AreasTabKey, "المناطق", new FrmAreas());
+
+    private void OpenGeographicTab(string tabKey, string title, Form form)
     {
         if (_workspaceTabs is null)
         {
+            form.Dispose();
             return;
         }
 
         var existingPage = _workspaceTabs.TabPages
             .Cast<TabPage>()
             .FirstOrDefault(page =>
-                string.Equals(page.Name, GovernoratesTabKey, StringComparison.Ordinal));
+                string.Equals(page.Name, tabKey, StringComparison.Ordinal));
 
         if (existingPage is not null)
         {
+            form.Dispose();
             _workspaceTabs.SelectedTab = existingPage;
             existingPage.Focus();
             return;
         }
 
-        var governoratesForm = new FrmGovernorates();
-        ConfigureFormForTabHosting(governoratesForm);
+        ConfigureFormForTabHosting(form);
 
-        var governoratesPage = new TabPage
+        var page = new TabPage
         {
-            Name = GovernoratesTabKey,
-            Text = "المحافظات  ×",
+            Name = tabKey,
+            Text = $"{title}  ×",
             BackColor = Color.FromArgb(239, 245, 252),
             RightToLeft = RightToLeft.Yes,
             Padding = Padding.Empty,
-            Tag = governoratesForm
+            Tag = form
         };
 
-        governoratesForm.FormClosed += (_, _) =>
+        form.FormClosed += (_, _) =>
         {
-            if (_workspaceTabs.TabPages.Contains(governoratesPage))
+            if (_workspaceTabs.TabPages.Contains(page))
             {
-                _workspaceTabs.TabPages.Remove(governoratesPage);
-                governoratesPage.Dispose();
+                _workspaceTabs.TabPages.Remove(page);
+                page.Dispose();
             }
         };
 
-        governoratesPage.Controls.Add(governoratesForm);
-        _workspaceTabs.TabPages.Add(governoratesPage);
-        _workspaceTabs.SelectedTab = governoratesPage;
-
-        governoratesForm.Show();
+        page.Controls.Add(form);
+        _workspaceTabs.TabPages.Add(page);
+        _workspaceTabs.SelectedTab = page;
+        form.Show();
     }
 
     private static void ConfigureFormForTabHosting(Form form)
