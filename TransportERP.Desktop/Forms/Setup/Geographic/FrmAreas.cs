@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace TransportERP.Desktop.Forms.Setup.Geographic
@@ -12,6 +13,20 @@ namespace TransportERP.Desktop.Forms.Setup.Geographic
         {
             InitializeComponent();
             NormalizeControlNames();
+            EnsureAuditFooterVisible();
+            Resize += (_, _) => EnsureAuditFooterVisible();
+        }
+
+        /// <summary>
+        /// يضمن بقاء بيانات الإنشاء والتعديل والعدادات ظاهرة عند عرض الشاشة
+        /// داخل تبويبات الشاشة الرئيسية وعلى الشاشات ذات الارتفاع المحدود.
+        /// </summary>
+        private void EnsureAuditFooterVisible()
+        {
+            MinimumSize = new Size(900, 700);
+            pnlAuditFooter.Visible = true;
+            pnlAuditFooter.Height = 100;
+            pnlAuditFooter.BringToFront();
         }
 
         /// <summary>
@@ -51,6 +66,12 @@ namespace TransportERP.Desktop.Forms.Setup.Geographic
             lblScreenTitle.Text = "المناطق";
             grpGrid.Text = "جدول البيانات";
             grpSearch.Text = "بحث وتصفية";
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            EnsureAuditFooterVisible();
         }
 
         private void tlpMainData_Paint(object sender, PaintEventArgs e)
