@@ -55,7 +55,6 @@ public abstract class SetupDataFormBase : Form
         AddButton(toolbar, "إيقاف", (_, _) => ToggleStatus(), Color.FromArgb(130, 130, 130));
         AddButton(toolbar, "حذف", (_, _) => DeleteRecord(), Color.FromArgb(235, 87, 87));
         AddButton(toolbar, "طباعة", (_, _) => PrintPreview(), Color.FromArgb(155, 81, 224));
-        AddButton(toolbar, "إغلاق", (_, _) => FindForm()?.Close(), Color.FromArgb(70, 78, 93));
         root.Controls.Add(toolbar, 0, 0);
 
         var search = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 8) };
