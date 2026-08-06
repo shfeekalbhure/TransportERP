@@ -16,32 +16,27 @@ public sealed class FrmFinancialTransfers : AccountingScreenForm { public FrmFin
 public sealed class FrmJournalAdjustments : AccountingScreenForm { public FrmJournalAdjustments() : base("ACC-013", "تسويات القيود", true) { } }
 public sealed class FrmPeriodClosing : AccountingScreenForm { public FrmPeriodClosing() : base("ACC-014", "إقفال الفترات", true) { } }
 public sealed class FrmJournalReversal : AccountingScreenForm { public FrmJournalReversal() : base("ACC-015", "عكس القيود", true) { } }
-public sealed class FrmJournalReport : AccountingScreenForm { public FrmJournalReport() : base("ACC-016", "دفتر اليومية") { } }
-public sealed class FrmGeneralLedger : AccountingScreenForm { public FrmGeneralLedger() : base("ACC-017", "الأستاذ العام") { } }
-public sealed class FrmAccountStatement : AccountingScreenForm { public FrmAccountStatement() : base("ACC-018", "كشف الحساب") { } }
-public sealed class FrmTrialBalance : AccountingScreenForm { public FrmTrialBalance() : base("ACC-019", "ميزان المراجعة") { } }
-public sealed class FrmIncomeStatement : AccountingScreenForm { public FrmIncomeStatement() : base("ACC-020", "قائمة الدخل") { } }
-public sealed class FrmBalanceSheet : AccountingScreenForm { public FrmBalanceSheet() : base("ACC-021", "الميزانية العمومية") { } }
-public sealed class FrmCashFlowStatement : AccountingScreenForm { public FrmCashFlowStatement() : base("ACC-022", "التدفقات النقدية") { } }
-public sealed class FrmCurrencyTrialBalance : AccountingScreenForm { public FrmCurrencyTrialBalance() : base("ACC-023", "ميزان حسب العملة") { } }
-public sealed class FrmBankReconciliation : AccountingScreenForm { public FrmBankReconciliation() : base("ACC-024", "التسويات البنكية", true) { } }
-public sealed class FrmOpeningBalances : AccountingScreenForm { public FrmOpeningBalances() : base("ACC-025", "الأرصدة الافتتاحية", true) { } }
-public sealed class FrmAccountingApprovals : AccountingScreenForm { public FrmAccountingApprovals() : base("ACC-026", "طلبات الاعتماد المحاسبية", true) { } }
-public sealed class FrmAdjustmentMemos : AccountingScreenForm { public FrmAdjustmentMemos() : base("ACC-027", "مذكرات التسوية", true) { } }
-public sealed class FrmSubLedger : AccountingScreenForm { public FrmSubLedger() : base("ACC-028", "دفتر الأستاذ المساعد") { } }
-public sealed class FrmCostCenterActivity : AccountingScreenForm { public FrmCostCenterActivity() : base("ACC-029", "حركة مركز التكلفة") { } }
-public sealed class FrmExpenseAnalysis : AccountingScreenForm { public FrmExpenseAnalysis() : base("ACC-030", "تحليل المصروفات") { } }
-public sealed class FrmRevenueAnalysis : AccountingScreenForm { public FrmRevenueAnalysis() : base("ACC-031", "تحليل الإيرادات") { } }
-public sealed class FrmCashStatement : AccountingScreenForm { public FrmCashStatement() : base("ACC-032", "كشف الصندوق") { } }
-public sealed class FrmBankStatement : AccountingScreenForm { public FrmBankStatement() : base("ACC-033", "كشف البنك") { } }
-public sealed class FrmCustomerBalanceReconciliation : AccountingScreenForm { public FrmCustomerBalanceReconciliation() : base("ACC-034", "مطابقة أرصدة العملاء") { } }
-public sealed class FrmSupplierBalanceReconciliation : AccountingScreenForm { public FrmSupplierBalanceReconciliation() : base("ACC-035", "مطابقة أرصدة الموردين") { } }
-public sealed class FrmAccrualEntries : AccountingScreenForm { public FrmAccrualEntries() : base("ACC-036", "قيود الاستحقاق", true) { } }
-public sealed class FrmDepreciationEntries : AccountingScreenForm { public FrmDepreciationEntries() : base("ACC-037", "قيود الإهلاك", true) { } }
-public sealed class FrmClosedPeriods : AccountingScreenForm { public FrmClosedPeriods() : base("ACC-038", "الفترات المقفلة") { } }
-public sealed class FrmAccountingApprovalPermissions : AccountingScreenForm { public FrmAccountingApprovalPermissions() : base("ACC-039", "صلاحيات الاعتماد المحاسبي") { } }
-public sealed class FrmApprovalLevels : AccountingScreenForm { public FrmApprovalLevels() : base("ACC-040", "مستويات الاعتماد") { } }
-public sealed class FrmPostingLog : AccountingScreenForm { public FrmPostingLog() : base("ACC-041", "سجل الترحيل", true) { } }
-public sealed class FrmCancellationAndReversalLog : AccountingScreenForm { public FrmCancellationAndReversalLog() : base("ACC-042", "سجل الإلغاء والعكس", true) { } }
-public sealed class FrmPendingEntries : AccountingScreenForm { public FrmPendingEntries() : base("ACC-043", "القيود المعلقة", true) { } }
-public sealed class FrmBalanceMonitor : AccountingScreenForm { public FrmBalanceMonitor() : base("ACC-044", "مراقبة الميزان", true) { } }
+public sealed class FrmJournalReport : AccountingReportScreenForm { public FrmJournalReport() : base("ACC-021", "دفتر اليومية", "من تاريخ", "إلى تاريخ", "الحساب", "الفرع", "مركز التكلفة", "العملة") { } }
+public sealed class FrmGeneralLedger : AccountingReportScreenForm { public FrmGeneralLedger() : base("ACC-022", "دفتر الأستاذ العام", "الحساب", "من تاريخ", "إلى تاريخ", "الفرع", "مركز التكلفة") { } }
+public sealed class FrmAccountStatement : AccountingReportScreenForm { public FrmAccountStatement() : base("ACC-023", "كشف الحساب", "نوع الطرف", "الطرف أو الحساب", "من تاريخ", "إلى تاريخ", "العملة") { } }
+public sealed class FrmTrialBalance : AccountingReportScreenForm { public FrmTrialBalance() : base("ACC-024", "ميزان المراجعة", "من تاريخ", "إلى تاريخ", "مستوى الحساب", "الفرع", "العملة") { } }
+public sealed class FrmIncomeStatement : AccountingReportScreenForm { public FrmIncomeStatement() : base("ACC-025", "قائمة الدخل", "من تاريخ", "إلى تاريخ", "الفرع", "مركز التكلفة", "العملة") { } }
+public sealed class FrmBalanceSheet : AccountingReportScreenForm { public FrmBalanceSheet() : base("ACC-026", "الميزانية العمومية", "حتى تاريخ", "الفرع", "مركز التكلفة", "مستوى العرض", "العملة") { } }
+public sealed class FrmCashFlowStatement : AccountingReportScreenForm { public FrmCashFlowStatement() : base("ACC-027", "قائمة التدفقات النقدية", "من تاريخ", "إلى تاريخ", "الفرع", "العملة", "طريقة العرض") { } }
+public sealed class FrmCurrencyTrialBalance : AccountingReportScreenForm { public FrmCurrencyTrialBalance() : base("ACC-028", "ميزان المراجعة حسب العملة", "من تاريخ", "إلى تاريخ", "العملة", "الفرع", "مستوى الحساب") { } }
+public sealed class FrmCostCenterActivity : AccountingReportScreenForm { public FrmCostCenterActivity() : base("ACC-029", "تقرير حركة مركز التكلفة", "مركز التكلفة", "من تاريخ", "إلى تاريخ", "الحساب", "الفرع") { } }
+public sealed class FrmCashStatement : AccountingReportScreenForm { public FrmCashStatement() : base("ACC-030", "تقرير الصناديق", "الصندوق", "من تاريخ", "إلى تاريخ", "العملة", "الفرع") { } }
+public sealed class FrmBankStatement : AccountingReportScreenForm { public FrmBankStatement() : base("ACC-031", "تقرير الحسابات البنكية", "البنك أو الحساب", "من تاريخ", "إلى تاريخ", "العملة", "الفرع") { } }
+public sealed class FrmUnpostedEntriesReport : AccountingReportScreenForm { public FrmUnpostedEntriesReport() : base("ACC-032", "تقرير القيود غير المرحلة", "من تاريخ", "إلى تاريخ", "نوع القيد", "الفرع", "الحالة") { } }
+public sealed class FrmBankReconciliation : AccountingScreenForm { public FrmBankReconciliation() : base("ACC-033", "التسويات البنكية", true) { } }
+public sealed class FrmBankReconciliationItems : AccountingScreenForm { public FrmBankReconciliationItems() : base("ACC-034", "عناصر المطابقة البنكية", true) { } }
+public sealed class FrmBankReconciliationApprovals : AccountingScreenForm { public FrmBankReconciliationApprovals() : base("ACC-035", "اعتماد التسويات البنكية", true) { } }
+public sealed class FrmOpeningBalances : AccountingScreenForm { public FrmOpeningBalances() : base("ACC-036", "الأرصدة الافتتاحية", true) { } }
+public sealed class FrmOpeningBalanceImport : AccountingScreenForm { public FrmOpeningBalanceImport() : base("ACC-037", "استيراد الأرصدة الافتتاحية", true) { } }
+public sealed class FrmOpeningBalanceApproval : AccountingScreenForm { public FrmOpeningBalanceApproval() : base("ACC-038", "اعتماد الأرصدة الافتتاحية", true) { } }
+public sealed class FrmAccountingApprovals : AccountingScreenForm { public FrmAccountingApprovals() : base("ACC-039", "طلبات الاعتماد المحاسبية", true) { } }
+public sealed class FrmAccountingApprovalInbox : AccountingScreenForm { public FrmAccountingApprovalInbox() : base("ACC-040", "صندوق وارد الاعتماد المحاسبي", true) { } }
+public sealed class FrmAccountingApprovalPolicies : AccountingScreenForm { public FrmAccountingApprovalPolicies() : base("ACC-041", "سياسات الاعتماد المحاسبي") { } }
+public sealed class FrmPostingControls : AccountingScreenForm { public FrmPostingControls() : base("ACC-042", "ضوابط الترحيل المحاسبي") { } }
+public sealed class FrmAccountingAuditLog : AccountingReportScreenForm { public FrmAccountingAuditLog() : base("ACC-043", "سجل التدقيق المحاسبي", "من تاريخ", "إلى تاريخ", "المستخدم", "العملية", "المرجع") { } }
+public sealed class FrmJournalIntegrityMonitor : AccountingReportScreenForm { public FrmJournalIntegrityMonitor() : base("ACC-044", "مراقبة سلامة القيود", "من تاريخ", "إلى تاريخ", "الحالة", "الفرع", "نوع الفحص") { } }
