@@ -17,11 +17,13 @@ public abstract class SecurityWorkspaceForm : Form
     private readonly ComboBox _filter = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label _audit = new() { AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(8) };
     private readonly SecurityScreenDefinition _definition;
+    private readonly SecurityScreenProfile _profile;
     private readonly Dictionary<string, TextBox> _details = new();
 
     protected SecurityWorkspaceForm(SecurityScreenDefinition definition)
     {
         _definition = definition;
+        _profile = SecurityScreenProfiles.For(definition.Code);
         Text = definition.Title;
         Name = definition.FormName;
         StartPosition = FormStartPosition.CenterParent;
@@ -78,14 +80,69 @@ public abstract class SecurityWorkspaceForm : Form
     private Control CreateDataCard()
     {
         var group = Card("بيانات " + _definition.Title);
-        var fields = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, AutoSize = true, Padding = new Padding(12) };
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
-        AddField(fields, 0, "الكود *", _code, true); AddField(fields, 0, "الاسم *", _name, true, 2);
-        AddField(fields, 1, "الحالة *", _status); AddField(fields, 1, _definition.Field1, AddDetail(_definition.Field1), true, 2);
-        AddField(fields, 2, _definition.Field2, AddDetail(_definition.Field2)); AddField(fields, 2, _definition.Field3, AddDetail(_definition.Field3), false, 2);
-        group.Controls.Add(fields);
+        var tabs = new TabControl { Dock = DockStyle.Fill, RightToLeftLayout = true, RightToLeft = RightToLeft.Yes };
+        var tabNames = _profile.Tabs.Length == 0 ? ["البيانات الرئيسية"] : _profile.Tabs;
+
+        for (var index = 0; index < tabNames.Length; index++)
+        {
+            var page = new TabPage(tabNames[index]) { RightToLeft = RightToLeft.Yes, AutoScroll = true, BackColor = Color.White };
+            if (index == 0)
+            {
+                page.Controls.Add(CreateProfileFields());
+            }
+            else
+            {
+                page.Controls.Add(CreateDetailTab(tabNames[index]));
+            }
+            tabs.TabPages.Add(page);
+        }
+
+        group.Controls.Add(tabs);
         return group;
+    }
+
+    private Control CreateProfileFields()
+    {
+        var captions = _profile.Fields.Length == 0
+            ? ["الكود *", "الاسم *", "الحالة *", _definition.Field1, _definition.Field2, _definition.Field3]
+            : _profile.Fields;
+        var fields = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top, ColumnCount = 4, AutoSize = true, Padding = new Padding(12), RightToLeft = RightToLeft.Yes
+        };
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18));
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18));
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
+
+        for (var index = 0; index < captions.Length; index++)
+        {
+            var control = AddDetail(captions[index]);
+            control.ReadOnly = _profile.ReadOnly;
+            AddField(fields, index / 2, captions[index], control, captions[index].Contains("*"), (index % 2) * 2);
+        }
+        return fields;
+    }
+
+    private Control CreateDetailTab(string tabName)
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = Color.White };
+        var note = new Label
+        {
+            Dock = DockStyle.Top, Height = 36, Text = "تبويب " + tabName + " — تُعرض تفاصيل السجل المحدد وفق الصلاحية.",
+            TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(35, 55, 80)
+        };
+        var list = new DataGridView
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+            AutoGenerateColumns = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.FixedSingle,
+            RightToLeft = RightToLeft.Yes, SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        };
+        list.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = tabName, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        list.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "الحالة", Width = 140 });
+        panel.Controls.Add(list);
+        panel.Controls.Add(note);
+        return panel;
     }
 
     private Control CreateListCard()
