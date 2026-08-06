@@ -1,14 +1,19 @@
+using TransportERP.Desktop.Services;
+
 using System.Windows.Forms;
 
 namespace TransportERP.Desktop.Forms.Security;
 
 public static class SecurityScreenCatalog
 {
-    public static bool TryCreate(string code, out Form? form)
+    public static bool TryCreate(string code, out Form? form) => TryCreate(code, null, out form);
+
+    /// <summary>نقطة إنشاء شاشات الأمن؛ يمرر التركيب الرئيسي عميل API المعتمد.</summary>
+    public static bool TryCreate(string code, AccessControlApiClient? accessControlClient, out Form? form)
     {
         form = code.Trim().ToUpperInvariant() switch
         {
-            "SEC-001" => new FrmUsers(),
+            "SEC-001" => new FrmUsers(accessControlClient),
             "SEC-002" => new FrmRoles(),
             "SEC-003" => new FrmPermissions(),
             "SEC-004" => new FrmSecurityPolicies(),
