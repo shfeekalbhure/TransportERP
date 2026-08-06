@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using TransportERP.Desktop.Forms.Setup.General;
+using TransportERP.Desktop.Forms.Security;
 
 namespace TransportERP.Desktop;
 
@@ -14,12 +15,14 @@ public partial class FrmDashboard : Form
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
+    private ContextMenuStrip? _securityAdministrationMenu;
 
     public FrmDashboard()
     {
         InitializeComponent();
         ConfigureTabbedWorkspace();
         ConfigureGeneralSetupMenu();
+        ConfigureSecurityAdministrationMenu();
         LoadDevelopmentPreviewData();
     }
 
@@ -118,6 +121,108 @@ public partial class FrmDashboard : Form
 
         generalSetupButton.Click -= GeneralSetupButton_Click;
         generalSetupButton.Click += GeneralSetupButton_Click;
+    }
+
+    /// <summary>إعداد قائمة الإدارة والأمن وربط شاشات المرحلة الثالثة بها.</summary>
+    private void ConfigureSecurityAdministrationMenu()
+    {
+        var securityButton = FindButtonByText(this, "الإدارة والأمن");
+        if (securityButton is null)
+        {
+            return;
+        }
+
+        _securityAdministrationMenu?.Dispose();
+        _securityAdministrationMenu = new ContextMenuStrip
+        {
+            RightToLeft = RightToLeft.Yes,
+            Font = new Font(Font.FontFamily, 10F),
+            ShowImageMargin = false,
+            AutoSize = true
+        };
+
+        AddSecurityAdministrationItem("SEC-017", "تفويض الصلاحيات");
+        AddSecurityAdministrationItem("SEC-018", "الأدوار");
+        AddSecurityAdministrationItem("SEC-019", "مجموعات المستخدمين");
+        AddSecurityAdministrationItem("SEC-020", "كتالوج الصلاحيات");
+        AddSecurityAdministrationItem("SEC-021", "سياسات الأمان");
+        AddSecurityAdministrationItem("SEC-022", "سجل الدخول");
+        AddSecurityAdministrationItem("SEC-023", "المصادقة متعددة العوامل");
+        AddSecurityAdministrationItem("SEC-024", "تنبيهات الأمان");
+        AddSecurityAdministrationItem("SEC-025", "سجل التنبيهات الأمنية");
+        AddSecurityAdministrationItem("SEC-026", "الوحدات التنظيمية");
+        AddSecurityAdministrationItem("SEC-027", "سجل التدقيق العام");
+        AddSecurityAdministrationItem("SEC-028", "الإشعارات");
+        AddSecurityAdministrationItem("SEC-029", "قوالب الإشعارات");
+        AddSecurityAdministrationItem("SEC-030", "إدارة كلمات المرور");
+        AddSecurityAdministrationItem("SEC-031", "إعدادات الأمان العامة");
+        AddSecurityAdministrationItem("SEC-032", "إدارة الجلسات النشطة والأجهزة الموثوقة");
+        AddSecurityAdministrationItem("SEC-033", "مفاتيح API والتكامل");
+        AddSecurityAdministrationItem("SEC-034", "محاولات الدخول الفاشلة");
+
+        securityButton.Click -= SecurityAdministrationButton_Click;
+        securityButton.Click += SecurityAdministrationButton_Click;
+    }
+
+    /// <summary>إضافة شاشة أمن وإدارة إلى القائمة الجانبية.</summary>
+    private void AddSecurityAdministrationItem(string code, string name)
+    {
+        if (_securityAdministrationMenu is null)
+        {
+            return;
+        }
+
+        var item = new ToolStripMenuItem(name)
+        {
+            Name = $"mnu{code.Replace("-", string.Empty, StringComparison.Ordinal)}",
+            ToolTipText = code,
+            RightToLeft = RightToLeft.Yes
+        };
+        item.Click += (_, _) => OpenSecurityAdministrationScreen(code, name);
+        _securityAdministrationMenu.Items.Add(item);
+    }
+
+    /// <summary>فتح شاشة الأمن أو الإدارة داخل تبويب واحد لكل شاشة.</summary>
+    private void OpenSecurityAdministrationScreen(string code, string name)
+    {
+        Form? form = code switch
+        {
+            "SEC-017" => new FrmSec017Delegation(),
+            "SEC-018" => new FrmSec018Roles(),
+            "SEC-019" => new FrmSec019UserGroups(),
+            "SEC-020" => new FrmSec020PermissionCatalog(),
+            "SEC-021" => new FrmSec021SecurityPolicies(),
+            "SEC-022" => new FrmSec022LoginLog(),
+            "SEC-023" => new FrmSec023Mfa(),
+            "SEC-024" => new FrmSec024SecurityAlerts(),
+            "SEC-025" => new FrmSec025SecurityAlertLog(),
+            "SEC-026" => new FrmSec026OrganizationalUnits(),
+            "SEC-027" => new FrmSec027AuditLog(),
+            "SEC-028" => new FrmSec028Notifications(),
+            "SEC-029" => new FrmSec029NotificationTemplates(),
+            "SEC-030" => new FrmSec030PasswordManagement(),
+            "SEC-031" => new FrmSec031GeneralSecuritySettings(),
+            "SEC-032" => new FrmSec032SessionsAndTrustedDevices(),
+            "SEC-033" => new FrmSec033ApiKeys(),
+            "SEC-034" => new FrmSec034FailedLoginAttempts(),
+            _ => null
+        };
+
+        if (form is not null)
+        {
+            OpenHostedScreenTab(code, name, form);
+        }
+    }
+
+    /// <summary>إظهار قائمة شاشات الإدارة والأمن بمحاذاة الزر الجانبي.</summary>
+    private void SecurityAdministrationButton_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button button || _securityAdministrationMenu is null)
+        {
+            return;
+        }
+
+        _securityAdministrationMenu.Show(button, new Point(0, button.Height));
     }
 
     /// <summary>إضافة شاشة تهيئة عامة إلى القائمة الجانبية.</summary>
