@@ -224,7 +224,6 @@ public sealed class FrmVehicleTypes : Form
     {
         var row = index / 2;
         var column = (index % 2) * 2;
-        host.RowStyles.Ensure(row);
         host.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, Padding = new Padding(4) }, column, row);
         input.Dock = DockStyle.Fill;
         input.Margin = new Padding(6, 4, 18, 4);
