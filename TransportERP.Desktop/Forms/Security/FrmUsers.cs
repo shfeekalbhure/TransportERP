@@ -132,9 +132,11 @@ public sealed class FrmUsers : Form
         AddFilter(panel, "الحالة", _searchStatus);
         AddFilter(panel, "الدور (يتطلب خدمة)", _searchRole);
         _searchRole.Enabled = false;
-        AddFilter(panel, "الشركة", _searchCompany);
-        AddFilter(panel, "الفرع", _searchBranch);
-        foreach (var control in new Control[] { _searchUser, _searchRole, _searchCompany, _searchBranch }) control.TextChanged += (_, _) => ApplyFilter();
+        AddFilter(panel, "الشركة (يتطلب خدمة)", _searchCompany);
+        _searchCompany.Enabled = false;
+        AddFilter(panel, "الفرع (يتطلب خدمة)", _searchBranch);
+        _searchBranch.Enabled = false;
+        foreach (var control in new Control[] { _searchUser }) control.TextChanged += (_, _) => ApplyFilter();
         _searchStatus.SelectedIndexChanged += (_, _) => ApplyFilter();
         return panel;
     }
@@ -163,7 +165,7 @@ public sealed class FrmUsers : Form
     private void ApplyFilter()
     {
         var query = _searchUser.Text.Trim(); var status = _searchStatus.Text;
-        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status) && (string.IsNullOrWhiteSpace(_searchCompany.Text) || x.Company.Contains(_searchCompany.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchBranch.Text) || x.Branch.Contains(_searchBranch.Text, StringComparison.OrdinalIgnoreCase))).ToList();
+        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status)).ToList();
         _source.DataSource = new BindingList<UserRow>(view); _counter.Text = "عدد السجلات: " + view.Count;
     }
 
