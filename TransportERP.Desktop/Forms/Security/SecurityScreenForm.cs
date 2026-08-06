@@ -10,21 +10,12 @@ public enum SecurityScreenLayout
     Tree
 }
 
-public sealed record SecurityScreenDefinition(
-    string Code,
-    string ArabicName,
-    string[] Tabs,
-    string[] Fields,
-    string[] Actions,
-    string[] Filters,
-    SecurityScreenLayout Layout);
-
 public abstract class SecurityScreenForm : Form
 {
-    protected SecurityScreenForm(SecurityScreenDefinition definition)
+    protected SecurityScreenForm(object definition)
     {
-        Text = $"{definition.Code} — {definition.ArabicName}";
-        Name = definition.Code;
+        Text = $"{ReadText(definition, "Code", "FormName")} — {ReadText(definition, "ArabicName", "Title")}";
+        Name = ReadText(definition, "Code", "FormName");
         RightToLeft = System.Windows.Forms.RightToLeft.Yes;
         RightToLeftLayout = true;
         StartPosition = FormStartPosition.CenterParent;
@@ -34,7 +25,7 @@ public abstract class SecurityScreenForm : Form
         BuildScreen(definition);
     }
 
-    private void BuildScreen(SecurityScreenDefinition definition)
+    private void BuildScreen(object definition)
     {
         var root = new TableLayoutPanel
         {
@@ -57,7 +48,7 @@ public abstract class SecurityScreenForm : Form
             Dock = DockStyle.Fill,
             AutoSize = true,
             Font = new Font("Tahoma", 12F, FontStyle.Bold),
-            Text = $"{definition.Code} — {definition.ArabicName}",
+            Text = $"{ReadText(definition, "Code", "FormName")} — {ReadText(definition, "ArabicName", "Title")}",
             TextAlign = ContentAlignment.MiddleRight,
             Padding = new Padding(8),
             BackColor = Color.FromArgb(239, 244, 250)
@@ -72,7 +63,7 @@ public abstract class SecurityScreenForm : Form
             WrapContents = true,
             Padding = new Padding(4)
         };
-        foreach (var action in definition.Actions)
+        foreach (var action in ReadTextArray(definition, "Actions"))
         {
             actions.Controls.Add(new Button
             {
@@ -90,14 +81,14 @@ public abstract class SecurityScreenForm : Form
             RightToLeftLayout = true,
             Alignment = TabAlignment.Top
         };
-        foreach (var tabName in definition.Tabs)
+        foreach (var tabName in ReadTextArray(definition, "Tabs"))
         {
             tabs.TabPages.Add(new TabPage(tabName) { RightToLeft = System.Windows.Forms.RightToLeft.Yes });
         }
 
         if (tabs.TabPages.Count > 0)
         {
-            if (definition.Layout == SecurityScreenLayout.Tree)
+            if (ReadText(definition, "Layout") == nameof(SecurityScreenLayout.Tree))
             {
                 var treeLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8) };
                 treeLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -108,7 +99,7 @@ public abstract class SecurityScreenForm : Form
             }
             else
             {
-                tabs.TabPages[0].Controls.Add(CreateFieldsPanel(definition.Fields));
+                tabs.TabPages[0].Controls.Add(CreateFieldsPanel(ReadTextArray(definition, "Fields")));
             }
         }
         root.Controls.Add(tabs, 0, 2);
@@ -122,6 +113,23 @@ public abstract class SecurityScreenForm : Form
             Padding = new Padding(6),
             ForeColor = Color.DimGray
         }, 0, 4);
+    }
+
+    private static string ReadText(object definition, params string[] propertyNames)
+    {
+        var type = definition.GetType();
+        foreach (var propertyName in propertyNames)
+        {
+            var value = type.GetProperty(propertyName)?.GetValue(definition);
+            if (value is not null) return value.ToString() ?? string.Empty;
+        }
+        return string.Empty;
+    }
+
+    private static IEnumerable<string> ReadTextArray(object definition, string propertyName)
+    {
+        return definition.GetType().GetProperty(propertyName)?.GetValue(definition) as IEnumerable<string>
+            ?? Array.Empty<string>();
     }
 
     private static Control CreateFieldsPanel(IEnumerable<string> fields)
@@ -148,7 +156,7 @@ public abstract class SecurityScreenForm : Form
         return panel;
     }
 
-    private static Control CreateSearchAndResultsPanel(SecurityScreenDefinition definition)
+    private static Control CreateSearchAndResultsPanel(object definition)
     {
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(4) };
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -156,7 +164,7 @@ public abstract class SecurityScreenForm : Form
         var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = true };
         filters.Controls.Add(new Label { Text = "البحث العام", AutoSize = true, Padding = new Padding(4) });
         filters.Controls.Add(new TextBox { Width = 180 });
-        foreach (var filter in definition.Filters)
+        foreach (var filter in ReadTextArray(definition, "Filters"))
         {
             filters.Controls.Add(new Label { Text = filter, AutoSize = true, Padding = new Padding(4) });
         }
@@ -164,7 +172,7 @@ public abstract class SecurityScreenForm : Form
         filters.Controls.Add(new Button { Text = "مسح المرشحات", AutoSize = true });
         panel.Controls.Add(filters, 0, 0);
 
-        var resultsHint = definition.Layout == SecurityScreenLayout.Tree
+        var resultsHint = ReadText(definition, "Layout") == nameof(SecurityScreenLayout.Tree)
             ? "يعرض الجدول المساعد نتائج البحث أو التقارير فقط؛ الأعمدة غير محددة في المرجع."
             : "جدول النتائج: الأعمدة غير المحددة في المرجع لم تُنشأ.";
         panel.Controls.Add(new Panel
