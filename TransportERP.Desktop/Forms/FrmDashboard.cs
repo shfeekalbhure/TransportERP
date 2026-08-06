@@ -13,12 +13,15 @@ public partial class FrmDashboard : Form
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
+    private ContextMenuStrip? _securityAdministrationMenu;
+    private ContextMenuStrip? _accountingMenu;
 
     public FrmDashboard()
     {
         InitializeComponent();
         ConfigureTabbedWorkspace();
         ConfigureGeneralSetupMenu();
+        ConfigureSecurityAndAccountingMenus();
         LoadDevelopmentPreviewData();
     }
 
@@ -99,6 +102,24 @@ public partial class FrmDashboard : Form
         geographicDataItem.DropDownItems.Add(countriesItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
+        var setupScreensItem = new ToolStripMenuItem("شاشات التهيئة العامة")
+        {
+            RightToLeft = RightToLeft.Yes
+        };
+        AddScreenItems(setupScreensItem, new[]
+        {
+            ("GEN-008", "أنواع المركبات"),
+            ("GEN-009", "العملات"),
+            ("GEN-010", "أسعار الصرف"),
+            ("GEN-011", "الشركات"),
+            ("GEN-012", "الفروع"),
+            ("GEN-013", "السنوات المالية"),
+            ("GEN-014", "الترقيم العام"),
+            ("GEN-015", "اللغات"),
+            ("GEN-016", "المتغيرات العامة")
+        });
+        _generalSetupMenu.Items.Add(setupScreensItem);
+
         generalSetupButton.Click -= GeneralSetupButton_Click;
         generalSetupButton.Click += GeneralSetupButton_Click;
     }
@@ -114,6 +135,151 @@ public partial class FrmDashboard : Form
         }
 
         _generalSetupMenu.Show(button, new Point(0, button.Height));
+    }
+
+    /// <summary>
+    /// ربط مجموعتي الأمن والمحاسبة بالشاشة الرئيسية عبر قوائمها الجانبية.
+    /// </summary>
+    private void ConfigureSecurityAndAccountingMenus()
+    {
+        _securityAdministrationMenu?.Dispose();
+        _accountingMenu?.Dispose();
+
+        _securityAdministrationMenu = CreateScreenMenu(new[]
+        {
+            ("SEC-001", "المستخدمون"),
+            ("SEC-002", "الأدوار"),
+            ("SEC-003", "الصلاحيات"),
+            ("SEC-004", "سياسات الأمان"),
+            ("SEC-005", "الأجهزة الموثوقة"),
+            ("SEC-006", "الجلسات النشطة"),
+            ("SEC-007", "سجل التدقيق العام"),
+            ("SEC-008", "الإشعارات"),
+            ("SEC-009", "قوالب الإشعارات"),
+            ("SEC-010", "إدارة كلمات المرور"),
+            ("SEC-011", "مفاتيح API والتكامل"),
+            ("SEC-012", "سجلات تسجيل الدخول"),
+            ("SEC-013", "المصادقة الثنائية"),
+            ("SEC-014", "إعدادات الأمان العامة"),
+            ("SEC-015", "محاولات الدخول الفاشلة"),
+            ("SEC-016", "الوحدات التنظيمية"),
+            ("SEC-017", "تفويض الصلاحيات"),
+            ("SEC-018", "نطاقات الوصول للبيانات")
+        });
+
+        _accountingMenu = CreateScreenMenu(new[]
+        {
+            ("ACC-001", "دليل الحسابات"), ("ACC-002", "أنواع الحسابات"),
+            ("ACC-003", "مجموعات الحسابات"), ("ACC-004", "مراكز التكلفة"),
+            ("ACC-005", "الصناديق"), ("ACC-006", "الحسابات البنكية"),
+            ("ACC-007", "طرق الدفع"), ("ACC-008", "السنوات والفترات المالية"),
+            ("ACC-009", "القيود اليومية"), ("ACC-010", "سندات القبض"),
+            ("ACC-011", "سندات الصرف"), ("ACC-012", "التحويلات المالية"),
+            ("ACC-013", "تسويات القيود"), ("ACC-014", "إقفال الفترات"),
+            ("ACC-015", "عكس القيود"), ("ACC-016", "دفتر اليومية"),
+            ("ACC-017", "الأستاذ العام"), ("ACC-018", "كشف الحساب"),
+            ("ACC-019", "ميزان المراجعة"), ("ACC-020", "قائمة الدخل"),
+            ("ACC-021", "الميزانية العمومية"), ("ACC-022", "التدفقات النقدية"),
+            ("ACC-023", "ميزان حسب العملة"), ("ACC-024", "التسويات البنكية"),
+            ("ACC-025", "الأرصدة الافتتاحية"), ("ACC-026", "طلبات الاعتماد المحاسبية"),
+            ("ACC-027", "مذكرات التسوية"), ("ACC-028", "دفتر الأستاذ المساعد"),
+            ("ACC-029", "حركة مركز التكلفة"), ("ACC-030", "تحليل المصروفات"),
+            ("ACC-031", "تحليل الإيرادات"), ("ACC-032", "كشف الصندوق"),
+            ("ACC-033", "كشف البنك"), ("ACC-034", "مطابقة أرصدة العملاء"),
+            ("ACC-035", "مطابقة أرصدة الموردين"), ("ACC-036", "قيود الاستحقاق"),
+            ("ACC-037", "قيود الإهلاك"), ("ACC-038", "الفترات المقفلة"),
+            ("ACC-039", "صلاحيات الاعتماد المحاسبي"), ("ACC-040", "مستويات الاعتماد"),
+            ("ACC-041", "سجل الترحيل"), ("ACC-042", "سجل الإلغاء والعكس"),
+            ("ACC-043", "القيود المعلقة"), ("ACC-044", "مراقبة الميزان")
+        });
+
+        BindSidebarMenu("الإدارة والأمن", _securityAdministrationMenu);
+        BindSidebarMenu("المحاسبة", _accountingMenu);
+    }
+
+    private ContextMenuStrip CreateScreenMenu(IEnumerable<(string Code, string Name)> screens)
+    {
+        var menu = new ContextMenuStrip
+        {
+            RightToLeft = RightToLeft.Yes,
+            Font = new Font(Font.FontFamily, 10F),
+            ShowImageMargin = false,
+            AutoSize = true
+        };
+        AddScreenItems(menu.Items, screens);
+        return menu;
+    }
+
+    private void BindSidebarMenu(string buttonText, ContextMenuStrip menu)
+    {
+        var button = FindButtonByText(this, buttonText);
+        if (button is null)
+        {
+            return;
+        }
+
+        button.Click += (_, _) => menu.Show(button, new Point(0, button.Height));
+    }
+
+    private void AddScreenItems(ToolStripItemCollection items, IEnumerable<(string Code, string Name)> screens)
+    {
+        foreach (var (code, name) in screens)
+        {
+            var item = new ToolStripMenuItem(name)
+            {
+                Name = $"mnu{code.Replace("-", string.Empty, StringComparison.Ordinal)}",
+                ToolTipText = code
+            };
+            item.Click += (_, _) => OpenPlannedScreenTab(code, name);
+            items.Add(item);
+        }
+    }
+
+    private void AddScreenItems(ToolStripMenuItem parent, IEnumerable<(string Code, string Name)> screens)
+    {
+        AddScreenItems(parent.DropDownItems, screens);
+    }
+
+    /// <summary>
+    /// فتح تبويب شاشة مخططة مع منع التكرار إلى أن يُربط نموذجها الفعلي.
+    /// </summary>
+    private void OpenPlannedScreenTab(string screenCode, string screenName)
+    {
+        if (_workspaceTabs is null)
+        {
+            return;
+        }
+
+        var existingPage = _workspaceTabs.TabPages
+            .Cast<TabPage>()
+            .FirstOrDefault(page => string.Equals(page.Name, screenCode, StringComparison.Ordinal));
+        if (existingPage is not null)
+        {
+            _workspaceTabs.SelectedTab = existingPage;
+            existingPage.Focus();
+            return;
+        }
+
+        var page = new TabPage
+        {
+            Name = screenCode,
+            Text = $"{screenName}  ×",
+            BackColor = Color.FromArgb(247, 249, 252),
+            RightToLeft = RightToLeft.Yes,
+            Padding = new Padding(24)
+        };
+
+        var notice = new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = $"{screenCode} — {screenName}\r\n\r\nتم ربط هذه الشاشة بالشاشة الرئيسية.\r\nسيُستبدل هذا التبويب بنموذج الشاشة الفعلي عند بدء التنفيذ البرمجي المعتمد.",
+            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = Color.FromArgb(70, 78, 93),
+            Font = new Font(Font.FontFamily, 12F)
+        };
+        page.Controls.Add(notice);
+        _workspaceTabs.TabPages.Add(page);
+        _workspaceTabs.SelectedTab = page;
     }
 
     /// <summary>
