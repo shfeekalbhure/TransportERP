@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.Forms.Setup.General;
 
 namespace TransportERP.Desktop;
 
@@ -245,6 +246,25 @@ public partial class FrmDashboard : Form
     /// </summary>
     private void OpenPlannedScreenTab(string screenCode, string screenName)
     {
+        var setupForm = screenCode switch
+        {
+            "GEN-008" => new FrmVehicleTypes(),
+            "GEN-009" => new FrmCurrencies(),
+            "GEN-010" => new FrmExchangeRates(),
+            "GEN-011" => new FrmCompanies(),
+            "GEN-012" => new FrmBranches(),
+            "GEN-013" => new FrmFiscalYears(),
+            "GEN-014" => new FrmNumbering(),
+            "GEN-015" => new FrmLanguages(),
+            "GEN-016" => new FrmGeneralSettings(),
+            _ => null
+        };
+
+        if (setupForm is not null)
+        {
+            OpenHostedScreenTab(screenCode, screenName, setupForm);
+            return;
+        }
         if (_workspaceTabs is null)
         {
             return;
@@ -280,6 +300,44 @@ public partial class FrmDashboard : Form
         page.Controls.Add(notice);
         _workspaceTabs.TabPages.Add(page);
         _workspaceTabs.SelectedTab = page;
+    }
+
+    /// <summary>استضافة نموذج شاشة فعلي داخل تبويب واحد ومنع التكرار.</summary>
+    private void OpenHostedScreenTab(string screenCode, string screenName, Form screenForm)
+    {
+        if (_workspaceTabs is null) return;
+        var existing = _workspaceTabs.TabPages.Cast<TabPage>()
+            .FirstOrDefault(page => string.Equals(page.Name, screenCode, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            screenForm.Dispose();
+            _workspaceTabs.SelectedTab = existing;
+            return;
+        }
+
+        screenForm.Dock = DockStyle.Fill;
+        screenForm.TopLevel = false;
+        var page = new TabPage
+        {
+            Name = screenCode,
+            Text = $"{screenName}  ×",
+            BackColor = Color.FromArgb(247, 249, 252),
+            RightToLeft = RightToLeft.Yes,
+            Padding = Padding.Empty,
+            Tag = screenForm
+        };
+        screenForm.FormClosed += (_, _) =>
+        {
+            if (_workspaceTabs.TabPages.Contains(page))
+            {
+                _workspaceTabs.TabPages.Remove(page);
+                page.Dispose();
+            }
+        };
+        page.Controls.Add(screenForm);
+        _workspaceTabs.TabPages.Add(page);
+        _workspaceTabs.SelectedTab = page;
+        screenForm.Show();
     }
 
     /// <summary>
