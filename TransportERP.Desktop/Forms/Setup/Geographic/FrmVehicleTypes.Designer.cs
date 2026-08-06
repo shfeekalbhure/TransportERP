@@ -100,26 +100,32 @@ partial class FrmVehicleTypes
         tlpC005Data.Name="tlpC005Data"; tlpC005Data.Dock=System.Windows.Forms.DockStyle.Fill; tlpC005Data.RightToLeft=System.Windows.Forms.RightToLeft.Yes; tlpC005Data.ColumnCount=4; tlpC005Data.RowCount=8; tlpC005Data.Padding=new System.Windows.Forms.Padding(16, 10, 16, 10); tlpC005Data.BackColor=System.Drawing.Color.White;
         tlpC005Data.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 15F)); tlpC005Data.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 35F)); tlpC005Data.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 15F)); tlpC005Data.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 35F));
         for (int i = 0; i < 7; i++) tlpC005Data.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 42F)); tlpC005Data.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-        var labels = new System.Windows.Forms.Label[] {
-            new System.Windows.Forms.Label { Name="lblVehicleTypeCode", Text="كود النوع *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) },
-            new System.Windows.Forms.Label { Name="lblNameAr", Text="الاسم العربي *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) },
-            new System.Windows.Forms.Label { Name="lblNameEn", Text="الاسم الإنجليزي *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) },
-            new System.Windows.Forms.Label { Name="lblCategory", Text="الفئة *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) },
-            new System.Windows.Forms.Label { Name="lblSeats", Text="عدد المقاعد", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblPayloadTons", Text="الحمولة بالطن", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblLength", Text="الطول", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblWidth", Text="العرض", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblHeight", Text="الارتفاع", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblAxles", Text="عدد المحاور", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblBodyType", Text="نوع الهيكل", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblRoofType", Text="نوع السطح", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblOwnershipType", Text="نوع الملكية", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Name="lblStatus", Text="الحالة *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) },
-            new System.Windows.Forms.Label { Name="lblNotes", Text="الملاحظات", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight }
-        };
-        System.Windows.Forms.Control[] inputs = { txtVehicleTypeCode, txtNameAr, txtNameEn, cmbCategory, nudSeats, nudPayloadTons, nudLength, nudWidth, nudHeight, nudAxles, cmbBodyType, cmbRoofType, cmbOwnershipType, cmbStatus, rtbNotes };
-        string[] inputNames = { "txtVehicleTypeCode", "txtNameAr", "txtNameEn", "cmbCategory", "nudSeats", "nudPayloadTons", "nudLength", "nudWidth", "nudHeight", "nudAxles", "cmbBodyType", "cmbRoofType", "cmbOwnershipType", "cmbStatus", "rtbNotes" };
-        for (int i = 0; i < inputs.Length; i++) { inputs[i].Name=inputNames[i]; inputs[i].Dock=System.Windows.Forms.DockStyle.Fill; inputs[i].Margin=new System.Windows.Forms.Padding(8,4,12,4); inputs[i].RightToLeft=System.Windows.Forms.RightToLeft.Yes; int row=i/2; int col=(i%2)*2; tlpC005Data.Controls.Add(labels[i],col,row); tlpC005Data.Controls.Add(inputs[i],col+1,row); }
+        var lblVehicleTypeCode = new System.Windows.Forms.Label { Name="lblVehicleTypeCode", Text="كود النوع *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) };
+        var lblNameAr = new System.Windows.Forms.Label { Name="lblNameAr", Text="الاسم العربي *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) };
+        var lblNameEn = new System.Windows.Forms.Label { Name="lblNameEn", Text="الاسم الإنجليزي *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) };
+        var lblCategory = new System.Windows.Forms.Label { Name="lblCategory", Text="الفئة *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) };
+        var lblSeats = new System.Windows.Forms.Label { Name="lblSeats", Text="عدد المقاعد", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblPayload = new System.Windows.Forms.Label { Name="lblPayload", Text="الحمولة بالطن", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblLength = new System.Windows.Forms.Label { Name="lblLength", Text="الطول", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblWidth = new System.Windows.Forms.Label { Name="lblWidth", Text="العرض", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblHeight = new System.Windows.Forms.Label { Name="lblHeight", Text="الارتفاع", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblAxles = new System.Windows.Forms.Label { Name="lblAxles", Text="عدد المحاور", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblBodyType = new System.Windows.Forms.Label { Name="lblBodyType", Text="نوع الهيكل", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblRoofType = new System.Windows.Forms.Label { Name="lblRoofType", Text="نوع السطح", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblOwnership = new System.Windows.Forms.Label { Name="lblOwnership", Text="نوع الملكية", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var lblStatus = new System.Windows.Forms.Label { Name="lblStatus", Text="الحالة *", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight, Font=new System.Drawing.Font("Arial",11F,System.Drawing.FontStyle.Bold) };
+        var lblNotes = new System.Windows.Forms.Label { Name="lblNotes", Text="الملاحظات", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        txtVehicleTypeCode.Name="txtVehicleTypeCode"; txtNameAr.Name="txtNameAr"; txtNameEn.Name="txtNameEn"; cmbCategory.Name="cmbCategory"; nudSeats.Name="nudSeats"; nudPayloadTons.Name="nudPayloadTons"; nudLength.Name="nudLength"; nudWidth.Name="nudWidth"; nudHeight.Name="nudHeight"; nudAxles.Name="nudAxles"; cmbBodyType.Name="cmbBodyType"; cmbRoofType.Name="cmbRoofType"; cmbOwnershipType.Name="cmbOwnershipType"; cmbStatus.Name="cmbStatus"; rtbNotes.Name="rtbNotes";
+        txtVehicleTypeCode.Dock=txtNameAr.Dock=txtNameEn.Dock=cmbCategory.Dock=nudSeats.Dock=nudPayloadTons.Dock=nudLength.Dock=nudWidth.Dock=nudHeight.Dock=nudAxles.Dock=cmbBodyType.Dock=cmbRoofType.Dock=cmbOwnershipType.Dock=cmbStatus.Dock=rtbNotes.Dock=System.Windows.Forms.DockStyle.Fill;
+        txtVehicleTypeCode.Margin=txtNameAr.Margin=txtNameEn.Margin=cmbCategory.Margin=nudSeats.Margin=nudPayloadTons.Margin=nudLength.Margin=nudWidth.Margin=nudHeight.Margin=nudAxles.Margin=cmbBodyType.Margin=cmbRoofType.Margin=cmbOwnershipType.Margin=cmbStatus.Margin=rtbNotes.Margin=new System.Windows.Forms.Padding(8,4,12,4);
+        tlpC005Data.Controls.Add(lblVehicleTypeCode,0,0); tlpC005Data.Controls.Add(txtVehicleTypeCode,1,0); tlpC005Data.Controls.Add(lblNameAr,2,0); tlpC005Data.Controls.Add(txtNameAr,3,0);
+        tlpC005Data.Controls.Add(lblNameEn,0,1); tlpC005Data.Controls.Add(txtNameEn,1,1); tlpC005Data.Controls.Add(lblCategory,2,1); tlpC005Data.Controls.Add(cmbCategory,3,1);
+        tlpC005Data.Controls.Add(lblSeats,0,2); tlpC005Data.Controls.Add(nudSeats,1,2); tlpC005Data.Controls.Add(lblPayload,2,2); tlpC005Data.Controls.Add(nudPayloadTons,3,2);
+        tlpC005Data.Controls.Add(lblLength,0,3); tlpC005Data.Controls.Add(nudLength,1,3); tlpC005Data.Controls.Add(lblWidth,2,3); tlpC005Data.Controls.Add(nudWidth,3,3);
+        tlpC005Data.Controls.Add(lblHeight,0,4); tlpC005Data.Controls.Add(nudHeight,1,4); tlpC005Data.Controls.Add(lblAxles,2,4); tlpC005Data.Controls.Add(nudAxles,3,4);
+        tlpC005Data.Controls.Add(lblBodyType,0,5); tlpC005Data.Controls.Add(cmbBodyType,1,5); tlpC005Data.Controls.Add(lblRoofType,2,5); tlpC005Data.Controls.Add(cmbRoofType,3,5);
+        tlpC005Data.Controls.Add(lblOwnership,0,6); tlpC005Data.Controls.Add(cmbOwnershipType,1,6); tlpC005Data.Controls.Add(lblStatus,2,6); tlpC005Data.Controls.Add(cmbStatus,3,6);
+        tlpC005Data.Controls.Add(lblNotes,0,7); tlpC005Data.Controls.Add(rtbNotes,1,7); tlpC005Data.SetColumnSpan(rtbNotes,3);
         txtVehicleTypeCode.BackColor=txtNameAr.BackColor=txtNameEn.BackColor=cmbCategory.BackColor=cmbStatus.BackColor=System.Drawing.Color.FromArgb(255,247,204);
         cmbCategory.DropDownStyle=cmbBodyType.DropDownStyle=cmbRoofType.DropDownStyle=cmbOwnershipType.DropDownStyle=cmbStatus.DropDownStyle=System.Windows.Forms.ComboBoxStyle.DropDownList;
         nudSeats.Maximum=9999; nudPayloadTons.Maximum=nudLength.Maximum=nudWidth.Maximum=nudHeight.Maximum=999999; nudPayloadTons.DecimalPlaces=nudLength.DecimalPlaces=nudWidth.DecimalPlaces=nudHeight.DecimalPlaces=2; nudAxles.Maximum=99;
@@ -148,18 +154,17 @@ partial class FrmVehicleTypes
         tlpC011Audit.Name="tlpC011Audit"; tlpC011Audit.Dock=System.Windows.Forms.DockStyle.Fill; tlpC011Audit.RightToLeft=System.Windows.Forms.RightToLeft.Yes; tlpC011Audit.ColumnCount=5; tlpC011Audit.RowCount=2; tlpC011Audit.Padding=new System.Windows.Forms.Padding(16,8,16,8); tlpC011Audit.BackColor=System.Drawing.Color.FromArgb(243,244,246);
         for (int i=0;i<5;i++) tlpC011Audit.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent,20F));
         tlpC011Audit.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent,50F)); tlpC011Audit.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent,50F));
-        var auditLabels = new System.Windows.Forms.Label[] {
-            new System.Windows.Forms.Label { Text="أنشئ بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="تاريخ الإنشاء: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="آخر تعديل بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="تاريخ التعديل: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="الشركة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="الفرع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="الجهاز / IP: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="العملية: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight },
-            new System.Windows.Forms.Label { Text="المرجع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight }
-        };
-        for (int i=0;i<auditLabels.Length;i++) tlpC011Audit.Controls.Add(auditLabels[i], i%5, i/5);
+        var auditCreatedBy = new System.Windows.Forms.Label { Text="أنشئ بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditCreatedAt = new System.Windows.Forms.Label { Text="تاريخ الإنشاء: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditModifiedBy = new System.Windows.Forms.Label { Text="آخر تعديل بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditModifiedAt = new System.Windows.Forms.Label { Text="تاريخ التعديل: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditCompany = new System.Windows.Forms.Label { Text="الشركة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditBranch = new System.Windows.Forms.Label { Text="الفرع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditDeviceIp = new System.Windows.Forms.Label { Text="الجهاز / IP: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditOperation = new System.Windows.Forms.Label { Text="العملية: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        var auditReference = new System.Windows.Forms.Label { Text="المرجع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        tlpC011Audit.Controls.Add(auditCreatedBy,0,0); tlpC011Audit.Controls.Add(auditCreatedAt,1,0); tlpC011Audit.Controls.Add(auditModifiedBy,2,0); tlpC011Audit.Controls.Add(auditModifiedAt,3,0); tlpC011Audit.Controls.Add(auditCompany,4,0);
+        tlpC011Audit.Controls.Add(auditBranch,0,1); tlpC011Audit.Controls.Add(auditDeviceIp,1,1); tlpC011Audit.Controls.Add(auditOperation,2,1); tlpC011Audit.Controls.Add(auditReference,3,1);
         btnAuditLog.Name="btnAuditLog"; btnAuditLog.Text="سجل التدقيق"; btnAuditLog.Dock=System.Windows.Forms.DockStyle.Fill; btnAuditLog.FlatStyle=System.Windows.Forms.FlatStyle.Flat; tlpC011Audit.Controls.Add(btnAuditLog,4,1);
 
         tlpRoot.Controls.Add(pnlC002Header,0,0); tlpRoot.Controls.Add(flpC003Toolbar,0,1); tlpRoot.Controls.Add(tlpC005Data,0,2); tlpRoot.Controls.Add(tlpC007Search,0,3); tlpRoot.Controls.Add(pnlC008Grid,0,4); tlpRoot.Controls.Add(flpC010Paging,0,5); tlpRoot.Controls.Add(tlpC011Audit,0,6);
