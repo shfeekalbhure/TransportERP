@@ -37,7 +37,7 @@ public sealed class FrmUsers : Form
         BackColor = Color.FromArgb(247, 249, 252);
 
         _source.DataSource = _users;
-        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "admin@transporterp.local", "", "مدير النظام", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
+        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "admin@transporterp.local", "", "", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
         BuildLayout();
         ApplyFilter();
     }
@@ -99,8 +99,15 @@ public sealed class FrmUsers : Form
         return page;
     }
 
-    private TabPage CreateRolesTab() => DetailGridTab("الأدوار", "الدور", "شركة/فرع", "الحالة");
-    private TabPage CreateScopeTab() => DetailGridTab("نطاق الوصول", "الشركة", "الفرع", "الوحدة التنظيمية");
+    private TabPage CreateRolesTab() => UnavailableSystemSourceTab("الأدوار", "خدمة الأدوار المعتمدة غير متاحة؛ لا تُقبل أو تُحاكى بيانات الأدوار محلياً.");
+    private TabPage CreateScopeTab() => UnavailableSystemSourceTab("نطاق الوصول", "خدمة نطاقات الوصول المعتمدة غير متاحة؛ لا تُقبل أو تُحاكى النطاقات محلياً.");
+    private static TabPage UnavailableSystemSourceTab(string title, string message)
+    {
+        var page = new TabPage(title) { RightToLeft = RightToLeft.Yes, BackColor = Color.White, Padding = new Padding(14) };
+        page.Controls.Add(new Label { Dock = DockStyle.Top, Height = 48, Text = message, TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(150, 70, 0) });
+        return page;
+    }
+
     private TabPage CreateSecurityTab()
     {
         var page = new TabPage("الأمان") { RightToLeft = RightToLeft.Yes, BackColor = Color.White, Padding = new Padding(14) };
@@ -123,7 +130,8 @@ public sealed class FrmUsers : Form
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8), BackColor = Color.White };
         AddFilter(panel, "اسم المستخدم", _searchUser);
         AddFilter(panel, "الحالة", _searchStatus);
-        AddFilter(panel, "الدور", _searchRole);
+        AddFilter(panel, "الدور (يتطلب خدمة)", _searchRole);
+        _searchRole.Enabled = false;
         AddFilter(panel, "الشركة", _searchCompany);
         AddFilter(panel, "الفرع", _searchBranch);
         foreach (var control in new Control[] { _searchUser, _searchRole, _searchCompany, _searchBranch }) control.TextChanged += (_, _) => ApplyFilter();
@@ -155,14 +163,14 @@ public sealed class FrmUsers : Form
     private void ApplyFilter()
     {
         var query = _searchUser.Text.Trim(); var status = _searchStatus.Text;
-        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status) && (string.IsNullOrWhiteSpace(_searchRole.Text) || x.Roles.Contains(_searchRole.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchCompany.Text) || x.Company.Contains(_searchCompany.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchBranch.Text) || x.Branch.Contains(_searchBranch.Text, StringComparison.OrdinalIgnoreCase))).ToList();
+        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status) && (string.IsNullOrWhiteSpace(_searchCompany.Text) || x.Company.Contains(_searchCompany.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchBranch.Text) || x.Branch.Contains(_searchBranch.Text, StringComparison.OrdinalIgnoreCase))).ToList();
         _source.DataSource = new BindingList<UserRow>(view); _counter.Text = "عدد السجلات: " + view.Count;
     }
 
     private void SaveUser()
     {
         if (string.IsNullOrWhiteSpace(_code.Text) || string.IsNullOrWhiteSpace(_nameAr.Text) || string.IsNullOrWhiteSpace(_username.Text)) { MessageBox.Show("أكمل الحقول الإلزامية.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), _email.Text.Trim(), _mobile.Text.Trim(), "—", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
+        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), _email.Text.Trim(), _mobile.Text.Trim(), "", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
         else { _selected.Code = _code.Text.Trim(); _selected.NameAr = _nameAr.Text.Trim(); _selected.NameEn = _nameEn.Text.Trim(); _selected.Username = _username.Text.Trim(); _selected.Email = _email.Text.Trim(); _selected.Mobile = _mobile.Text.Trim(); _selected.Status = _status.Text; }
         _audit.Text = "آخر تعديل بواسطة المستخدم الحالي — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
         ClearEditor(); ApplyFilter();
