@@ -21,7 +21,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Forms\FrmCountries.cs">
+    <Compile Remove="Forms\Setup\General\**\*.cs" />
+    <EmbeddedResource Remove="Forms\Setup\General\**\*.resx" />
+    <Compile Remove="Forms\Security\**\*.cs" />
+    <EmbeddedResource Remove="Forms\Security\**\*.resx" />
+    <Compile Remove="Forms\Accounting\**\*.cs" />
+    <EmbeddedResource Remove="Forms\Accounting\**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Forms\\FrmCountries.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\Setup\Geographic\FrmAreas.cs">
