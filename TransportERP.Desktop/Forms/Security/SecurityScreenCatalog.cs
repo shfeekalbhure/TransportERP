@@ -14,7 +14,7 @@ public static class SecurityScreenCatalog
         form = code.Trim().ToUpperInvariant() switch
         {
             "SEC-001" => new FrmUsers(accessControlClient),
-            "SEC-002" => new FrmRoles(),
+            "SEC-002" => new FrmRoles(accessControlClient),
             "SEC-003" => new FrmPermissions(),
             "SEC-004" => new FrmSecurityPolicies(),
             "SEC-005" => new FrmTrustedDevices(),
