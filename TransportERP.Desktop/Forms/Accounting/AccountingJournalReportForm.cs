@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Drawing;
+using TransportERP.Contracts.Accounting;
+using TransportERP.Desktop.Services;
 
 namespace TransportERP.Desktop.Forms.Accounting;
 
@@ -9,6 +11,7 @@ namespace TransportERP.Desktop.Forms.Accounting;
 public abstract class AccountingJournalReportForm : Form
 {
     private readonly BindingList<JournalRow> _allRows = new();
+    private readonly IJournalReportApiClient _client = new JournalReportApiClient(new HttpClient());
     private readonly BindingSource _source = new();
     private readonly DateTimePicker _fromDate = new() { Format = DateTimePickerFormat.Short, Value = DateTime.Today.AddMonths(-1) };
     private readonly DateTimePicker _toDate = new() { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
@@ -29,7 +32,7 @@ public abstract class AccountingJournalReportForm : Form
         RightToLeft = RightToLeft.Yes; RightToLeftLayout = true;
         Font = new Font("Segoe UI", 10F); BackColor = Color.FromArgb(245, 247, 250);
         _source.DataSource = _allRows;
-        BuildLayout(); SeedRows(); ApplyFilters();
+        BuildLayout(); ApplyFilters();
     }
 
     private static ComboBox RequiredCombo(params string[] values)
@@ -51,7 +54,7 @@ public abstract class AccountingJournalReportForm : Form
     private Control BuildToolbar()
     {
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(7), BackColor = Color.FromArgb(35, 65, 100) };
-        AddButton(bar, "تحديث", (_, _) => ApplyFilters());
+        AddButton(bar, async (_, _) => await LoadFromApiAsync());
         AddButton(bar, "طباعة", (_, _) => ReportMessage("تم تجهيز دفتر اليومية للطباعة وفق الصلاحية."));
         AddButton(bar, "تصدير", (_, _) => ReportMessage("سيتم تنفيذ التصدير من خدمة التقارير بعد الربط."));
         return bar;
@@ -81,7 +84,7 @@ public abstract class AccountingJournalReportForm : Form
     private static DataGridViewTextBoxColumn Column(string name, string title) => new() { DataPropertyName = name, HeaderText = title, SortMode = DataGridViewColumnSortMode.Automatic };
     private Control BuildAudit() { var bar = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(235, 241, 248), Padding = new Padding(10, 7, 10, 2) }; _audit.Text = "تقرير قراءة فقط | آخر تحديث محلي: — | الطباعة والتصدير تخضعان للصلاحيات."; bar.Controls.Add(_audit); return bar; }
     private static void AddButton(FlowLayoutPanel bar, string text, EventHandler click) { var b = new Button { Text = text, Width = 88, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(35, 65, 100), Margin = new Padding(4, 2, 4, 2) }; b.FlatAppearance.BorderSize = 0; b.Click += click; bar.Controls.Add(b); }
-    private void SeedRows() { _allRows.Add(new JournalRow(DateTime.Today.AddDays(-4), "JV-00041", "النقدية", "قيد يومي تجريبي", 125000M, 0M, "مرحّل", "YER", "قيد يومي", "الفرع الرئيسي", "الإدارة")); _allRows.Add(new JournalRow(DateTime.Today.AddDays(-2), "JV-00042", "المصروفات", "تسوية محلية", 0M, 42500M, "معلق", "USD", "تسوية", "الفرع الرئيسي", "التشغيل")); }
+    private async Task LoadFromApiAsync() { var response = await _client.QueryAsync(new JournalReportQuery(DateOnly.FromDateTime(_fromDate.Value), DateOnly.FromDateTime(_toDate.Value), null, null, null, _status.Text, _currency.Text, _journalType.Text, _search.Text)); _allRows.Clear(); _audit.Text = response.StorageAvailable ? "تم استلام التقرير من الخدمة." : $"مانع التخزين: {response.BlockerCode} — {response.BlockerMessage}"; ApplyFilters(); }
     private void ApplyFilters() { var text = _search.Text.Trim(); var rows = _allRows.Where(x => x.Date.Date >= _fromDate.Value.Date && x.Date.Date <= _toDate.Value.Date && (_account.Text == "كل الحسابات" || x.Account == _account.Text) && (_branch.Text == "كل الفروع" || x.Branch == _branch.Text) && (_costCenter.Text == "كل مراكز التكلفة" || x.CostCenter == _costCenter.Text) && (_status.Text == "الكل" || x.Status == _status.Text) && (_currency.Text == "كل العملات" || x.Currency == _currency.Text) && (_journalType.Text == "كل أنواع القيود" || x.JournalType == _journalType.Text) && (string.IsNullOrWhiteSpace(text) || x.Number.Contains(text, StringComparison.OrdinalIgnoreCase) || x.Account.Contains(text, StringComparison.OrdinalIgnoreCase) || x.Description.Contains(text, StringComparison.OrdinalIgnoreCase))).ToList(); _source.DataSource = new BindingList<JournalRow>(rows); _resultCount.Text = $"عدد النتائج: {rows.Count}"; _audit.Text = $"تقرير قراءة فقط | آخر تحديث محلي: {DateTime.Now:yyyy/MM/dd HH:mm} | الطباعة والتصدير تخضعان للصلاحيات."; }
     private void ReportMessage(string text) => MessageBox.Show(text, "دفتر اليومية", MessageBoxButtons.OK, MessageBoxIcon.Information);
     private sealed record JournalRow(DateTime Date, string Number, string Account, string Description, decimal Debit, decimal Credit, string Status, string Currency, string JournalType, string Branch, string CostCenter);
