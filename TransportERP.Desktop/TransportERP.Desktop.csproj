@@ -21,8 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Forms\Setup\General\**\*.cs" />
-    <EmbeddedResource Remove="Forms\Setup\General\**\*.resx" />
     <Compile Remove="Forms\Security\**\*.cs" />
     <EmbeddedResource Remove="Forms\Security\**\*.resx" />
     <Compile Remove="Forms\Accounting\**\*.cs" />
