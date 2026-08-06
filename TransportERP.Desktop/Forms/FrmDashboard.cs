@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.Forms.Setup.General;
 
 namespace TransportERP.Desktop;
 
@@ -99,8 +100,59 @@ public partial class FrmDashboard : Form
         geographicDataItem.DropDownItems.Add(countriesItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
+        var generalDataItem = new ToolStripMenuItem("التهيئة العامة")
+        {
+            RightToLeft = RightToLeft.Yes
+        };
+
+        AddGeneralSetupItem(generalDataItem, "GEN-008", "أنواع المركبات");
+        AddGeneralSetupItem(generalDataItem, "GEN-009", "العملات");
+        AddGeneralSetupItem(generalDataItem, "GEN-010", "أسعار الصرف");
+        AddGeneralSetupItem(generalDataItem, "GEN-011", "الشركات");
+        AddGeneralSetupItem(generalDataItem, "GEN-012", "الفروع");
+        AddGeneralSetupItem(generalDataItem, "GEN-013", "السنوات المالية");
+        AddGeneralSetupItem(generalDataItem, "GEN-014", "الترقيم العام");
+        AddGeneralSetupItem(generalDataItem, "GEN-015", "اللغات");
+        AddGeneralSetupItem(generalDataItem, "GEN-016", "المتغيرات العامة");
+        _generalSetupMenu.Items.Add(generalDataItem);
+
         generalSetupButton.Click -= GeneralSetupButton_Click;
         generalSetupButton.Click += GeneralSetupButton_Click;
+    }
+
+    /// <summary>إضافة شاشة تهيئة عامة إلى القائمة الجانبية.</summary>
+    private void AddGeneralSetupItem(ToolStripMenuItem parent, string code, string name)
+    {
+        var item = new ToolStripMenuItem(name)
+        {
+            Name = $"mnu{code.Replace("-", string.Empty, StringComparison.Ordinal)}",
+            ToolTipText = code
+        };
+        item.Click += (_, _) => OpenGeneralSetupScreen(code, name);
+        parent.DropDownItems.Add(item);
+    }
+
+    /// <summary>فتح شاشة التهيئة العامة داخل تبويب رئيسي واحد لكل شاشة.</summary>
+    private void OpenGeneralSetupScreen(string code, string name)
+    {
+        Form? form = code switch
+        {
+            "GEN-008" => new FrmVehicleTypes(),
+            "GEN-009" => new FrmCurrencies(),
+            "GEN-010" => new FrmExchangeRates(),
+            "GEN-011" => new FrmCompanies(),
+            "GEN-012" => new FrmBranches(),
+            "GEN-013" => new FrmFiscalYears(),
+            "GEN-014" => new FrmNumberingSettings(),
+            "GEN-015" => new FrmLanguages(),
+            "GEN-016" => new FrmGeneralVariables(),
+            _ => null
+        };
+
+        if (form is not null)
+        {
+            OpenHostedScreenTab(code, name, form);
+        }
     }
 
     /// <summary>
