@@ -3,14 +3,14 @@ using System.Windows.Forms;
 
 namespace TransportERP.Desktop.Forms.Security;
 
-internal enum SecurityScreenLayout
+public enum SecurityScreenLayout
 {
     Standard,
     ReadOnly,
     Tree
 }
 
-internal sealed record SecurityScreenDefinition(
+public sealed record SecurityScreenDefinition(
     string Code,
     string ArabicName,
     string[] Tabs,
@@ -25,7 +25,7 @@ public abstract class SecurityScreenForm : Form
     {
         Text = $"{definition.Code} — {definition.ArabicName}";
         Name = definition.Code;
-        RightToLeft = RightToLeft.Yes;
+        RightToLeft = System.Windows.Forms.RightToLeft.Yes;
         RightToLeftLayout = true;
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(980, 680);
@@ -39,7 +39,7 @@ public abstract class SecurityScreenForm : Form
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RightToLeft = RightToLeft.Yes,
+            RightToLeft = System.Windows.Forms.RightToLeft.Yes,
             ColumnCount = 1,
             RowCount = 5,
             Padding = new Padding(12),
@@ -92,7 +92,7 @@ public abstract class SecurityScreenForm : Form
         };
         foreach (var tabName in definition.Tabs)
         {
-            tabs.TabPages.Add(new TabPage(tabName) { RightToLeft = RightToLeft.Yes });
+            tabs.TabPages.Add(new TabPage(tabName) { RightToLeft = System.Windows.Forms.RightToLeft.Yes });
         }
 
         if (tabs.TabPages.Count > 0)
@@ -103,7 +103,7 @@ public abstract class SecurityScreenForm : Form
                 treeLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                 treeLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                 treeLayout.Controls.Add(new Label { AutoSize = true, Text = "الشجرة هي العرض الرئيسي؛ البحث والتوسيع والطي والتحميل الكسول تُربط لاحقاً بخدمة معتمدة.", TextAlign = ContentAlignment.MiddleRight }, 0, 0);
-                treeLayout.Controls.Add(new TreeView { Dock = DockStyle.Fill, RightToLeftLayout = true, RightToLeft = RightToLeft.Yes }, 0, 1);
+                treeLayout.Controls.Add(new TreeView { Dock = DockStyle.Fill, RightToLeftLayout = true, RightToLeft = System.Windows.Forms.RightToLeft.Yes }, 0, 1);
                 tabs.TabPages[0].Controls.Add(treeLayout);
             }
             else
@@ -130,7 +130,7 @@ public abstract class SecurityScreenForm : Form
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            RightToLeft = RightToLeft.Yes,
+            RightToLeft = System.Windows.Forms.RightToLeft.Yes,
             ColumnCount = 2,
             Padding = new Padding(10)
         };
