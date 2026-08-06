@@ -330,7 +330,7 @@ public abstract class AccountingScreenForm : Form
 
     private sealed class AccountingRow
     {
-        public AccountingRow(string code, string nameAr, string nameEn, string currency, decimal exchangeRate, string status) { Code = code; NameAr = nameAr; NameEn = nameEn; Currency = currency; ExchangeRate = exchangeRate; Status = status; }
+        public AccountingRow() : this("", "", "", "YER", 1M, "معلق") { }\n        public AccountingRow(string code, string nameAr, string nameEn, string currency, decimal exchangeRate, string status) { Code = code; NameAr = nameAr; NameEn = nameEn; Currency = currency; ExchangeRate = exchangeRate; Status = status; }
         public string Code { get; set; }
         public string NameAr { get; set; }
         public string NameEn { get; set; }
