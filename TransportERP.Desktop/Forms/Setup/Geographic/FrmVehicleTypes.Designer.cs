@@ -29,6 +29,7 @@ partial class FrmVehicleTypes
     private System.Windows.Forms.ComboBox cmbPageSize = null!;
     private System.Windows.Forms.TableLayoutPanel tlpC011Audit = null!;
     private System.Windows.Forms.Button btnAuditLog = null!;
+    private System.Windows.Forms.Label auditCreatedBy = null!, auditCreatedAt = null!, auditModifiedBy = null!, auditModifiedAt = null!, auditCompany = null!, auditBranch = null!, auditDeviceIp = null!, auditOperation = null!, auditReference = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -56,7 +57,7 @@ partial class FrmVehicleTypes
         pnlC008Grid = new System.Windows.Forms.Panel(); dgvRecords = new System.Windows.Forms.DataGridView();
         colCode = new System.Windows.Forms.DataGridViewTextBoxColumn(); colNameAr = new System.Windows.Forms.DataGridViewTextBoxColumn(); colCategory = new System.Windows.Forms.DataGridViewTextBoxColumn(); colSeats = new System.Windows.Forms.DataGridViewTextBoxColumn(); colPayload = new System.Windows.Forms.DataGridViewTextBoxColumn(); colStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
         flpC010Paging = new System.Windows.Forms.FlowLayoutPanel(); btnFirst = new System.Windows.Forms.Button(); btnPrevious = new System.Windows.Forms.Button(); lblPageNumber = new System.Windows.Forms.Label(); btnNext = new System.Windows.Forms.Button(); btnLast = new System.Windows.Forms.Button(); cmbPageSize = new System.Windows.Forms.ComboBox(); lblTotalRecords = new System.Windows.Forms.Label();
-        tlpC011Audit = new System.Windows.Forms.TableLayoutPanel(); btnAuditLog = new System.Windows.Forms.Button();
+        tlpC011Audit = new System.Windows.Forms.TableLayoutPanel(); btnAuditLog = new System.Windows.Forms.Button(); auditCreatedBy = new System.Windows.Forms.Label(); auditCreatedAt = new System.Windows.Forms.Label(); auditModifiedBy = new System.Windows.Forms.Label(); auditModifiedAt = new System.Windows.Forms.Label(); auditCompany = new System.Windows.Forms.Label(); auditBranch = new System.Windows.Forms.Label(); auditDeviceIp = new System.Windows.Forms.Label(); auditOperation = new System.Windows.Forms.Label(); auditReference = new System.Windows.Forms.Label();
 
         SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)nudSeats).BeginInit(); ((System.ComponentModel.ISupportInitialize)nudPayloadTons).BeginInit(); ((System.ComponentModel.ISupportInitialize)nudLength).BeginInit(); ((System.ComponentModel.ISupportInitialize)nudWidth).BeginInit(); ((System.ComponentModel.ISupportInitialize)nudHeight).BeginInit(); ((System.ComponentModel.ISupportInitialize)nudAxles).BeginInit();
@@ -156,15 +157,15 @@ partial class FrmVehicleTypes
         tlpC011Audit.Name="tlpC011Audit"; tlpC011Audit.Dock=System.Windows.Forms.DockStyle.Fill; tlpC011Audit.RightToLeft=System.Windows.Forms.RightToLeft.Yes; tlpC011Audit.ColumnCount=5; tlpC011Audit.RowCount=2; tlpC011Audit.Padding=new System.Windows.Forms.Padding(16,8,16,8); tlpC011Audit.BackColor=System.Drawing.Color.FromArgb(243,244,246);
         for (int i=0;i<5;i++) tlpC011Audit.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent,20F));
         tlpC011Audit.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent,50F)); tlpC011Audit.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent,50F));
-        var auditCreatedBy = new System.Windows.Forms.Label { Name="lblCreatedBy", Text="أنشئ بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditCreatedAt = new System.Windows.Forms.Label { Name="lblCreatedAt", Text="تاريخ الإنشاء: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditModifiedBy = new System.Windows.Forms.Label { Name="lblModifiedBy", Text="آخر تعديل بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditModifiedAt = new System.Windows.Forms.Label { Name="lblModifiedAt", Text="تاريخ التعديل: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditCompany = new System.Windows.Forms.Label { Name="lblCompany", Text="الشركة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditBranch = new System.Windows.Forms.Label { Name="lblBranch", Text="الفرع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditDeviceIp = new System.Windows.Forms.Label { Name="lblDeviceOrIp", Text="الجهاز / IP: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditOperation = new System.Windows.Forms.Label { Name="lblOperation", Text="العملية: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
-        var auditReference = new System.Windows.Forms.Label { Name="lblReference", Text="المرجع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditCreatedBy = new System.Windows.Forms.Label { Name="lblCreatedBy", Text="أنشئ بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditCreatedAt = new System.Windows.Forms.Label { Name="lblCreatedAt", Text="تاريخ الإنشاء: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditModifiedBy = new System.Windows.Forms.Label { Name="lblModifiedBy", Text="آخر تعديل بواسطة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditModifiedAt = new System.Windows.Forms.Label { Name="lblModifiedAt", Text="تاريخ التعديل: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditCompany = new System.Windows.Forms.Label { Name="lblCompany", Text="الشركة: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditBranch = new System.Windows.Forms.Label { Name="lblBranch", Text="الفرع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditDeviceIp = new System.Windows.Forms.Label { Name="lblDeviceOrIp", Text="الجهاز / IP: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditOperation = new System.Windows.Forms.Label { Name="lblOperation", Text="العملية: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
+        auditReference = new System.Windows.Forms.Label { Name="lblReference", Text="المرجع: —", Dock=System.Windows.Forms.DockStyle.Fill, TextAlign=System.Drawing.ContentAlignment.MiddleRight };
         tlpC011Audit.Controls.Add(auditCreatedBy,0,0); tlpC011Audit.Controls.Add(auditCreatedAt,1,0); tlpC011Audit.Controls.Add(auditModifiedBy,2,0); tlpC011Audit.Controls.Add(auditModifiedAt,3,0); tlpC011Audit.Controls.Add(auditCompany,4,0);
         tlpC011Audit.Controls.Add(auditBranch,0,1); tlpC011Audit.Controls.Add(auditDeviceIp,1,1); tlpC011Audit.Controls.Add(auditOperation,2,1); tlpC011Audit.Controls.Add(auditReference,3,1);
         btnAuditLog.Name="btnAuditLog"; btnAuditLog.Text="سجل التدقيق"; btnAuditLog.Dock=System.Windows.Forms.DockStyle.Fill; btnAuditLog.FlatStyle=System.Windows.Forms.FlatStyle.Flat; tlpC011Audit.Controls.Add(btnAuditLog,4,1);
