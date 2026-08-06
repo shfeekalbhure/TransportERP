@@ -70,8 +70,7 @@ public abstract class SecurityWorkspaceForm : Form
             Button("تعديل", (_, _) => LoadSelected(), Color.FromArgb(245, 124, 0)),
             Button("إيقاف", (_, _) => SetStatus("موقوف"), Color.FromArgb(117, 117, 117)),
             Button("حذف", (_, _) => DeleteSelected(), Color.FromArgb(198, 40, 40)),
-            Button("طباعة", (_, _) => PrintPreview(), Color.FromArgb(97, 97, 97)),
-            Button("إغلاق", (_, _) => Close(), Color.FromArgb(69, 90, 100))
+            Button("طباعة", (_, _) => PrintPreview(), Color.FromArgb(97, 97, 97))
         ]);
         return bar;
     }
@@ -103,9 +102,22 @@ public abstract class SecurityWorkspaceForm : Form
         outer.Controls.Add(filters, 0, 0); outer.Controls.Add(grid, 0, 1); group.Controls.Add(outer); return group;
     }
 
-    private Control CreateAuditBar() { var panel = new Panel { Dock = DockStyle.Fill, Height = 35, BackColor = Color.FromArgb(235, 240, 247) }; panel.Controls.Add(_audit); _audit.Text = "بيانات الإنشاء والتعديل — المستخدم: مدير النظام | الشركة/الفرع/السنة تؤخذ من سياق النظام الرئيسي."; return panel; }
+    private Control CreateAuditBar()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Height = 35, BackColor = Color.FromArgb(235, 240, 247) };
+        panel.Controls.Add(_audit);
+        _audit.Text = "بيانات الإنشاء والتعديل — المستخدم: مدير النظام | الشركة/الفرع/السنة تؤخذ من سياق النظام الرئيسي. الإغلاق من تبويب النافذة فقط.";
+        return panel;
+    }
     private GroupBox Card(string text) => new() { Text = text, Dock = DockStyle.Fill, Padding = new Padding(10), BackColor = Color.White, ForeColor = Color.FromArgb(35, 55, 80), Margin = new Padding(0, 0, 0, 10) };
-    private TextBox AddDetail(string field) { var box = CreateTextBox(); box.UseSystemPasswordChar = field.Contains("مفتاح") || field.Contains("سر"); _details[field] = box; return box; }
+    private TextBox AddDetail(string field)
+    {
+        var box = CreateTextBox();
+        // لا تُعرض مفاتيح التكامل أو كلمات المرور أو الرموز السرية كنص واضح في الواجهة.
+        box.UseSystemPasswordChar = field.Contains("مفتاح") || field.Contains("سر") || field.Contains("كلمة المرور") || field.Contains("رمز");
+        _details[field] = box;
+        return box;
+    }
     private static TextBox CreateTextBox() => new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(255, 253, 231), BorderStyle = BorderStyle.FixedSingle };
     private static Button Button(string text, EventHandler onClick, Color color) { var b = new Button { Text = text, AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = color, ForeColor = Color.White, Margin = new Padding(4), Padding = new Padding(12, 5, 12, 5) }; b.FlatAppearance.BorderSize = 0; b.Click += onClick; return b; }
     private static void AddField(TableLayoutPanel panel, int row, string label, Control control, bool required = false, int col = 0) { while (panel.RowCount <= row) panel.RowStyles.Add(new RowStyle(SizeType.AutoSize)); panel.Controls.Add(new Label { Text = label, AutoSize = true, Padding = new Padding(3, 7, 3, 3) }, col, row); panel.Controls.Add(control, col + 1, row); }
