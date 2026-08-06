@@ -14,6 +14,7 @@ namespace TransportERP.Api
             builder.Services.AddScoped<IAccessControlService, ApprovedStorageBlockedAccessControlService>();
 
             builder.Services.AddControllers();
+            builder.Services.AddScoped<TransportERP.Application.Accounting.IJournalReportQueryService, TransportERP.Application.Accounting.JournalReportQueryService>();
             builder.Services.AddScoped<IVehicleTypeService, VehicleTypeService>();
             builder.Services.AddScoped<ICurrencyService, CurrencyService>();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
