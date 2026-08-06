@@ -24,7 +24,7 @@ public sealed class FrmPeriodReopening : AccountingScreenForm { public FrmPeriod
 public sealed class FrmJournalReport : AccountingJournalReportForm { }
 public sealed class FrmGeneralLedger : AccountingReportScreenForm { public FrmGeneralLedger() : base("ACC-022", "دفتر الأستاذ العام", "الحساب", "من تاريخ", "إلى تاريخ", "الفرع", "مركز التكلفة", "العملة", "يشمل القيود غير المرحلة") { } }
 public sealed class FrmAccountStatement : AccountingReportScreenForm { public FrmAccountStatement() : base("ACC-023", "كشف حساب", "نوع الطرف", "الطرف أو الحساب", "من تاريخ", "إلى تاريخ", "العملة", "الفرع", "حالة السند") { } }
-public sealed class FrmTrialBalance : AccountingReportScreenForm { public FrmTrialBalance() : base("ACC-024", "ميزان المراجعة", "من تاريخ", "إلى تاريخ", "مستوى الحساب", "الفرع", "العملة") { } }
+public sealed class FrmTrialBalance : AccountingReportScreenForm { public FrmTrialBalance() : base("ACC-024", "ميزان المراجعة", "من تاريخ", "إلى تاريخ", "مستوى الحساب", "الفرع", "مركز التكلفة", "العملة", "شامل الصفر") { } }
 public sealed class FrmIncomeStatement : AccountingReportScreenForm { public FrmIncomeStatement() : base("ACC-025", "قائمة الدخل", "من تاريخ", "إلى تاريخ", "الفرع", "مركز التكلفة", "العملة") { } }
 public sealed class FrmBalanceSheet : AccountingReportScreenForm { public FrmBalanceSheet() : base("ACC-026", "الميزانية العمومية", "حتى تاريخ", "الفرع", "مركز التكلفة", "مستوى العرض", "العملة") { } }
 public sealed class FrmCashFlowStatement : AccountingReportScreenForm { public FrmCashFlowStatement() : base("ACC-027", "قائمة التدفقات النقدية", "من تاريخ", "إلى تاريخ", "الفرع", "العملة", "طريقة العرض") { } }
