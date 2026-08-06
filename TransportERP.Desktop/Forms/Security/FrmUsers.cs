@@ -37,7 +37,7 @@ public sealed class FrmUsers : Form
         BackColor = Color.FromArgb(247, 249, 252);
 
         _source.DataSource = _users;
-        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "مدير النظام", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
+        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "admin@transporterp.local", "", "مدير النظام", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
         BuildLayout();
         ApplyFilter();
     }
@@ -162,8 +162,8 @@ public sealed class FrmUsers : Form
     private void SaveUser()
     {
         if (string.IsNullOrWhiteSpace(_code.Text) || string.IsNullOrWhiteSpace(_nameAr.Text) || string.IsNullOrWhiteSpace(_username.Text)) { MessageBox.Show("أكمل الحقول الإلزامية.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), "—", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
-        else { _selected.Code = _code.Text.Trim(); _selected.NameAr = _nameAr.Text.Trim(); _selected.NameEn = _nameEn.Text.Trim(); _selected.Username = _username.Text.Trim(); _selected.Status = _status.Text; }
+        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), _email.Text.Trim(), _mobile.Text.Trim(), "—", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
+        else { _selected.Code = _code.Text.Trim(); _selected.NameAr = _nameAr.Text.Trim(); _selected.NameEn = _nameEn.Text.Trim(); _selected.Username = _username.Text.Trim(); _selected.Email = _email.Text.Trim(); _selected.Mobile = _mobile.Text.Trim(); _selected.Status = _status.Text; }
         _audit.Text = "آخر تعديل بواسطة المستخدم الحالي — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
         ClearEditor(); ApplyFilter();
     }
@@ -171,7 +171,7 @@ public sealed class FrmUsers : Form
     private void LoadSelected()
     {
         if (_grid.CurrentRow?.DataBoundItem is not UserRow row) return;
-        _selected = row; _code.Text = row.Code; _nameAr.Text = row.NameAr; _nameEn.Text = row.NameEn; _username.Text = row.Username; _status.SelectedItem = row.Status;
+        _selected = row; _code.Text = row.Code; _nameAr.Text = row.NameAr; _nameEn.Text = row.NameEn; _username.Text = row.Username; _email.Text = row.Email; _mobile.Text = row.Mobile; _status.SelectedItem = row.Status;
     }
     private void ClearEditor() { _selected = null; _code.Clear(); _nameAr.Clear(); _nameEn.Clear(); _username.Clear(); _email.Clear(); _mobile.Clear(); _status.SelectedIndex = 0; _code.Focus(); }
     private void SetStatus(string value) { if (_selected is null) return; _selected.Status = value; _status.SelectedItem = value; ApplyFilter(); }
@@ -187,7 +187,7 @@ public sealed class FrmUsers : Form
     private void AddGridColumn(string property, string title) => _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = property, HeaderText = title, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
     private sealed class UserRow
     {
-        public UserRow(string code, string nameAr, string nameEn, string username, string roles, string company, string branch, string status, string lastLogin) { Code = code; NameAr = nameAr; NameEn = nameEn; Username = username; Roles = roles; Company = company; Branch = branch; Status = status; LastLogin = lastLogin; }
-        public string Code { get; set; } public string NameAr { get; set; } public string NameEn { get; set; } public string Username { get; set; } public string Roles { get; set; } public string Company { get; set; } public string Branch { get; set; } public string Status { get; set; } public string LastLogin { get; set; }
+        public UserRow(string code, string nameAr, string nameEn, string username, string email, string mobile, string roles, string company, string branch, string status, string lastLogin) { Code = code; NameAr = nameAr; NameEn = nameEn; Username = username; Email = email; Mobile = mobile; Roles = roles; Company = company; Branch = branch; Status = status; LastLogin = lastLogin; }
+        public string Code { get; set; } public string NameAr { get; set; } public string NameEn { get; set; } public string Username { get; set; } public string Email { get; set; } public string Mobile { get; set; } public string Roles { get; set; } public string Company { get; set; } public string Branch { get; set; } public string Status { get; set; } public string LastLogin { get; set; }
     }
 }
