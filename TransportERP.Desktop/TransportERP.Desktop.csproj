@@ -20,20 +20,10 @@
     <Folder Include="Themes\" />
   </ItemGroup>
 
-  <!--
-    شاشة الدول مبنية حاليًا بالكامل داخل FrmCountries.cs.
-    نستبعد أي ملفات جزئية قديمة مثل FrmCountries.Designer.cs أو نسخ احتياطية مشابهة
-    حتى لا تدخل في التجميع وتعيد تعريف الكلاس أو تغير نوعه الأساسي من Form إلى object.
-  -->
   <ItemGroup>
-    <Compile Remove="Forms\FrmCountries.*.cs" />
-    <EmbeddedResource Remove="Forms\FrmCountries.*.resx" />
     <Compile Update="Forms\FrmCountries.cs">
       <SubType>Form</SubType>
     </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Update="Forms\Setup\Geographic\FrmAreas.cs">
       <SubType>Form</SubType>
     </Compile>
