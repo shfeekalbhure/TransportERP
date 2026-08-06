@@ -450,14 +450,67 @@ public sealed class FrmVehicleTypes : Form
     private bool ConfirmDiscardChanges()
     {
         if (!_isDirty) return true;
-        var choice = MessageBox.Show("توجد تغييرات غير محفوظة. هل تريد حفظها؟", Text, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
-        if (choice == DialogResult.Cancel) return false;
-        if (choice == DialogResult.Yes)
+
+        return ShowUnsavedChangesPrompt() switch
         {
-            SaveRecord();
-            return !_isDirty;
+            UnsavedChangesChoice.Save => SaveAndConfirm(),
+            UnsavedChangesChoice.Discard => true,
+            _ => false
+        };
+    }
+
+    private bool SaveAndConfirm()
+    {
+        SaveRecord();
+        return !_isDirty;
+    }
+
+    private UnsavedChangesChoice ShowUnsavedChangesPrompt()
+    {
+        var choice = UnsavedChangesChoice.Cancel;
+        using var dialog = new Form
+        {
+            Text = "تغييرات غير محفوظة",
+            RightToLeft = RightToLeft.Yes,
+            RightToLeftLayout = true,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(430, 145)
+        };
+
+        var message = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 70,
+            Padding = new Padding(18),
+            Text = "توجد تغييرات غير محفوظة. اختر الإجراء المطلوب قبل إغلاق التبويب.",
+            TextAlign = ContentAlignment.MiddleRight
+        };
+        var commands = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 56,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(12, 8, 12, 8)
+        };
+        AddPromptButton(commands, "حفظ", UnsavedChangesChoice.Save);
+        AddPromptButton(commands, "تجاهل", UnsavedChangesChoice.Discard);
+        AddPromptButton(commands, "إلغاء", UnsavedChangesChoice.Cancel);
+        dialog.Controls.Add(message);
+        dialog.Controls.Add(commands);
+        dialog.ShowDialog(this);
+
+        return choice;
+
+        void AddPromptButton(FlowLayoutPanel host, string text, UnsavedChangesChoice action)
+        {
+            var button = new Button { Text = text, AutoSize = true, Height = 32, DialogResult = DialogResult.None };
+            button.Click += (_, _) => { choice = action; dialog.Close(); };
+            host.Controls.Add(button);
         }
-        return true;
     }
 
     private static TextBox CreateInput() => new() { Height = 30 };
