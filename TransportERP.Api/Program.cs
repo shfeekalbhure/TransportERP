@@ -1,3 +1,4 @@
+using TransportERP.Application.Setup.VehicleTypes;
 using TransportERP.Application.AccessControl;
 
 namespace TransportERP.Api
@@ -12,6 +13,7 @@ namespace TransportERP.Api
             builder.Services.AddScoped<IAccessControlService, ApprovedStorageBlockedAccessControlService>();
 
             builder.Services.AddControllers();
+            builder.Services.AddScoped<IVehicleTypeService, VehicleTypeService>();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
