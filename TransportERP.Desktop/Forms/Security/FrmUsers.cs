@@ -37,7 +37,7 @@ public sealed class FrmUsers : Form
         BackColor = Color.FromArgb(247, 249, 252);
 
         _source.DataSource = _users;
-        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "مدير النظام", "نشط", "لم يسجل"));
+        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "مدير النظام", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
         BuildLayout();
         ApplyFilter();
     }
@@ -155,14 +155,14 @@ public sealed class FrmUsers : Form
     private void ApplyFilter()
     {
         var query = _searchUser.Text.Trim(); var status = _searchStatus.Text;
-        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status) && (string.IsNullOrWhiteSpace(_searchRole.Text) || x.Roles.Contains(_searchRole.Text, StringComparison.OrdinalIgnoreCase))).ToList();
+        var view = _users.Where(x => (string.IsNullOrEmpty(query) || x.Username.Contains(query, StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(query, StringComparison.OrdinalIgnoreCase)) && (status == "الكل" || x.Status == status) && (string.IsNullOrWhiteSpace(_searchRole.Text) || x.Roles.Contains(_searchRole.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchCompany.Text) || x.Company.Contains(_searchCompany.Text, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(_searchBranch.Text) || x.Branch.Contains(_searchBranch.Text, StringComparison.OrdinalIgnoreCase))).ToList();
         _source.DataSource = new BindingList<UserRow>(view); _counter.Text = "عدد السجلات: " + view.Count;
     }
 
     private void SaveUser()
     {
         if (string.IsNullOrWhiteSpace(_code.Text) || string.IsNullOrWhiteSpace(_nameAr.Text) || string.IsNullOrWhiteSpace(_username.Text)) { MessageBox.Show("أكمل الحقول الإلزامية.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), "—", _status.Text, "لم يسجل"));
+        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), "—", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
         else { _selected.Code = _code.Text.Trim(); _selected.NameAr = _nameAr.Text.Trim(); _selected.NameEn = _nameEn.Text.Trim(); _selected.Username = _username.Text.Trim(); _selected.Status = _status.Text; }
         _audit.Text = "آخر تعديل بواسطة المستخدم الحالي — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
         ClearEditor(); ApplyFilter();
@@ -187,7 +187,7 @@ public sealed class FrmUsers : Form
     private void AddGridColumn(string property, string title) => _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = property, HeaderText = title, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
     private sealed class UserRow
     {
-        public UserRow(string code, string nameAr, string nameEn, string username, string roles, string status, string lastLogin) { Code = code; NameAr = nameAr; NameEn = nameEn; Username = username; Roles = roles; Status = status; LastLogin = lastLogin; }
-        public string Code { get; set; } public string NameAr { get; set; } public string NameEn { get; set; } public string Username { get; set; } public string Roles { get; set; } public string Status { get; set; } public string LastLogin { get; set; }
+        public UserRow(string code, string nameAr, string nameEn, string username, string roles, string company, string branch, string status, string lastLogin) { Code = code; NameAr = nameAr; NameEn = nameEn; Username = username; Roles = roles; Company = company; Branch = branch; Status = status; LastLogin = lastLogin; }
+        public string Code { get; set; } public string NameAr { get; set; } public string NameEn { get; set; } public string Username { get; set; } public string Roles { get; set; } public string Company { get; set; } public string Branch { get; set; } public string Status { get; set; } public string LastLogin { get; set; }
     }
 }
