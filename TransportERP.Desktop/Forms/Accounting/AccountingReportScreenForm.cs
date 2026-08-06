@@ -17,11 +17,14 @@ public abstract class AccountingReportScreenForm : Form
 
     protected AccountingReportScreenForm(string code, string title, params string[] filterNames)
     {
-        _code = code; _title = title; _filterNames = filterNames;
+        _code = code;
+        _title = title;
+        _filterNames = filterNames;
         Text = $"TransportERP — {title}";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(1040, 670);
-        RightToLeft = RightToLeft.Yes; RightToLeftLayout = true;
+        RightToLeft = RightToLeft.Yes;
+        RightToLeftLayout = true;
         BackColor = Color.FromArgb(245, 247, 250);
         Font = new Font("Segoe UI", 10F);
         _source.DataSource = _rows;
@@ -66,6 +69,7 @@ public abstract class AccountingReportScreenForm : Form
             box.TextChanged += (_, _) => ApplyFilter();
             card.Controls.Add(box);
         }
+
         _search.TextChanged += (_, _) => ApplyFilter();
         card.Controls.Add(_search);
         card.Controls.Add(_count);
@@ -74,19 +78,71 @@ public abstract class AccountingReportScreenForm : Form
 
     private Control Grid()
     {
-        var grid = new DataGridView { Dock = DockStyle.Fill, DataSource = _source, AutoGenerateColumns = false, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, RightToLeft = RightToLeft.Yes, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            DataSource = _source,
+            AutoGenerateColumns = false,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            RightToLeft = RightToLeft.Yes,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+        };
+
         grid.Columns.AddRange(
             new DataGridViewTextBoxColumn { DataPropertyName = nameof(ReportRow.Reference), HeaderText = "المرجع" },
             new DataGridViewTextBoxColumn { DataPropertyName = nameof(ReportRow.Description), HeaderText = "البيان" },
             new DataGridViewTextBoxColumn { DataPropertyName = nameof(ReportRow.Debit), HeaderText = "مدين" },
             new DataGridViewTextBoxColumn { DataPropertyName = nameof(ReportRow.Credit), HeaderText = "دائن" },
             new DataGridViewTextBoxColumn { DataPropertyName = nameof(ReportRow.Balance), HeaderText = "الرصيد" });
+
         return grid;
     }
 
-    private Control Audit() { var bar = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(235, 241, 248), Padding = new Padding(10, 6, 10, 2) }; _audit.Text = "آخر تحديث محلي: — | صلاحيات العرض والطباعة والتصدير تُتحقق من الخادم عند الربط."; bar.Controls.Add(_audit); return bar; }
-    private static void AddButton(FlowLayoutPanel panel, string text, EventHandler action) { var b = new Button { Text = text, Width = 90, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(35, 65, 100), Margin = new Padding(4, 2, 4, 2) }; b.FlatAppearance.BorderSize = 0; b.Click += action; panel.Controls.Add(b); }
-    private void Seed() { _rows.Add(new ReportRow("ACC-LOCAL-001", "رصيد افتتاحي", 250000M, 0M, 250000M)); _rows.Add(new ReportRow("ACC-LOCAL-002", "حركة مراجعة", 0M, 45000M, 205000M)); }
-    private void ApplyFilter() { var value = _search.Text.Trim(); var view = string.IsNullOrEmpty(value) ? _rows : _rows.Where(x => x.Reference.Contains(value, StringComparison.OrdinalIgnoreCase) || x.Description.Contains(value, StringComparison.OrdinalIgnoreCase)).ToList(); _source.DataSource = new BindingList<ReportRow>(view.ToList()); _count.Text = $"عدد النتائج: {view.Count}"; _audit.Text = $"آخر تحديث محلي: {DateTime.Now:yyyy/MM/dd HH:mm} | صلاحيات العرض والطباعة والتصدير تُتحقق من الخادم عند الربط."; }
+    private Control Audit()
+    {
+        var bar = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(235, 241, 248), Padding = new Padding(10, 6, 10, 2) };
+        _audit.Text = "آخر تحديث محلي: — | صلاحيات العرض والطباعة والتصدير تُتحقق من الخادم عند الربط.";
+        bar.Controls.Add(_audit);
+        return bar;
+    }
+
+    private static void AddButton(FlowLayoutPanel panel, string text, EventHandler action)
+    {
+        var button = new Button { Text = text, Width = 90, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(35, 65, 100), Margin = new Padding(4, 2, 4, 2) };
+        button.FlatAppearance.BorderSize = 0;
+        button.Click += action;
+        panel.Controls.Add(button);
+    }
+
+    private void Seed()
+    {
+        _rows.Add(new ReportRow("ACC-LOCAL-001", "رصيد افتتاحي", 250000M, 0M, 250000M));
+        _rows.Add(new ReportRow("ACC-LOCAL-002", "حركة مراجعة", 0M, 45000M, 205000M));
+    }
+
+    private void ApplyFilter()
+    {
+        var value = _search.Text.Trim();
+
+        // توحيد نوع طرفي التعبير الشرطي إلى List<ReportRow> لمنع خطأ استنتاج النوع.
+        List<ReportRow> view = string.IsNullOrEmpty(value)
+            ? _rows.ToList()
+            : _rows
+                .Where(x =>
+                    x.Reference.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                    x.Description.Contains(value, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        _source.DataSource = new BindingList<ReportRow>(view);
+        _count.Text = $"عدد النتائج: {view.Count}";
+        _audit.Text = $"آخر تحديث محلي: {DateTime.Now:yyyy/MM/dd HH:mm} | صلاحيات العرض والطباعة والتصدير تُتحقق من الخادم عند الربط.";
+    }
+
     private sealed record ReportRow(string Reference, string Description, decimal Debit, decimal Credit, decimal Balance);
 }
