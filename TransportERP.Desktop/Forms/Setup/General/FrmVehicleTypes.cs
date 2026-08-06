@@ -137,8 +137,8 @@ public sealed class FrmVehicleTypes : Form
     {
         if (!ValidateInputs()) return;
         var response = _selected is null
-            ? await _client.CreateAsync(new CreateVehicleTypeRequest(_code.Text.Trim(), _arabicName.Text.Trim(), EmptyToNull(_englishName), _category.Text, ToNullable(_passengers), ToNullable(_cargo), ToStatus(), EmptyToNull(_notes)), CancellationToken.None)
-            : await _client.UpdateAsync(_selected.Id, new UpdateVehicleTypeRequest(_arabicName.Text.Trim(), EmptyToNull(_englishName), _category.Text, ToNullable(_passengers), ToNullable(_cargo), ToStatus(), EmptyToNull(_notes)), CancellationToken.None);
+            ? await _client.CreateAsync(new CreateVehicleTypeRequest(_code.Text.Trim(), _arabicName.Text.Trim(), EmptyToNull(_englishName), _category.Text, ToNullableInt(_passengers), ToNullable(_cargo), ToStatus(), EmptyToNull(_notes)), CancellationToken.None)
+            : await _client.UpdateAsync(_selected.Id, new UpdateVehicleTypeRequest(_arabicName.Text.Trim(), EmptyToNull(_englishName), _category.Text, ToNullableInt(_passengers), ToNullable(_cargo), ToStatus(), EmptyToNull(_notes)), CancellationToken.None);
         ShowResponse(response); if (response.Succeeded) { _dirty = false; await LoadAsync(); }
     }
 
@@ -205,7 +205,7 @@ public sealed class FrmVehicleTypes : Form
     private static NumericUpDown NewNumber() => new() { Minimum = 0, Maximum = 9_999_999, DecimalPlaces = 2, ThousandsSeparator = true, Height = 30 };
     private static void AddField(TableLayoutPanel panel, int index, string label, Control input, bool required) { var row = index / 2; var col = (index % 2) * 2; panel.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, col, row); input.Dock = DockStyle.Fill; input.Margin = new Padding(6, 4, 16, 4); if (required) input.BackColor = Color.FromArgb(255, 252, 220); panel.Controls.Add(input, col + 1, row); }
     private static string? EmptyToNull(TextBox box) => string.IsNullOrWhiteSpace(box.Text) ? null : box.Text.Trim();
-    private static int? ToNullable(NumericUpDown value) => value.Value == 0 ? null : (int)value.Value;
+    private static int? ToNullableInt(NumericUpDown value) => value.Value == 0 ? null : (int)value.Value;
     private static decimal? ToNullable(NumericUpDown value) => value.Value == 0 ? null : value.Value;
     private VehicleTypeStatus ToStatus() => _status.Text == "موقوف" ? VehicleTypeStatus.Suspended : VehicleTypeStatus.Active;
 }
