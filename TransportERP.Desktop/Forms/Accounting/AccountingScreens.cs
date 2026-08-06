@@ -16,6 +16,11 @@ public sealed class FrmFinancialTransfers : AccountingScreenForm { public FrmFin
 public sealed class FrmJournalAdjustments : AccountingScreenForm { public FrmJournalAdjustments() : base("ACC-013", "تسويات القيود", true) { } }
 public sealed class FrmPeriodClosing : AccountingScreenForm { public FrmPeriodClosing() : base("ACC-014", "إقفال الفترات", true) { } }
 public sealed class FrmJournalReversal : AccountingScreenForm { public FrmJournalReversal() : base("ACC-015", "عكس القيود", true) { } }
+public sealed class FrmJournalReversal : AccountingScreenForm { public FrmJournalReversal() : base("ACC-016", "القيود العكسية", true) { } }
+public sealed class FrmAccountingAdjustments : AccountingScreenForm { public FrmAccountingAdjustments() : base("ACC-017", "التسويات المحاسبية", true) { } }
+public sealed class FrmPeriodClosing : AccountingScreenForm { public FrmPeriodClosing() : base("ACC-018", "إقفال الفترات", true) { } }
+public sealed class FrmAnnualClosing : AccountingScreenForm { public FrmAnnualClosing() : base("ACC-019", "الإقفال السنوي", true) { } }
+public sealed class FrmPeriodReopening : AccountingScreenForm { public FrmPeriodReopening() : base("ACC-020", "فتح وإعادة فتح الفترات", true) { } }
 public sealed class FrmJournalReport : AccountingReportScreenForm { public FrmJournalReport() : base("ACC-021", "دفتر اليومية", "من تاريخ", "إلى تاريخ", "الحساب", "الفرع", "مركز التكلفة", "العملة") { } }
 public sealed class FrmGeneralLedger : AccountingReportScreenForm { public FrmGeneralLedger() : base("ACC-022", "دفتر الأستاذ العام", "الحساب", "من تاريخ", "إلى تاريخ", "الفرع", "مركز التكلفة") { } }
 public sealed class FrmAccountStatement : AccountingReportScreenForm { public FrmAccountStatement() : base("ACC-023", "كشف الحساب", "نوع الطرف", "الطرف أو الحساب", "من تاريخ", "إلى تاريخ", "العملة") { } }
