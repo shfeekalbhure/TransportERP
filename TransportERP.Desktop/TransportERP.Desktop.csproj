@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -21,22 +21,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Forms\Security\**\*.cs" />
-    <EmbeddedResource Remove="Forms\Security\**\*.resx" />
     <Compile Remove="Forms\Accounting\**\*.cs" />
     <EmbeddedResource Remove="Forms\Accounting\**\*.resx" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Forms\\FrmCountries.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\Setup\Geographic\FrmAreas.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\Setup\Geographic\FrmDirectorates.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Update="Forms\\FrmCountries.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms\Setup\Geographic\FrmAreas.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms\Setup\Geographic\FrmDirectorates.cs"><SubType>Form</SubType></Compile>
   </ItemGroup>
-
 </Project>
