@@ -81,7 +81,7 @@ public abstract class SecurityWorkspaceForm : Form
     {
         var group = Card("بيانات " + _definition.Title);
         var tabs = new TabControl { Dock = DockStyle.Fill, RightToLeftLayout = true, RightToLeft = RightToLeft.Yes };
-        var tabNames = _profile.Tabs.Length == 0 ? ["البيانات الرئيسية"] : _profile.Tabs;
+        var tabNames = _profile.Tabs.Length == 0 ? new[] { "البيانات الرئيسية" } : _profile.Tabs;
 
         for (var index = 0; index < tabNames.Length; index++)
         {
@@ -104,7 +104,7 @@ public abstract class SecurityWorkspaceForm : Form
     private Control CreateProfileFields()
     {
         var captions = _profile.Fields.Length == 0
-            ? ["الكود *", "الاسم *", "الحالة *", _definition.Field1, _definition.Field2, _definition.Field3]
+            ? new[] { "الكود *", "الاسم *", "الحالة *", _definition.Field1, _definition.Field2, _definition.Field3 }
             : _profile.Fields;
         var fields = new TableLayoutPanel
         {
