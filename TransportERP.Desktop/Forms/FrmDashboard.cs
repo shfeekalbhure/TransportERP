@@ -1,4 +1,6 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.Forms.Accounting;
+using TransportERP.Desktop.Forms.Security;
 using TransportERP.Desktop.Forms.Setup.General;
 
 namespace TransportERP.Desktop;
@@ -242,11 +244,11 @@ public partial class FrmDashboard : Form
     }
 
     /// <summary>
-    /// فتح تبويب شاشة مخططة مع منع التكرار إلى أن يُربط نموذجها الفعلي.
+    /// فتح نموذج الشاشة الفعلي داخل تبويب واحد ومنع التكرار.
     /// </summary>
     private void OpenPlannedScreenTab(string screenCode, string screenName)
     {
-        var setupForm = screenCode switch
+        Form? screenForm = screenCode switch
         {
             "GEN-008" => new FrmVehicleTypes(),
             "GEN-009" => new FrmCurrencies(),
@@ -260,11 +262,28 @@ public partial class FrmDashboard : Form
             _ => null
         };
 
-        if (setupForm is not null)
+        if (screenForm is null && SecurityScreenCatalog.TryCreate(screenCode, out var securityForm))
         {
-            OpenHostedScreenTab(screenCode, screenName, setupForm);
+            screenForm = securityForm;
+        }
+
+        if (screenForm is null && AccountingScreenCatalog.TryCreate(screenCode, out var accountingForm))
+        {
+            screenForm = accountingForm;
+        }
+
+        if (screenForm is not null)
+        {
+            OpenHostedScreenTab(screenCode, screenName, screenForm);
             return;
         }
+
+        if (screenCode.StartsWith("SEC-", StringComparison.Ordinal)
+            || screenCode.StartsWith("ACC-", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"لم يتم العثور على نموذج فعلي للشاشة {screenCode}.");
+        }
+
         if (_workspaceTabs is null)
         {
             return;
