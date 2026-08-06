@@ -1,3 +1,4 @@
+using TransportERP.Application.Setup.ExchangeRates;
 using TransportERP.Application.Setup.Currencies;
 using TransportERP.Application.Setup.VehicleTypes;
 using TransportERP.Application.AccessControl;
@@ -17,6 +18,7 @@ namespace TransportERP.Api
             builder.Services.AddScoped<TransportERP.Application.Accounting.IJournalReportQueryService, TransportERP.Application.Accounting.JournalReportQueryService>();
             builder.Services.AddScoped<IVehicleTypeService, VehicleTypeService>();
             builder.Services.AddScoped<ICurrencyService, CurrencyService>();
+            builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
