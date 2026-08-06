@@ -1,3 +1,4 @@
+using TransportERP.Desktop.Services;
 using System.ComponentModel;
 using System.Drawing;
 
@@ -24,9 +25,13 @@ public sealed class FrmUsers : Form
     private readonly Label _counter = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.DimGray };
     private readonly DataGridView _grid = new();
     private UserRow? _selected;
+    private readonly AccessControlApiClient? _accessControlClient;
 
-    public FrmUsers()
+    public FrmUsers() : this(null) { }
+
+    public FrmUsers(AccessControlApiClient? accessControlClient)
     {
+        _accessControlClient = accessControlClient;
         Text = "المستخدمون — SEC-001";
         Name = nameof(FrmUsers);
         StartPosition = FormStartPosition.CenterParent;
@@ -37,8 +42,8 @@ public sealed class FrmUsers : Form
         BackColor = Color.FromArgb(247, 249, 252);
 
         _source.DataSource = _users;
-        _users.Add(new UserRow("USR-001", "مدير النظام", "System Administrator", "admin", "admin@transporterp.local", "", "", "الشركة الرئيسية", "الفرع الرئيسي", "نشط", "لم يسجل"));
         BuildLayout();
+        Shown += async (_, _) => await LoadApprovedRolesAsync();
         ApplyFilter();
     }
 
@@ -169,13 +174,17 @@ public sealed class FrmUsers : Form
         _source.DataSource = new BindingList<UserRow>(view); _counter.Text = "عدد السجلات: " + view.Count;
     }
 
-    private void SaveUser()
+    private void SaveUser() => MessageBox.Show("مانع التخزين المعتمد: حفظ المستخدمين غير متاح حتى اعتماد خدمة التخزين.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    private async Task LoadApprovedRolesAsync()
     {
-        if (string.IsNullOrWhiteSpace(_code.Text) || string.IsNullOrWhiteSpace(_nameAr.Text) || string.IsNullOrWhiteSpace(_username.Text)) { MessageBox.Show("أكمل الحقول الإلزامية.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-        if (_selected is null) _users.Add(new UserRow(_code.Text.Trim(), _nameAr.Text.Trim(), _nameEn.Text.Trim(), _username.Text.Trim(), _email.Text.Trim(), _mobile.Text.Trim(), "", "الشركة الرئيسية", "الفرع الرئيسي", _status.Text, "لم يسجل"));
-        else { _selected.Code = _code.Text.Trim(); _selected.NameAr = _nameAr.Text.Trim(); _selected.NameEn = _nameEn.Text.Trim(); _selected.Username = _username.Text.Trim(); _selected.Email = _email.Text.Trim(); _selected.Mobile = _mobile.Text.Trim(); _selected.Status = _status.Text; }
-        _audit.Text = "آخر تعديل بواسطة المستخدم الحالي — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-        ClearEditor(); ApplyFilter();
+        if (_accessControlClient is null) { _audit.Text = "مانع التكامل: لم يُحقن عميل API المعتمد للأدوار ونطاقات الوصول."; return; }
+        try
+        {
+            var result = await _accessControlClient.SearchRolesAsync(new TransportERP.Contracts.AccessControl.PagedQuery());
+            _audit.Text = result.Blocker ?? "تم تحميل الأدوار من API المعتمد.";
+        }
+        catch (Exception ex) { _audit.Text = "تعذر الاتصال بخدمة الأدوار: " + ex.Message; }
     }
 
     private void LoadSelected()
