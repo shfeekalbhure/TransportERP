@@ -1,3 +1,4 @@
+using TransportERP.Application.Setup.Currencies;
 using TransportERP.Application.Setup.VehicleTypes;
 using TransportERP.Application.AccessControl;
 
@@ -14,6 +15,7 @@ namespace TransportERP.Api
 
             builder.Services.AddControllers();
             builder.Services.AddScoped<IVehicleTypeService, VehicleTypeService>();
+            builder.Services.AddScoped<ICurrencyService, CurrencyService>();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
