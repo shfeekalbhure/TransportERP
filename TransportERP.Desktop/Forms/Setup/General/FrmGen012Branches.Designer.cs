@@ -69,7 +69,6 @@ partial class FrmGen012Branches
     private Label lblFilter2 = null!;
     private TextBox txtFilter2 = null!;
     private Button btnSearch = null!;
-    private Button btnClearFilters = null!;
     private Panel pnlC008 = null!;
     private DataGridView gridC008 = null!;
     private FlowLayoutPanel flowC010 = null!;
@@ -166,7 +165,6 @@ partial class FrmGen012Branches
         this.lblFilter2 = new Label();
         this.txtFilter2 = new TextBox();
         this.btnSearch = new Button();
-        this.btnClearFilters = new Button();
         this.pnlC008 = new Panel();
         this.gridC008 = new DataGridView();
         this.flowC010 = new FlowLayoutPanel();
@@ -470,11 +468,7 @@ partial class FrmGen012Branches
         this.btnSearch.Text = "بحث";
         this.btnSearch.Height = 36;
         this.btnSearch.RightToLeft = RightToLeft.Yes;
-        this.btnClearFilters.Text = "مسح المرشحات";
-        this.btnClearFilters.Height = 36;
-        this.btnClearFilters.RightToLeft = RightToLeft.Yes;
         this.flowC007.Controls.Add(this.btnSearch);
-        this.flowC007.Controls.Add(this.btnClearFilters);
         this.pnlC008.Dock = DockStyle.Fill;
         this.pnlC008.RightToLeft = RightToLeft.Yes;
         this.pnlC008.Controls.Add(this.gridC008);
@@ -572,6 +566,7 @@ partial class FrmGen012Branches
         this.Text = "GEN-012 — الفروع";
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
+        this.Font = new Font("Arial", 11F);
         this.Controls.Add(this.pnlC008);
         this.Controls.Add(this.flowC010);
         this.Controls.Add(this.pnlC011);
@@ -585,4 +580,3 @@ partial class FrmGen012Branches
         this.PerformLayout();
     }
 }
-
