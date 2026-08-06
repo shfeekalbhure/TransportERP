@@ -55,7 +55,6 @@ partial class FrmGen008VehicleTypes
     private Label lblFilter2 = null!;
     private TextBox txtFilter2 = null!;
     private Button btnSearch = null!;
-    private Button btnClearFilters = null!;
     private Panel pnlC008 = null!;
     private DataGridView gridC008 = null!;
     private FlowLayoutPanel flowC010 = null!;
@@ -138,7 +137,6 @@ partial class FrmGen008VehicleTypes
         this.lblFilter2 = new Label();
         this.txtFilter2 = new TextBox();
         this.btnSearch = new Button();
-        this.btnClearFilters = new Button();
         this.pnlC008 = new Panel();
         this.gridC008 = new DataGridView();
         this.flowC010 = new FlowLayoutPanel();
@@ -274,6 +272,7 @@ partial class FrmGen008VehicleTypes
         this.txt05.Dock = DockStyle.Fill;
         this.txt05.Height = 36;
         this.txt05.RightToLeft = RightToLeft.Yes;
+        this.txt05.BackColor = Color.FromArgb(255, 247, 204);
         this.tblC005.Controls.Add(this.lblf05, 0, 4);
         this.tblC005.Controls.Add(this.txt05, 1, 4);
         this.tblC005.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
@@ -284,6 +283,7 @@ partial class FrmGen008VehicleTypes
         this.txt06.Dock = DockStyle.Fill;
         this.txt06.Height = 36;
         this.txt06.RightToLeft = RightToLeft.Yes;
+        this.txt06.BackColor = Color.FromArgb(255, 247, 204);
         this.tblC005.Controls.Add(this.lblf06, 0, 5);
         this.tblC005.Controls.Add(this.txt06, 1, 5);
         this.tblC005.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
@@ -384,11 +384,7 @@ partial class FrmGen008VehicleTypes
         this.btnSearch.Text = "بحث";
         this.btnSearch.Height = 36;
         this.btnSearch.RightToLeft = RightToLeft.Yes;
-        this.btnClearFilters.Text = "مسح المرشحات";
-        this.btnClearFilters.Height = 36;
-        this.btnClearFilters.RightToLeft = RightToLeft.Yes;
         this.flowC007.Controls.Add(this.btnSearch);
-        this.flowC007.Controls.Add(this.btnClearFilters);
         this.pnlC008.Dock = DockStyle.Fill;
         this.pnlC008.RightToLeft = RightToLeft.Yes;
         this.pnlC008.Controls.Add(this.gridC008);
@@ -486,6 +482,7 @@ partial class FrmGen008VehicleTypes
         this.Text = "GEN-008 — أنواع المركبات";
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
+        this.Font = new Font("Arial", 11F);
         this.Controls.Add(this.pnlC008);
         this.Controls.Add(this.flowC010);
         this.Controls.Add(this.pnlC011);
@@ -498,4 +495,3 @@ partial class FrmGen008VehicleTypes
         this.PerformLayout();
     }
 }
-
