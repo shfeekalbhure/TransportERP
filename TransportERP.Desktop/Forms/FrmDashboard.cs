@@ -1,5 +1,4 @@
 using System.Drawing.Drawing2D;
-using TransportERP.Desktop.Forms.Setup.General;
 using TransportERP.Desktop.Forms.Security;
 
 namespace TransportERP.Desktop;
@@ -242,15 +241,15 @@ public partial class FrmDashboard : Form
     {
         Form? form = code switch
         {
-            "GEN-008" => new FrmVehicleTypes(),
-            "GEN-009" => new FrmCurrencies(),
-            "GEN-010" => new FrmExchangeRates(),
-            "GEN-011" => new FrmCompanies(),
-            "GEN-012" => new FrmBranches(),
-            "GEN-013" => new FrmFiscalYears(),
-            "GEN-014" => new FrmNumberingSettings(),
-            "GEN-015" => new FrmLanguages(),
-            "GEN-016" => new FrmGeneralVariables(),
+            "GEN-008" => new FrmGen008VehicleTypes(),
+            "GEN-009" => new FrmGen009Currencies(),
+            "GEN-010" => new FrmGen010ExchangeRates(),
+            "GEN-011" => new FrmGen011Companies(),
+            "GEN-012" => new FrmGen012Branches(),
+            "GEN-013" => new FrmGen013FiscalYears(),
+            "GEN-014" => new FrmGen014Numbering(),
+            "GEN-015" => new FrmGen015Languages(),
+            "GEN-016" => new FrmGen016GlobalVariables(),
             _ => null
         };
 
