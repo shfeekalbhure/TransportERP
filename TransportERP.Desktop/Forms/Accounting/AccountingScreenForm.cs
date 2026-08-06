@@ -129,7 +129,6 @@ public abstract class AccountingScreenForm : Form
         AddButton(panel, "إيقاف", (_, _) => StopRecord());
         AddButton(panel, "حذف", (_, _) => DeleteRecord());
         AddButton(panel, "طباعة", (_, _) => PrintRecord());
-        AddButton(panel, "إغلاق", (_, _) => Close());
         return panel;
     }
 
