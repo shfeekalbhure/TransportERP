@@ -17,6 +17,7 @@ public sealed class FrmCurrencies : Form
     private readonly DataGridView _grid = new();
     private readonly Label _state = new() { AutoSize = true }, _audit = new() { AutoSize = true };
     private CurrencyDto? _selected;
+    private bool _dirty;
     private int _page = 1;
 
     public FrmCurrencies(ICurrenciesApiClient? client = null)
@@ -27,6 +28,14 @@ public sealed class FrmCurrencies : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent,35)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent,65)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(Toolbar(),0,0); root.Controls.Add(Tabs(),0,1); root.Controls.Add(Search(),0,2); root.Controls.Add(Grid(),0,3); root.Controls.Add(Pager(),0,4); root.Controls.Add(_audit,0,5); Controls.Add(root);
         Shown += async (_,_) => await LoadAsync();
+        TrackChanges(_code, _arabic, _english, _iso, _symbol, _decimals, _local, _status, _notes);
+        FormClosing += (_, eventArgs) =>
+        {
+            if (!_dirty) return;
+            var choice = MessageBox.Show("توجد تغييرات غير محفوظة. اختر نعم للحفظ، أو لا للتجاهل، أو إلغاء للعودة.", Text, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+            if (choice == DialogResult.Cancel) eventArgs.Cancel = true;
+            else if (choice == DialogResult.Yes) _ = SaveAsync();
+        };
     }
 
     private Control Toolbar()
@@ -44,11 +53,21 @@ public sealed class FrmCurrencies : Form
     private Control Grid(){_grid.Dock=DockStyle.Fill;_grid.ReadOnly=true;_grid.AllowUserToAddRows=false;_grid.AutoGenerateColumns=false;_grid.BackgroundColor=Color.White;_grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;AddCol(nameof(CurrencyDto.Code),"الرمز",90);AddCol(nameof(CurrencyDto.ArabicName),"الاسم العربي",180);AddCol(nameof(CurrencyDto.IsoCode),"ISO",80);AddCol(nameof(CurrencyDto.IsLocal),"المحلية",70);AddCol(nameof(CurrencyDto.DecimalPlaces),"المنازل",70);AddCol(nameof(CurrencyDto.Status),"الحالة",90);_grid.CellClick+=(_,_)=>SelectRow();return _grid;}
     private Control Pager(){var p=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};Button(p,"الأول",async(_,_)=>{_page=1;await LoadAsync();},Color.Gray);Button(p,"السابق",async(_,_)=>{_page=Math.Max(1,_page-1);await LoadAsync();},Color.Gray);Button(p,"التالي",async(_,_)=>{_page++;await LoadAsync();},Color.Gray);return p;}
     private async Task LoadAsync(){try{var status=_filter.Text=="نشط"?CurrencyStatus.Active:_filter.Text=="موقوف"?CurrencyStatus.Suspended:(CurrencyStatus?)null;var r=await _client.SearchAsync(new CurrencySearchRequest(_search.Text,status,_page),CancellationToken.None);_grid.DataSource=new BindingList<CurrencyDto>(r.Items.ToList());_state.Text=r.StorageAvailable?$"عدد السجلات: {r.TotalCount}":r.Message??"مانع التخزين المعتمد";if(!r.StorageAvailable)_audit.Text=$"الحالة: {r.BlockerCode} — لا توجد بيانات بديلة.";}catch(HttpRequestException){_grid.DataSource=new BindingList<CurrencyDto>();_state.Text="تعذر الاتصال بخدمة العملات.";} }
-    private async Task SaveAsync(){if(string.IsNullOrWhiteSpace(_code.Text)||string.IsNullOrWhiteSpace(_arabic.Text)||string.IsNullOrWhiteSpace(_iso.Text)){MessageBox.Show("رمز العملة والاسم العربي ورمز ISO حقول إلزامية.",Text);return;}var r=_selected is null?await _client.CreateAsync(new(_code.Text.Trim(),_arabic.Text.Trim(),Null(_english),_iso.Text.Trim(),Null(_symbol),(int)_decimals.Value,_local.Checked,Status(),Null(_notes)),CancellationToken.None):await _client.UpdateAsync(_selected.Id,new(_arabic.Text.Trim(),Null(_english),_iso.Text.Trim(),Null(_symbol),(int)_decimals.Value,_local.Checked,Status(),Null(_notes)),CancellationToken.None);Show(r);if(r.Succeeded)await LoadAsync();}
+    private async Task SaveAsync(){if(string.IsNullOrWhiteSpace(_code.Text)||string.IsNullOrWhiteSpace(_arabic.Text)||string.IsNullOrWhiteSpace(_iso.Text)){MessageBox.Show("رمز العملة والاسم العربي ورمز ISO حقول إلزامية.",Text);return;}var r=_selected is null?await _client.CreateAsync(new(_code.Text.Trim(),_arabic.Text.Trim(),Null(_english),_iso.Text.Trim(),Null(_symbol),(int)_decimals.Value,_local.Checked,Status(),Null(_notes)),CancellationToken.None):await _client.UpdateAsync(_selected.Id,new(_arabic.Text.Trim(),Null(_english),_iso.Text.Trim(),Null(_symbol),(int)_decimals.Value,_local.Checked,Status(),Null(_notes)),CancellationToken.None);Show(r);if(r.Succeeded){_dirty=false;await LoadAsync();}}
     private async Task SuspendAsync(){if(_selected is null){MessageBox.Show("اختر سجلًا أولًا.",Text);return;}Show(await _client.SuspendAsync(_selected.Id,CancellationToken.None));await LoadAsync();}
     private async Task DeleteAsync(){if(_selected is null){MessageBox.Show("اختر سجلًا أولًا.",Text);return;}if(MessageBox.Show("هل تريد حذف السجل؟",Text,MessageBoxButtons.YesNo)!=DialogResult.Yes)return;Show(await _client.DeleteAsync(_selected.Id,CancellationToken.None));await LoadAsync();}
-    private void NewRecord(){_selected=null;_code.Clear();_arabic.Clear();_english.Clear();_iso.Clear();_symbol.Clear();_decimals.Value=0;_local.Checked=false;_status.SelectedIndex=0;_notes.Clear();_audit.Text="سجل جديد";}
-    private void SelectRow(){if(_grid.CurrentRow?.DataBoundItem is not CurrencyDto x)return;_selected=x;_code.Text=x.Code;_arabic.Text=x.ArabicName;_english.Text=x.EnglishName??"";_iso.Text=x.IsoCode;_symbol.Text=x.Symbol??"";_decimals.Value=x.DecimalPlaces;_local.Checked=x.IsLocal;_status.Text=x.Status==CurrencyStatus.Active?"نشط":"موقوف";_notes.Text=x.Notes??"";_audit.Text=$"أنشئ بواسطة: {x.CreatedBy} في {x.CreatedAt:yyyy/MM/dd HH:mm} | آخر تعديل: {x.ModifiedBy??"—"} | تعديل: {x.EditCount} | طباعة: {x.PrintCount}";}
+    private void NewRecord(){_selected=null;_code.Clear();_arabic.Clear();_english.Clear();_iso.Clear();_symbol.Clear();_decimals.Value=0;_local.Checked=false;_status.SelectedIndex=0;_notes.Clear();_dirty=false;_audit.Text="سجل جديد";}
+    private void SelectRow(){if(_grid.CurrentRow?.DataBoundItem is not CurrencyDto x)return;_selected=x;_code.Text=x.Code;_arabic.Text=x.ArabicName;_english.Text=x.EnglishName??"";_iso.Text=x.IsoCode;_symbol.Text=x.Symbol??"";_decimals.Value=x.DecimalPlaces;_local.Checked=x.IsLocal;_status.Text=x.Status==CurrencyStatus.Active?"نشط":"موقوف";_notes.Text=x.Notes??"";_dirty=false;_audit.Text=$"أنشئ بواسطة: {x.CreatedBy} في {x.CreatedAt:yyyy/MM/dd HH:mm} | آخر تعديل: {x.ModifiedBy??"—"} | تعديل: {x.EditCount} | طباعة: {x.PrintCount}";}
+    private void TrackChanges(params Control[] controls)
+    {
+        foreach (var control in controls)
+        {
+            if (control is TextBox text) text.TextChanged += (_, _) => _dirty = true;
+            else if (control is ComboBox combo) combo.SelectedIndexChanged += (_, _) => _dirty = true;
+            else if (control is NumericUpDown number) number.ValueChanged += (_, _) => _dirty = true;
+            else if (control is CheckBox check) check.CheckedChanged += (_, _) => _dirty = true;
+        }
+    }
     private CurrencyStatus Status()=>_status.Text=="موقوف"?CurrencyStatus.Suspended:CurrencyStatus.Active; private static string? Null(TextBox x)=>string.IsNullOrWhiteSpace(x.Text)?null:x.Text.Trim(); private void Show(CurrencyCommandResponse r)=>MessageBox.Show(r.Message??(r.Succeeded?"تم الحفظ.":"تعذر التنفيذ."),Text);
     private void AddCol(string n,string h,int w)=>_grid.Columns.Add(new DataGridViewTextBoxColumn{DataPropertyName=n,HeaderText=h,Width=w});
     private static FlowLayoutPanel Bar()=>new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,FlowDirection=FlowDirection.RightToLeft,Padding=new Padding(8),BackColor=Color.FromArgb(28,80,130)};
