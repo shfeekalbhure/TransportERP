@@ -117,8 +117,14 @@ public abstract class SecurityWorkspaceForm : Form
 
         for (var index = 0; index < captions.Length; index++)
         {
-            var control = AddDetail(captions[index]);
-            control.ReadOnly = _profile.ReadOnly;
+            Control control = index switch
+            {
+                0 => _code,
+                1 => _name,
+                _ when captions[index].Contains("الحالة") => _status,
+                _ => AddDetail(captions[index])
+            };
+            if (control is TextBox textBox) textBox.ReadOnly = _profile.ReadOnly;
             AddField(fields, index / 2, captions[index], control, captions[index].Contains("*"), (index % 2) * 2);
         }
         return fields;
