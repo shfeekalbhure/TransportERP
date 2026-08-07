@@ -2,41 +2,74 @@ namespace TransportERP.Desktop.Views.Setup.Geographic;
 
 /// <summary>
 /// GEN-005 — المديريات.
-/// شاشة عمل داخل الـ Main Shell وتُصمم عبر Windows Forms Designer/Toolbox.
+/// الشاشة تحتفظ فقط بحقول المديرية، بينما الأدوات العامة تأتي من القالب المشترك.
 /// </summary>
 public partial class UcDirectorates : UserControl
 {
     public UcDirectorates()
     {
         InitializeComponent();
+        ConfigureSharedControls();
         ConfigureRuntimeDefaults();
     }
 
+    /// <summary>
+    /// ربط أحداث الأدوات المشتركة بوظائف شاشة المديريات.
+    /// </summary>
+    private void ConfigureSharedControls()
+    {
+        screenShell.Toolbar.NewRequested += (_, _) => ClearEditor();
+        screenShell.Toolbar.CloseRequested += (_, _) => CloseHostTab();
+        screenShell.SearchPanel.SearchTextChanged += (_, _) => HandleSearchChanged();
+        screenShell.SearchPanel.StatusChanged += (_, _) => HandleSearchChanged();
+    }
+
+    /// <summary>
+    /// ضبط القيم الافتراضية للشاشة.
+    /// </summary>
     private void ConfigureRuntimeDefaults()
     {
         RightToLeft = RightToLeft.Yes;
         cmbStatus.SelectedIndex = 0;
-        lblCreatedValue.Text = "—";
-        lblModifiedValue.Text = "—";
-        lblEditCountValue.Text = "0";
-        lblPrintCountValue.Text = "0";
+        screenShell.SearchPanel.SetStatusItems("نشط", "موقوف");
+        screenShell.SearchPanel.SearchPlaceholder = "ابحث بكود المديرية أو الاسم...";
+        screenShell.Pagination.SetPageInfo(1, 1, 0, 0, 0);
+        screenShell.AuditPanel.ClearAuditInfo();
     }
 
-    private void btnNew_Click(object? sender, EventArgs e)
+    /// <summary>
+    /// تفريغ حقول المديرية عند الضغط على زر جديد الموجود في الشريط المشترك.
+    /// </summary>
+    private void ClearEditor()
     {
+        cmbCountry.SelectedIndex = -1;
+        cmbGovernorate.SelectedIndex = -1;
         txtDirectorateCode.Clear();
         txtNameAr.Clear();
         txtNameEn.Clear();
         txtNotes.Clear();
-        cmbCountry.SelectedIndex = -1;
-        cmbGovernorate.SelectedIndex = -1;
         cmbStatus.SelectedIndex = 0;
-        txtDirectorateCode.Focus();
+        screenShell.AlertBar.HideMessage();
+        screenShell.AuditPanel.ClearAuditInfo();
+        cmbCountry.Focus();
     }
 
-    private void txtSearch_TextChanged(object? sender, EventArgs e)
+    /// <summary>
+    /// نقطة الربط المستقبلية مع API للبحث والتصفية.
+    /// </summary>
+    private void HandleSearchChanged()
     {
-        // الربط الفعلي بالـ API سيضاف في طبقة التنفيذ اللاحقة.
-        // يبقى عنصر البحث جاهزًا من الـ Designer دون منطق بيانات وهمي.
+        // لاحقًا نرسل SearchText وSelectedStatus إلى API.
+    }
+
+    /// <summary>
+    /// إغلاق تبويب الشاشة الحالي.
+    /// </summary>
+    private void CloseHostTab()
+    {
+        if (Parent is not TabPage page || page.Parent is not TabControl tabs) return;
+        tabs.TabPages.Remove(page);
+        Dispose();
+        page.Dispose();
     }
 }
