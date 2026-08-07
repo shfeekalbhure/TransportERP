@@ -39,13 +39,15 @@ internal static class TransportUiMetrics
     internal const int MainDataMinimumGroupHeight = 151;
     internal const int MainDataGroupChromeHeight = GroupBoxHeaderSpace + GroupVerticalPadding + (MainDataHostPadding * 2);
     internal const int MainDataMinContentHeight = MainDataMinimumGroupHeight - MainDataGroupChromeHeight;
-    internal const int MainDataMaxContentHeight = MainDataRowHeight * MainDataMaxRows;
+    internal const int MainDataMaxFieldContentHeight = MainDataRowHeight * MainDataMaxRows;
+    internal const int AdditionalDataTabHeaderHeight = 34;
+    // عند وجود تبويبات نضيف مساحة رأس التبويب والـPadding إلى سقف خمسة صفوف؛
+    // وإلا كان رأس التبويب يستهلك جزءًا من مساحة الحقول ويؤدي إلى قصها.
+    internal const int MainDataMaxContentHeight = MainDataMaxFieldContentHeight + AdditionalDataTabHeaderHeight + (TabContentPadding * 2);
     internal const int MainDataMultilineMinHeight = 58;
     internal const int MainDataLabelWidth = 120;
     internal const int MainDataLabelFieldGap = 8;
     internal const int MainDataHostPadding = 4;
-
-    internal const int AdditionalDataTabHeaderHeight = 34;
 
     internal const int TabHorizontalPadding = 16;
     internal const int TabVerticalPadding = 5;
@@ -93,7 +95,7 @@ internal static class TransportUiMetrics
 
     /// <summary>
     /// يحسب ارتفاع حاوية البيانات الرئيسية. لا يسمح بانكماشها تحت 4 سم تقريبًا،
-    /// ثم تتمدد إلى الأسفل حسب المحتوى حتى سقف خمسة صفوف، بلا Scroll.
+    /// ثم تتمدد إلى الأسفل حسب المحتوى. في التبويبات يسمح بسقف خمسة صفوف إضافةً إلى رأس التبويب، بلا Scroll.
     /// </summary>
     internal static int CalculateMainDataGroupHeight(int contentHeight)
     {
