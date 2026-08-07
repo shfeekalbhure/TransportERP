@@ -18,8 +18,20 @@ partial class UcUserGroups
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "بيانات المجموعة الأساسية."),
                 new("الأعضاء", SecurityTabKind.Details, "أعضاء المجموعة الفعليون."),
-                new("الإشعارات والتوزيع", SecurityTabKind.Settings, "قنوات الإشعار وقواعد التوزيع والتصعيد."),
-                new("سجل العمليات", SecurityTabKind.Audit, "سجل عمليات المجموعة.")
+                new("الإشعارات والتوزيع", SecurityTabKind.Settings, "قنوات الإشعار وقواعد التوزيع والتصعيد.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("استقبال إشعارات النظام", SecurityFieldKind.Boolean),
+                        new("قنوات الإشعار"),
+                        new("قائمة التوزيع"),
+                        new("إرسال نسخة لمالك المجموعة", SecurityFieldKind.Boolean),
+                        new("زمن التصعيد بالدقائق"),
+                        new("مجموعة التصعيد"),
+                        new("إيقاف الإشعارات خارج أوقات العمل", SecurityFieldKind.Boolean),
+                        new("ملاحظات التوزيع", SecurityFieldKind.Multiline)
+                    }),
+                new("سجل العمليات", SecurityTabKind.Audit, "سجل عمليات المجموعة.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "العضو / الإعداد", "القيمة السابقة", "القيمة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
