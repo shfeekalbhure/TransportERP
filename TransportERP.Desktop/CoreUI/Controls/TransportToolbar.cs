@@ -6,7 +6,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// شريط الأوامر الموحد لجميع شاشات TransportERP.
-/// الأزرار تبدأ دائمًا من أقصى اليمين وبنفس الأسماء والألوان في كل شاشة.
+/// الأزرار تبدأ دائمًا من أقصى اليمين وبنفس الأسماء والألوان والمقاسات في كل شاشة.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportToolbar : UserControl
@@ -54,7 +54,9 @@ public sealed class TransportToolbar : UserControl
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.ToolbarHeight;
         MinimumSize = new Size(0, TransportUiMetrics.ToolbarHeight);
-        Padding = new Padding(6, 4, 6, 4);
+
+        // الأزرار مرتفعة قليلًا داخل الحاوية، والقيم تؤخذ من المقاسات المركزية.
+        Padding = new Padding(TransportUiMetrics.GroupHorizontalPadding, 1, TransportUiMetrics.GroupHorizontalPadding, 7);
         RightToLeft = RightToLeft.Yes;
 
         _buttonsPanel.AutoSize = true;
@@ -66,10 +68,8 @@ public sealed class TransportToolbar : UserControl
         _buttonsPanel.RightToLeft = RightToLeft.Yes;
         _buttonsPanel.WrapContents = false;
         _buttonsPanel.Padding = Padding.Empty;
+        _buttonsPanel.Margin = Padding.Empty;
 
-        // بسبب اتجاه FlowLayoutPanel من اليمين إلى اليسار، نضيف الأزرار بترتيب عكسي
-        // حتى يظهر الترتيب البصري الفعلي من أقصى اليمين كما هو معتمد:
-        // جديد ← حفظ ← تعديل ← إيقاف ← حذف ← طباعة ← إغلاق
         _buttonsPanel.Controls.Add(CloseButton);
         _buttonsPanel.Controls.Add(PrintButton);
         _buttonsPanel.Controls.Add(DeleteButton);
@@ -108,9 +108,9 @@ public sealed class TransportToolbar : UserControl
         {
             CornerRadius = 6,
             Height = TransportUiMetrics.ToolbarButtonHeight,
-            MinimumSize = new Size(70, TransportUiMetrics.ToolbarButtonHeight),
-            Width = 78,
-            Margin = new Padding(2, 0, 2, 0),
+            MinimumSize = new Size(TransportUiMetrics.ToolbarButtonWidth, TransportUiMetrics.ToolbarButtonHeight),
+            Width = TransportUiMetrics.ToolbarButtonWidth,
+            Margin = new Padding(TransportUiMetrics.ToolbarButtonGap / 2, 0, TransportUiMetrics.ToolbarButtonGap / 2, 0),
             Text = text,
             NormalBackColor = normal,
             HoverBackColor = hover
