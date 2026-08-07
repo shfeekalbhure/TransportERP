@@ -26,14 +26,8 @@ public sealed class SearchBox : UserControl
         ShowPlaceholder();
     }
 
-    /// <summary>
-    /// يحدث عند تغير نص البحث الفعلي.
-    /// </summary>
     public event EventHandler<SearchTextChangedEventArgs>? SearchTextChanged;
 
-    /// <summary>
-    /// النص الإرشادي الذي يظهر عندما يكون مربع البحث فارغًا.
-    /// </summary>
     [Category("TransportERP")]
     [Description("النص الإرشادي المعروض داخل مربع البحث عندما لا توجد قيمة.")]
     [DefaultValue("بحث...")]
@@ -42,10 +36,7 @@ public sealed class SearchBox : UserControl
         get => _placeholderText;
         set
         {
-            _placeholderText = string.IsNullOrWhiteSpace(value)
-                ? "بحث..."
-                : value.Trim();
-
+            _placeholderText = string.IsNullOrWhiteSpace(value) ? "بحث..." : value.Trim();
             if (_isShowingPlaceholder)
             {
                 ShowPlaceholder();
@@ -53,10 +44,6 @@ public sealed class SearchBox : UserControl
         }
     }
 
-    /// <summary>
-    /// قيمة البحث الحالية بدون النص الإرشادي.
-    /// هذه قيمة تشغيلية ولا يحفظها مصمم WinForms داخل ملف Designer.
-    /// </summary>
     [Browsable(false)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SearchText
@@ -78,57 +65,50 @@ public sealed class SearchBox : UserControl
         }
     }
 
-    /// <summary>
-    /// مسح قيمة البحث وإعادة النص الإرشادي.
-    /// </summary>
+    /// <summary>مسح قيمة البحث وإعادة النص الإرشادي.</summary>
     public void ClearSearch()
     {
         ShowPlaceholder();
         RaiseSearchTextChanged();
     }
 
-    /// <summary>
-    /// نقل التركيز إلى حقل البحث.
-    /// </summary>
-    public void FocusSearch()
-    {
-        _searchTextBox.Focus();
-    }
+    /// <summary>نقل التركيز إلى حقل البحث.</summary>
+    public void FocusSearch() => _searchTextBox.Focus();
 
     /// <summary>
-    /// تهيئة بنية العنصر وترتيب الأيقونة والحقل وزر المسح.
+    /// تهيئة مربع البحث بارتفاع 8 مم تقريبًا حتى يطابق بقية حقول البحث والتصفية.
     /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
         BorderStyle = BorderStyle.FixedSingle;
-        Height = 40;
-        MinimumSize = new Size(180, 40);
-        Padding = new Padding(8, 6, 8, 6);
+        Height = TransportUiMetrics.Control8Mm;
+        MinimumSize = new Size(180, TransportUiMetrics.Control8Mm);
+        Padding = new Padding(6, 4, 6, 4);
         RightToLeft = RightToLeft.Yes;
 
         _searchIconLabel.AutoSize = false;
         _searchIconLabel.Dock = DockStyle.Right;
-        _searchIconLabel.Font = UiTheme.CreateRegularFont(12F);
+        _searchIconLabel.Font = UiTheme.CreateRegularFont(11F);
         _searchIconLabel.ForeColor = UiTheme.SecondaryText;
         _searchIconLabel.Text = "⌕";
         _searchIconLabel.TextAlign = ContentAlignment.MiddleCenter;
-        _searchIconLabel.Width = 28;
+        _searchIconLabel.Width = 24;
 
         _clearLabel.AutoSize = false;
         _clearLabel.Cursor = Cursors.Hand;
         _clearLabel.Dock = DockStyle.Left;
-        _clearLabel.Font = UiTheme.CreateBoldFont(10F);
+        _clearLabel.Font = UiTheme.CreateBoldFont(9.5F);
         _clearLabel.ForeColor = UiTheme.SecondaryText;
         _clearLabel.Text = "×";
         _clearLabel.TextAlign = ContentAlignment.MiddleCenter;
         _clearLabel.Visible = false;
-        _clearLabel.Width = 28;
+        _clearLabel.Width = 24;
 
         _searchTextBox.BackColor = Color.White;
         _searchTextBox.BorderStyle = BorderStyle.None;
         _searchTextBox.Dock = DockStyle.Fill;
-        _searchTextBox.Font = UiTheme.CreateRegularFont(10F);
+        _searchTextBox.Font = UiTheme.CreateRegularFont(9.5F);
         _searchTextBox.ForeColor = UiTheme.HeadingText;
         _searchTextBox.RightToLeft = RightToLeft.Yes;
         _searchTextBox.TextAlign = HorizontalAlignment.Right;
@@ -138,9 +118,7 @@ public sealed class SearchBox : UserControl
         Controls.Add(_searchIconLabel);
     }
 
-    /// <summary>
-    /// تسجيل أحداث التركيز والكتابة ومسح البحث.
-    /// </summary>
+    /// <summary>تسجيل أحداث التركيز والكتابة ومسح البحث.</summary>
     private void RegisterEvents()
     {
         _searchTextBox.Enter += HandleEnter;
@@ -150,9 +128,6 @@ public sealed class SearchBox : UserControl
         _clearLabel.Click += (_, _) => ClearSearch();
     }
 
-    /// <summary>
-    /// إزالة النص الإرشادي عند بدء المستخدم في الكتابة.
-    /// </summary>
     private void HandleEnter(object? sender, EventArgs e)
     {
         BackColor = UiTheme.FocusedInputBackground;
@@ -166,51 +141,30 @@ public sealed class SearchBox : UserControl
         }
     }
 
-    /// <summary>
-    /// إعادة النص الإرشادي عند مغادرة الحقل وهو فارغ.
-    /// </summary>
     private void HandleLeave(object? sender, EventArgs e)
     {
         BackColor = Color.White;
         _searchTextBox.BackColor = Color.White;
-
         if (string.IsNullOrWhiteSpace(_searchTextBox.Text))
         {
             ShowPlaceholder();
         }
     }
 
-    /// <summary>
-    /// نشر قيمة البحث الجديدة عند تغير النص.
-    /// </summary>
     private void HandleTextChanged(object? sender, EventArgs e)
     {
-        if (_isShowingPlaceholder)
-        {
-            return;
-        }
-
+        if (_isShowingPlaceholder) return;
         UpdateClearVisibility();
         RaiseSearchTextChanged();
     }
 
-    /// <summary>
-    /// مسح البحث عند الضغط على مفتاح Escape.
-    /// </summary>
     private void HandleKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.KeyCode != Keys.Escape)
-        {
-            return;
-        }
-
+        if (e.KeyCode != Keys.Escape) return;
         ClearSearch();
         e.SuppressKeyPress = true;
     }
 
-    /// <summary>
-    /// إظهار النص الإرشادي داخل مربع البحث.
-    /// </summary>
     private void ShowPlaceholder()
     {
         _isShowingPlaceholder = true;
@@ -219,41 +173,16 @@ public sealed class SearchBox : UserControl
         _clearLabel.Visible = false;
     }
 
-    /// <summary>
-    /// تحديث ظهور زر المسح حسب وجود قيمة بحث.
-    /// </summary>
-    private void UpdateClearVisibility()
-    {
+    private void UpdateClearVisibility() =>
         _clearLabel.Visible = !_isShowingPlaceholder && !string.IsNullOrWhiteSpace(_searchTextBox.Text);
-    }
 
-    /// <summary>
-    /// إطلاق حدث تغير قيمة البحث للشاشة المستضيفة.
-    /// </summary>
-    private void RaiseSearchTextChanged()
-    {
-        SearchTextChanged?.Invoke(
-            this,
-            new SearchTextChangedEventArgs(SearchText));
-    }
+    private void RaiseSearchTextChanged() =>
+        SearchTextChanged?.Invoke(this, new SearchTextChangedEventArgs(SearchText));
 }
 
-/// <summary>
-/// بيانات حدث تغير نص البحث.
-/// </summary>
+/// <summary>بيانات حدث تغير نص البحث.</summary>
 public sealed class SearchTextChangedEventArgs : EventArgs
 {
-    /// <summary>
-    /// إنشاء بيانات الحدث بقيمة البحث الحالية.
-    /// </summary>
-    /// <param name="searchText">قيمة البحث بعد التنظيف.</param>
-    public SearchTextChangedEventArgs(string searchText)
-    {
-        SearchText = searchText;
-    }
-
-    /// <summary>
-    /// قيمة البحث الحالية.
-    /// </summary>
+    public SearchTextChangedEventArgs(string searchText) => SearchText = searchText;
     public string SearchText { get; }
 }
