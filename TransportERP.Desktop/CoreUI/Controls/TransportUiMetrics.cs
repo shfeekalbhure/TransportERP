@@ -12,6 +12,7 @@ internal static class TransportUiMetrics
     internal const int Container10Mm = 38;
     internal const int Control9Mm = 34;
     internal const int Control8Mm = 30;
+    internal const int Control6Mm = 23;
 
     // هوامش الشاشة والحاويات.
     internal const int ScreenOuterPadding = 6;
@@ -26,9 +27,9 @@ internal static class TransportUiMetrics
     internal const int ToolbarButtonWidth = 78;
     internal const int ToolbarButtonGap = 4;
 
-    // البيانات الرئيسية: الحقل 8 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
+    // البيانات الرئيسية: الحقل 6 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
     internal const int MainDataGroupHeight = 230;
-    internal const int MainDataControlHeight = Control8Mm;
+    internal const int MainDataControlHeight = Control6Mm;
     internal const int MainDataRowGap = 6;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
     internal const int MainDataHorizontalMargin = 4;
@@ -49,9 +50,10 @@ internal static class TransportUiMetrics
     internal const int ActionButtonMinWidth = 90;
     internal const int ActionButtonGap = 4;
 
-    // البحث والتصفية: الحاوية 10 مم والحقول 8 مم.
+    // البحث والتصفية: الحاوية 10 مم، ومربع البحث 8 مم، وحقل الحالة 6 مم.
     internal const int SearchPanelHeight = Container10Mm;
     internal const int SearchControlHeight = Control8Mm;
+    internal const int SearchStatusControlHeight = Control6Mm;
 
     // التنقل: الحاوية 10 مم والأزرار 8 مم.
     internal const int PaginationHeight = Container10Mm;
