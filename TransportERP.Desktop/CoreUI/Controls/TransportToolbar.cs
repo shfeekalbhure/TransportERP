@@ -11,7 +11,6 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportToolbar : UserControl
 {
-    // هذه الحاوية تجمع الأزرار نفسها، وتثبت ككتلة كاملة في أقصى يمين الشريط.
     private readonly FlowLayoutPanel _buttonsPanel = new();
 
     public PrimaryButton NewButton { get; } = CreateButton("جديد", ToolbarAction.New);
@@ -48,10 +47,6 @@ public sealed class TransportToolbar : UserControl
         }
     }
 
-    /// <summary>
-    /// يثبت شريط الأوامر أعلى الشاشة، ويثبت كتلة الأزرار نفسها في أقصى اليمين.
-    /// استخدام Dock=Right للحاوية الداخلية يمنع ظهور الأزرار من اليسار عند اختلاف اتجاه الحاوية الأب.
-    /// </summary>
     private void InitializeLayout()
     {
         AutoSize = false;
@@ -59,7 +54,7 @@ public sealed class TransportToolbar : UserControl
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.ToolbarHeight;
         MinimumSize = new Size(0, TransportUiMetrics.ToolbarHeight);
-        Padding = new Padding(10, 5, 10, 5);
+        Padding = new Padding(6, 4, 6, 4);
         RightToLeft = RightToLeft.Yes;
 
         _buttonsPanel.AutoSize = true;
@@ -72,7 +67,6 @@ public sealed class TransportToolbar : UserControl
         _buttonsPanel.WrapContents = false;
         _buttonsPanel.Padding = Padding.Empty;
 
-        // الترتيب المرئي من أقصى اليمين: جديد، حفظ، تعديل، إيقاف، حذف، طباعة، إغلاق.
         _buttonsPanel.Controls.Add(NewButton);
         _buttonsPanel.Controls.Add(SaveButton);
         _buttonsPanel.Controls.Add(EditButton);
@@ -109,11 +103,11 @@ public sealed class TransportToolbar : UserControl
 
         return new PrimaryButton
         {
-            CornerRadius = 8,
+            CornerRadius = 7,
             Height = TransportUiMetrics.ToolbarButtonHeight,
-            MinimumSize = new Size(88, TransportUiMetrics.ToolbarButtonHeight),
-            Width = 96,
-            Margin = new Padding(4, 0, 4, 0),
+            MinimumSize = new Size(78, TransportUiMetrics.ToolbarButtonHeight),
+            Width = 86,
+            Margin = new Padding(3, 0, 3, 0),
             Text = text,
             NormalBackColor = normal,
             HoverBackColor = hover
