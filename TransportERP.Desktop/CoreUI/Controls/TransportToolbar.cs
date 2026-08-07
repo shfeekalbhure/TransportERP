@@ -5,40 +5,23 @@ using TransportERP.Desktop.Themes;
 namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
-/// شريط الأدوات الموحد لشاشات TransportERP.
-/// يرتب أزرار العمليات من اليمين إلى اليسار وفق القرار المعتمد،
-/// ويوفر أحداثًا مستقلة لكل عملية رئيسية في الشاشة.
+/// شريط الأوامر الموحد لجميع شاشات TransportERP.
+/// الأزرار تبدأ دائمًا من أقصى اليمين وبنفس الأسماء والألوان في كل شاشة.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportToolbar : UserControl
 {
-    // الحاوية الداخلية التي تجمع الأزرار في صف واحد من اليمين إلى اليسار.
+    // حاوية الأزرار؛ اتجاه RightToLeft يضمن أن زر "جديد" يبدأ من أقصى اليمين.
     private readonly FlowLayoutPanel _buttonsPanel = new();
 
-    /// <summary>زر إنشاء سجل جديد.</summary>
-    public PrimaryButton NewButton { get; } = CreateButton("جديد");
+    public PrimaryButton NewButton { get; } = CreateButton("جديد", ToolbarAction.New);
+    public PrimaryButton SaveButton { get; } = CreateButton("حفظ", ToolbarAction.Save);
+    public PrimaryButton EditButton { get; } = CreateButton("تعديل", ToolbarAction.Edit);
+    public PrimaryButton DisableButton { get; } = CreateButton("إيقاف", ToolbarAction.Disable);
+    public PrimaryButton DeleteButton { get; } = CreateButton("حذف", ToolbarAction.Delete);
+    public PrimaryButton PrintButton { get; } = CreateButton("طباعة", ToolbarAction.Print);
+    public PrimaryButton CloseButton { get; } = CreateButton("إغلاق", ToolbarAction.Close);
 
-    /// <summary>زر حفظ السجل الحالي.</summary>
-    public PrimaryButton SaveButton { get; } = CreateButton("حفظ");
-
-    /// <summary>زر تعديل السجل الحالي.</summary>
-    public PrimaryButton EditButton { get; } = CreateButton("تعديل");
-
-    /// <summary>زر إيقاف السجل الحالي.</summary>
-    public PrimaryButton DisableButton { get; } = CreateButton("إيقاف");
-
-    /// <summary>زر حذف السجل الحالي.</summary>
-    public PrimaryButton DeleteButton { get; } = CreateButton("حذف");
-
-    /// <summary>زر طباعة بيانات الشاشة.</summary>
-    public PrimaryButton PrintButton { get; } = CreateButton("طباعة");
-
-    /// <summary>زر إغلاق الشاشة.</summary>
-    public PrimaryButton CloseButton { get; } = CreateButton("إغلاق");
-
-    /// <summary>
-    /// إنشاء شريط الأدوات وترتيب الأزرار وفق التسلسل المعتمد.
-    /// </summary>
     public TransportToolbar()
     {
         InitializeLayout();
@@ -53,15 +36,9 @@ public sealed class TransportToolbar : UserControl
     public event EventHandler? PrintRequested;
     public event EventHandler? CloseRequested;
 
-    /// <summary>إظهار أو إخفاء زر محدد داخل شريط الأدوات.</summary>
-    public void SetActionVisible(ToolbarAction action, bool isVisible) =>
-        GetButton(action).Visible = isVisible;
+    public void SetActionVisible(ToolbarAction action, bool isVisible) => GetButton(action).Visible = isVisible;
+    public void SetActionEnabled(ToolbarAction action, bool isEnabled) => GetButton(action).Enabled = isEnabled;
 
-    /// <summary>تمكين أو تعطيل زر محدد داخل شريط الأدوات.</summary>
-    public void SetActionEnabled(ToolbarAction action, bool isEnabled) =>
-        GetButton(action).Enabled = isEnabled;
-
-    /// <summary>إعادة جميع الأزرار إلى الحالة المرئية والمفعلة.</summary>
     public void ResetActions()
     {
         foreach (Control control in _buttonsPanel.Controls)
@@ -72,27 +49,28 @@ public sealed class TransportToolbar : UserControl
     }
 
     /// <summary>
-    /// تهيئة الحاوية بارتفاع 12 مم تقريبًا، بينما ارتفاع كل زر 9 مم تقريبًا.
-    /// بهذه الطريقة تبقى الأزرار بنفس المقاس في جميع الشاشات.
+    /// يثبت الشريط أعلى الشاشة، ويضع الأزرار من اليمين إلى اليسار.
+    /// ارتفاع الحاوية 12 مم، وارتفاع كل زر 9 مم حسب القرار المعتمد.
     /// </summary>
     private void InitializeLayout()
     {
         AutoSize = false;
         BackColor = Color.White;
         Dock = DockStyle.Fill;
-        Height = TransportUiMetrics.Container12Mm;
-        MinimumSize = new Size(0, TransportUiMetrics.Container12Mm);
-        Padding = new Padding(8, 5, 8, 5);
+        Height = TransportUiMetrics.ToolbarHeight;
+        MinimumSize = new Size(0, TransportUiMetrics.ToolbarHeight);
+        Padding = new Padding(10, 5, 10, 5);
         RightToLeft = RightToLeft.Yes;
 
         _buttonsPanel.AutoScroll = true;
         _buttonsPanel.BackColor = Color.Transparent;
         _buttonsPanel.Dock = DockStyle.Fill;
         _buttonsPanel.FlowDirection = FlowDirection.RightToLeft;
+        _buttonsPanel.RightToLeft = RightToLeft.Yes;
         _buttonsPanel.WrapContents = false;
         _buttonsPanel.Padding = Padding.Empty;
 
-        // الترتيب المعتمد من أقصى اليمين: جديد ← حفظ ← تعديل ← إيقاف ← حذف ← طباعة ← إغلاق.
+        // الترتيب المرئي من أقصى اليمين: جديد، حفظ، تعديل، إيقاف، حذف، طباعة، إغلاق.
         _buttonsPanel.Controls.Add(NewButton);
         _buttonsPanel.Controls.Add(SaveButton);
         _buttonsPanel.Controls.Add(EditButton);
@@ -104,9 +82,6 @@ public sealed class TransportToolbar : UserControl
         Controls.Add(_buttonsPanel);
     }
 
-    /// <summary>
-    /// ربط نقر كل زر بحدث عام، حتى لا نكرر نفس التوصيلات داخل كل شاشة.
-    /// </summary>
     private void RegisterEvents()
     {
         NewButton.Click += (_, _) => NewRequested?.Invoke(this, EventArgs.Empty);
@@ -119,40 +94,47 @@ public sealed class TransportToolbar : UserControl
     }
 
     /// <summary>
-    /// إنشاء زر موحد بارتفاع 9 مم تقريبًا.
-    /// العرض يبقى كافيًا للنص العربي مع الحفاظ على شكل مضغوط.
+    /// ينشئ زرًا موحدًا ويعطي كل عملية لونها الدلالي.
+    /// الأزرق للعمليات العامة، الأخضر للحفظ، الكهرماني للتعديل، البرتقالي للإيقاف، الأحمر للحذف.
     /// </summary>
-    private static PrimaryButton CreateButton(string text)
+    private static PrimaryButton CreateButton(string text, ToolbarAction action)
     {
+        var (normal, hover) = action switch
+        {
+            ToolbarAction.Save => (UiTheme.ActionSave, UiTheme.ActionSaveHover),
+            ToolbarAction.Edit => (UiTheme.ActionEdit, UiTheme.ActionEditHover),
+            ToolbarAction.Disable => (UiTheme.ActionDisable, UiTheme.ActionDisableHover),
+            ToolbarAction.Delete => (UiTheme.ActionDelete, UiTheme.ActionDeleteHover),
+            ToolbarAction.Close => (UiTheme.ActionClose, UiTheme.ActionCloseHover),
+            _ => (UiTheme.PrimaryBlue, UiTheme.PrimaryBlueHover)
+        };
+
         return new PrimaryButton
         {
-            CornerRadius = 9,
-            Height = TransportUiMetrics.Control9Mm,
+            CornerRadius = 8,
+            Height = TransportUiMetrics.ToolbarButtonHeight,
+            MinimumSize = new Size(88, TransportUiMetrics.ToolbarButtonHeight),
+            Width = 96,
             Margin = new Padding(4, 0, 4, 0),
-            MinimumSize = new Size(88, TransportUiMetrics.Control9Mm),
             Text = text,
-            Width = 94
+            NormalBackColor = normal,
+            HoverBackColor = hover
         };
     }
 
-    /// <summary>الحصول على الزر المرتبط بنوع العملية المحدد.</summary>
-    private PrimaryButton GetButton(ToolbarAction action)
+    private PrimaryButton GetButton(ToolbarAction action) => action switch
     {
-        return action switch
-        {
-            ToolbarAction.New => NewButton,
-            ToolbarAction.Save => SaveButton,
-            ToolbarAction.Edit => EditButton,
-            ToolbarAction.Disable => DisableButton,
-            ToolbarAction.Delete => DeleteButton,
-            ToolbarAction.Print => PrintButton,
-            ToolbarAction.Close => CloseButton,
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "نوع العملية غير مدعوم.")
-        };
-    }
+        ToolbarAction.New => NewButton,
+        ToolbarAction.Save => SaveButton,
+        ToolbarAction.Edit => EditButton,
+        ToolbarAction.Disable => DisableButton,
+        ToolbarAction.Delete => DeleteButton,
+        ToolbarAction.Print => PrintButton,
+        ToolbarAction.Close => CloseButton,
+        _ => throw new ArgumentOutOfRangeException(nameof(action), action, "نوع العملية غير مدعوم.")
+    };
 }
 
-/// <summary>العمليات القياسية المتاحة داخل شريط أدوات TransportERP.</summary>
 public enum ToolbarAction
 {
     New,
