@@ -17,9 +17,20 @@ partial class UcOrganizationalUnits
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "بيانات الوحدة المحددة."),
                 new("الهيكل التنظيمي", SecurityTabKind.Tree, "الشجرة التنظيمية متعددة المستويات."),
-                new("المسؤولون والاتصال", SecurityTabKind.Details, "المدير وبديله وبيانات الاتصال."),
+                new("المسؤولون والاتصال", SecurityTabKind.Details, "المدير وبديله وبيانات الاتصال.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("المدير", SecurityFieldKind.Choice, Array.Empty<string>()),
+                        new("بديل المدير", SecurityFieldKind.Choice, Array.Empty<string>()),
+                        new("البريد الإلكتروني"),
+                        new("الهاتف"),
+                        new("هاتف بديل"),
+                        new("جهة الاتصال للطوارئ"),
+                        new("ملاحظات الاتصال", SecurityFieldKind.Multiline)
+                    }),
                 new("الصلاحيات والنطاق", SecurityTabKind.CheckList, "نطاق الوحدة والصلاحيات المرتبطة."),
-                new("سجل العمليات", SecurityTabKind.Audit, "الإنشاء والنقل وتغيير الأب والمدير والنطاق.")
+                new("سجل العمليات", SecurityTabKind.Audit, "الإنشاء والنقل وتغيير الأب والمدير والنطاق.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الوحدة السابقة", "الوحدة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
