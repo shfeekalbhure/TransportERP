@@ -11,9 +11,9 @@ internal static class TransportUiMetrics
     internal const int Control9Mm = 34;
     internal const int Control8Mm = 30;
 
-    // شريط الأوامر أصبح أصغر قليلًا: الحاوية 10 مم والأزرار 8 مم.
-    internal const int ToolbarHeight = Container10Mm;
-    internal const int ToolbarButtonHeight = Control8Mm;
+    // شريط الأوامر أصغر قليلًا حتى لا يستهلك مساحة كبيرة من أعلى الشاشة.
+    internal const int ToolbarHeight = 36;
+    internal const int ToolbarButtonHeight = 28;
 
     // البحث والتصفية حسب القرار: الحاوية 10 مم والحقول 8 مم.
     internal const int SearchPanelHeight = Container10Mm;
@@ -31,13 +31,13 @@ internal static class TransportUiMetrics
     internal const int AlertBarHeight = Container12Mm;
     internal const int AlertContentHeight = Control9Mm;
 
-    // المسافة الرأسية المعتمدة بين صفوف البيانات الرئيسية: 1.5 مم تقريبًا = 6 بكسل.
-    internal const int MainDataRowGap = 6;
+    // زيادة الفراغ بين صفوف البيانات بنحو 1 مم إضافي لتحسين القراءة والفصل البصري.
+    internal const int MainDataRowGap = 10;
 
     // نوزع المسافة بالتساوي أعلى وأسفل الأداة داخل الصف.
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
 
-    // ارتفاع صف البيانات القياسي = ارتفاع الحقل 8 مم + مسافة 1.5 مم.
+    // ارتفاع صف البيانات القياسي = ارتفاع الحقل 8 مم + المسافة المعتمدة.
     internal const int MainDataRowHeight = Control8Mm + MainDataRowGap;
 
     // مساحة عنوان وحدود GroupBox فوق الحاوية الداخلية.
