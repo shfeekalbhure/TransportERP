@@ -114,6 +114,8 @@ partial class UcGen016GlobalVariables
         tabControl.RightToLeftLayout = true;
         tabControl.Multiline = false;
         tabControl.HotTrack = true;
+        tabControl.Margin = Padding.Empty;
+        tabControl.Padding = new Point(TransportUiMetrics.TabHorizontalPadding, TransportUiMetrics.TabVerticalPadding);
 
         ConfigureTabPage(tabMain, "البيانات الرئيسية");
         ConfigureTabPage(tabScope, "النطاق والقيمة");
@@ -134,7 +136,7 @@ partial class UcGen016GlobalVariables
 
     private void ConfigureMainTab()
     {
-        mainFields.FieldColumnCount = 3;
+        mainFields.FieldColumnCount = TransportUiMetrics.ResolveMainDataFieldColumns(7);
         mainFields.Dock = DockStyle.Top;
         mainFields.AutoScroll = false;
 
@@ -151,7 +153,7 @@ partial class UcGen016GlobalVariables
 
     private void ConfigureScopeTab()
     {
-        scopeFields.FieldColumnCount = 3;
+        scopeFields.FieldColumnCount = TransportUiMetrics.ResolveMainDataFieldColumns(7);
         scopeFields.Dock = DockStyle.Top;
         scopeFields.AutoScroll = false;
 
@@ -168,7 +170,7 @@ partial class UcGen016GlobalVariables
 
     private void ConfigureEffectiveTab()
     {
-        effectiveFields.FieldColumnCount = 2;
+        effectiveFields.FieldColumnCount = TransportUiMetrics.ResolveMainDataFieldColumns(4);
         effectiveFields.Dock = DockStyle.Top;
         effectiveFields.AutoScroll = false;
 

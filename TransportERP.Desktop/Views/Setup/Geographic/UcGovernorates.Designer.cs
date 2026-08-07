@@ -1,5 +1,6 @@
 using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.Views.Setup.Geographic;
 
@@ -37,25 +38,28 @@ partial class UcGovernorates
 
         SuspendLayout();
 
-        // استدعاء القالب الواحد الذي يحتوي الأوامر والتنبيه والبحث والجدول والتصفح والتدقيق.
         screenShell.Dock = DockStyle.Fill;
         screenShell.Name = "screenShell";
         screenShell.RightToLeft = RightToLeft.Yes;
 
-        // هذا الجدول ينظم فقط حقول المحافظة.
+        // ستة حقول = عمودان وفق القرار الحاكم. الارتفاع يأتي من المحتوى ولا يملأ مساحة زائدة.
         tblData.ColumnCount = 4;
-        tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130F));
+        tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, TransportUiMetrics.MainDataLabelWidth));
         tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130F));
+        tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, TransportUiMetrics.MainDataLabelWidth));
         tblData.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        tblData.Dock = DockStyle.Fill;
+        tblData.Dock = DockStyle.Top;
+        tblData.AutoSize = true;
+        tblData.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        tblData.AutoScroll = false;
+        tblData.Margin = Padding.Empty;
+        tblData.Padding = Padding.Empty;
         tblData.RightToLeft = RightToLeft.Yes;
         tblData.RowCount = 4;
-        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        // الملاحظات تبقى واضحة لكن بارتفاع مضغوط بدل أن تملأ بقية الحاوية.
-        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataRowHeight));
+        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataRowHeight));
+        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataRowHeight));
+        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataMultilineMinHeight + TransportUiMetrics.MainDataRowGap));
 
         ConfigureComboBox(cmbCountry);
         ConfigureRequiredTextBox(txtGovernorateCode);
@@ -78,7 +82,7 @@ partial class UcGovernorates
 
         screenShell.DataHost.Controls.Add(tblData);
 
-        // الأعمدة التالية خاصة بالمحافظات فقط.
+        // الأعمدة التالية خاصة بالمحافظات فقط وتبقى محلية لأنها مرتبطة بمحتوى الشاشة.
         screenShell.Grid.AutoGenerateColumns = false;
         screenShell.Grid.Columns.Add("colGovernorateCode", "كود المحافظة");
         screenShell.Grid.Columns.Add("colNameAr", "اسم المحافظة");
@@ -87,55 +91,46 @@ partial class UcGovernorates
 
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        BackColor = Color.FromArgb(247, 249, 252);
+        BackColor = UiTheme.WorkspaceBackground;
         Controls.Add(screenShell);
-        Font = new Font("Segoe UI", 10F);
         Name = "UcGovernorates";
         RightToLeft = RightToLeft.Yes;
         Size = new Size(1280, 760);
         ResumeLayout(false);
     }
 
-    /// <summary>إضافة عنوان وحقل بنفس المسافات الثابتة.</summary>
     private static void AddField(TableLayoutPanel table, string labelText, Control field, int labelColumn, int row)
     {
         table.Controls.Add(CreateLabel(labelText), labelColumn, row);
         table.Controls.Add(field, labelColumn + 1, row);
     }
 
-    /// <summary>إنشاء Label عربي بمحاذاة يمين.</summary>
     private static Label CreateLabel(string text) => new()
     {
         Dock = DockStyle.Fill,
-        Margin = new Padding(4),
         Text = text,
-        TextAlign = ContentAlignment.MiddleRight
+        TextAlign = ContentAlignment.MiddleRight,
+        RightToLeft = RightToLeft.Yes
     };
 
-    /// <summary>تهيئة حقل إلزامي بنفس اللون والتحقق المستخدم في بقية النظام.</summary>
     private static void ConfigureRequiredTextBox(RequiredTextBox textBox)
     {
         textBox.Dock = DockStyle.Fill;
-        textBox.Margin = new Padding(4, 5, 8, 5);
         textBox.RightToLeft = RightToLeft.Yes;
         textBox.TextAlign = HorizontalAlignment.Right;
     }
 
-    /// <summary>تهيئة TextBox عربي قياسي.</summary>
     private static void ConfigureTextBox(TextBox textBox)
     {
         textBox.Dock = DockStyle.Fill;
-        textBox.Margin = new Padding(4, 5, 8, 5);
         textBox.RightToLeft = RightToLeft.Yes;
         textBox.TextAlign = HorizontalAlignment.Right;
     }
 
-    /// <summary>تهيئة ComboBox قياسي من اليمين إلى اليسار.</summary>
     private static void ConfigureComboBox(ComboBox comboBox)
     {
         comboBox.Dock = DockStyle.Fill;
         comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-        comboBox.Margin = new Padding(4, 5, 8, 5);
         comboBox.RightToLeft = RightToLeft.Yes;
     }
 }

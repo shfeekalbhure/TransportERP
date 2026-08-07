@@ -1,12 +1,13 @@
 using System.ComponentModel;
 using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.Forms.Setup.General;
 
 /// <summary>
-/// منشئ مركزي لمحتوى شاشات المجموعة الثانية. يعتمد حصراً على CoreUI للعناصر المشتركة،
-/// ويترك لكل شاشة تعريف تبويباتها وحقولها المتخصصة فقط.
+/// منشئ مركزي لمحتوى شاشات المجموعة الثانية. يعتمد على CoreUI للمقاسات والحاويات والحقول العامة،
+/// ويترك لكل شاشة تعريف التبويبات والبيانات المتخصصة فقط.
 /// </summary>
 internal static class GeneralSetupScreenBuilder
 {
@@ -49,7 +50,9 @@ internal static class GeneralSetupScreenBuilder
             RightToLeft = RightToLeft.Yes,
             RightToLeftLayout = true,
             Multiline = false,
-            HotTrack = true
+            HotTrack = true,
+            Margin = Padding.Empty,
+            Padding = new Point(TransportUiMetrics.TabHorizontalPadding, TransportUiMetrics.TabVerticalPadding)
         };
 
         foreach (var tab in tabs)
@@ -92,73 +95,78 @@ internal static class GeneralSetupScreenBuilder
         {
             Text = spec.Title,
             RightToLeft = RightToLeft.Yes,
-            BackColor = Color.White,
-            Padding = new Padding(8)
+            BackColor = UiTheme.SurfaceBackground,
+            Padding = new Padding(TransportUiMetrics.TabContentPadding),
+            AutoScroll = false
         };
 
         if (spec.IsLog)
         {
-            page.Controls.Add(CreateLogGrid());
+            // TabPage -> Container -> Grid، حتى يبقى مبدأ الحاويات ثابتًا.
+            var logHost = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = false,
+                BackColor = UiTheme.SurfaceBackground,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                RightToLeft = RightToLeft.Yes
+            };
+            logHost.Controls.Add(CreateLogGrid());
+            page.Controls.Add(logHost);
             return page;
+        }
+
+        var fieldColumns = TransportUiMetrics.ResolveMainDataFieldColumns(spec.Fields.Length);
+        var fieldRows = Math.Max(1, (int)Math.Ceiling(spec.Fields.Length / (double)fieldColumns));
+        if (fieldRows > TransportUiMetrics.MainDataMaxRows)
+        {
+            throw new InvalidOperationException($"التبويب '{spec.Title}' يتجاوز الحد الحاكم البالغ {TransportUiMetrics.MainDataMaxRows} صفوف.");
         }
 
         var root = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = spec.ActionButtons is { Length: > 0 } ? 2 : 1,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            AutoScroll = false,
+            BackColor = UiTheme.SurfaceBackground,
             RightToLeft = RightToLeft.Yes,
-            ColumnCount = 4,
-            AutoScroll = true,
             Padding = Padding.Empty,
             Margin = Padding.Empty
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155F));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155F));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var rowCount = Math.Max(1, (int)Math.Ceiling(spec.Fields.Length / 2d));
-        root.RowCount = rowCount + (spec.ActionButtons is { Length: > 0 } ? 1 : 0);
-        for (var row = 0; row < rowCount; row++)
+        var dataEntry = new TransportDataEntryPanel
         {
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataRowHeight));
-        }
+            FieldColumnCount = fieldColumns,
+            Dock = DockStyle.Top,
+            AutoScroll = false,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
 
         for (var index = 0; index < spec.Fields.Length; index++)
         {
             var field = spec.Fields[index];
-            var pair = index % 2;
-            var row = index / 2;
-            var labelColumn = pair == 0 ? 0 : 2;
-            var controlColumn = pair == 0 ? 1 : 3;
-
-            var label = new Label
-            {
-                Text = field.Caption + (field.Kind == FieldKind.RequiredText ? " *" : string.Empty),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleRight,
-                RightToLeft = RightToLeft.Yes
-            };
-            root.Controls.Add(label, labelColumn, row);
-            root.Controls.Add(CreateEditor(field), controlColumn, row);
+            var label = field.Caption + (field.Kind == FieldKind.RequiredText ? " *" : string.Empty);
+            dataEntry.AddField(label, CreateEditor(field), index);
         }
+
+        root.Controls.Add(dataEntry, 0, 0);
 
         if (spec.ActionButtons is { Length: > 0 } buttons)
         {
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
-            var actions = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                RightToLeft = RightToLeft.Yes,
-                FlowDirection = FlowDirection.RightToLeft,
-                WrapContents = false,
-                AutoSize = true
-            };
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ActionPanelHeight));
+            var actions = new TransportActionPanel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             foreach (var caption in buttons)
             {
-                actions.Controls.Add(new PrimaryButton { Text = caption, AutoSize = true });
+                actions.AddAction(caption);
             }
-            root.Controls.Add(actions, 0, rowCount);
-            root.SetColumnSpan(actions, 4);
+            root.Controls.Add(actions, 0, 1);
         }
 
         page.Controls.Add(root);
@@ -171,12 +179,24 @@ internal static class GeneralSetupScreenBuilder
         {
             FieldKind.RequiredText => new RequiredTextBox(),
             FieldKind.Combo => CreateCombo(field.Items),
-            FieldKind.Date => new DateTimePicker { Format = DateTimePickerFormat.Short, RightToLeftLayout = true },
-            FieldKind.Number => new NumericUpDown { DecimalPlaces = 2, Maximum = 999999999M, ThousandsSeparator = true, TextAlign = HorizontalAlignment.Right },
-            FieldKind.Check => new CheckBox { Text = "نعم", AutoSize = true, TextAlign = ContentAlignment.MiddleRight },
-            FieldKind.Multiline => new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, MinimumSize = new Size(0, TransportUiMetrics.MainDataMultilineMinHeight) },
-            FieldKind.Picture => new PictureBox { BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, MinimumSize = new Size(160, 72) },
-            _ => new TextBox { TextAlign = HorizontalAlignment.Right }
+            FieldKind.Date => new TransportDatePicker(),
+            FieldKind.Number => new NumericUpDown
+            {
+                DecimalPlaces = 2,
+                Maximum = 999999999M,
+                ThousandsSeparator = true,
+                TextAlign = HorizontalAlignment.Right,
+                RightToLeft = RightToLeft.Yes
+            },
+            FieldKind.Check => new CheckBox { Text = "نعم", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, RightToLeft = RightToLeft.Yes },
+            FieldKind.Multiline => new TransportMultilineTextBox(),
+            FieldKind.Picture => new PictureBox
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                MinimumSize = new Size(160, TransportUiMetrics.MainDataMultilineMinHeight)
+            },
+            _ => new TransportTextBox()
         };
 
         control.Dock = field.Kind == FieldKind.Check ? DockStyle.Right : DockStyle.Fill;
@@ -185,20 +205,16 @@ internal static class GeneralSetupScreenBuilder
         return control;
     }
 
-    private static ComboBox CreateCombo(string[]? items)
+    private static TransportComboBox CreateCombo(string[]? items)
     {
-        var combo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            RightToLeft = RightToLeft.Yes
-        };
+        var combo = new TransportComboBox();
         if (items is { Length: > 0 }) combo.Items.AddRange(items.Cast<object>().ToArray());
         return combo;
     }
 
     private static TransportDataGrid CreateLogGrid()
     {
-        var grid = new TransportDataGrid { Dock = DockStyle.Fill, AutoGenerateColumns = false };
+        var grid = new TransportDataGrid { Dock = DockStyle.Fill, AutoGenerateColumns = false, Margin = Padding.Empty };
         AddColumn(grid, "التاريخ", 145);
         AddColumn(grid, "المستخدم", 150);
         AddColumn(grid, "العملية", 130);

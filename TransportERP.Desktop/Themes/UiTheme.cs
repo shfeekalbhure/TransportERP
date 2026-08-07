@@ -30,6 +30,11 @@ internal static class UiTheme
     internal static Color ActionClose => Color.FromArgb(71, 85, 105);
     internal static Color ActionCloseHover => Color.FromArgb(51, 65, 85);
 
+    // حالات الأزرار المشتركة. Disabled لا يعتمد على SystemColors حتى لا يختلف حسب الجهاز/الثيم.
+    internal static Color ActionText => Color.White;
+    internal static Color ActionDisabledBackground => Color.FromArgb(203, 213, 225);
+    internal static Color ActionDisabledText => Color.FromArgb(51, 65, 85);
+
     // الأسطح والحاويات: معرفة مركزيًا حتى لا تمتلك كل وحدة Theme فرعيًا خاصًا بها.
     internal static Color WindowBackground => Color.FromArgb(239, 245, 252);
     internal static Color WorkspaceBackground => Color.FromArgb(247, 249, 252);

@@ -6,7 +6,7 @@ namespace TransportERP.Desktop.Controls;
 
 /// <summary>
 /// الزر الموحد في TransportERP.
-/// يدعم لونًا أساسيًا ولون مرور مستقلين حتى نستطيع تلوين الحفظ والتعديل والحذف دون إنشاء زر جديد لكل عملية.
+/// يدعم لونًا أساسيًا ولون مرور مستقلين، بينما حالة Disabled موحدة من UiTheme.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class PrimaryButton : Button
@@ -38,10 +38,6 @@ public sealed class PrimaryButton : Button
         }
     }
 
-    /// <summary>
-    /// لون الزر في الحالة الطبيعية.
-    /// DesignerSerializationVisibility يوضح لمصمم WinForms أن هذه الخاصية قابلة للحفظ في Designer.
-    /// </summary>
     [Category("TransportERP")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Color NormalBackColor
@@ -54,15 +50,17 @@ public sealed class PrimaryButton : Button
         }
     }
 
-    /// <summary>
-    /// لون الزر عند مرور مؤشر الفأرة.
-    /// </summary>
     [Category("TransportERP")]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Color HoverBackColor
     {
         get => _hoverBackColor;
-        set => _hoverBackColor = value;
+        set
+        {
+            _hoverBackColor = value;
+            FlatAppearance.MouseOverBackColor = value;
+            FlatAppearance.MouseDownBackColor = value;
+        }
     }
 
     private void ApplyDefaultStyle()
@@ -72,8 +70,10 @@ public sealed class PrimaryButton : Button
         Cursor = Cursors.Hand;
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
+        FlatAppearance.MouseOverBackColor = _hoverBackColor;
+        FlatAppearance.MouseDownBackColor = _hoverBackColor;
         Font = UiTheme.CreateBoldFont(10F);
-        ForeColor = Color.White;
+        ForeColor = UiTheme.ActionText;
         Height = 34;
         MinimumSize = new Size(88, 34);
         Padding = new Padding(10, 0, 10, 0);
@@ -88,13 +88,19 @@ public sealed class PrimaryButton : Button
 
     private void HandleMouseLeave(object? sender, EventArgs e)
     {
-        BackColor = Enabled ? _normalBackColor : SystemColors.ControlDark;
+        ApplyEnabledVisualState();
     }
 
     private void HandleEnabledChanged(object? sender, EventArgs e)
     {
-        BackColor = Enabled ? _normalBackColor : SystemColors.ControlDark;
+        ApplyEnabledVisualState();
         Cursor = Enabled ? Cursors.Hand : Cursors.Default;
+    }
+
+    private void ApplyEnabledVisualState()
+    {
+        BackColor = Enabled ? _normalBackColor : UiTheme.ActionDisabledBackground;
+        ForeColor = Enabled ? UiTheme.ActionText : UiTheme.ActionDisabledText;
     }
 
     private void UpdateRoundedRegion()

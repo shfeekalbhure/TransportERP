@@ -27,7 +27,7 @@ internal static class TransportUiMetrics
     internal const int ToolbarVerticalPadding = (ToolbarHeight - ToolbarButtonHeight) / 2;
 
     // البيانات الرئيسية: الحقل 6 مم، فجوة الصفوف 1.5 مم، 3 أعمدة و5 صفوف كحد أقصى.
-    // الحد الأدنى للحاوية كاملة هو 4 سم تقريبًا = 151px عند 96 DPI.
+    // لا نفرض ارتفاعًا ثابتًا كبيرًا؛ الحد الأدنى هو صف واحد فعلي + Chrome الحاوية.
     internal const int MainDataDefaultGroupHeight = 230;
     internal const int MainDataMaxFieldColumns = 3;
     internal const int MainDataMaxRows = 5;
@@ -36,14 +36,17 @@ internal static class TransportUiMetrics
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
     internal const int MainDataHorizontalMargin = 4;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
-    internal const int MainDataMinimumGroupHeight = 151;
     internal const int MainDataGroupChromeHeight = GroupBoxHeaderSpace + GroupVerticalPadding + (MainDataHostPadding * 2);
-    internal const int MainDataMinContentHeight = MainDataMinimumGroupHeight - MainDataGroupChromeHeight;
+    internal const int MainDataMinContentHeight = MainDataRowHeight;
+    internal const int MainDataMinimumGroupHeight = MainDataMinContentHeight + MainDataGroupChromeHeight;
     internal const int MainDataMaxFieldContentHeight = MainDataRowHeight * MainDataMaxRows;
     internal const int AdditionalDataTabHeaderHeight = 34;
-    // عند وجود تبويبات نضيف مساحة رأس التبويب والـPadding إلى سقف خمسة صفوف؛
-    // وإلا كان رأس التبويب يستهلك جزءًا من مساحة الحقول ويؤدي إلى قصها.
-    internal const int MainDataMaxContentHeight = MainDataMaxFieldContentHeight + AdditionalDataTabHeaderHeight + (TabContentPadding * 2);
+    // سقف المحتوى يسمح بخمسة صفوف فعلية، رأس التبويب وPadding، وحتى مستويين من GroupBox
+    // في الشاشات المتخصصة؛ الـChrome لا يجوز أن يقتطع من مساحة الحقول.
+    internal const int MainDataMaxContentHeight = MainDataMaxFieldContentHeight
+        + AdditionalDataTabHeaderHeight
+        + (TabContentPadding * 2)
+        + ((GroupBoxHeaderSpace + GroupVerticalPadding) * 2);
     internal const int MainDataMultilineMinHeight = 58;
     internal const int MainDataLabelWidth = 120;
     internal const int MainDataLabelFieldGap = 8;
@@ -94,18 +97,26 @@ internal static class TransportUiMetrics
     internal const int CompactGap = 6;
 
     /// <summary>
-    /// يحسب ارتفاع حاوية البيانات الرئيسية. لا يسمح بانكماشها تحت 4 سم تقريبًا،
-    /// ثم تتمدد إلى الأسفل حسب المحتوى. في التبويبات يسمح بسقف خمسة صفوف إضافةً إلى رأس التبويب، بلا Scroll.
+    /// يعيد عدد أعمدة الحقول وفق القرار الحاكم: 1–5 عمود، 6–10 عمودان، 11–15 ثلاثة أعمدة.
+    /// </summary>
+    internal static int ResolveMainDataFieldColumns(int fieldCount)
+    {
+        var count = Math.Max(0, fieldCount);
+        return count switch
+        {
+            <= 5 => 1,
+            <= 10 => 2,
+            _ => MainDataMaxFieldColumns
+        };
+    }
+
+    /// <summary>
+    /// يحسب ارتفاع حاوية البيانات الرئيسية من المحتوى الحقيقي + Chrome الحاوية.
+    /// الحافة العليا لا تتحرك، ولا يفرض حد أدنى أكبر من صف واحد، ولا يستخدم Scroll لتعويض القياس.
     /// </summary>
     internal static int CalculateMainDataGroupHeight(int contentHeight)
     {
-        var boundedContentHeight = Math.Clamp(
-            contentHeight,
-            MainDataMinContentHeight,
-            MainDataMaxContentHeight);
-
-        return Math.Max(
-            MainDataMinimumGroupHeight,
-            boundedContentHeight + MainDataGroupChromeHeight);
+        var boundedContentHeight = Math.Clamp(contentHeight, MainDataMinContentHeight, MainDataMaxContentHeight);
+        return boundedContentHeight + MainDataGroupChromeHeight;
     }
 }
