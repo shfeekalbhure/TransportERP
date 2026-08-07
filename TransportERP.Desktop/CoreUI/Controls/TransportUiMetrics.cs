@@ -27,6 +27,7 @@ internal static class TransportUiMetrics
     internal const int ToolbarButtonGap = 4;
 
     // البيانات الرئيسية: الحقل 8 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
+    internal const int MainDataGroupHeight = 230;
     internal const int MainDataControlHeight = Control8Mm;
     internal const int MainDataRowGap = 6;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
