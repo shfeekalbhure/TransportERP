@@ -16,10 +16,41 @@ partial class UcSecurityPolicies
             new SecurityTabDefinition[]
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "تعريف السياسة ونطاق تطبيقها."),
-                new("كلمة المرور والمصادقة", SecurityTabKind.Settings, "ضوابط كلمة المرور والمصادقة متعددة العوامل."),
-                new("الدخول والجلسات", SecurityTabKind.Settings, "ضوابط محاولات الدخول والجلسات والأجهزة."),
-                new("التدقيق والتنبيهات", SecurityTabKind.Settings, "إعدادات التدقيق وقنوات التنبيه."),
-                new("سجل العمليات", SecurityTabKind.Audit, "سجل تغييرات السياسة وتفعيلها.")
+                new("كلمة المرور والمصادقة", SecurityTabKind.Settings, "ضوابط كلمة المرور والمصادقة متعددة العوامل.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("الحد الأدنى لطول كلمة المرور"),
+                        new("التعقيد المطلوب", SecurityFieldKind.Choice, new[] { "أساسي", "متوسط", "قوي" }),
+                        new("مدة صلاحية كلمة المرور بالأيام"),
+                        new("عدد كلمات المرور الممنوع إعادة استخدامها"),
+                        new("السماح بتغيير كلمة المرور", SecurityFieldKind.Boolean),
+                        new("إلزام MFA", SecurityFieldKind.Choice, new[] { "إلزامي", "اختياري", "غير مفعل" }),
+                        new("طرق MFA المسموحة"),
+                        new("فترة السماح للتسجيل")
+                    }),
+                new("الدخول والجلسات", SecurityTabKind.Settings, "ضوابط محاولات الدخول والجلسات والأجهزة.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("الحد الأقصى لمحاولات الدخول"),
+                        new("مدة الحظر بالدقائق"),
+                        new("مهلة خمول الجلسة بالدقائق"),
+                        new("الحد الأقصى للجلسات المتزامنة"),
+                        new("السماح بالأجهزة الموثوقة", SecurityFieldKind.Boolean),
+                        new("مدة الثقة بالجهاز بالأيام"),
+                        new("إنهاء الجلسات عند تغيير كلمة المرور", SecurityFieldKind.Boolean)
+                    }),
+                new("التدقيق والتنبيهات", SecurityTabKind.Settings, "إعدادات التدقيق وقنوات التنبيه.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("مستوى التدقيق", SecurityFieldKind.Choice, new[] { "أساسي", "تفصيلي", "موسع" }),
+                        new("تسجيل العمليات الحساسة", SecurityFieldKind.Boolean),
+                        new("تنبيه عند فشل الدخول المتكرر", SecurityFieldKind.Boolean),
+                        new("تنبيه عند تغيير صلاحية حساسة", SecurityFieldKind.Boolean),
+                        new("قنوات التنبيه"),
+                        new("مدة الاحتفاظ بالسجلات بالأيام")
+                    }),
+                new("سجل العمليات", SecurityTabKind.Audit, "سجل تغييرات السياسة وتفعيلها.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "القيمة السابقة", "القيمة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
