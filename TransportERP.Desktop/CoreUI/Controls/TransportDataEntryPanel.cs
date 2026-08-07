@@ -27,6 +27,8 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
 
     /// <summary>
     /// يضيف حقلًا مع عنوانه في المكان الصحيح، ويضبط RTL والمحاذاة والهوامش المركزية تلقائيًا.
+    /// الصفوف العادية تعتمد ارتفاع 6 مم مع فجوة 1.5 مم، بينما الملاحظات متعددة الأسطر
+    /// تأخذ الحد الأدنى المركزي دون قص المحتوى.
     /// </summary>
     public void AddField(string labelText, Control editor, int index)
     {
@@ -41,26 +43,40 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
             RowCount++;
         }
 
+        var isMultiline = editor is TextBox textBox && textBox.Multiline;
+        var requiredRowHeight = isMultiline
+            ? TransportUiMetrics.MainDataMultilineMinHeight + TransportUiMetrics.MainDataRowGap
+            : TransportUiMetrics.MainDataRowHeight;
+
+        if (RowStyles[row].SizeType == SizeType.Absolute)
+        {
+            RowStyles[row].Height = Math.Max(RowStyles[row].Height, requiredRowHeight);
+        }
+
         var label = new Label
         {
             Dock = DockStyle.Fill,
             Text = labelText,
             TextAlign = ContentAlignment.MiddleRight,
             RightToLeft = RightToLeft.Yes,
-            Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, TransportUiMetrics.MainDataVerticalMargin,
-                                 TransportUiMetrics.MainDataLabelFieldGap, TransportUiMetrics.MainDataVerticalMargin)
+            Margin = new Padding(
+                TransportUiMetrics.MainDataHorizontalMargin,
+                TransportUiMetrics.MainDataVerticalMargin,
+                TransportUiMetrics.MainDataLabelFieldGap,
+                TransportUiMetrics.MainDataVerticalMargin)
         };
 
         editor.Dock = DockStyle.Fill;
         editor.RightToLeft = RightToLeft.Yes;
-        editor.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin,
-                                    TransportUiMetrics.MainDataVerticalMargin,
-                                    TransportUiMetrics.MainDataHorizontalMargin,
-                                    TransportUiMetrics.MainDataVerticalMargin);
+        editor.Margin = new Padding(
+            TransportUiMetrics.MainDataHorizontalMargin,
+            TransportUiMetrics.MainDataVerticalMargin,
+            TransportUiMetrics.MainDataHorizontalMargin,
+            TransportUiMetrics.MainDataVerticalMargin);
 
-        if (editor is TextBox textBox)
+        if (editor is TextBox fieldTextBox)
         {
-            textBox.TextAlign = HorizontalAlignment.Right;
+            fieldTextBox.TextAlign = HorizontalAlignment.Right;
         }
 
         Controls.Add(label, labelColumn, row);
