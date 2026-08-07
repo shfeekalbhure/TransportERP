@@ -11,6 +11,8 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportDataGrid : DataGridView
 {
+    private string _emptyStateText = "لا توجد سجلات للعرض";
+
     /// <summary>
     /// إنشاء جدول بيانات بالإعدادات القياسية المعتمدة للنظام.
     /// </summary>
@@ -18,6 +20,21 @@ public sealed class TransportDataGrid : DataGridView
     {
         ApplyDefaultStyle();
         DataBindingComplete += HandleDataBindingComplete;
+    }
+
+    /// <summary>
+    /// النص الذي يظهر في منتصف الجدول عندما لا توجد أي سجلات.
+    /// يمكن تغييره عند الحاجة، وتبقى القيمة الافتراضية موحدة في جميع الشاشات.
+    /// </summary>
+    [DefaultValue("لا توجد سجلات للعرض")]
+    public string EmptyStateText
+    {
+        get => _emptyStateText;
+        set
+        {
+            _emptyStateText = string.IsNullOrWhiteSpace(value) ? "لا توجد سجلات للعرض" : value.Trim();
+            Invalidate();
+        }
     }
 
     /// <summary>
@@ -88,6 +105,7 @@ public sealed class TransportDataGrid : DataGridView
         DataSource = null;
         DataSource = dataSource;
         ClearSelection();
+        Invalidate();
     }
 
     /// <summary>
@@ -135,6 +153,29 @@ public sealed class TransportDataGrid : DataGridView
         return default;
     }
 
+    /// <summary>
+    /// يرسم حالة فارغة واضحة بدل ترك مساحة بيضاء كبيرة عندما لا توجد بيانات.
+    /// </summary>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        if (Rows.Count != 0 || string.IsNullOrWhiteSpace(_emptyStateText))
+        {
+            return;
+        }
+
+        var headerOffset = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
+        var area = new Rectangle(0, headerOffset, ClientSize.Width, Math.Max(0, ClientSize.Height - headerOffset));
+        TextRenderer.DrawText(
+            e.Graphics,
+            _emptyStateText,
+            UiTheme.CreateRegularFont(10F),
+            area,
+            Color.FromArgb(120, 130, 145),
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
+    }
+
     private void HandleDataBindingComplete(object? sender, DataGridViewBindingCompleteEventArgs e)
     {
         ClearSelection();
@@ -143,5 +184,7 @@ public sealed class TransportDataGrid : DataGridView
         {
             column.SortMode = DataGridViewColumnSortMode.Automatic;
         }
+
+        Invalidate();
     }
 }
