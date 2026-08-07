@@ -55,6 +55,7 @@ internal static class TransportUiMetrics
     internal const int SearchPanelHeight = Container10Mm;
     internal const int SearchControlHeight = Control8Mm;
     internal const int SearchStatusControlHeight = Control6Mm;
+    internal const int SearchStatusVerticalMargin = (SearchControlHeight - SearchStatusControlHeight) / 2;
 
     // التنقل: الحاوية 10 مم والأزرار 8 مم.
     internal const int PaginationHeight = Container10Mm;
@@ -74,7 +75,6 @@ internal static class TransportUiMetrics
     internal const int GridCellHorizontalPadding = 6;
 
     // ارتفاع GroupBox = ارتفاع المحتوى + مساحة العنوان + Padding الفعلي أعلى وأسفل.
-    // إبقاء المعادلة هنا يمنع قص المحتوى أو اختلاف الحاويات بين الشاشات.
     internal const int GroupBoxHeaderSpace = 20;
     internal const int SearchGroupHeight = SearchPanelHeight + GroupBoxHeaderSpace + GroupVerticalPadding;
     internal const int AuditGroupHeight = AuditPanelHeight + GroupBoxHeaderSpace + GroupVerticalPadding;
