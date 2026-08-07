@@ -28,8 +28,20 @@ partial class UcPermissionDelegations
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "البيانات الأساسية المعتمدة للتفويض."),
                 new("نطاق الصلاحيات", SecurityTabKind.CheckList, "نطاقات الصلاحيات المحددة للتفويض."),
-                new("مدة التفويض والموافقة", SecurityTabKind.Details, "مدة التفويض ومسار الموافقة."),
-                new("سجل التدقيق", SecurityTabKind.Audit, "سجل تدقيق التفويض.")
+                new("مدة التفويض والموافقة", SecurityTabKind.Details, "مدة التفويض ومسار الموافقة.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("تاريخ البداية", SecurityFieldKind.Date),
+                        new("تاريخ النهاية", SecurityFieldKind.Date),
+                        new("حالة الموافقة", SecurityFieldKind.Choice, new[] { "مسودة", "بانتظار الموافقة", "معتمد", "مرفوض", "ملغى" }),
+                        new("مسار الموافقة"),
+                        new("المعتمد بواسطة"),
+                        new("تاريخ الاعتماد", SecurityFieldKind.Date),
+                        new("سبب الرفض / الإلغاء", SecurityFieldKind.Multiline)
+                    },
+                    Actions: new[] { "إرسال للموافقة", "اعتماد", "رفض" }),
+                new("سجل التدقيق", SecurityTabKind.Audit, "سجل تدقيق التفويض.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الحالة السابقة", "الحالة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
