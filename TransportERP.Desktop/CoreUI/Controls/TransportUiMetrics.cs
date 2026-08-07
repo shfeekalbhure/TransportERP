@@ -31,14 +31,17 @@ internal static class TransportUiMetrics
 
     // البيانات الرئيسية: الحقل 6 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
     // الحد الأعلى ثلاثة أعمدة حقول وخمسة صفوف في التبويب الرئيسي.
+    // الحد الأدنى المرئي يعادل ثلاثة صفوف حتى لا تتحول المنطقة في الشاشات قليلة الحقول إلى شريط ضيق.
     internal const int MainDataDefaultGroupHeight = 230;
     internal const int MainDataMaxFieldColumns = 3;
+    internal const int MainDataMinRows = 3;
     internal const int MainDataMaxRows = 5;
     internal const int MainDataControlHeight = Control6Mm;
     internal const int MainDataRowGap = 6;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
     internal const int MainDataHorizontalMargin = 4;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
+    internal const int MainDataMinContentHeight = MainDataRowHeight * MainDataMinRows;
     internal const int MainDataMaxContentHeight = MainDataRowHeight * MainDataMaxRows;
     internal const int MainDataMultilineMinHeight = 58;
     internal const int MainDataLabelWidth = 120;
@@ -104,13 +107,14 @@ internal static class TransportUiMetrics
     /// <summary>
     /// يحسب الارتفاع الكامل لحاوية البيانات من ارتفاع محتواها الفعلي.
     /// الحافة العليا تبقى ثابتة، والزيادة تكون إلى الأسفل فقط حتى خمسة صفوف.
+    /// يحافظ على حد أدنى مريح يعادل ثلاثة صفوف حتى في الشاشات قليلة الحقول.
     /// أي محتوى يتجاوز السعة ينتقل إلى تبويب إضافي بدل تمديد الحاوية أكثر أو إضافة Scroll.
     /// </summary>
     internal static int CalculateMainDataGroupHeight(int contentHeight)
     {
         var boundedContentHeight = Math.Clamp(
-            Math.Max(MainDataRowHeight, contentHeight),
-            MainDataRowHeight,
+            contentHeight,
+            MainDataMinContentHeight,
             MainDataMaxContentHeight);
 
         return boundedContentHeight
