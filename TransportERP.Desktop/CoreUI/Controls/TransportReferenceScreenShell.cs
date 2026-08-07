@@ -74,17 +74,21 @@ public sealed class TransportReferenceScreenShell : UserControl
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.TopUtilityRowHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.CalculateMainDataGroupHeight(TransportUiMetrics.MainDataRowHeight)));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.SearchGroupHeight));
+        // البحث انتقل إلى الصف العلوي؛ نحتفظ بالصف القديم بصفر حتى لا نكسر فهارس القالب الحالية.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AuditGroupHeight));
 
-        _topUtilityRow.ColumnCount = 2;
-        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
-        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
+        // الصف العلوي: الإشعارات يسار، التنقل بالوسط، البحث والتصفية يمين.
+        // نستخدم LTR للحاوية التخطيطية فقط لضمان المواقع الثلاثة صراحةً؛ كل مكون داخلي يحتفظ بـ RTL.
+        _topUtilityRow.ColumnCount = 3;
+        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
+        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
         _topUtilityRow.Dock = DockStyle.Fill;
         _topUtilityRow.Margin = Padding.Empty;
         _topUtilityRow.Padding = Padding.Empty;
-        _topUtilityRow.RightToLeft = RightToLeft.Yes;
+        _topUtilityRow.RightToLeft = RightToLeft.No;
         _topUtilityRow.RowCount = 1;
         _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
@@ -127,11 +131,11 @@ public sealed class TransportReferenceScreenShell : UserControl
 
         _topUtilityRow.Controls.Add(NotificationGroup, 0, 0);
         _topUtilityRow.Controls.Add(Pagination, 1, 0);
+        _topUtilityRow.Controls.Add(SearchGroup, 2, 0);
 
         _root.Controls.Add(_topUtilityRow, 0, 0);
         _root.Controls.Add(Toolbar, 0, 1);
         _root.Controls.Add(DataGroup, 0, 2);
-        _root.Controls.Add(SearchGroup, 0, 3);
         _root.Controls.Add(GridGroup, 0, 4);
         _root.Controls.Add(AuditGroup, 0, 5);
         Controls.Add(_root);
@@ -139,10 +143,11 @@ public sealed class TransportReferenceScreenShell : UserControl
 
     public void ConfigureWorkspaceMode(bool showSearch, bool showGrid, bool expandDataWorkspace)
     {
+        // البحث أصبح داخل الصف العلوي؛ إظهاره وإخفاؤه لا يستهلك صفًا رأسيًا مستقلًا.
         SearchGroup.Visible = showSearch;
         GridGroup.Visible = showGrid;
         _root.RowStyles[3].SizeType = SizeType.Absolute;
-        _root.RowStyles[3].Height = showSearch ? TransportUiMetrics.SearchGroupHeight : 0F;
+        _root.RowStyles[3].Height = 0F;
 
         if (expandDataWorkspace)
         {
