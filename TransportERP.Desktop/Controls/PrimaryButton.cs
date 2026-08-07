@@ -38,8 +38,12 @@ public sealed class PrimaryButton : Button
         }
     }
 
-    /// <summary>لون الزر في الحالة الطبيعية.</summary>
+    /// <summary>
+    /// لون الزر في الحالة الطبيعية.
+    /// DesignerSerializationVisibility يوضح لمصمم WinForms أن هذه الخاصية قابلة للحفظ في Designer.
+    /// </summary>
     [Category("TransportERP")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Color NormalBackColor
     {
         get => _normalBackColor;
@@ -50,8 +54,11 @@ public sealed class PrimaryButton : Button
         }
     }
 
-    /// <summary>لون الزر عند مرور مؤشر الفأرة.</summary>
+    /// <summary>
+    /// لون الزر عند مرور مؤشر الفأرة.
+    /// </summary>
     [Category("TransportERP")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Color HoverBackColor
     {
         get => _hoverBackColor;
