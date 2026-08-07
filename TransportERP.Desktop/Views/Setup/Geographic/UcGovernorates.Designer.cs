@@ -54,7 +54,8 @@ partial class UcGovernorates
         tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        tblData.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        // الملاحظات تبقى واضحة لكن بارتفاع مضغوط بدل أن تملأ بقية الحاوية.
+        tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
 
         ConfigureComboBox(cmbCountry);
         ConfigureRequiredTextBox(txtGovernorateCode);
