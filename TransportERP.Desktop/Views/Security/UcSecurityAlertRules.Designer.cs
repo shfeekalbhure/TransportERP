@@ -16,10 +16,31 @@ partial class UcSecurityAlertRules
             new SecurityTabDefinition[]
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "تعريف قاعدة التنبيه."),
-                new("شروط التفعيل", SecurityTabKind.Settings, "الشروط والعتبات ونافذة الزمن."),
+                new("شروط التفعيل", SecurityTabKind.Settings, "الشروط والعتبات ونافذة الزمن.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("الحقل / المؤشر"),
+                        new("عامل المقارنة", SecurityFieldKind.Choice, new[] { "يساوي", "لا يساوي", "أكبر من", "أقل من", "يحتوي" }),
+                        new("قيمة العتبة"),
+                        new("نافذة الزمن بالدقائق"),
+                        new("عدد مرات التكرار المطلوبة"),
+                        new("منع تكرار التنبيه", SecurityFieldKind.Boolean),
+                        new("مدة كتم التكرار بالدقائق")
+                    }),
                 new("المستلمون والقنوات", SecurityTabKind.CheckList, "المستلمون والقنوات المعتمدة."),
-                new("التصعيد", SecurityTabKind.Settings, "إجراءات التصعيد المسموحة."),
-                new("سجل العمليات", SecurityTabKind.Audit, "تغييرات القاعدة واختبارها وتفعيلها.")
+                new("التصعيد", SecurityTabKind.Settings, "إجراءات التصعيد المسموحة.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("تفعيل التصعيد", SecurityFieldKind.Boolean),
+                        new("زمن التصعيد بالدقائق"),
+                        new("مستوى التصعيد التالي", SecurityFieldKind.Choice, new[] { "متوسط", "عال", "حرج" }),
+                        new("المستلمون عند التصعيد"),
+                        new("القنوات عند التصعيد"),
+                        new("الإجراء التلقائي المسموح"),
+                        new("يتطلب اعتمادًا قبل الإجراء", SecurityFieldKind.Boolean)
+                    }),
+                new("سجل العمليات", SecurityTabKind.Audit, "تغييرات القاعدة واختبارها وتفعيلها.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "النتيجة", "الإصدار", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
