@@ -1,0 +1,3 @@
+TransportERP.Desktop execution baseline
+Branch: setup/initial-solution-structure
+Decision: Forms are reserved for shell/standalone windows. Working ERP screens are implemented as UserControls hosted inside the main shell.
