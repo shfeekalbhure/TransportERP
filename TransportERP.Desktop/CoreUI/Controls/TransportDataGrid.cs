@@ -21,7 +21,7 @@ public sealed class TransportDataGrid : DataGridView
     }
 
     /// <summary>
-    /// تطبيق التنسيق والسلوك الافتراضي للجدول.
+    /// تطبيق التنسيق والسلوك الافتراضي للجدول من المقاسات المركزية.
     /// </summary>
     private void ApplyDefaultStyle()
     {
@@ -35,7 +35,7 @@ public sealed class TransportDataGrid : DataGridView
         BorderStyle = BorderStyle.None;
         CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
-        ColumnHeadersHeight = 42;
+        ColumnHeadersHeight = TransportUiMetrics.GridHeaderHeight;
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         Dock = DockStyle.Fill;
         EnableHeadersVisualStyles = false;
@@ -44,16 +44,16 @@ public sealed class TransportDataGrid : DataGridView
         ReadOnly = true;
         RightToLeft = RightToLeft.Yes;
         RowHeadersVisible = false;
-        RowTemplate.Height = 38;
+        RowTemplate.Height = TransportUiMetrics.GridRowHeight;
         SelectionMode = DataGridViewSelectionMode.FullRowSelect;
 
         DefaultCellStyle = new DataGridViewCellStyle
         {
             Alignment = DataGridViewContentAlignment.MiddleRight,
             BackColor = Color.White,
-            Font = UiTheme.CreateRegularFont(10F),
+            Font = UiTheme.CreateRegularFont(9.5F),
             ForeColor = UiTheme.HeadingText,
-            Padding = new Padding(6, 0, 6, 0),
+            Padding = new Padding(TransportUiMetrics.GridCellHorizontalPadding, 0, TransportUiMetrics.GridCellHorizontalPadding, 0),
             SelectionBackColor = Color.FromArgb(228, 238, 255),
             SelectionForeColor = UiTheme.HeadingText,
             WrapMode = DataGridViewTriState.False
@@ -71,9 +71,9 @@ public sealed class TransportDataGrid : DataGridView
         {
             Alignment = DataGridViewContentAlignment.MiddleCenter,
             BackColor = Color.FromArgb(241, 245, 249),
-            Font = UiTheme.CreateBoldFont(10F),
+            Font = UiTheme.CreateBoldFont(9.5F),
             ForeColor = UiTheme.HeadingText,
-            Padding = new Padding(6),
+            Padding = new Padding(TransportUiMetrics.GridCellHorizontalPadding),
             SelectionBackColor = Color.FromArgb(241, 245, 249),
             SelectionForeColor = UiTheme.HeadingText,
             WrapMode = DataGridViewTriState.True
@@ -83,7 +83,6 @@ public sealed class TransportDataGrid : DataGridView
     /// <summary>
     /// تحميل مصدر بيانات جديد داخل الجدول مع مسح التحديد السابق.
     /// </summary>
-    /// <param name="dataSource">مصدر البيانات المطلوب عرضه.</param>
     public void BindData(object? dataSource)
     {
         DataSource = null;
@@ -94,7 +93,6 @@ public sealed class TransportDataGrid : DataGridView
     /// <summary>
     /// إخفاء عمود محدد باستخدام اسم الخاصية البرمجية المرتبطة به.
     /// </summary>
-    /// <param name="columnName">اسم العمود البرمجي.</param>
     public void HideColumn(string columnName)
     {
         if (string.IsNullOrWhiteSpace(columnName))
@@ -111,8 +109,6 @@ public sealed class TransportDataGrid : DataGridView
     /// <summary>
     /// تغيير عنوان عمود مع إبقاء الاسم البرمجي كما هو.
     /// </summary>
-    /// <param name="columnName">اسم العمود البرمجي.</param>
-    /// <param name="arabicHeaderText">العنوان العربي المعروض للمستخدم.</param>
     public void SetArabicHeader(string columnName, string arabicHeaderText)
     {
         if (string.IsNullOrWhiteSpace(columnName) || string.IsNullOrWhiteSpace(arabicHeaderText))
@@ -129,8 +125,6 @@ public sealed class TransportDataGrid : DataGridView
     /// <summary>
     /// الحصول على العنصر المرتبط بالصف المحدد حاليًا.
     /// </summary>
-    /// <typeparam name="TItem">نوع العنصر المتوقع.</typeparam>
-    /// <returns>العنصر المحدد عند نجاح التحويل؛ وإلا يعيد القيمة الافتراضية.</returns>
     public TItem? GetSelectedItem<TItem>()
     {
         if (CurrentRow?.DataBoundItem is TItem item)
@@ -141,9 +135,6 @@ public sealed class TransportDataGrid : DataGridView
         return default;
     }
 
-    /// <summary>
-    /// تنفيذ تهيئة إضافية بعد اكتمال ربط البيانات.
-    /// </summary>
     private void HandleDataBindingComplete(object? sender, DataGridViewBindingCompleteEventArgs e)
     {
         ClearSelection();
