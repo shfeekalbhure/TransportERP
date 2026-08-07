@@ -18,7 +18,7 @@ internal static class TransportUiMetrics
     internal const int GroupHorizontalPadding = 6;
     internal const int GroupTopPadding = 4;
     internal const int GroupBottomPadding = 4;
-    internal const int SectionGap = 0;
+    internal const int SectionGap = 6; // قرابة 1.5 مم بين الحاويات حتى لا تلتصق الحدود.
 
     // شريط الأوامر مصغر حتى يحافظ على مساحة الجدول.
     internal const int ToolbarHeight = 36;
@@ -34,6 +34,20 @@ internal static class TransportUiMetrics
     internal const int MainDataHorizontalMargin = 4;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
     internal const int MainDataMultilineMinHeight = 58;
+    internal const int MainDataLabelWidth = 145;
+    internal const int MainDataLabelFieldGap = 8;
+
+    // التبويبات: قيم مركزية لمنع تكرار Padding محلي داخل كل مجموعة.
+    internal const int TabHorizontalPadding = 16;
+    internal const int TabVerticalPadding = 5;
+    internal const int TabContentPadding = 8;
+    internal const int TabDescriptionHeight = 34;
+
+    // حاوية الإجراءات الخاصة بالشاشة مثل إضافة عضو أو طلب موافقة.
+    internal const int ActionPanelHeight = Container10Mm;
+    internal const int ActionButtonHeight = Control8Mm;
+    internal const int ActionButtonMinWidth = 90;
+    internal const int ActionButtonGap = 4;
 
     // البحث والتصفية: الحاوية 10 مم والحقول 8 مم.
     internal const int SearchPanelHeight = Container10Mm;
