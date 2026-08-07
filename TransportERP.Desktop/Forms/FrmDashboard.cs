@@ -3,28 +3,21 @@ using System.Drawing.Drawing2D;
 namespace TransportERP.Desktop;
 
 /// <summary>
-/// الشاشة الرئيسية لنظام TransportERP.
-/// تستضيف شاشة الدول المعتمدة حاليًا داخل تبويب مستقل.
+/// النافذة الرئيسية لنظام TransportERP.
+/// تستضيف شاشات العمل كعناصر UserControl داخل تبويبات مساحة العمل.
 /// </summary>
 public partial class FrmDashboard : Form
 {
     private const string DashboardTabKey = "DASHBOARD";
-    private const string CountriesTabKey = "GEN-003";
-
     private TabControl? _workspaceTabs;
-    private ContextMenuStrip? _generalSetupMenu;
 
     public FrmDashboard()
     {
         InitializeComponent();
         ConfigureTabbedWorkspace();
-        ConfigureGeneralSetupMenu();
         LoadDevelopmentPreviewData();
     }
 
-    /// <summary>
-    /// تحويل مساحة العمل إلى تبويبات مع حماية تبويب الرئيسية من الإغلاق.
-    /// </summary>
     private void ConfigureTabbedWorkspace()
     {
         if (_workspaceTabs is not null)
@@ -65,102 +58,49 @@ public partial class FrmDashboard : Form
     }
 
     /// <summary>
-    /// إبقاء قائمة التهيئة العامة محصورة في شاشة الدول المعتمدة حاليًا.
+    /// يفتح شاشة عمل داخل مساحة النظام. شاشات العمل يجب أن تكون UserControl وليست Form.
     /// </summary>
-    private void ConfigureGeneralSetupMenu()
+    public void OpenWorkspaceView(string screenKey, string title, UserControl view)
     {
-        var generalSetupButton = FindButtonByText(this, "التهيئة العامة");
-        if (generalSetupButton is null)
-        {
-            return;
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(screenKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(view);
 
-        _generalSetupMenu?.Dispose();
-        _generalSetupMenu = new ContextMenuStrip
-        {
-            RightToLeft = RightToLeft.Yes,
-            Font = new Font(Font.FontFamily, 10F),
-            ShowImageMargin = false,
-            AutoSize = true
-        };
-
-        var geographicDataItem = new ToolStripMenuItem("البيانات الجغرافية")
-        {
-            RightToLeft = RightToLeft.Yes
-        };
-
-        var countriesItem = new ToolStripMenuItem("الدول")
-        {
-            Name = "mnuCountries",
-            ToolTipText = "GEN-003 — الدول",
-            RightToLeft = RightToLeft.Yes
-        };
-        countriesItem.Click += (_, _) => OpenCountriesTab();
-
-        geographicDataItem.DropDownItems.Add(countriesItem);
-        _generalSetupMenu.Items.Add(geographicDataItem);
-
-        generalSetupButton.Click -= GeneralSetupButton_Click;
-        generalSetupButton.Click += GeneralSetupButton_Click;
-    }
-
-    private void GeneralSetupButton_Click(object? sender, EventArgs e)
-    {
-        if (sender is not Button button || _generalSetupMenu is null)
-        {
-            return;
-        }
-
-        _generalSetupMenu.Show(button, new Point(0, button.Height));
-    }
-
-    /// <summary>
-    /// فتح شاشة الدول داخل تبويب واحد فقط.
-    /// </summary>
-    private void OpenCountriesTab()
-    {
         if (_workspaceTabs is null)
         {
+            view.Dispose();
             return;
         }
 
         var existingPage = _workspaceTabs.TabPages
             .Cast<TabPage>()
-            .FirstOrDefault(page => string.Equals(page.Name, CountriesTabKey, StringComparison.Ordinal));
+            .FirstOrDefault(page => string.Equals(page.Name, screenKey, StringComparison.Ordinal));
 
         if (existingPage is not null)
         {
+            view.Dispose();
             _workspaceTabs.SelectedTab = existingPage;
             existingPage.Focus();
             return;
         }
 
-        var countriesForm = new FrmCountries();
-        countriesForm.ConfigureForTabHosting();
+        view.Dock = DockStyle.Fill;
+        view.RightToLeft = RightToLeft.Yes;
 
-        var countriesPage = new TabPage
+        var page = new TabPage
         {
-            Name = CountriesTabKey,
-            Text = "الدول  ×",
-            BackColor = Color.FromArgb(239, 245, 252),
+            Name = screenKey,
+            Text = $"{title}  ×",
+            BackColor = Color.FromArgb(247, 249, 252),
             RightToLeft = RightToLeft.Yes,
             Padding = Padding.Empty,
-            Tag = countriesForm
+            Tag = view
         };
 
-        countriesForm.FormClosed += (_, _) =>
-        {
-            if (_workspaceTabs.TabPages.Contains(countriesPage))
-            {
-                _workspaceTabs.TabPages.Remove(countriesPage);
-                countriesPage.Dispose();
-            }
-        };
-
-        countriesPage.Controls.Add(countriesForm);
-        _workspaceTabs.TabPages.Add(countriesPage);
-        _workspaceTabs.SelectedTab = countriesPage;
-        countriesForm.Show();
+        page.Controls.Add(view);
+        _workspaceTabs.TabPages.Add(page);
+        _workspaceTabs.SelectedTab = page;
+        view.Focus();
     }
 
     private void WorkspaceTabs_MouseDoubleClick(object? sender, MouseEventArgs e)
@@ -190,34 +130,13 @@ public partial class FrmDashboard : Form
 
     private void CloseWorkspacePage(TabPage page)
     {
-        if (page.Tag is Form form && !form.IsDisposed)
+        if (page.Tag is UserControl view && !view.IsDisposed)
         {
-            form.Close();
-            return;
+            view.Dispose();
         }
 
         _workspaceTabs?.TabPages.Remove(page);
         page.Dispose();
-    }
-
-    private static Button? FindButtonByText(Control root, string text)
-    {
-        foreach (Control control in root.Controls)
-        {
-            if (control is Button button
-                && button.Text.Contains(text, StringComparison.Ordinal))
-            {
-                return button;
-            }
-
-            var nested = FindButtonByText(control, text);
-            if (nested is not null)
-            {
-                return nested;
-            }
-        }
-
-        return null;
     }
 
     private void LoadDevelopmentPreviewData()
