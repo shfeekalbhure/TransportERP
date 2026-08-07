@@ -29,15 +29,21 @@ internal static class TransportUiMetrics
     internal const int ToolbarButtonGap = 4;
 
     // البيانات الرئيسية: الحقل 6 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
-    internal const int MainDataGroupHeight = 230;
+    // الحد الأعلى ثلاثة أعمدة حقول؛ أي ستة أعمدة فعلية داخل TableLayoutPanel لأن كل حقل له Label.
+    internal const int MainDataDefaultGroupHeight = 230;
+    internal const int MainDataMaxFieldColumns = 3;
     internal const int MainDataControlHeight = Control6Mm;
     internal const int MainDataRowGap = 6;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
     internal const int MainDataHorizontalMargin = 4;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
     internal const int MainDataMultilineMinHeight = 58;
-    internal const int MainDataLabelWidth = 145;
+    internal const int MainDataLabelWidth = 120;
     internal const int MainDataLabelFieldGap = 8;
+    internal const int MainDataHostPadding = 4;
+
+    // التبويب الإضافي يستخدم فقط للبيانات الثانوية/الأقل أهمية، وليس كبديل لشريط تمرير.
+    internal const int AdditionalDataTabHeaderHeight = 34;
 
     // التبويبات: قيم مركزية لمنع تكرار Padding محلي داخل كل مجموعة.
     internal const int TabHorizontalPadding = 16;
@@ -85,4 +91,14 @@ internal static class TransportUiMetrics
 
     internal const int CompactPadding = 4;
     internal const int CompactGap = 6;
+
+    /// <summary>
+    /// يحسب الارتفاع الكامل لحاوية البيانات من ارتفاع محتواها الفعلي.
+    /// لا نستخدم Scroll للبيانات الرئيسية؛ الحاوية تتمدد إلى الأسفل بمقدار المحتوى.
+    /// </summary>
+    internal static int CalculateMainDataGroupHeight(int contentHeight) =>
+        Math.Max(MainDataRowHeight, contentHeight)
+        + GroupBoxHeaderSpace
+        + GroupVerticalPadding
+        + (MainDataHostPadding * 2);
 }
