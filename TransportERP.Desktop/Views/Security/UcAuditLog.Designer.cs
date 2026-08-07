@@ -16,9 +16,11 @@ partial class UcAuditLog
             new SecurityTabDefinition[]
             {
                 new("معايير البحث", SecurityTabKind.Details, "مرشحات سجل التدقيق العام."),
-                new("النتائج", SecurityTabKind.Details, "نتائج التدقيق للقراءة فقط."),
+                new("النتائج", SecurityTabKind.Details, "نتائج التدقيق للقراءة فقط.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "الدور", "الوحدة", "الشاشة", "الكيان", "معرف السجل", "العملية", "النتيجة", "IP", "معرف الطلب" }),
                 new("تفاصيل العملية والقيم قبل/بعد", SecurityTabKind.Comparison, "مقارنة منظمة للقيم قبل وبعد العملية."),
-                new("سجل التصدير", SecurityTabKind.Audit, "أثر التصدير والوصول للبيانات الحساسة.")
+                new("سجل التصدير", SecurityTabKind.Audit, "أثر التصدير والوصول للبيانات الحساسة.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "نوع التصدير", "معايير البحث", "عدد السجلات", "الغرض", "النتيجة", "معرف الطلب" })
             },
             new SecurityFieldDefinition[]
             {
