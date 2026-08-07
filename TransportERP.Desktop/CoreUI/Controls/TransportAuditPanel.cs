@@ -11,7 +11,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportAuditPanel : UserControl
 {
-    // القيم التالية هي النصوص التي تتغير حسب السجل الحالي.
+    // القيم التالية تتغير حسب السجل الحالي، بينما التسميات ثابتة في جميع الشاشات.
     private readonly Label _createdByValue = CreateValueLabel();
     private readonly Label _createdAtValue = CreateValueLabel();
     private readonly Label _modifiedByValue = CreateValueLabel();
@@ -20,7 +20,7 @@ public sealed class TransportAuditPanel : UserControl
     private readonly Label _printCountValue = CreateValueLabel();
 
     /// <summary>
-    /// إنشاء الحاوية ووضع جميع معلومات التدقيق بنفس الترتيب المعتمد.
+    /// إنشاء الحاوية ووضع معلومات التدقيق بنفس الترتيب المعتمد.
     /// </summary>
     public TransportAuditPanel()
     {
@@ -28,9 +28,7 @@ public sealed class TransportAuditPanel : UserControl
         ClearAuditInfo();
     }
 
-    /// <summary>
-    /// تعبئة معلومات السجل الحالي بعد تحميله من API.
-    /// </summary>
+    /// <summary>تعبئة معلومات السجل الحالي بعد تحميله من API.</summary>
     public void SetAuditInfo(
         string? createdBy,
         DateTime? createdAt,
@@ -47,9 +45,7 @@ public sealed class TransportAuditPanel : UserControl
         _printCountValue.Text = Math.Max(0, printCount).ToString();
     }
 
-    /// <summary>
-    /// إعادة الحاوية إلى القيم الفارغة عند إنشاء سجل جديد.
-    /// </summary>
+    /// <summary>إعادة الحاوية إلى القيم الفارغة عند إنشاء سجل جديد.</summary>
     public void ClearAuditInfo()
     {
         _createdByValue.Text = "—";
@@ -61,15 +57,16 @@ public sealed class TransportAuditPanel : UserControl
     }
 
     /// <summary>
-    /// بناء جدول ثابت يضم اسم كل معلومة وقيمتها.
+    /// بناء الحاوية بارتفاع 12 مم تقريبًا، بينما المحتوى الداخلي بارتفاع 9 مم تقريبًا.
+    /// هذه الحاوية تثبت أسفل الشاشة تحت أزرار التنقل.
     /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
-        Dock = DockStyle.Top;
-        Height = 64;
-        MinimumSize = new Size(0, 64);
-        Padding = new Padding(10, 8, 10, 8);
+        Dock = DockStyle.Fill;
+        Height = TransportUiMetrics.Container12Mm;
+        MinimumSize = new Size(0, TransportUiMetrics.Container12Mm);
+        Padding = new Padding(8, 5, 8, 5);
         RightToLeft = RightToLeft.Yes;
 
         var table = new TableLayoutPanel
@@ -96,47 +93,37 @@ public sealed class TransportAuditPanel : UserControl
         Controls.Add(table);
     }
 
-    /// <summary>
-    /// إضافة تسمية وقيمة متجاورتين إلى الجدول لتبقى البنية متطابقة دائمًا.
-    /// </summary>
+    /// <summary>إضافة تسمية وقيمة متجاورتين إلى الجدول لتبقى البنية متطابقة دائمًا.</summary>
     private static void AddPair(TableLayoutPanel table, int column, string caption, Label valueLabel)
     {
         table.Controls.Add(CreateCaptionLabel(caption), column, 0);
         table.Controls.Add(valueLabel, column + 1, 0);
     }
 
-    /// <summary>
-    /// إنشاء عنوان ثابت لمعلومة التدقيق مثل "تاريخ الإنشاء".
-    /// </summary>
+    /// <summary>إنشاء عنوان ثابت لمعلومة التدقيق مثل تاريخ الإنشاء.</summary>
     private static Label CreateCaptionLabel(string text) => new()
     {
         Dock = DockStyle.Fill,
-        Font = UiTheme.CreateBoldFont(9F),
+        Font = UiTheme.CreateBoldFont(8.5F),
         ForeColor = UiTheme.SecondaryText,
+        MinimumSize = new Size(0, TransportUiMetrics.Control9Mm),
         Text = text,
         TextAlign = ContentAlignment.MiddleRight
     };
 
-    /// <summary>
-    /// إنشاء Label خاص بالقيمة التي ستتغير مع السجل الحالي.
-    /// </summary>
+    /// <summary>إنشاء Label خاص بالقيمة التي ستتغير مع السجل الحالي.</summary>
     private static Label CreateValueLabel() => new()
     {
         Dock = DockStyle.Fill,
-        Font = UiTheme.CreateRegularFont(9F),
+        Font = UiTheme.CreateRegularFont(8.5F),
         ForeColor = UiTheme.HeadingText,
+        MinimumSize = new Size(0, TransportUiMetrics.Control9Mm),
         TextAlign = ContentAlignment.MiddleRight
     };
 
-    /// <summary>
-    /// تحويل القيمة الفارغة إلى شرطة موحدة بدل ترك الحقل بلا نص.
-    /// </summary>
     private static string Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
 
-    /// <summary>
-    /// تنسيق التاريخ بنفس الشكل في جميع الشاشات.
-    /// </summary>
     private static string FormatDate(DateTime? value) =>
         value.HasValue ? value.Value.ToString("yyyy/MM/dd HH:mm") : "—";
 }
