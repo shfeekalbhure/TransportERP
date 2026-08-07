@@ -5,7 +5,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// عنصر التصفح الموحد بين صفحات السجلات.
-/// يعرض أسهمًا مختصرة في مساحة صغيرة حتى يظهر بجانب حاوية الإشعارات أعلى الشاشة.
+/// يعرض أسهمًا مختصرة في مساحة صغيرة ويثبت مجموعة التنقل في مركز المساحة المخصصة لها.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportPagination : UserControl
@@ -59,8 +59,11 @@ public sealed class TransportPagination : UserControl
         RightToLeft = RightToLeft.Yes;
 
         _layout.AutoSize = true;
+        _layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _layout.Anchor = AnchorStyles.None;
         _layout.FlowDirection = FlowDirection.RightToLeft;
+        _layout.Margin = Padding.Empty;
+        _layout.Padding = Padding.Empty;
         _layout.RightToLeft = RightToLeft.Yes;
         _layout.WrapContents = false;
 
@@ -89,15 +92,21 @@ public sealed class TransportPagination : UserControl
         _layout.Controls.Add(_lastButton);
         _layout.Controls.Add(_recordsLabel);
 
+        // ثلاثة أعمدة متناظرة تضمن أن مركز مجموعة التنقل يطابق مركز المساحة فعليًا.
+        // نستخدم LTR في حاوية التوسيط فقط لمنع RTL من تبديل أعمدة النسب؛ الأدوات نفسها تبقى RTL.
         var centeringPanel = new TableLayoutPanel
         {
             ColumnCount = 3,
+            RowCount = 1,
             Dock = DockStyle.Fill,
-            RightToLeft = RightToLeft.Yes
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            RightToLeft = RightToLeft.No
         };
         centeringPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
         centeringPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         centeringPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        centeringPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         centeringPanel.Controls.Add(_layout, 1, 0);
         Controls.Add(centeringPanel);
     }
