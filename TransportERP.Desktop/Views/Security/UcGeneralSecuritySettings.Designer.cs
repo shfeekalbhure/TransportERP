@@ -16,10 +16,40 @@ partial class UcGeneralSecuritySettings
             new SecurityTabDefinition[]
             {
                 new("الإعدادات العامة", SecurityTabKind.Settings, "القيم الأمنية العامة ضمن النطاق."),
-                new("الجلسات والأجهزة", SecurityTabKind.Settings, "إعدادات الجلسات والأجهزة الموثوقة."),
-                new("التنبيهات والحماية", SecurityTabKind.Settings, "التنبيهات والحماية ومستوى التسجيل."),
-                new("الشبكة والتكامل", SecurityTabKind.Settings, "قيود الشبكة والتكامل دون أسرار صريحة."),
-                new("سجل العمليات", SecurityTabKind.Audit, "القيم المعدلة ومصدرها واعتمادها.")
+                new("الجلسات والأجهزة", SecurityTabKind.Settings, "إعدادات الجلسات والأجهزة الموثوقة.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("مهلة الخمول بالدقائق"),
+                        new("الحد الأقصى للجلسات المتزامنة"),
+                        new("السماح بتذكر الجلسة", SecurityFieldKind.Boolean),
+                        new("سياسة الجهاز الموثوق", SecurityFieldKind.Choice, new[] { "غير مسموح", "بموافقة", "مسموح ضمن السياسة" }),
+                        new("مدة الثقة بالجهاز بالأيام"),
+                        new("إنهاء الجلسة عند تغيير بيانات الأمان", SecurityFieldKind.Boolean),
+                        new("تسجيل بصمة الجهاز", SecurityFieldKind.Boolean)
+                    }),
+                new("التنبيهات والحماية", SecurityTabKind.Settings, "التنبيهات والحماية ومستوى التسجيل.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("مستوى السجل", SecurityFieldKind.Choice, new[] { "أساسي", "تفصيلي", "موسع" }),
+                        new("قنوات التنبيه"),
+                        new("تنبيه المسؤول عند حدث حرج", SecurityFieldKind.Boolean),
+                        new("تنبيه المستخدم عند دخول جديد", SecurityFieldKind.Boolean),
+                        new("تفعيل الحماية من المحاولات المتكررة", SecurityFieldKind.Boolean),
+                        new("حالة الصيانة الأمنية", SecurityFieldKind.Boolean)
+                    }),
+                new("الشبكة والتكامل", SecurityTabKind.Settings, "قيود الشبكة والتكامل دون أسرار صريحة.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("قوائم IP المسموحة"),
+                        new("قوائم IP المحظورة"),
+                        new("قيود الموقع الجغرافي"),
+                        new("السماح بتكاملات API", SecurityFieldKind.Boolean),
+                        new("فرض HTTPS", SecurityFieldKind.Boolean),
+                        new("الحد الافتراضي لمعدل الطلبات"),
+                        new("تسجيل طلبات التكامل", SecurityFieldKind.Boolean)
+                    }),
+                new("سجل العمليات", SecurityTabKind.Audit, "القيم المعدلة ومصدرها واعتمادها.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "الإعداد", "القيمة السابقة", "القيمة الجديدة", "النطاق", "الاعتماد / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
