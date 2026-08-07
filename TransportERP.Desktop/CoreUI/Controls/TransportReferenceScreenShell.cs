@@ -10,15 +10,14 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 public sealed class TransportReferenceScreenShell : UserControl
 {
     private readonly TableLayoutPanel _root = new();
+    private readonly TableLayoutPanel _topUtilityRow = new();
 
-    // الحاويات الخارجية الثابتة التي تظهر بعنوان وحدود واضحة.
     public GroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
     public GroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
     public GroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
     public GroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
     public GroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
 
-    // الأدوات الداخلية المشتركة.
     public TransportAlertBar AlertBar { get; } = new();
     public TransportToolbar Toolbar { get; } = new();
     public Panel DataHost { get; } = new();
@@ -51,29 +50,25 @@ public sealed class TransportReferenceScreenShell : UserControl
         _root.ColumnCount = 1;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         _root.Dock = DockStyle.Fill;
-        _root.RowCount = 7;
+        _root.RowCount = 6;
         _root.RightToLeft = RightToLeft.Yes;
 
-        // الإشعارات داخل GroupBox مستقل.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AlertGroupHeight));
-
-        // شريط الأوامر بدون GroupBox حتى يبقى خفيفًا، لكنه مثبت أعلى الشاشة.
+        // الصف العلوي يجمع الإشعارات وأزرار التنقل بدل استهلاك صف مستقل أسفل الجدول.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.TopUtilityRowHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
-
-        // البيانات الرئيسية.
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 230F));
-
-        // البحث والتصفية داخل GroupBox مستقل.
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.SearchGroupHeight));
-
-        // الجدول داخل GroupBox ويأخذ كل المساحة المتبقية.
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-        // التنقل يبقى في المنتصف أسفل الجدول.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.PaginationHeight));
-
-        // معلومات الإنشاء والتعديل داخل GroupBox مستقل.
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AuditGroupHeight));
+
+        // تقسيم الصف العلوي: الإشعارات تأخذ المساحة الأكبر، والتنقل بجانبها في مساحة ثابتة مناسبة.
+        _topUtilityRow.ColumnCount = 2;
+        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
+        _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
+        _topUtilityRow.Dock = DockStyle.Fill;
+        _topUtilityRow.RightToLeft = RightToLeft.Yes;
+        _topUtilityRow.RowCount = 1;
+        _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         DataHost.BackColor = Color.White;
         DataHost.Dock = DockStyle.Fill;
@@ -96,20 +91,19 @@ public sealed class TransportReferenceScreenShell : UserControl
         Toolbar.Dock = DockStyle.Fill;
         Pagination.Dock = DockStyle.Fill;
 
-        _root.Controls.Add(NotificationGroup, 0, 0);
+        _topUtilityRow.Controls.Add(NotificationGroup, 0, 0);
+        _topUtilityRow.Controls.Add(Pagination, 1, 0);
+
+        _root.Controls.Add(_topUtilityRow, 0, 0);
         _root.Controls.Add(Toolbar, 0, 1);
         _root.Controls.Add(DataGroup, 0, 2);
         _root.Controls.Add(SearchGroup, 0, 3);
         _root.Controls.Add(GridGroup, 0, 4);
-        _root.Controls.Add(Pagination, 0, 5);
-        _root.Controls.Add(AuditGroup, 0, 6);
+        _root.Controls.Add(AuditGroup, 0, 5);
 
         Controls.Add(_root);
     }
 
-    /// <summary>
-    /// إنشاء GroupBox موحد حتى تكون جميع حدود وعناوين الحاويات بنفس الشكل.
-    /// </summary>
     private static GroupBox CreateGroupBox(string title) => new()
     {
         BackColor = Color.White,
