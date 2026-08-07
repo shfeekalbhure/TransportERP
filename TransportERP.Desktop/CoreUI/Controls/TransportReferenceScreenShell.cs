@@ -12,11 +12,11 @@ public sealed class TransportReferenceScreenShell : UserControl
     private readonly TableLayoutPanel _root = new();
     private readonly TableLayoutPanel _topUtilityRow = new();
 
-    public GroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
-    public GroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
-    public GroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
-    public GroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
-    public GroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
+    public TransportGroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
+    public TransportGroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
+    public TransportGroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
+    public TransportGroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
+    public TransportGroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
 
     public TransportAlertBar AlertBar { get; } = new();
     public TransportToolbar Toolbar { get; } = new();
@@ -44,12 +44,15 @@ public sealed class TransportReferenceScreenShell : UserControl
     {
         BackColor = Color.FromArgb(247, 249, 252);
         Dock = DockStyle.Fill;
-        Padding = new Padding(12);
+        // هامش خارجي بسيط فقط؛ لا نترك فراغات بين الحاويات الداخلية.
+        Padding = new Padding(6);
         RightToLeft = RightToLeft.Yes;
 
         _root.ColumnCount = 1;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         _root.Dock = DockStyle.Fill;
+        _root.Margin = Padding.Empty;
+        _root.Padding = Padding.Empty;
         _root.RowCount = 6;
         _root.RightToLeft = RightToLeft.Yes;
 
@@ -64,12 +67,15 @@ public sealed class TransportReferenceScreenShell : UserControl
         _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
         _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
         _topUtilityRow.Dock = DockStyle.Fill;
+        _topUtilityRow.Margin = Padding.Empty;
+        _topUtilityRow.Padding = Padding.Empty;
         _topUtilityRow.RightToLeft = RightToLeft.Yes;
         _topUtilityRow.RowCount = 1;
         _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         DataHost.BackColor = Color.White;
         DataHost.Dock = DockStyle.Fill;
+        DataHost.Margin = Padding.Empty;
         DataHost.Padding = new Padding(4);
         DataHost.RightToLeft = RightToLeft.Yes;
 
@@ -78,19 +84,25 @@ public sealed class TransportReferenceScreenShell : UserControl
         DataGroup.Controls.Add(DataHost);
 
         AlertBar.Dock = DockStyle.Fill;
+        AlertBar.Margin = Padding.Empty;
         NotificationGroup.Controls.Add(AlertBar);
 
         SearchPanel.Dock = DockStyle.Fill;
+        SearchPanel.Margin = Padding.Empty;
         SearchGroup.Controls.Add(SearchPanel);
 
         Grid.Dock = DockStyle.Fill;
+        Grid.Margin = Padding.Empty;
         GridGroup.Controls.Add(Grid);
 
         AuditPanel.Dock = DockStyle.Fill;
+        AuditPanel.Margin = Padding.Empty;
         AuditGroup.Controls.Add(AuditPanel);
 
         Toolbar.Dock = DockStyle.Fill;
+        Toolbar.Margin = Padding.Empty;
         Pagination.Dock = DockStyle.Fill;
+        Pagination.Margin = Padding.Empty;
 
         _topUtilityRow.Controls.Add(NotificationGroup, 0, 0);
         _topUtilityRow.Controls.Add(Pagination, 1, 0);
@@ -115,6 +127,8 @@ public sealed class TransportReferenceScreenShell : UserControl
         {
             return;
         }
+
+        table.Margin = Padding.Empty;
 
         for (var row = 0; row < table.RowStyles.Count; row++)
         {
@@ -149,13 +163,10 @@ public sealed class TransportReferenceScreenShell : UserControl
         return false;
     }
 
-    private static GroupBox CreateGroupBox(string title) => new()
+    private static TransportGroupBox CreateGroupBox(string title) => new()
     {
-        BackColor = Color.White,
         Dock = DockStyle.Fill,
-        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-        Padding = new Padding(8, 6, 8, 6),
-        RightToLeft = RightToLeft.Yes,
+        Margin = Padding.Empty,
         Text = title
     };
 }
