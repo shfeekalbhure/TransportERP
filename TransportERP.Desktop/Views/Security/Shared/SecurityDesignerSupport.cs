@@ -1,12 +1,13 @@
 using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.Views.Security.Shared;
 
 /// <summary>
 /// أدوات تصميم مشتركة لشاشات الأمن والإدارة.
-/// تعتمد حصريًا على مكونات CoreUI للأجزاء العامة، وتسمح فقط بالأدوات المتخصصة
-/// مثل TreeView وCheckedListBox داخل حاويات منظمة وليست مباشرة على الشاشة أو التبويب.
+/// تعتمد حصريًا على مكونات CoreUI للأجزاء العامة، وتسمح لكل تبويب أمني
+/// بتعريف حقوله أو أعمدته الفعلية بدل الاعتماد على محتوى Placeholder موحد.
 /// </summary>
 internal static class SecurityDesignerSupport
 {
@@ -73,7 +74,7 @@ internal static class SecurityDesignerSupport
     private static TabPage CreateTabPage(string title) => new()
     {
         Text = title,
-        BackColor = Color.White,
+        BackColor = UiTheme.SurfaceBackground,
         RightToLeft = RightToLeft.Yes,
         Padding = new Padding(TransportUiMetrics.TabContentPadding)
     };
@@ -85,26 +86,37 @@ internal static class SecurityDesignerSupport
     private static Control CreateFieldWorkspace(
         IReadOnlyList<SecurityFieldDefinition> fields,
         IReadOnlyList<string> specialActions)
-    {
-        var section = CreateSection("بيانات الشاشة");
-        var layout = CreateSingleColumnLayout(specialActions.Count == 0 ? 0 : TransportUiMetrics.ActionPanelHeight);
+        => CreateFormWorkspace("بيانات الشاشة", fields, specialActions);
 
-        var actions = new TransportActionPanel
+    /// <summary>
+    /// يبني نموذج حقول متخصصًا داخل تبويب معين مع إمكانية وجود إجراءات خاصة به.
+    /// يستخدم هذا بدل تكرار Panels وLabels وEditors في كل شاشة أمنية.
+    /// </summary>
+    private static Control CreateFormWorkspace(
+        string title,
+        IReadOnlyList<SecurityFieldDefinition> fields,
+        IReadOnlyList<string>? actions = null)
+    {
+        actions ??= Array.Empty<string>();
+        var section = CreateSection(title);
+        var layout = CreateSingleColumnLayout(actions.Count == 0 ? 0 : TransportUiMetrics.ActionPanelHeight);
+
+        var actionPanel = new TransportActionPanel
         {
             Dock = DockStyle.Fill,
-            Visible = specialActions.Count > 0
+            Visible = actions.Count > 0
         };
 
-        foreach (var action in specialActions)
+        foreach (var action in actions)
         {
-            actions.AddAction(action);
+            actionPanel.AddAction(action);
         }
 
         var scrollHost = new Panel
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            BackColor = Color.White,
+            BackColor = UiTheme.SurfaceBackground,
             RightToLeft = RightToLeft.Yes,
             Padding = Padding.Empty,
             Margin = Padding.Empty
@@ -123,7 +135,7 @@ internal static class SecurityDesignerSupport
         }
 
         scrollHost.Controls.Add(dataEntry);
-        layout.Controls.Add(actions, 0, 0);
+        layout.Controls.Add(actionPanel, 0, 0);
         layout.Controls.Add(scrollHost, 0, 1);
         section.Controls.Add(layout);
         return section;
@@ -180,12 +192,12 @@ internal static class SecurityDesignerSupport
     }
 
     /// <summary>
-    /// كل تبويب متخصص يبدأ بحاوية عامة، ثم وصف بارتفاع مركزي، ثم محتوى متخصص داخل حاوية.
-    /// تبويب الأعضاء له معالجة خاصة لأنه يحتاج أوامر مستقلة وجدول أعضاء كامل المساحة.
+    /// كل تبويب متخصص يبدأ بحاوية عامة، ثم وصف بارتفاع مركزي، ثم محتوى متخصص.
+    /// إذا عرّف التبويب Fields أو Columns فيستخدمها مباشرة، ولا يسقط على Placeholder عام.
     /// </summary>
     private static Control CreateSpecializedWorkspace(
         SecurityTabDefinition definition,
-        IReadOnlyList<string> specialActions)
+        IReadOnlyList<string> screenActions)
     {
         var section = CreateSection(definition.Title);
         var host = CreateSingleColumnLayout(TransportUiMetrics.TabDescriptionHeight);
@@ -198,13 +210,24 @@ internal static class SecurityDesignerSupport
             RightToLeft = RightToLeft.Yes,
             Text = definition.Description,
             TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = SystemColors.GrayText
+            ForeColor = UiTheme.SecondaryText
         };
 
         Control content;
         if (IsMembersTab(definition.Title))
         {
-            content = CreateMembersWorkspace(specialActions);
+            content = CreateMembersWorkspace(definition.Actions ?? screenActions);
+        }
+        else if (definition.Fields is { Count: > 0 })
+        {
+            content = CreateFormWorkspace(
+                definition.Title,
+                definition.Fields,
+                definition.Actions ?? Array.Empty<string>());
+        }
+        else if (definition.Columns is { Count: > 0 })
+        {
+            content = CreateGridWorkspace(definition.Title, definition.Columns);
         }
         else
         {
@@ -232,7 +255,6 @@ internal static class SecurityDesignerSupport
     /// <summary>
     /// يبني تبويب الأعضاء بصورة مؤسسية موحدة:
     /// شريط إجراءات صغير أعلى التبويب من اليمين، وجدول أعضاء يملأ بقية المساحة.
-    /// هذا يمنع ظهور قائمة ضيقة أو حقل طويل كما كان يحدث في القالب العام السابق.
     /// </summary>
     private static Control CreateMembersWorkspace(IReadOnlyList<string> specialActions)
     {
@@ -340,40 +362,20 @@ internal static class SecurityDesignerSupport
         return section;
     }
 
+    /// <summary>
+    /// Fallback فقط للتبويبات العامة التي لا تملك حقولًا متخصصة بعد.
+    /// الشاشات الحساسة يجب أن تعرّف Fields صراحة في SecurityTabDefinition.
+    /// </summary>
     private static Control CreateSettingsWorkspace()
     {
-        var section = CreateSection("الإعدادات");
-        var scrollHost = new Panel
-        {
-            Dock = DockStyle.Fill,
-            AutoScroll = true,
-            BackColor = Color.White,
-            RightToLeft = RightToLeft.Yes,
-            Padding = Padding.Empty,
-            Margin = Padding.Empty
-        };
-
-        var dataEntry = new TransportDataEntryPanel
-        {
-            Dock = DockStyle.Top,
-            Margin = Padding.Empty
-        };
-
-        var settings = new[]
-        {
-            "تفعيل الإعداد ضمن النطاق",
-            "الوراثة من المستوى الأعلى",
-            "يتطلب اعتمادًا قبل التطبيق"
-        };
-
-        for (var index = 0; index < settings.Length; index++)
-        {
-            dataEntry.AddField(settings[index], CreateChoice(new[] { "نعم", "لا" }), index);
-        }
-
-        scrollHost.Controls.Add(dataEntry);
-        section.Controls.Add(scrollHost);
-        return section;
+        return CreateFormWorkspace(
+            "الإعدادات",
+            new SecurityFieldDefinition[]
+            {
+                new("تفعيل الإعداد ضمن النطاق", SecurityFieldKind.Boolean),
+                new("الوراثة من المستوى الأعلى", SecurityFieldKind.Boolean),
+                new("يتطلب اعتمادًا قبل التطبيق", SecurityFieldKind.Boolean)
+            });
     }
 
     private static Control CreateComparisonWorkspace()
@@ -420,7 +422,7 @@ internal static class SecurityDesignerSupport
     private static Panel CreateContentHost() => new()
     {
         Dock = DockStyle.Fill,
-        BackColor = Color.White,
+        BackColor = UiTheme.SurfaceBackground,
         RightToLeft = RightToLeft.Yes,
         Padding = new Padding(TransportUiMetrics.CompactPadding),
         Margin = Padding.Empty
@@ -433,7 +435,7 @@ internal static class SecurityDesignerSupport
             ColumnCount = 1,
             RowCount = 2,
             Dock = DockStyle.Fill,
-            BackColor = Color.White,
+            BackColor = UiTheme.SurfaceBackground,
             RightToLeft = RightToLeft.Yes,
             Padding = Padding.Empty,
             Margin = Padding.Empty
@@ -481,7 +483,14 @@ internal sealed record SecurityFieldDefinition(
     SecurityFieldKind Kind = SecurityFieldKind.Text,
     IReadOnlyList<string>? Items = null);
 
+/// <summary>
+/// تعريف التبويب الأمني. يمكن للتبويب أن يحدد حقوله أو أعمدته وإجراءاته الفعلية.
+/// بقاء هذه البيانات ضمن تعريف الشاشة يمنع الاعتماد على محتوى عام لا يعكس وظيفة التبويب.
+/// </summary>
 internal sealed record SecurityTabDefinition(
     string Title,
     SecurityTabKind Kind,
-    string Description);
+    string Description,
+    IReadOnlyList<SecurityFieldDefinition>? Fields = null,
+    IReadOnlyList<string>? Columns = null,
+    IReadOnlyList<string>? Actions = null);
