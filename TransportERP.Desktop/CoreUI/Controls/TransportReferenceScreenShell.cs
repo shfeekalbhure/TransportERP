@@ -13,7 +13,7 @@ public sealed class TransportReferenceScreenShell : UserControl
     // الجدول الرئيسي يقسم الشاشة رأسيًا إلى المناطق الثابتة المعتمدة.
     private readonly TableLayoutPanel _root = new();
 
-    // هذه هي الأدوات المشتركة التي ستظهر بنفس الاسم ونفس الوظيفة في جميع الشاشات.
+    // الأدوات المشتركة التي تظهر بنفس الاسم ونفس الوظيفة في جميع الشاشات.
     public TransportAlertBar AlertBar { get; } = new();
     public TransportToolbar Toolbar { get; } = new();
     public GroupBox DataGroup { get; } = new();
@@ -45,7 +45,10 @@ public sealed class TransportReferenceScreenShell : UserControl
     }
 
     /// <summary>
-    /// تجهيز ترتيب الحاويات الثابت من أعلى الشاشة إلى أسفلها.
+    /// تجهيز ترتيب الشاشة وفق القرار المعتمد:
+    /// التنبيهات والأوامر والبيانات والبحث تثبت في الأعلى،
+    /// الجدول يأخذ كل المساحة المتبقية Fill،
+    /// والتنقل وبيانات الإنشاء والتعديل تثبت في الأسفل.
     /// </summary>
     private void InitializeLayout()
     {
@@ -60,24 +63,26 @@ public sealed class TransportReferenceScreenShell : UserControl
         _root.RowCount = 7;
         _root.RightToLeft = RightToLeft.Yes;
 
-        // شريط التنبيهات مخفي تلقائيًا، لذلك يأخذ ارتفاعه فقط عند ظهور رسالة.
+        // التنبيه في أعلى الشاشة، ويختفي بالكامل عند عدم وجود رسالة.
         _root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        // شريط الأوامر ثابت الارتفاع حتى تبقى الأزرار بنفس المقاس في كل شاشة.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
+        // حاوية الأزرار الرئيسية: 12 مم تقريبًا.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container12Mm));
 
-        // حاوية البيانات الرئيسية لها ارتفاع قياسي ويمكن زيادته للشاشات الأكبر عند الحاجة.
+        // البيانات الرئيسية تبقى أعلى الجدول. ارتفاعها مستقل لأن عدد حقول الشاشة يختلف.
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 230F));
 
-        // البحث والتصفية له ارتفاع موحد.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+        // البحث والتصفية: 10 مم تقريبًا.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container10Mm));
 
-        // الجدول يأخذ كل المساحة المرنة المتبقية.
+        // الجدول هو الجزء المرن الوحيد ويملأ كل المساحة الوسطية المتبقية.
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        // التصفح ومعلومات التدقيق لهما ارتفاعان ثابتان.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+        // التنقل أسفل الجدول مباشرة: 10 مم تقريبًا.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container10Mm));
+
+        // معلومات الإنشاء والتعديل والعدادات في آخر الشاشة: 12 مم تقريبًا.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container12Mm));
 
         DataGroup.Dock = DockStyle.Fill;
         DataGroup.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
@@ -92,8 +97,10 @@ public sealed class TransportReferenceScreenShell : UserControl
         DataHost.RightToLeft = RightToLeft.Yes;
         DataGroup.Controls.Add(DataHost);
 
+        // الجدول Fill حتى يتمدد تلقائيًا مع تكبير وتصغير النافذة.
         Grid.Dock = DockStyle.Fill;
 
+        // الترتيب من أعلى الشاشة إلى أسفلها.
         _root.Controls.Add(AlertBar, 0, 0);
         _root.Controls.Add(Toolbar, 0, 1);
         _root.Controls.Add(DataGroup, 0, 2);
