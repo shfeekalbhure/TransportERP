@@ -11,6 +11,7 @@ public partial class FrmDashboard : Form
 {
     private const string DashboardTabKey = "DASHBOARD";
     private const string CountriesTabKey = "GEN-003";
+    private const string GovernoratesTabKey = "GEN-004";
     private const string DirectoratesTabKey = "GEN-005";
 
     private TabControl? _workspaceTabs;
@@ -26,10 +27,7 @@ public partial class FrmDashboard : Form
 
     private void ConfigureTabbedWorkspace()
     {
-        if (_workspaceTabs is not null)
-        {
-            return;
-        }
+        if (_workspaceTabs is not null) return;
 
         tblRoot.SuspendLayout();
         tblRoot.Controls.Remove(tblWorkspace);
@@ -58,7 +56,6 @@ public partial class FrmDashboard : Form
         tblWorkspace.Dock = DockStyle.Fill;
         dashboardPage.Controls.Add(tblWorkspace);
         _workspaceTabs.TabPages.Add(dashboardPage);
-
         tblRoot.Controls.Add(_workspaceTabs, 0, 0);
         tblRoot.ResumeLayout(true);
     }
@@ -66,10 +63,7 @@ public partial class FrmDashboard : Form
     private void ConfigureGeneralSetupMenu()
     {
         var generalSetupButton = FindButtonByText(this, "التهيئة العامة");
-        if (generalSetupButton is null)
-        {
-            return;
-        }
+        if (generalSetupButton is null) return;
 
         _generalSetupMenu?.Dispose();
         _generalSetupMenu = new ContextMenuStrip
@@ -94,6 +88,14 @@ public partial class FrmDashboard : Form
         };
         countriesItem.Click += (_, _) => OpenCountriesView();
 
+        var governoratesItem = new ToolStripMenuItem("المحافظات")
+        {
+            Name = "mnuGovernorates",
+            ToolTipText = "GEN-004 — المحافظات",
+            RightToLeft = RightToLeft.Yes
+        };
+        governoratesItem.Click += (_, _) => OpenGovernoratesView();
+
         var directoratesItem = new ToolStripMenuItem("المديريات")
         {
             Name = "mnuDirectorates",
@@ -103,6 +105,7 @@ public partial class FrmDashboard : Form
         directoratesItem.Click += (_, _) => OpenDirectoratesView();
 
         geographicDataItem.DropDownItems.Add(countriesItem);
+        geographicDataItem.DropDownItems.Add(governoratesItem);
         geographicDataItem.DropDownItems.Add(directoratesItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
@@ -112,23 +115,19 @@ public partial class FrmDashboard : Form
 
     private void GeneralSetupButton_Click(object? sender, EventArgs e)
     {
-        if (sender is not Button button || _generalSetupMenu is null)
-        {
-            return;
-        }
-
+        if (sender is not Button button || _generalSetupMenu is null) return;
         _generalSetupMenu.Show(button, new Point(0, button.Height));
     }
 
     private void OpenCountriesView() =>
         OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
 
+    private void OpenGovernoratesView() =>
+        OpenWorkspaceView(GovernoratesTabKey, "المحافظات", new UcGovernorates());
+
     private void OpenDirectoratesView() =>
         OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
 
-    /// <summary>
-    /// يفتح شاشة عمل داخل مساحة النظام. شاشات العمل يجب أن تكون UserControl وليست Form.
-    /// </summary>
     public void OpenWorkspaceView(string screenKey, string title, UserControl view)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(screenKey);
@@ -141,8 +140,7 @@ public partial class FrmDashboard : Form
             return;
         }
 
-        var existingPage = _workspaceTabs.TabPages
-            .Cast<TabPage>()
+        var existingPage = _workspaceTabs.TabPages.Cast<TabPage>()
             .FirstOrDefault(page => string.Equals(page.Name, screenKey, StringComparison.Ordinal));
 
         if (existingPage is not null)
@@ -174,23 +172,14 @@ public partial class FrmDashboard : Form
 
     private void WorkspaceTabs_MouseDoubleClick(object? sender, MouseEventArgs e)
     {
-        if (_workspaceTabs is null)
-        {
-            return;
-        }
+        if (_workspaceTabs is null) return;
 
         for (var index = 0; index < _workspaceTabs.TabPages.Count; index++)
         {
-            if (!_workspaceTabs.GetTabRect(index).Contains(e.Location))
-            {
-                continue;
-            }
+            if (!_workspaceTabs.GetTabRect(index).Contains(e.Location)) continue;
 
             var page = _workspaceTabs.TabPages[index];
-            if (string.Equals(page.Name, DashboardTabKey, StringComparison.Ordinal))
-            {
-                return;
-            }
+            if (string.Equals(page.Name, DashboardTabKey, StringComparison.Ordinal)) return;
 
             CloseWorkspacePage(page);
             return;
@@ -199,11 +188,7 @@ public partial class FrmDashboard : Form
 
     private void CloseWorkspacePage(TabPage page)
     {
-        if (page.Tag is UserControl view && !view.IsDisposed)
-        {
-            view.Dispose();
-        }
-
+        if (page.Tag is UserControl view && !view.IsDisposed) view.Dispose();
         _workspaceTabs?.TabPages.Remove(page);
         page.Dispose();
     }
@@ -212,19 +197,10 @@ public partial class FrmDashboard : Form
     {
         foreach (Control control in root.Controls)
         {
-            if (control is Button button
-                && button.Text.Contains(text, StringComparison.Ordinal))
-            {
-                return button;
-            }
-
+            if (control is Button button && button.Text.Contains(text, StringComparison.Ordinal)) return button;
             var nested = FindButtonByText(control, text);
-            if (nested is not null)
-            {
-                return nested;
-            }
+            if (nested is not null) return nested;
         }
-
         return null;
     }
 
@@ -255,18 +231,12 @@ public partial class FrmDashboard : Form
             MessageBoxDefaultButton.Button2,
             MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
 
-        if (answer == DialogResult.Yes)
-        {
-            Close();
-        }
+        if (answer == DialogResult.Yes) Close();
     }
 
     private void QuickAction_Click(object? sender, EventArgs e)
     {
-        if (sender is not Button button)
-        {
-            return;
-        }
+        if (sender is not Button button) return;
 
         MessageBox.Show(
             $"الاختصار «{button.Text.Replace("\r\n", " ", StringComparison.Ordinal)}» غير مفعل في النطاق الحالي.",
@@ -277,29 +247,18 @@ public partial class FrmDashboard : Form
             MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
-    private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e)
-    {
+    private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e) =>
         DrawPreviewLineChart(e.Graphics, pnlRevenueChart.ClientRectangle);
-    }
 
-    private void pnlActivityChart_Paint(object? sender, PaintEventArgs e)
-    {
+    private void pnlActivityChart_Paint(object? sender, PaintEventArgs e) =>
         DrawPreviewActivityChart(e.Graphics, pnlActivityChart.ClientRectangle);
-    }
 
     private static void DrawPreviewLineChart(Graphics graphics, Rectangle bounds)
     {
-        if (bounds.Width < 120 || bounds.Height < 100)
-        {
-            return;
-        }
-
+        if (bounds.Width < 120 || bounds.Height < 100) return;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var chart = Rectangle.Inflate(bounds, -28, -58);
-        if (chart.Width <= 0 || chart.Height <= 0)
-        {
-            return;
-        }
+        if (chart.Width <= 0 || chart.Height <= 0) return;
 
         using var axisPen = new Pen(Color.FromArgb(220, 225, 232), 1F);
         graphics.DrawLine(axisPen, chart.Left, chart.Bottom, chart.Right, chart.Bottom);
@@ -321,29 +280,21 @@ public partial class FrmDashboard : Form
 
     private static void DrawPreviewActivityChart(Graphics graphics, Rectangle bounds)
     {
-        if (bounds.Width < 120 || bounds.Height < 100)
-        {
-            return;
-        }
-
+        if (bounds.Width < 120 || bounds.Height < 100) return;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var area = Rectangle.Inflate(bounds, -34, -62);
-        if (area.Width <= 0 || area.Height <= 0)
-        {
-            return;
-        }
+        if (area.Width <= 0 || area.Height <= 0) return;
 
         var values = new[] { 0.72F, 0.54F, 0.38F, 0.63F };
         var gap = 12;
         var barWidth = Math.Max(14, (area.Width - gap * (values.Length - 1)) / values.Length);
-
         using var brush = new SolidBrush(Color.FromArgb(86, 204, 200));
+
         for (var i = 0; i < values.Length; i++)
         {
             var height = (int)(area.Height * values[i]);
             var x = area.Left + i * (barWidth + gap);
-            var bar = new Rectangle(x, area.Bottom - height, barWidth, height);
-            graphics.FillRectangle(brush, bar);
+            graphics.FillRectangle(brush, new Rectangle(x, area.Bottom - height, barWidth, height));
         }
     }
 }
