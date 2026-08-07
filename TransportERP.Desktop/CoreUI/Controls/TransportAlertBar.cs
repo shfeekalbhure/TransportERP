@@ -41,14 +41,19 @@ public sealed class TransportAlertBar : UserControl
     }
 
     /// <summary>
-    /// الحاوية ارتفاعها 12 مم تقريبًا، وزر الإغلاق والمحتوى بارتفاع 9 مم تقريبًا.
+    /// الحاوية ارتفاعها 12 مم تقريبًا، والمحتوى 9 مم تقريبًا.
+    /// النص يتمدد مع العرض، بينما زر الإغلاق يبقى بمقاس ثابت.
     /// </summary>
     private void InitializeLayout()
     {
         Dock = DockStyle.Fill;
-        Height = TransportUiMetrics.Container12Mm;
-        MinimumSize = new Size(0, TransportUiMetrics.Container12Mm);
-        Padding = new Padding(8, 5, 8, 5);
+        Height = TransportUiMetrics.AlertBarHeight;
+        MinimumSize = new Size(0, TransportUiMetrics.AlertBarHeight);
+        Padding = new Padding(
+            TransportUiMetrics.AlertHorizontalPadding,
+            TransportUiMetrics.AlertVerticalPadding,
+            TransportUiMetrics.AlertHorizontalPadding,
+            TransportUiMetrics.AlertVerticalPadding);
         RightToLeft = RightToLeft.Yes;
 
         _closeButton.Dock = DockStyle.Left;
@@ -56,14 +61,14 @@ public sealed class TransportAlertBar : UserControl
         _closeButton.FlatAppearance.BorderSize = 0;
         _closeButton.Font = UiTheme.CreateBoldFont(9.5F);
         _closeButton.Text = "×";
-        _closeButton.Width = TransportUiMetrics.Control9Mm;
-        _closeButton.Height = TransportUiMetrics.Control9Mm;
+        _closeButton.Width = TransportUiMetrics.AlertContentHeight;
+        _closeButton.Height = TransportUiMetrics.AlertContentHeight;
         _closeButton.Cursor = Cursors.Hand;
         _closeButton.Click += (_, _) => HideMessage();
 
         _messageLabel.Dock = DockStyle.Fill;
         _messageLabel.Font = UiTheme.CreateRegularFont(9.5F);
-        _messageLabel.MinimumSize = new Size(0, TransportUiMetrics.Control9Mm);
+        _messageLabel.MinimumSize = new Size(0, TransportUiMetrics.AlertContentHeight);
         _messageLabel.TextAlign = ContentAlignment.MiddleRight;
         _messageLabel.RightToLeft = RightToLeft.Yes;
 
