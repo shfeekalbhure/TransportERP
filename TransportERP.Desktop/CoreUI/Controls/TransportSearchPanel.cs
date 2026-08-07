@@ -5,7 +5,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// حاوية البحث والتصفية الموحدة لكل شاشة تعرض قائمة سجلات.
-/// جميع أدواتها تبدأ من أقصى اليمين وبنفس الارتفاع المعتمد.
+/// جميع أدواتها تبدأ من أقصى اليمين وبنفس الارتفاع والمسافات المعتمدة.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportSearchPanel : UserControl
@@ -66,16 +66,13 @@ public sealed class TransportSearchPanel : UserControl
         }
     }
 
-    /// <summary>
-    /// يثبت أدوات البحث في أقصى يمين الحاوية، ويجعل كل الحقول بارتفاع 8 مم تقريبًا.
-    /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.SearchPanelHeight;
         MinimumSize = new Size(0, TransportUiMetrics.SearchPanelHeight);
-        Padding = new Padding(8, 4, 8, 4);
+        Padding = new Padding(TransportUiMetrics.GroupHorizontalPadding, TransportUiMetrics.CompactPadding, TransportUiMetrics.GroupHorizontalPadding, TransportUiMetrics.CompactPadding);
         RightToLeft = RightToLeft.Yes;
 
         _layout.AutoSize = true;
@@ -84,24 +81,25 @@ public sealed class TransportSearchPanel : UserControl
         _layout.FlowDirection = FlowDirection.RightToLeft;
         _layout.RightToLeft = RightToLeft.Yes;
         _layout.WrapContents = false;
+        _layout.Margin = Padding.Empty;
 
         _searchBox.Width = 300;
         _searchBox.Height = TransportUiMetrics.SearchControlHeight;
         _searchBox.MinimumSize = new Size(300, TransportUiMetrics.SearchControlHeight);
-        _searchBox.Margin = new Padding(4, 0, 4, 0);
+        _searchBox.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, 0, TransportUiMetrics.MainDataHorizontalMargin, 0);
         _searchBox.RightToLeft = RightToLeft.Yes;
         _searchBox.SearchTextChanged += (_, e) => SearchTextChanged?.Invoke(this, e);
 
         _statusLabel.AutoSize = false;
         _statusLabel.Font = UiTheme.CreateRegularFont(9.5F);
-        _statusLabel.Margin = new Padding(6, 0, 2, 0);
+        _statusLabel.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, 0, 2, 0);
         _statusLabel.Size = new Size(54, TransportUiMetrics.SearchControlHeight);
         _statusLabel.Text = "الحالة:";
         _statusLabel.TextAlign = ContentAlignment.MiddleRight;
 
         _statusComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _statusComboBox.Font = UiTheme.CreateRegularFont(9.5F);
-        _statusComboBox.Margin = new Padding(2, 0, 6, 0);
+        _statusComboBox.Margin = new Padding(2, 0, TransportUiMetrics.MainDataHorizontalMargin, 0);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
         _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchControlHeight);
         _statusComboBox.MinimumSize = new Size(140, TransportUiMetrics.SearchControlHeight);
@@ -117,7 +115,6 @@ public sealed class TransportSearchPanel : UserControl
         _extraFiltersHost.WrapContents = false;
         _extraFiltersHost.MinimumSize = new Size(0, TransportUiMetrics.SearchControlHeight);
 
-        // الإضافة بهذا الترتيب تجعل أول عنصر مرئي من أقصى اليمين هو مربع البحث، ثم الحالة، ثم الفلاتر الخاصة.
         _layout.Controls.Add(_searchBox);
         _layout.Controls.Add(_statusLabel);
         _layout.Controls.Add(_statusComboBox);
