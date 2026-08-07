@@ -44,9 +44,6 @@ public sealed class TransportReferenceScreenShell : UserControl
         set => DataGroup.Text = string.IsNullOrWhiteSpace(value) ? "البيانات الرئيسية" : value.Trim();
     }
 
-    /// <summary>
-    /// عند التفعيل تتمدد حاوية البيانات إلى الأسفل آليًا حسب عدد الصفوف بدون شريط تمرير.
-    /// </summary>
     [Category("TransportERP")]
     [DefaultValue(true)]
     public bool AutoFitDataGroup
@@ -98,8 +95,6 @@ public sealed class TransportReferenceScreenShell : UserControl
         DataHost.Padding = new Padding(TransportUiMetrics.MainDataHostPadding);
         DataHost.RightToLeft = RightToLeft.Yes;
 
-        // الحافة العليا للبيانات ثابتة، والمحتوى يرتب من الأعلى؛ أي زيادة في الارتفاع
-        // تحرك الحافة السفلية فقط إلى الأسفل وتدفع البحث والجدول إلى الأسفل بصورة محسوبة.
         DataGroup.AutoSize = false;
         DataGroup.Dock = DockStyle.Fill;
         DataGroup.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -142,10 +137,6 @@ public sealed class TransportReferenceScreenShell : UserControl
         Controls.Add(_root);
     }
 
-    /// <summary>
-    /// يكيّف القالب للشاشات المتخصصة مثل الإعدادات والشاشات الشجرية
-    /// من دون إنشاء قالب مكرر خارج CoreUI.
-    /// </summary>
     public void ConfigureWorkspaceMode(bool showSearch, bool showGrid, bool expandDataWorkspace)
     {
         SearchGroup.Visible = showSearch;
@@ -172,15 +163,34 @@ public sealed class TransportReferenceScreenShell : UserControl
     private void HandleDataHostControlAdded(object? sender, ControlEventArgs e)
     {
         ApplyMainDataMetrics(e.Control);
+        ObserveHeightRelevantControls(e.Control);
         e.Control.SizeChanged += (_, _) => RecalculateDataGroupHeight();
         e.Control.Layout += (_, _) => RecalculateDataGroupHeight();
         RecalculateDataGroupHeight();
     }
 
     /// <summary>
-    /// يحسب ارتفاع البيانات من المحتوى الفعلي، مع تثبيت أعلى الحاوية.
-    /// التمدد يحدث إلى الأسفل فقط وبحد أقصى خمسة صفوف؛ لا Scroll داخل البيانات الرئيسية.
+    /// يراقب التبويبات والحاويات الداخلية التي تغير المحتوى المرئي حتى يعاد حساب الارتفاع
+    /// من التبويب النشط فعليًا بدل الاكتفاء بارتفاع شريط التبويبات.
     /// </summary>
+    private void ObserveHeightRelevantControls(Control control)
+    {
+        if (control is TabControl tabs)
+        {
+            tabs.SelectedIndexChanged += (_, _) => RecalculateDataGroupHeight();
+            tabs.ControlAdded += (_, e) =>
+            {
+                ObserveHeightRelevantControls(e.Control);
+                RecalculateDataGroupHeight();
+            };
+        }
+
+        foreach (Control child in control.Controls)
+        {
+            ObserveHeightRelevantControls(child);
+        }
+    }
+
     private void RecalculateDataGroupHeight()
     {
         if (!_autoFitDataGroup || _isRecalculatingDataHeight || _root.RowStyles.Count < 3)
@@ -208,6 +218,7 @@ public sealed class TransportReferenceScreenShell : UserControl
     private int GetPreferredDataContentHeight()
     {
         var totalHeight = 0;
+        var availableWidth = Math.Max(1, DataHost.ClientSize.Width - DataHost.Padding.Horizontal);
 
         foreach (Control child in DataHost.Controls)
         {
@@ -216,18 +227,7 @@ public sealed class TransportReferenceScreenShell : UserControl
                 continue;
             }
 
-            // للحاويات العامة المعروفة نستخدم ارتفاع المحتوى المحسوب منها مباشرة.
-            // للمحتوى المتخصص لا نسمح لـGetPreferredSize غير المقيد بتضخيم الحاوية؛
-            // نستخدم ارتفاعه الفعلي الحالي، ثم يطبق الحد الأعلى المركزي لاحقًا.
-            var preferredHeight = child switch
-            {
-                TransportDataEntryPanel entryPanel => entryPanel.PreferredContentHeight,
-                TransportAdaptiveDataSection adaptiveSection => adaptiveSection.GetPreferredSize(new Size(DataHost.ClientSize.Width, 0)).Height,
-                _ when child.Height > 0 => child.Height,
-                _ => TransportUiMetrics.MainDataRowHeight
-            };
-
-            totalHeight += Math.Max(TransportUiMetrics.MainDataRowHeight, preferredHeight);
+            totalHeight += MeasureVisibleContentHeight(child, availableWidth);
         }
 
         return Math.Clamp(
@@ -237,9 +237,87 @@ public sealed class TransportReferenceScreenShell : UserControl
     }
 
     /// <summary>
-    /// يفرض ارتفاع الحقول والمسافة بين الصفوف والمحاذاة RTL على البيانات الرئيسية.
-    /// المسافة بين صف وآخر ثابتة 1.5 مم تقريبًا في جميع الشاشات.
+    /// قياس واعٍ بالتبويبات: TabControl يقاس من رأس التبويب + المحتوى الحقيقي للتبويب النشط.
+    /// أما الحاويات العادية فتقاس من المحتوى المرئي داخلها عند الحاجة.
     /// </summary>
+    private int MeasureVisibleContentHeight(Control control, int availableWidth)
+    {
+        if (!control.Visible)
+        {
+            return 0;
+        }
+
+        switch (control)
+        {
+            case TransportDataEntryPanel entryPanel:
+                return Math.Max(TransportUiMetrics.MainDataRowHeight, entryPanel.PreferredContentHeight);
+
+            case TransportAdaptiveDataSection adaptiveSection:
+                return Math.Max(
+                    TransportUiMetrics.MainDataRowHeight,
+                    adaptiveSection.GetPreferredSize(new Size(availableWidth, 0)).Height);
+
+            case TabControl tabs:
+                return MeasureActiveTabHeight(tabs, availableWidth);
+        }
+
+        if (control.Controls.Count > 0 && (control is Panel || control is TableLayoutPanel || control is FlowLayoutPanel || control is GroupBox))
+        {
+            var nestedHeight = MeasureVisibleChildrenHeight(control, availableWidth);
+            if (nestedHeight > 0)
+            {
+                return nestedHeight + control.Padding.Vertical;
+            }
+        }
+
+        var preferred = control.GetPreferredSize(new Size(availableWidth, 0)).Height;
+        var actual = control.Height;
+        return Math.Max(TransportUiMetrics.MainDataRowHeight, Math.Max(preferred, actual));
+    }
+
+    private int MeasureActiveTabHeight(TabControl tabs, int availableWidth)
+    {
+        var headerHeight = Math.Max(TransportUiMetrics.MainDataControlHeight, tabs.ItemSize.Height > 0 ? tabs.ItemSize.Height : 0);
+        var selected = tabs.SelectedTab;
+
+        if (selected is null)
+        {
+            return headerHeight + TransportUiMetrics.MainDataRowHeight;
+        }
+
+        var contentHeight = MeasureVisibleChildrenHeight(selected, availableWidth);
+        if (contentHeight <= 0)
+        {
+            contentHeight = TransportUiMetrics.MainDataRowHeight;
+        }
+
+        return headerHeight + selected.Padding.Vertical + contentHeight;
+    }
+
+    private int MeasureVisibleChildrenHeight(Control parent, int availableWidth)
+    {
+        var bottom = 0;
+        var stackedHeight = 0;
+
+        foreach (Control child in parent.Controls)
+        {
+            if (!child.Visible)
+            {
+                continue;
+            }
+
+            var measuredHeight = MeasureVisibleContentHeight(child, availableWidth);
+            bottom = Math.Max(bottom, child.Top + measuredHeight + child.Margin.Bottom);
+
+            if (child.Dock == DockStyle.Top)
+            {
+                stackedHeight += measuredHeight + child.Margin.Vertical;
+            }
+        }
+
+        return Math.Max(bottom, stackedHeight);
+    }
+
     private static void ApplyMainDataMetrics(Control control)
     {
         if (control is TransportAdaptiveDataSection)
@@ -273,9 +351,6 @@ public sealed class TransportReferenceScreenShell : UserControl
         }
     }
 
-    /// <summary>
-    /// يوحّد ارتفاع ومحاذاة كل أداة داخل البيانات الرئيسية دون تكرار الخصائص في Designer لكل شاشة.
-    /// </summary>
     private static void ApplyStandardControlMetrics(Control control)
     {
         var isMultiline = control is TextBox currentTextBox && currentTextBox.Multiline;
