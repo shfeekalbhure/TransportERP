@@ -23,8 +23,10 @@ partial class UcRoles
                 new("البيانات الرئيسية", SecurityTabKind.Details, "بيانات الدور الأساسية."),
                 new("الصلاحيات", SecurityTabKind.Tree, "شجرة الصلاحيات المسموح إسنادها للدور."),
                 new("نطاق البيانات الافتراضي", SecurityTabKind.CheckList, "نطاق الشركات والفروع والبيانات الافتراضي."),
-                new("المستخدمون المرتبطون", SecurityTabKind.Details, "المستخدمون المرتبطون بالدور."),
-                new("سجل العمليات", SecurityTabKind.Audit, "سجل عمليات الدور.")
+                new("المستخدمون المرتبطون", SecurityTabKind.Details, "المستخدمون المرتبطون بالدور.",
+                    Columns: new[] { "المستخدم", "الاسم", "الشركة", "الفرع", "الوحدة التنظيمية", "الحالة", "تاريخ الإسناد", "أسند بواسطة" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "سجل عمليات الدور.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الصلاحية / النطاق", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
