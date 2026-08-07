@@ -13,6 +13,7 @@ public partial class FrmDashboard : Form
     private const string CountriesTabKey = "GEN-003";
     private const string GovernoratesTabKey = "GEN-004";
     private const string DirectoratesTabKey = "GEN-005";
+    private const string CitiesTabKey = "GEN-006";
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
@@ -104,9 +105,18 @@ public partial class FrmDashboard : Form
         };
         directoratesItem.Click += (_, _) => OpenDirectoratesView();
 
+        var citiesItem = new ToolStripMenuItem("المدن")
+        {
+            Name = "mnuCities",
+            ToolTipText = "GEN-006 — المدن",
+            RightToLeft = RightToLeft.Yes
+        };
+        citiesItem.Click += (_, _) => OpenCitiesView();
+
         geographicDataItem.DropDownItems.Add(countriesItem);
         geographicDataItem.DropDownItems.Add(governoratesItem);
         geographicDataItem.DropDownItems.Add(directoratesItem);
+        geographicDataItem.DropDownItems.Add(citiesItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
         generalSetupButton.Click -= GeneralSetupButton_Click;
@@ -127,6 +137,9 @@ public partial class FrmDashboard : Form
 
     private void OpenDirectoratesView() =>
         OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
+
+    private void OpenCitiesView() =>
+        OpenWorkspaceView(CitiesTabKey, "المدن", new UcCities());
 
     public void OpenWorkspaceView(string screenKey, string title, UserControl view)
     {
