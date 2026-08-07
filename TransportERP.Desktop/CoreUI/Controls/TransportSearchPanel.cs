@@ -5,7 +5,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// حاوية البحث والتصفية الموحدة لكل شاشة تعرض قائمة سجلات.
-/// جميع أدواتها تبدأ من أقصى اليمين وبنفس الارتفاع والمسافات المعتمدة.
+/// جميع أدواتها تبدأ من أقصى اليمين وبالمقاسات المركزية المعتمدة.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportSearchPanel : UserControl
@@ -93,7 +93,7 @@ public sealed class TransportSearchPanel : UserControl
         _statusLabel.AutoSize = false;
         _statusLabel.Font = UiTheme.CreateRegularFont(9.5F);
         _statusLabel.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, 0, 2, 0);
-        _statusLabel.Size = new Size(54, TransportUiMetrics.SearchControlHeight);
+        _statusLabel.Size = new Size(54, TransportUiMetrics.SearchStatusControlHeight);
         _statusLabel.Text = "الحالة:";
         _statusLabel.TextAlign = ContentAlignment.MiddleRight;
 
@@ -101,8 +101,8 @@ public sealed class TransportSearchPanel : UserControl
         _statusComboBox.Font = UiTheme.CreateRegularFont(9.5F);
         _statusComboBox.Margin = new Padding(2, 0, TransportUiMetrics.MainDataHorizontalMargin, 0);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
-        _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchControlHeight);
-        _statusComboBox.MinimumSize = new Size(140, TransportUiMetrics.SearchControlHeight);
+        _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchStatusControlHeight);
+        _statusComboBox.MinimumSize = new Size(140, TransportUiMetrics.SearchStatusControlHeight);
         _statusComboBox.Items.AddRange(new object[] { "الكل", "نشط", "موقوف" });
         _statusComboBox.SelectedIndex = 0;
         _statusComboBox.SelectedIndexChanged += (_, _) => StatusChanged?.Invoke(this, EventArgs.Empty);
