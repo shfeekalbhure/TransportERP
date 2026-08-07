@@ -51,14 +51,19 @@ public sealed class TransportAuditPanel : UserControl
 
     /// <summary>
     /// الحاوية الداخلية 10 مم والمحتوى 8 مم لتوفير مساحة أكبر للجدول.
+    /// الهوامش تأتي من TransportUiMetrics حتى تبقى مطابقة لبقية CoreUI.
     /// </summary>
     private void InitializeLayout()
     {
-        BackColor = Color.White;
+        BackColor = UiTheme.SurfaceBackground;
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.AuditPanelHeight;
         MinimumSize = new Size(0, TransportUiMetrics.AuditPanelHeight);
-        Padding = new Padding(6, 3, 6, 3);
+        Padding = new Padding(
+            TransportUiMetrics.GroupHorizontalPadding,
+            TransportUiMetrics.MainDataVerticalMargin,
+            TransportUiMetrics.GroupHorizontalPadding,
+            TransportUiMetrics.MainDataVerticalMargin);
         RightToLeft = RightToLeft.Yes;
 
         var table = new TableLayoutPanel
