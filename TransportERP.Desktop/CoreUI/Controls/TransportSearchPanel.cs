@@ -11,24 +11,12 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportSearchPanel : UserControl
 {
-    // الحاوية الأفقية ترتب جميع أدوات البحث من اليمين إلى اليسار.
     private readonly FlowLayoutPanel _layout = new();
-
-    // مربع البحث الموحد الموجود مسبقًا في CoreUI.
     private readonly SearchBox _searchBox = new();
-
-    // عنوان ثابت لحقل الحالة حتى تكون التسمية واحدة في جميع الشاشات.
     private readonly Label _statusLabel = new();
-
-    // قائمة الحالة الثابتة وتبدأ افتراضيًا بخيار "الكل".
     private readonly ComboBox _statusComboBox = new();
-
-    // هذه الحاوية تستقبل أي فلاتر إضافية خاصة بالشاشة مثل الدولة أو الفرع.
     private readonly FlowLayoutPanel _extraFiltersHost = new();
 
-    /// <summary>
-    /// إنشاء حاوية البحث وتطبيق التخطيط الموحد.
-    /// </summary>
     public TransportSearchPanel()
     {
         InitializeLayout();
@@ -48,17 +36,19 @@ public sealed class TransportSearchPanel : UserControl
     [Description("الحاوية المخصصة لإضافة فلاتر الشاشة الإضافية.")]
     public FlowLayoutPanel ExtraFiltersHost => _extraFiltersHost;
 
+    /// <summary>
+    /// النص الإرشادي داخل مربع البحث.
+    /// تعريف DefaultValue يمنع تحذير WFO1000 ويجعل مصمم WinForms يعرف متى يحتاج إلى حفظ القيمة.
+    /// </summary>
     [Category("TransportERP")]
     [Description("النص الإرشادي داخل مربع البحث.")]
+    [DefaultValue("بحث...")]
     public string SearchPlaceholder
     {
         get => _searchBox.PlaceholderText;
         set => _searchBox.PlaceholderText = value;
     }
 
-    /// <summary>
-    /// استبدال عناصر فلتر الحالة عندما تكون للشاشة حالات مختلفة عن نشط وموقوف.
-    /// </summary>
     public void SetStatusItems(params string[] items)
     {
         _statusComboBox.Items.Clear();
@@ -72,7 +62,6 @@ public sealed class TransportSearchPanel : UserControl
         _statusComboBox.SelectedIndex = 0;
     }
 
-    /// <summary>إعادة البحث والتصفية إلى الوضع الافتراضي.</summary>
     public void ResetFilters()
     {
         _searchBox.ClearSearch();
@@ -82,15 +71,12 @@ public sealed class TransportSearchPanel : UserControl
         }
     }
 
-    /// <summary>
-    /// إنشاء الحاوية بارتفاع 10 مم تقريبًا، وجميع الحقول داخلها بارتفاع 8 مم تقريبًا.
-    /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
         Dock = DockStyle.Fill;
-        Height = TransportUiMetrics.Container10Mm;
-        MinimumSize = new Size(0, TransportUiMetrics.Container10Mm);
+        Height = TransportUiMetrics.SearchPanelHeight;
+        MinimumSize = new Size(0, TransportUiMetrics.SearchPanelHeight);
         Padding = new Padding(8, 4, 8, 4);
         RightToLeft = RightToLeft.Yes;
 
@@ -100,14 +86,14 @@ public sealed class TransportSearchPanel : UserControl
         _layout.WrapContents = false;
 
         _searchBox.Width = 300;
-        _searchBox.Height = TransportUiMetrics.Control8Mm;
+        _searchBox.Height = TransportUiMetrics.SearchControlHeight;
         _searchBox.Margin = new Padding(4, 0, 4, 0);
         _searchBox.SearchTextChanged += (_, e) => SearchTextChanged?.Invoke(this, e);
 
         _statusLabel.AutoSize = false;
         _statusLabel.Font = UiTheme.CreateRegularFont(9.5F);
         _statusLabel.Margin = new Padding(6, 0, 2, 0);
-        _statusLabel.Size = new Size(54, TransportUiMetrics.Control8Mm);
+        _statusLabel.Size = new Size(54, TransportUiMetrics.SearchControlHeight);
         _statusLabel.Text = "الحالة:";
         _statusLabel.TextAlign = ContentAlignment.MiddleRight;
 
@@ -115,7 +101,7 @@ public sealed class TransportSearchPanel : UserControl
         _statusComboBox.Font = UiTheme.CreateRegularFont(9.5F);
         _statusComboBox.Margin = new Padding(2, 0, 6, 0);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
-        _statusComboBox.Size = new Size(140, TransportUiMetrics.Control8Mm);
+        _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchControlHeight);
         _statusComboBox.Items.AddRange(new object[] { "الكل", "نشط", "موقوف" });
         _statusComboBox.SelectedIndex = 0;
         _statusComboBox.SelectedIndexChanged += (_, _) => StatusChanged?.Invoke(this, EventArgs.Empty);
