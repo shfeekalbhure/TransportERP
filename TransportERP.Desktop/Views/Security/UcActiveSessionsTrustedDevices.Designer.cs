@@ -16,9 +16,26 @@ partial class UcActiveSessionsTrustedDevices
             new SecurityTabDefinition[]
             {
                 new("الجلسات النشطة", SecurityTabKind.Details, "الجلسات النشطة وحالتها الحالية."),
-                new("الأجهزة الموثوقة", SecurityTabKind.Details, "الأجهزة الموثوقة وتاريخ الثقة وآخر استخدام."),
-                new("تفاصيل الجلسة والجهاز", SecurityTabKind.Details, "تفاصيل الجلسة والجهاز والبيانات الشبكية حسب الصلاحية."),
-                new("سجل العمليات", SecurityTabKind.Audit, "إنهاء الجلسات وإلغاء الثقة والوصول الحساس.")
+                new("الأجهزة الموثوقة", SecurityTabKind.Details, "الأجهزة الموثوقة وتاريخ الثقة وآخر استخدام.",
+                    Columns: new[] { "المستخدم", "الجهاز", "نظام التشغيل", "IP", "تاريخ الثقة", "آخر استخدام", "حالة الثقة", "وثق بواسطة" }),
+                new("تفاصيل الجلسة والجهاز", SecurityTabKind.Details, "تفاصيل الجلسة والجهاز والبيانات الشبكية حسب الصلاحية.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("معرف الجلسة"),
+                        new("المستخدم"),
+                        new("وقت البدء", SecurityFieldKind.Date),
+                        new("آخر نشاط", SecurityFieldKind.Date),
+                        new("وقت الانتهاء", SecurityFieldKind.Date),
+                        new("عنوان IP"),
+                        new("الجهاز"),
+                        new("نظام التشغيل"),
+                        new("المتصفح / العميل"),
+                        new("الموقع"),
+                        new("استخدام MFA", SecurityFieldKind.Choice, new[] { "نعم", "لا" }),
+                        new("حالة الثقة", SecurityFieldKind.Choice, new[] { "موثوق", "غير موثوق", "ملغى" })
+                    }),
+                new("سجل العمليات", SecurityTabKind.Audit, "إنهاء الجلسات وإلغاء الثقة والوصول الحساس.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الجلسة / الجهاز", "نفذ بواسطة", "النتيجة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
