@@ -5,8 +5,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// حاوية البحث والتصفية الموحدة لكل شاشة تعرض قائمة سجلات.
-/// تحتوي دائمًا على البحث والحالة، وتوفر مساحة إضافية لفلاتر الشاشة الخاصة.
-/// الهدف منها منع تكرار نفس أدوات البحث والحالة في كل Designer.
+/// جميع أدواتها تبدأ من أقصى اليمين وبنفس الارتفاع المعتمد.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportSearchPanel : UserControl
@@ -36,10 +35,6 @@ public sealed class TransportSearchPanel : UserControl
     [Description("الحاوية المخصصة لإضافة فلاتر الشاشة الإضافية.")]
     public FlowLayoutPanel ExtraFiltersHost => _extraFiltersHost;
 
-    /// <summary>
-    /// النص الإرشادي داخل مربع البحث.
-    /// تعريف DefaultValue يمنع تحذير WFO1000 ويجعل مصمم WinForms يعرف متى يحتاج إلى حفظ القيمة.
-    /// </summary>
     [Category("TransportERP")]
     [Description("النص الإرشادي داخل مربع البحث.")]
     [DefaultValue("بحث...")]
@@ -71,6 +66,9 @@ public sealed class TransportSearchPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// يثبت أدوات البحث في أقصى يمين الحاوية، ويجعل كل الحقول بارتفاع 8 مم تقريبًا.
+    /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
@@ -80,14 +78,18 @@ public sealed class TransportSearchPanel : UserControl
         Padding = new Padding(8, 4, 8, 4);
         RightToLeft = RightToLeft.Yes;
 
-        _layout.Dock = DockStyle.Fill;
+        _layout.AutoSize = true;
+        _layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _layout.Dock = DockStyle.Right;
         _layout.FlowDirection = FlowDirection.RightToLeft;
         _layout.RightToLeft = RightToLeft.Yes;
         _layout.WrapContents = false;
 
         _searchBox.Width = 300;
         _searchBox.Height = TransportUiMetrics.SearchControlHeight;
+        _searchBox.MinimumSize = new Size(300, TransportUiMetrics.SearchControlHeight);
         _searchBox.Margin = new Padding(4, 0, 4, 0);
+        _searchBox.RightToLeft = RightToLeft.Yes;
         _searchBox.SearchTextChanged += (_, e) => SearchTextChanged?.Invoke(this, e);
 
         _statusLabel.AutoSize = false;
@@ -102,16 +104,20 @@ public sealed class TransportSearchPanel : UserControl
         _statusComboBox.Margin = new Padding(2, 0, 6, 0);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
         _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchControlHeight);
+        _statusComboBox.MinimumSize = new Size(140, TransportUiMetrics.SearchControlHeight);
         _statusComboBox.Items.AddRange(new object[] { "الكل", "نشط", "موقوف" });
         _statusComboBox.SelectedIndex = 0;
         _statusComboBox.SelectedIndexChanged += (_, _) => StatusChanged?.Invoke(this, EventArgs.Empty);
 
         _extraFiltersHost.AutoSize = true;
+        _extraFiltersHost.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _extraFiltersHost.FlowDirection = FlowDirection.RightToLeft;
         _extraFiltersHost.Margin = Padding.Empty;
         _extraFiltersHost.RightToLeft = RightToLeft.Yes;
         _extraFiltersHost.WrapContents = false;
+        _extraFiltersHost.MinimumSize = new Size(0, TransportUiMetrics.SearchControlHeight);
 
+        // الإضافة بهذا الترتيب تجعل أول عنصر مرئي من أقصى اليمين هو مربع البحث، ثم الحالة، ثم الفلاتر الخاصة.
         _layout.Controls.Add(_searchBox);
         _layout.Controls.Add(_statusLabel);
         _layout.Controls.Add(_statusComboBox);
