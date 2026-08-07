@@ -50,13 +50,18 @@ public sealed class TransportToolbar : UserControl
     private void InitializeLayout()
     {
         AutoSize = false;
-        BackColor = Color.White;
+        BackColor = UiTheme.SurfaceBackground;
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.ToolbarHeight;
         MinimumSize = new Size(0, TransportUiMetrics.ToolbarHeight);
 
-        // الأزرار مرتفعة قليلًا داخل الحاوية، والقيم تؤخذ من المقاسات المركزية.
-        Padding = new Padding(TransportUiMetrics.GroupHorizontalPadding, 1, TransportUiMetrics.GroupHorizontalPadding, 7);
+        // الحاوية نفسها يمكن أن تتغير في العرض، أما الأزرار فتبقى بمقاس ثابت وتلتصق بأقصى اليمين.
+        // التوسيط الرأسي محسوب مركزيًا من الفرق بين ارتفاع الحاوية وارتفاع الزر.
+        Padding = new Padding(
+            TransportUiMetrics.GroupHorizontalPadding,
+            TransportUiMetrics.ToolbarVerticalPadding,
+            TransportUiMetrics.GroupHorizontalPadding,
+            TransportUiMetrics.ToolbarVerticalPadding);
         RightToLeft = RightToLeft.Yes;
 
         _buttonsPanel.AutoSize = true;
