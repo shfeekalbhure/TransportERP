@@ -15,21 +15,30 @@ internal static class TransportUiMetrics
     internal const int ToolbarHeight = Container10Mm;
     internal const int ToolbarButtonHeight = Control8Mm;
 
-    // البحث والتصفية يبقى حسب القرار: الحاوية 10 مم والحقول 8 مم.
+    // البحث والتصفية حسب القرار: الحاوية 10 مم والحقول 8 مم.
     internal const int SearchPanelHeight = Container10Mm;
     internal const int SearchControlHeight = Control8Mm;
 
-    // التنقل يستخدم نفس مقاس 10/8 مم، لكنه يعرض في أعلى الشاشة بجانب الإشعارات.
+    // التنقل يستخدم نفس مقاس 10/8 مم ويظهر أعلى الشاشة بجانب الإشعارات.
     internal const int PaginationHeight = Container10Mm;
     internal const int PaginationButtonHeight = Control8Mm;
 
-    // معلومات الإنشاء والتعديل أصبحت أصغر: الحاوية 10 مم والمحتوى 8 مم.
+    // معلومات الإنشاء والتعديل أصغر: الحاوية 10 مم والمحتوى 8 مم.
     internal const int AuditPanelHeight = Container10Mm;
     internal const int AuditContentHeight = Control8Mm;
 
     // الإشعارات تبقى بحاوية 12 مم ومحتوى 9 مم.
     internal const int AlertBarHeight = Container12Mm;
     internal const int AlertContentHeight = Control9Mm;
+
+    // المسافة الرأسية المعتمدة بين صفوف البيانات الرئيسية: 1.5 مم تقريبًا = 6 بكسل.
+    internal const int MainDataRowGap = 6;
+
+    // نوزع المسافة بالتساوي أعلى وأسفل الأداة داخل الصف.
+    internal const int MainDataVerticalMargin = MainDataRowGap / 2;
+
+    // ارتفاع صف البيانات القياسي = ارتفاع الحقل 8 مم + مسافة 1.5 مم.
+    internal const int MainDataRowHeight = Control8Mm + MainDataRowGap;
 
     // مساحة عنوان وحدود GroupBox فوق الحاوية الداخلية.
     internal const int GroupBoxHeaderSpace = 24;
@@ -38,7 +47,7 @@ internal static class TransportUiMetrics
     internal const int AuditGroupHeight = AuditPanelHeight + GroupBoxHeaderSpace;
     internal const int AlertGroupHeight = AlertBarHeight + GroupBoxHeaderSpace;
 
-    // الصف العلوي يضم الإشعارات والتنقل معًا، ولذلك يأخذ ارتفاع حاوية الإشعارات الخارجية.
+    // الصف العلوي يضم الإشعارات والتنقل معًا.
     internal const int TopUtilityRowHeight = AlertGroupHeight;
 
     internal const int CompactPadding = 4;
