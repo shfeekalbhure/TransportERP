@@ -16,9 +16,22 @@ partial class UcSecurityAlertLog
             new SecurityTabDefinition[]
             {
                 new("معايير البحث", SecurityTabKind.Details, "مرشحات السجل الأمني."),
-                new("التنبيهات والتفاصيل", SecurityTabKind.Details, "تفاصيل التنبيه المحدد للقراءة فقط."),
-                new("المعالجة والتعليقات", SecurityTabKind.Details, "إجراءات المعالجة كأثر مستقل ومدقق."),
-                new("سجل التصدير", SecurityTabKind.Audit, "عمليات التصدير والوصول.")
+                new("التنبيهات والتفاصيل", SecurityTabKind.Details, "تفاصيل التنبيه المحدد للقراءة فقط.",
+                    Columns: new[] { "رقم التنبيه", "الوقت", "القاعدة", "نوع الحدث", "الخطورة", "المستخدم", "IP", "الجهاز", "الحالة", "المسؤول", "المرجع" }),
+                new("المعالجة والتعليقات", SecurityTabKind.Details, "إجراءات المعالجة كأثر مستقل ومدقق.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("حالة المعالجة", SecurityFieldKind.Choice, new[] { "جديد", "مقر", "قيد المعالجة", "مغلق" }),
+                        new("المسؤول"),
+                        new("وقت الإقرار", SecurityFieldKind.Date),
+                        new("نتيجة المعالجة"),
+                        new("تعليق المعالجة", SecurityFieldKind.Multiline),
+                        new("مرجع الإجراء"),
+                        new("يتطلب تصعيدًا", SecurityFieldKind.Boolean)
+                    },
+                    Actions: new[] { "إقرار الاستلام", "إسناد", "إغلاق", "إعادة فتح" }),
+                new("سجل التصدير", SecurityTabKind.Audit, "عمليات التصدير والوصول.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "نوع التصدير", "عدد السجلات", "الغرض", "النتيجة", "معرف الطلب" })
             },
             new SecurityFieldDefinition[]
             {
