@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.Views.Setup.Geographic;
 
 namespace TransportERP.Desktop;
 
@@ -9,12 +10,16 @@ namespace TransportERP.Desktop;
 public partial class FrmDashboard : Form
 {
     private const string DashboardTabKey = "DASHBOARD";
+    private const string CountriesTabKey = "GEN-003";
+
     private TabControl? _workspaceTabs;
+    private ContextMenuStrip? _generalSetupMenu;
 
     public FrmDashboard()
     {
         InitializeComponent();
         ConfigureTabbedWorkspace();
+        ConfigureGeneralSetupMenu();
         LoadDevelopmentPreviewData();
     }
 
@@ -56,6 +61,57 @@ public partial class FrmDashboard : Form
         tblRoot.Controls.Add(_workspaceTabs, 0, 0);
         tblRoot.ResumeLayout(true);
     }
+
+    private void ConfigureGeneralSetupMenu()
+    {
+        var generalSetupButton = FindButtonByText(this, "التهيئة العامة");
+        if (generalSetupButton is null)
+        {
+            return;
+        }
+
+        _generalSetupMenu?.Dispose();
+        _generalSetupMenu = new ContextMenuStrip
+        {
+            RightToLeft = RightToLeft.Yes,
+            Font = new Font(Font.FontFamily, 10F),
+            ShowImageMargin = false,
+            AutoSize = true
+        };
+
+        var geographicDataItem = new ToolStripMenuItem("البيانات الجغرافية")
+        {
+            Name = "mnuGeographicData",
+            RightToLeft = RightToLeft.Yes
+        };
+
+        var countriesItem = new ToolStripMenuItem("الدول")
+        {
+            Name = "mnuCountries",
+            ToolTipText = "GEN-003 — الدول",
+            RightToLeft = RightToLeft.Yes
+        };
+        countriesItem.Click += (_, _) => OpenCountriesView();
+
+        geographicDataItem.DropDownItems.Add(countriesItem);
+        _generalSetupMenu.Items.Add(geographicDataItem);
+
+        generalSetupButton.Click -= GeneralSetupButton_Click;
+        generalSetupButton.Click += GeneralSetupButton_Click;
+    }
+
+    private void GeneralSetupButton_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button button || _generalSetupMenu is null)
+        {
+            return;
+        }
+
+        _generalSetupMenu.Show(button, new Point(0, button.Height));
+    }
+
+    private void OpenCountriesView() =>
+        OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
 
     /// <summary>
     /// يفتح شاشة عمل داخل مساحة النظام. شاشات العمل يجب أن تكون UserControl وليست Form.
@@ -137,6 +193,26 @@ public partial class FrmDashboard : Form
 
         _workspaceTabs?.TabPages.Remove(page);
         page.Dispose();
+    }
+
+    private static Button? FindButtonByText(Control root, string text)
+    {
+        foreach (Control control in root.Controls)
+        {
+            if (control is Button button
+                && button.Text.Contains(text, StringComparison.Ordinal))
+            {
+                return button;
+            }
+
+            var nested = FindButtonByText(control, text);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     private void LoadDevelopmentPreviewData()
