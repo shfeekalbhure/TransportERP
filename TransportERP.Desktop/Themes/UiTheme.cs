@@ -1,60 +1,42 @@
 namespace TransportERP.Desktop.Themes;
 
 /// <summary>
-/// يحتوي الألوان والخطوط الأساسية المعتمدة لهوية واجهات TransportERP.
-/// يُستخدم هذا الملف لتوحيد المظهر ومنع تكرار قيم الألوان داخل كل شاشة.
+/// الهوية البصرية المركزية لنظام TransportERP.
+/// جميع الألوان والخطوط المشتركة تعرف هنا حتى لا تتكرر قيم الألوان داخل الشاشات.
 /// </summary>
 internal static class UiTheme
 {
-    /// <summary>
-    /// اللون الأزرق الرئيسي المستخدم في الأزرار والعناصر النشطة.
-    /// </summary>
+    // الأزرق: الإجراءات العامة مثل جديد وطباعة.
     internal static Color PrimaryBlue => Color.FromArgb(35, 111, 229);
-
-    /// <summary>
-    /// اللون الأزرق الداكن المستخدم عند مرور مؤشر الفأرة.
-    /// </summary>
     internal static Color PrimaryBlueHover => Color.FromArgb(24, 88, 197);
 
-    /// <summary>
-    /// لون خلفية النوافذ الرئيسية.
-    /// </summary>
+    // الأخضر: الحفظ؛ يدل على إتمام العملية بأمان.
+    internal static Color ActionSave => Color.FromArgb(22, 145, 90);
+    internal static Color ActionSaveHover => Color.FromArgb(17, 120, 74);
+
+    // الكهرماني: التعديل؛ يلفت الانتباه إلى تغيير بيانات موجودة.
+    internal static Color ActionEdit => Color.FromArgb(202, 138, 4);
+    internal static Color ActionEditHover => Color.FromArgb(169, 111, 2);
+
+    // البرتقالي الداكن: الإيقاف؛ عملية حساسة لكنها ليست حذفًا نهائيًا.
+    internal static Color ActionDisable => Color.FromArgb(217, 100, 18);
+    internal static Color ActionDisableHover => Color.FromArgb(180, 78, 14);
+
+    // الأحمر: الحذف فقط، لأنه الإجراء الأعلى خطورة في الشريط.
+    internal static Color ActionDelete => Color.FromArgb(200, 55, 55);
+    internal static Color ActionDeleteHover => Color.FromArgb(168, 42, 42);
+
+    // الرمادي الداكن: الإغلاق، لأنه إجراء تنقلي وليس تعديل بيانات.
+    internal static Color ActionClose => Color.FromArgb(71, 85, 105);
+    internal static Color ActionCloseHover => Color.FromArgb(51, 65, 85);
+
     internal static Color WindowBackground => Color.FromArgb(239, 245, 252);
-
-    /// <summary>
-    /// لون العناوين الرئيسية والنصوص المهمة.
-    /// </summary>
     internal static Color HeadingText => Color.FromArgb(17, 43, 78);
-
-    /// <summary>
-    /// لون النصوص الثانوية والتوضيحية.
-    /// </summary>
     internal static Color SecondaryText => Color.FromArgb(91, 111, 139);
-
-    /// <summary>
-    /// لون بداية التدرج الخاص بلوحة هوية النظام.
-    /// </summary>
     internal static Color BrandGradientStart => Color.FromArgb(17, 58, 140);
-
-    /// <summary>
-    /// لون نهاية التدرج الخاص بلوحة هوية النظام.
-    /// </summary>
     internal static Color BrandGradientEnd => Color.FromArgb(38, 132, 232);
-
-    /// <summary>
-    /// لون تمييز حقل الإدخال النشط.
-    /// </summary>
     internal static Color FocusedInputBackground => Color.FromArgb(245, 249, 255);
 
-    /// <summary>
-    /// إنشاء الخط الافتراضي للنصوص العادية.
-    /// </summary>
-    /// <param name="size">حجم الخط المطلوب.</param>
     internal static Font CreateRegularFont(float size) => new("Segoe UI", size, FontStyle.Regular);
-
-    /// <summary>
-    /// إنشاء الخط الافتراضي للنصوص البارزة والعناوين.
-    /// </summary>
-    /// <param name="size">حجم الخط المطلوب.</param>
     internal static Font CreateBoldFont(float size) => new("Segoe UI", size, FontStyle.Bold);
 }
