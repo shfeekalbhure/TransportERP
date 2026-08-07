@@ -58,7 +58,7 @@ public sealed class TransportReferenceScreenShell : UserControl
 
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.TopUtilityRowHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 230F));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataGroupHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.SearchGroupHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AuditGroupHeight));
@@ -137,7 +137,7 @@ public sealed class TransportReferenceScreenShell : UserControl
         else
         {
             _root.RowStyles[2].SizeType = SizeType.Absolute;
-            _root.RowStyles[2].Height = 230F;
+            _root.RowStyles[2].Height = TransportUiMetrics.MainDataGroupHeight;
             _root.RowStyles[4].SizeType = SizeType.Percent;
             _root.RowStyles[4].Height = showGrid ? 100F : 0F;
         }
