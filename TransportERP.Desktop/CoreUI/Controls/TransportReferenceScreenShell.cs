@@ -13,6 +13,8 @@ public sealed class TransportReferenceScreenShell : UserControl
 {
     private readonly TableLayoutPanel _root = new();
     private readonly TableLayoutPanel _topUtilityRow = new();
+    private bool _autoFitDataGroup = true;
+    private bool _isRecalculatingDataHeight;
 
     public TransportGroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
     public TransportGroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
@@ -42,6 +44,21 @@ public sealed class TransportReferenceScreenShell : UserControl
         set => DataGroup.Text = string.IsNullOrWhiteSpace(value) ? "البيانات الرئيسية" : value.Trim();
     }
 
+    /// <summary>
+    /// عند التفعيل تتمدد حاوية البيانات إلى الأسفل آليًا حسب عدد الصفوف بدون شريط تمرير.
+    /// </summary>
+    [Category("TransportERP")]
+    [DefaultValue(true)]
+    public bool AutoFitDataGroup
+    {
+        get => _autoFitDataGroup;
+        set
+        {
+            _autoFitDataGroup = value;
+            RecalculateDataGroupHeight();
+        }
+    }
+
     private void InitializeLayout()
     {
         BackColor = UiTheme.WorkspaceBackground;
@@ -59,7 +76,7 @@ public sealed class TransportReferenceScreenShell : UserControl
 
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.TopUtilityRowHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataGroupHeight));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.CalculateMainDataGroupHeight(TransportUiMetrics.MainDataRowHeight)));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.SearchGroupHeight));
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AuditGroupHeight));
@@ -74,14 +91,17 @@ public sealed class TransportReferenceScreenShell : UserControl
         _topUtilityRow.RowCount = 1;
         _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
+        DataHost.AutoScroll = false;
         DataHost.BackColor = UiTheme.SurfaceBackground;
         DataHost.Dock = DockStyle.Fill;
         DataHost.Margin = Padding.Empty;
-        DataHost.Padding = new Padding(TransportUiMetrics.CompactPadding);
+        DataHost.Padding = new Padding(TransportUiMetrics.MainDataHostPadding);
         DataHost.RightToLeft = RightToLeft.Yes;
 
-        // أي جدول حقول يضاف إلى البيانات الرئيسية يأخذ المقاسات العالمية تلقائيًا.
-        DataHost.ControlAdded += (_, e) => ApplyMainDataMetrics(e.Control);
+        // أي محتوى يضاف إلى البيانات الرئيسية يأخذ المقاسات العالمية ويعيد حساب الارتفاع تلقائيًا.
+        DataHost.ControlAdded += HandleDataHostControlAdded;
+        DataHost.ControlRemoved += (_, _) => RecalculateDataGroupHeight();
+        DataHost.Layout += (_, _) => RecalculateDataGroupHeight();
         DataGroup.Controls.Add(DataHost);
 
         AlertBar.Dock = DockStyle.Fill;
@@ -130,6 +150,7 @@ public sealed class TransportReferenceScreenShell : UserControl
 
         if (expandDataWorkspace)
         {
+            // الشاشات الشجرية/الإعدادات المتخصصة تحتاج مساحة عمل كاملة، لذلك يوقف AutoFit مؤقتًا.
             _root.RowStyles[2].SizeType = SizeType.Percent;
             _root.RowStyles[2].Height = 100F;
             _root.RowStyles[4].SizeType = SizeType.Absolute;
@@ -138,10 +159,71 @@ public sealed class TransportReferenceScreenShell : UserControl
         else
         {
             _root.RowStyles[2].SizeType = SizeType.Absolute;
-            _root.RowStyles[2].Height = TransportUiMetrics.MainDataGroupHeight;
+            RecalculateDataGroupHeight();
             _root.RowStyles[4].SizeType = SizeType.Percent;
             _root.RowStyles[4].Height = showGrid ? 100F : 0F;
         }
+    }
+
+    private void HandleDataHostControlAdded(object? sender, ControlEventArgs e)
+    {
+        ApplyMainDataMetrics(e.Control);
+        e.Control.SizeChanged += (_, _) => RecalculateDataGroupHeight();
+        e.Control.Layout += (_, _) => RecalculateDataGroupHeight();
+        RecalculateDataGroupHeight();
+    }
+
+    /// <summary>
+    /// يحسب ارتفاع البيانات من المحتوى الفعلي ويزيد الصف إلى الأسفل فقط.
+    /// لا يوجد حد تمرير داخل البيانات الرئيسية؛ البيانات الثانوية يجب أن تنتقل إلى تبويب إضافي.
+    /// </summary>
+    private void RecalculateDataGroupHeight()
+    {
+        if (!_autoFitDataGroup || _isRecalculatingDataHeight || _root.RowStyles.Count < 3)
+        {
+            return;
+        }
+
+        // لا نتدخل عندما تكون منطقة البيانات نفسها في وضع Percent للشاشات المتخصصة.
+        if (_root.RowStyles[2].SizeType == SizeType.Percent)
+        {
+            return;
+        }
+
+        try
+        {
+            _isRecalculatingDataHeight = true;
+            var contentHeight = GetPreferredDataContentHeight();
+            _root.RowStyles[2].Height = TransportUiMetrics.CalculateMainDataGroupHeight(contentHeight);
+        }
+        finally
+        {
+            _isRecalculatingDataHeight = false;
+        }
+    }
+
+    private int GetPreferredDataContentHeight()
+    {
+        var totalHeight = 0;
+
+        foreach (Control child in DataHost.Controls)
+        {
+            if (!child.Visible)
+            {
+                continue;
+            }
+
+            var preferredHeight = child switch
+            {
+                TransportDataEntryPanel entryPanel => entryPanel.PreferredContentHeight,
+                TransportAdaptiveDataSection adaptiveSection => adaptiveSection.GetPreferredSize(new Size(DataHost.ClientSize.Width, 0)).Height,
+                _ => child.GetPreferredSize(new Size(DataHost.ClientSize.Width, 0)).Height
+            };
+
+            totalHeight += Math.Max(TransportUiMetrics.MainDataRowHeight, preferredHeight);
+        }
+
+        return Math.Max(TransportUiMetrics.MainDataRowHeight, totalHeight);
     }
 
     /// <summary>
@@ -150,6 +232,13 @@ public sealed class TransportReferenceScreenShell : UserControl
     /// </summary>
     private static void ApplyMainDataMetrics(Control control)
     {
+        if (control is TransportAdaptiveDataSection)
+        {
+            control.Margin = Padding.Empty;
+            control.RightToLeft = RightToLeft.Yes;
+            return;
+        }
+
         if (control is not TableLayoutPanel table)
         {
             return;
