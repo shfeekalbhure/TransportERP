@@ -16,9 +16,23 @@ partial class UcMultiFactorAuthentication
             new SecurityTabDefinition[]
             {
                 new("الطرق والسياسات", SecurityTabKind.Settings, "طرق المصادقة وسياسة الإلزام."),
-                new("المستخدمون المسجلون", SecurityTabKind.Details, "حالة تسجيل المستخدمين وأجهزتهم."),
-                new("الاسترداد والرموز الاحتياطية", SecurityTabKind.Details, "حالة الاسترداد دون عرض الرموز الخام."),
-                new("سجل العمليات", SecurityTabKind.Audit, "التسجيل والإلغاء وإعادة الضبط والاسترداد.")
+                new("المستخدمون المسجلون", SecurityTabKind.Details, "حالة تسجيل المستخدمين وأجهزتهم.",
+                    Columns: new[] { "المستخدم", "الطريقة", "الجهاز", "حالة التسجيل", "تاريخ التسجيل", "آخر تحقق", "النطاق", "الحالة" }),
+                new("الاسترداد والرموز الاحتياطية", SecurityTabKind.Details, "حالة الاسترداد دون عرض الرموز الخام.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("المستخدم"),
+                        new("حالة الاسترداد", SecurityFieldKind.Choice, new[] { "متاح", "مستخدم", "موقوف" }),
+                        new("عدد الرموز الاحتياطية المتبقية"),
+                        new("تاريخ آخر توليد", SecurityFieldKind.Date),
+                        new("تاريخ آخر استخدام", SecurityFieldKind.Date),
+                        new("قناة الاسترداد"),
+                        new("يتطلب موافقة أمنية", SecurityFieldKind.Boolean),
+                        new("ملاحظات", SecurityFieldKind.Multiline)
+                    },
+                    Actions: new[] { "توليد رموز جديدة", "إلغاء الرموز الحالية", "بدء استرداد" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "التسجيل والإلغاء وإعادة الضبط والاسترداد.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الطريقة / الجهاز", "النتيجة", "نفذ بواسطة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
