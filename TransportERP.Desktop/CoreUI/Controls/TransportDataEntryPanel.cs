@@ -3,26 +3,78 @@ using System.ComponentModel;
 namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
-/// حاوية موحدة لترتيب حقول البيانات الرئيسية في عمودين من اليمين إلى اليسار.
-/// هذه الحاوية تمنع تكرار المقاسات والمسافات داخل كل شاشة، وتضمن أن كل أداة تكون داخل حاوية منظمة.
+/// حاوية موحدة لترتيب حقول البيانات الرئيسية من اليمين إلى اليسار.
+/// تتمدد رأسيًا حسب عدد الصفوف ولا تستخدم شريط تمرير.
+/// الحد الأعلى ثلاثة أعمدة حقول في الصف الواحد، وكل حقل يتكون من Label + أداة إدخال.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportDataEntryPanel : TableLayoutPanel
 {
+    private int _fieldColumnCount = TransportUiMetrics.MainDataMaxFieldColumns;
+
     public TransportDataEntryPanel()
     {
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        ColumnCount = 4;
+        AutoScroll = false;
         Dock = DockStyle.Top;
         RightToLeft = RightToLeft.Yes;
-        Padding = new Padding(TransportUiMetrics.CompactPadding);
+        Padding = Padding.Empty;
         Margin = Padding.Empty;
 
-        ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, TransportUiMetrics.MainDataLabelWidth));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, TransportUiMetrics.MainDataLabelWidth));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        ConfigureColumns(_fieldColumnCount);
+    }
+
+    /// <summary>
+    /// عدد أعمدة الحقول في الصف الواحد. لا يسمح بأكثر من ثلاثة أعمدة حفاظًا على وضوح شاشة ERP.
+    /// </summary>
+    [Category("TransportERP")]
+    [DefaultValue(TransportUiMetrics.MainDataMaxFieldColumns)]
+    public int FieldColumnCount
+    {
+        get => _fieldColumnCount;
+        set
+        {
+            var normalized = Math.Clamp(value, 1, TransportUiMetrics.MainDataMaxFieldColumns);
+            if (_fieldColumnCount == normalized)
+            {
+                return;
+            }
+
+            if (Controls.Count > 0)
+            {
+                throw new InvalidOperationException("يجب تحديد عدد الأعمدة قبل إضافة الحقول إلى الحاوية.");
+            }
+
+            _fieldColumnCount = normalized;
+            ConfigureColumns(_fieldColumnCount);
+        }
+    }
+
+    /// <summary>
+    /// الارتفاع الفعلي المطلوب لعرض جميع الصفوف بدون أي Scroll.
+    /// يستخدمه القالب العام لتمديد حاوية البيانات إلى الأسفل تلقائيًا.
+    /// </summary>
+    [Browsable(false)]
+    public int PreferredContentHeight
+    {
+        get
+        {
+            if (RowCount == 0)
+            {
+                return TransportUiMetrics.MainDataRowHeight;
+            }
+
+            var total = 0;
+            for (var row = 0; row < RowStyles.Count; row++)
+            {
+                total += RowStyles[row].SizeType == SizeType.Absolute
+                    ? (int)Math.Ceiling(RowStyles[row].Height)
+                    : TransportUiMetrics.MainDataRowHeight;
+            }
+
+            return Math.Max(TransportUiMetrics.MainDataRowHeight, total);
+        }
     }
 
     /// <summary>
@@ -32,9 +84,11 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
     /// </summary>
     public void AddField(string labelText, Control editor, int index)
     {
-        var row = index / 2;
-        var pair = index % 2;
-        var labelColumn = pair == 0 ? 0 : 2;
+        ArgumentNullException.ThrowIfNull(editor);
+
+        var row = index / _fieldColumnCount;
+        var fieldPosition = index % _fieldColumnCount;
+        var labelColumn = fieldPosition * 2;
         var fieldColumn = labelColumn + 1;
 
         while (RowCount <= row)
@@ -81,5 +135,21 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
 
         Controls.Add(label, labelColumn, row);
         Controls.Add(editor, fieldColumn, row);
+        PerformLayout();
+    }
+
+    private void ConfigureColumns(int fieldColumns)
+    {
+        SuspendLayout();
+        ColumnStyles.Clear();
+        ColumnCount = fieldColumns * 2;
+
+        for (var column = 0; column < fieldColumns; column++)
+        {
+            ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, TransportUiMetrics.MainDataLabelWidth));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / fieldColumns));
+        }
+
+        ResumeLayout(true);
     }
 }
