@@ -29,14 +29,16 @@ internal static class TransportUiMetrics
     internal const int ToolbarButtonGap = 4;
 
     // البيانات الرئيسية: الحقل 6 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
-    // الحد الأعلى ثلاثة أعمدة حقول؛ أي ستة أعمدة فعلية داخل TableLayoutPanel لأن كل حقل له Label.
+    // الحد الأعلى ثلاثة أعمدة حقول وخمسة صفوف في التبويب الرئيسي.
     internal const int MainDataDefaultGroupHeight = 230;
     internal const int MainDataMaxFieldColumns = 3;
+    internal const int MainDataMaxRows = 5;
     internal const int MainDataControlHeight = Control6Mm;
     internal const int MainDataRowGap = 6;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
     internal const int MainDataHorizontalMargin = 4;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
+    internal const int MainDataMaxContentHeight = MainDataRowHeight * MainDataMaxRows;
     internal const int MainDataMultilineMinHeight = 58;
     internal const int MainDataLabelWidth = 120;
     internal const int MainDataLabelFieldGap = 8;
@@ -94,11 +96,19 @@ internal static class TransportUiMetrics
 
     /// <summary>
     /// يحسب الارتفاع الكامل لحاوية البيانات من ارتفاع محتواها الفعلي.
-    /// لا نستخدم Scroll للبيانات الرئيسية؛ الحاوية تتمدد إلى الأسفل بمقدار المحتوى.
+    /// الحافة العليا تبقى ثابتة، والزيادة تكون إلى الأسفل فقط حتى خمسة صفوف.
+    /// أي محتوى يتجاوز السعة ينتقل إلى تبويب إضافي بدل تمديد الحاوية أكثر أو إضافة Scroll.
     /// </summary>
-    internal static int CalculateMainDataGroupHeight(int contentHeight) =>
-        Math.Max(MainDataRowHeight, contentHeight)
-        + GroupBoxHeaderSpace
-        + GroupVerticalPadding
-        + (MainDataHostPadding * 2);
+    internal static int CalculateMainDataGroupHeight(int contentHeight)
+    {
+        var boundedContentHeight = Math.Clamp(
+            Math.Max(MainDataRowHeight, contentHeight),
+            MainDataRowHeight,
+            MainDataMaxContentHeight);
+
+        return boundedContentHeight
+            + GroupBoxHeaderSpace
+            + GroupVerticalPadding
+            + (MainDataHostPadding * 2);
+    }
 }
