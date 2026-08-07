@@ -3,38 +3,35 @@ using System.ComponentModel;
 namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
-/// القالب الموحد لشاشات البيانات المرجعية مثل الدول والمحافظات والمديريات والمدن والمناطق.
-/// هذا العنصر يجمع كل الأجزاء الثابتة في مكان واحد بدل تكرارها داخل كل شاشة.
-/// الشاشة المستضيفة تضيف فقط حقولها الخاصة داخل DataHost وتحدد أعمدة الجدول.
+/// القالب الموحد لشاشات البيانات المرجعية.
+/// كل الحاويات العامة تعرف هنا مرة واحدة وتستخدمها جميع الشاشات.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportReferenceScreenShell : UserControl
 {
-    // الجدول الرئيسي يقسم الشاشة رأسيًا إلى المناطق الثابتة المعتمدة.
     private readonly TableLayoutPanel _root = new();
 
-    // الأدوات المشتركة التي تظهر بنفس الاسم ونفس الوظيفة في جميع الشاشات.
+    // الحاويات الخارجية الثابتة التي تظهر بعنوان وحدود واضحة.
+    public GroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
+    public GroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
+    public GroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
+    public GroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
+    public GroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
+
+    // الأدوات الداخلية المشتركة.
     public TransportAlertBar AlertBar { get; } = new();
     public TransportToolbar Toolbar { get; } = new();
-    public GroupBox DataGroup { get; } = new();
     public Panel DataHost { get; } = new();
     public TransportSearchPanel SearchPanel { get; } = new();
     public TransportDataGrid Grid { get; } = new();
     public TransportPagination Pagination { get; } = new();
     public TransportAuditPanel AuditPanel { get; } = new();
 
-    /// <summary>
-    /// إنشاء القالب الموحد مرة واحدة.
-    /// بعد وضعه في أي UserControl تصبح جميع الحاويات العامة جاهزة دون تكرار كودها.
-    /// </summary>
     public TransportReferenceScreenShell()
     {
         InitializeLayout();
     }
 
-    /// <summary>
-    /// عنوان حاوية البيانات الرئيسية، ويمكن تغييره عند الحاجة دون تغيير التصميم.
-    /// </summary>
     [Category("TransportERP")]
     [Description("عنوان حاوية البيانات الرئيسية.")]
     [DefaultValue("البيانات الرئيسية")]
@@ -44,17 +41,11 @@ public sealed class TransportReferenceScreenShell : UserControl
         set => DataGroup.Text = string.IsNullOrWhiteSpace(value) ? "البيانات الرئيسية" : value.Trim();
     }
 
-    /// <summary>
-    /// تجهيز ترتيب الشاشة وفق القرار المعتمد:
-    /// التنبيهات والأوامر والبيانات والبحث تثبت في الأعلى،
-    /// الجدول يأخذ كل المساحة المتبقية Fill،
-    /// والتنقل وبيانات الإنشاء والتعديل تثبت في الأسفل.
-    /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.FromArgb(247, 249, 252);
         Dock = DockStyle.Fill;
-        Padding = new Padding(16);
+        Padding = new Padding(12);
         RightToLeft = RightToLeft.Yes;
 
         _root.ColumnCount = 1;
@@ -63,52 +54,69 @@ public sealed class TransportReferenceScreenShell : UserControl
         _root.RowCount = 7;
         _root.RightToLeft = RightToLeft.Yes;
 
-        // التنبيه في أعلى الشاشة، ويختفي بالكامل عند عدم وجود رسالة.
-        _root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        // الإشعارات داخل GroupBox مستقل.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AlertGroupHeight));
 
-        // حاوية الأزرار الرئيسية: 12 مم تقريبًا.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container12Mm));
+        // شريط الأوامر بدون GroupBox حتى يبقى خفيفًا، لكنه مثبت أعلى الشاشة.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ToolbarHeight));
 
-        // البيانات الرئيسية تبقى أعلى الجدول. ارتفاعها مستقل لأن عدد حقول الشاشة يختلف.
+        // البيانات الرئيسية.
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 230F));
 
-        // البحث والتصفية: 10 مم تقريبًا.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container10Mm));
+        // البحث والتصفية داخل GroupBox مستقل.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.SearchGroupHeight));
 
-        // الجدول هو الجزء المرن الوحيد ويملأ كل المساحة الوسطية المتبقية.
+        // الجدول داخل GroupBox ويأخذ كل المساحة المتبقية.
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        // التنقل أسفل الجدول مباشرة: 10 مم تقريبًا.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container10Mm));
+        // التنقل يبقى في المنتصف أسفل الجدول.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.PaginationHeight));
 
-        // معلومات الإنشاء والتعديل والعدادات في آخر الشاشة: 12 مم تقريبًا.
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.Container12Mm));
+        // معلومات الإنشاء والتعديل داخل GroupBox مستقل.
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.AuditGroupHeight));
 
-        DataGroup.Dock = DockStyle.Fill;
-        DataGroup.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        DataGroup.Padding = new Padding(12);
-        DataGroup.RightToLeft = RightToLeft.Yes;
-        DataGroup.Text = "البيانات الرئيسية";
-
-        // DataHost هو المكان الوحيد الذي تضيف إليه كل شاشة حقولها الخاصة.
         DataHost.BackColor = Color.White;
         DataHost.Dock = DockStyle.Fill;
         DataHost.Padding = new Padding(4);
         DataHost.RightToLeft = RightToLeft.Yes;
         DataGroup.Controls.Add(DataHost);
 
-        // الجدول Fill حتى يتمدد تلقائيًا مع تكبير وتصغير النافذة.
-        Grid.Dock = DockStyle.Fill;
+        AlertBar.Dock = DockStyle.Fill;
+        NotificationGroup.Controls.Add(AlertBar);
 
-        // الترتيب من أعلى الشاشة إلى أسفلها.
-        _root.Controls.Add(AlertBar, 0, 0);
+        SearchPanel.Dock = DockStyle.Fill;
+        SearchGroup.Controls.Add(SearchPanel);
+
+        Grid.Dock = DockStyle.Fill;
+        GridGroup.Controls.Add(Grid);
+
+        AuditPanel.Dock = DockStyle.Fill;
+        AuditGroup.Controls.Add(AuditPanel);
+
+        Toolbar.Dock = DockStyle.Fill;
+        Pagination.Dock = DockStyle.Fill;
+
+        _root.Controls.Add(NotificationGroup, 0, 0);
         _root.Controls.Add(Toolbar, 0, 1);
         _root.Controls.Add(DataGroup, 0, 2);
-        _root.Controls.Add(SearchPanel, 0, 3);
-        _root.Controls.Add(Grid, 0, 4);
+        _root.Controls.Add(SearchGroup, 0, 3);
+        _root.Controls.Add(GridGroup, 0, 4);
         _root.Controls.Add(Pagination, 0, 5);
-        _root.Controls.Add(AuditPanel, 0, 6);
+        _root.Controls.Add(AuditGroup, 0, 6);
 
         Controls.Add(_root);
     }
+
+    /// <summary>
+    /// إنشاء GroupBox موحد حتى تكون جميع حدود وعناوين الحاويات بنفس الشكل.
+    /// </summary>
+    private static GroupBox CreateGroupBox(string title) => new()
+    {
+        BackColor = Color.White,
+        Dock = DockStyle.Fill,
+        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+        Padding = new Padding(8, 6, 8, 6),
+        RightToLeft = RightToLeft.Yes,
+        Text = title
+    };
 }
