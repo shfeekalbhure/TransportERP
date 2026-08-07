@@ -66,9 +66,6 @@ public partial class UcGen016GlobalVariables : UserControl
         screenShell.SearchPanel.SearchTextChanged += (_, _) => ApplyCatalogFilter();
         screenShell.SearchPanel.StatusChanged += (_, _) => ApplyCatalogFilter();
 
-        screenShell.Toolbar.NewRequested += (_, _) =>
-            screenShell.AlertBar.Text = "GEN-016 كتالوج مغلق؛ لا يمكن إنشاء PropertyCode جديد.";
-
         screenShell.Toolbar.EditRequested += (_, _) =>
         {
             RefreshEditability();
@@ -78,10 +75,6 @@ public partial class UcGen016GlobalVariables : UserControl
         };
 
         screenShell.Toolbar.SaveRequested += (_, _) => ValidatePendingOverride();
-        screenShell.Toolbar.DeleteRequested += (_, _) =>
-            screenShell.AlertBar.Text = "تعريف Property لا يُحذف من GEN-016؛ إزالة Override تتطلب خدمة API معتمدة.";
-        screenShell.Toolbar.DisableRequested += (_, _) =>
-            screenShell.AlertBar.Text = "حالة تعريف Property ReadOnly وتدار من كتالوج النظام.";
         screenShell.Toolbar.PrintRequested += (_, _) =>
             screenShell.AlertBar.Text = "طباعة كتالوج الإعدادات تمر عبر خدمة التقارير عند توفرها.";
         screenShell.Toolbar.CloseRequested += (_, _) =>
@@ -119,9 +112,7 @@ public partial class UcGen016GlobalVariables : UserControl
 
         txtPropertyCode.Text = definition.PropertyCode;
         txtArabicName.Text = definition.ArabicName;
-        txtEnglishName.Text = definition.PropertyCode;
         txtGroup.Text = definition.Group;
-        txtDescription.Text = "الوصف التفصيلي غير معرف كحقل مستقل في العقد الحاكم.";
         txtValueType.Text = definition.ValueTypeDisplay;
         txtAllowedScopes.Text = string.Join("، ", definition.AllowedScopes.Select(ToArabicScope));
         txtDefaultValue.Text = definition.DefaultDisplayValue;
@@ -235,7 +226,7 @@ public partial class UcGen016GlobalVariables : UserControl
             PropertyValueKind.Boolean => CreateBooleanEditor(),
             PropertyValueKind.Integer or PropertyValueKind.DurationMinutes => CreateNumericEditor(definition),
             PropertyValueKind.List => CreateListEditor(definition),
-            _ => new TextBox { ReadOnly = true }
+            _ => new TransportTextBox { ReadOnly = true }
         };
 
         _overrideEditor.Dock = DockStyle.Fill;
@@ -245,7 +236,7 @@ public partial class UcGen016GlobalVariables : UserControl
 
     private static Control CreateBooleanEditor()
     {
-        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        var combo = new TransportComboBox();
         combo.Items.AddRange(new object[] { "نعم", "لا" });
         return combo;
     }
@@ -259,17 +250,32 @@ public partial class UcGen016GlobalVariables : UserControl
             Maximum = definition.Maximum ?? decimal.MaxValue,
             Increment = definition.Increment ?? 1M,
             ThousandsSeparator = true,
-            TextAlign = HorizontalAlignment.Right
+            TextAlign = HorizontalAlignment.Right,
+            RightToLeft = RightToLeft.Yes
         };
         return number;
     }
 
     private static Control CreateListEditor(PropertyDefinition definition)
     {
-        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        combo.Items.AddRange(definition.AllowedValues.Cast<object>().ToArray());
+        var combo = new TransportComboBox();
+        combo.Items.AddRange(definition.AllowedValues
+            .Select(value => new PropertyOption(value, GetOptionDisplayText(value)))
+            .Cast<object>()
+            .ToArray());
         return combo;
     }
+
+    /// <summary>
+    /// يحافظ على معرفات القيم الداخلية كما هي، ويحوّلها إلى نص مستخدم واضح للعرض فقط.
+    /// </summary>
+    private static string GetOptionDisplayText(string valueId) => valueId switch
+    {
+        "DateFormat.DMY_SLASH" => "31/12/2026 — يوم/شهر/سنة",
+        "TimeFormat.H24_MIN" => "23:45 — نظام 24 ساعة",
+        "NumberFormat.GROUPED_DOT_DECIMAL" => "1,234.56",
+        _ => valueId
+    };
 
     private void ValidatePendingOverride()
     {
@@ -491,6 +497,14 @@ public partial class UcGen016GlobalVariables : UserControl
             PropertyValueKind.List => "قائمة ثابتة",
             _ => ValueKind.ToString()
         };
+    }
+
+    /// <summary>
+    /// عنصر قائمة يحتفظ بالمعرف الداخلي الحاكم ويعرض تسمية مستخدم منفصلة.
+    /// </summary>
+    private sealed record PropertyOption(string ValueId, string DisplayText)
+    {
+        public override string ToString() => DisplayText;
     }
 
     private sealed record PropertyCatalogRow(

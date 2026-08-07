@@ -1,4 +1,5 @@
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.Forms.Setup.General;
 
@@ -15,26 +16,24 @@ partial class UcGen016GlobalVariables
     private TransportDataEntryPanel scopeFields = null!;
     private TransportDataEntryPanel effectiveFields = null!;
     private TransportDataGrid changeLogGrid = null!;
-    private TextBox txtPropertyCode = null!;
-    private TextBox txtArabicName = null!;
-    private TextBox txtEnglishName = null!;
-    private TextBox txtGroup = null!;
-    private TextBox txtDescription = null!;
-    private TextBox txtValueType = null!;
-    private TextBox txtAllowedScopes = null!;
-    private TextBox txtDefaultValue = null!;
-    private TextBox txtCurrentOverride = null!;
-    private TextBox txtEffectiveValue = null!;
-    private TextBox txtValueSource = null!;
-    private TextBox txtResolutionPolicy = null!;
-    private TextBox txtStatus = null!;
-    private ComboBox cmbScope = null!;
-    private TextBox txtScopeIdentity = null!;
+    private TransportTextBox txtPropertyCode = null!;
+    private TransportTextBox txtArabicName = null!;
+    private TransportTextBox txtGroup = null!;
+    private TransportTextBox txtValueType = null!;
+    private TransportTextBox txtAllowedScopes = null!;
+    private TransportTextBox txtDefaultValue = null!;
+    private TransportTextBox txtCurrentOverride = null!;
+    private TransportTextBox txtEffectiveValue = null!;
+    private TransportTextBox txtValueSource = null!;
+    private TransportTextBox txtResolutionPolicy = null!;
+    private TransportTextBox txtStatus = null!;
+    private TransportComboBox cmbScope = null!;
+    private TransportTextBox txtScopeIdentity = null!;
     private Panel pnlOverrideEditor = null!;
-    private DateTimePicker dtEffectiveFrom = null!;
-    private DateTimePicker dtEffectiveTo = null!;
-    private TextBox txtReason = null!;
-    private TextBox txtValidation = null!;
+    private TransportDatePicker dtEffectiveFrom = null!;
+    private TransportDatePicker dtEffectiveTo = null!;
+    private TransportTextBox txtReason = null!;
+    private TransportTextBox txtValidation = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -58,9 +57,7 @@ partial class UcGen016GlobalVariables
 
         txtPropertyCode = ReadOnlyTextBox();
         txtArabicName = ReadOnlyTextBox();
-        txtEnglishName = ReadOnlyTextBox();
         txtGroup = ReadOnlyTextBox();
-        txtDescription = ReadOnlyTextBox();
         txtValueType = ReadOnlyTextBox();
         txtAllowedScopes = ReadOnlyTextBox();
         txtDefaultValue = ReadOnlyTextBox();
@@ -69,12 +66,12 @@ partial class UcGen016GlobalVariables
         txtValueSource = ReadOnlyTextBox();
         txtResolutionPolicy = ReadOnlyTextBox();
         txtStatus = ReadOnlyTextBox();
-        cmbScope = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, RightToLeft = RightToLeft.Yes };
+        cmbScope = new TransportComboBox();
         txtScopeIdentity = ReadOnlyTextBox();
         pnlOverrideEditor = new Panel { AutoScroll = false, Margin = Padding.Empty, Padding = Padding.Empty };
         dtEffectiveFrom = OptionalDatePicker();
         dtEffectiveTo = OptionalDatePicker();
-        txtReason = new TextBox { TextAlign = HorizontalAlignment.Right };
+        txtReason = new TransportTextBox();
         txtValidation = ReadOnlyTextBox();
 
         SuspendLayout();
@@ -86,6 +83,9 @@ partial class UcGen016GlobalVariables
         screenShell.SearchPanel.SearchPlaceholder = "ابحث برمز الخاصية أو الاسم أو المجموعة";
         screenShell.SearchPanel.SetStatusItems("نشط", "موقوف");
         screenShell.ConfigureWorkspaceMode(showSearch: true, showGrid: true, expandDataWorkspace: false);
+        screenShell.Toolbar.SetActionVisible(ToolbarAction.New, false);
+        screenShell.Toolbar.SetActionVisible(ToolbarAction.Delete, false);
+        screenShell.Toolbar.SetActionVisible(ToolbarAction.Disable, false);
 
         ConfigureTabs();
         ConfigureMainTab();
@@ -98,7 +98,7 @@ partial class UcGen016GlobalVariables
 
         AutoScaleMode = AutoScaleMode.Font;
         AutoScroll = false;
-        BackColor = Color.White;
+        BackColor = UiTheme.SurfaceBackground;
         Controls.Add(screenShell);
         Name = "UcGen016GlobalVariables";
         RightToLeft = RightToLeft.Yes;
@@ -127,7 +127,7 @@ partial class UcGen016GlobalVariables
     {
         page.Text = title;
         page.RightToLeft = RightToLeft.Yes;
-        page.BackColor = Color.White;
+        page.BackColor = UiTheme.SurfaceBackground;
         page.Padding = new Padding(TransportUiMetrics.TabContentPadding);
         page.AutoScroll = false;
     }
@@ -140,13 +140,11 @@ partial class UcGen016GlobalVariables
 
         mainFields.AddField("PropertyCode", txtPropertyCode, 0);
         mainFields.AddField("الاسم العربي", txtArabicName, 1);
-        mainFields.AddField("الاسم الإنجليزي", txtEnglishName, 2);
-        mainFields.AddField("المجموعة", txtGroup, 3);
-        mainFields.AddField("نوع القيمة", txtValueType, 4);
-        mainFields.AddField("الحالة", txtStatus, 5);
-        mainFields.AddField("AllowedScopes", txtAllowedScopes, 6);
-        mainFields.AddField("ResolutionPolicy", txtResolutionPolicy, 7);
-        mainFields.AddField("الوصف", txtDescription, 8);
+        mainFields.AddField("المجموعة", txtGroup, 2);
+        mainFields.AddField("نوع القيمة", txtValueType, 3);
+        mainFields.AddField("AllowedScopes", txtAllowedScopes, 4);
+        mainFields.AddField("ResolutionPolicy", txtResolutionPolicy, 5);
+        mainFields.AddField("الحالة", txtStatus, 6);
 
         tabMain.Controls.Add(mainFields);
     }
@@ -177,7 +175,7 @@ partial class UcGen016GlobalVariables
         effectiveFields.AddField("EffectiveFrom", dtEffectiveFrom, 0);
         effectiveFields.AddField("EffectiveTo", dtEffectiveTo, 1);
         effectiveFields.AddField("سبب التغيير", txtReason, 2);
-        effectiveFields.AddField("قواعد التحقق", txtValidation, 3);
+        effectiveFields.AddField("قواعد التحقق / ملاحظة", txtValidation, 3);
 
         tabEffective.Controls.Add(effectiveFields);
     }
@@ -190,7 +188,8 @@ partial class UcGen016GlobalVariables
             AutoScroll = false,
             Padding = Padding.Empty,
             Margin = Padding.Empty,
-            RightToLeft = RightToLeft.Yes
+            RightToLeft = RightToLeft.Yes,
+            BackColor = UiTheme.SurfaceBackground
         };
 
         changeLogGrid.Dock = DockStyle.Fill;
@@ -230,21 +229,17 @@ partial class UcGen016GlobalVariables
         AddReadOnlyColumn(grid, "الحالة", nameof(PropertyCatalogRow.Status), 85);
     }
 
-    private static TextBox ReadOnlyTextBox() => new()
+    private static TransportTextBox ReadOnlyTextBox() => new()
     {
         ReadOnly = true,
-        TextAlign = HorizontalAlignment.Right,
-        RightToLeft = RightToLeft.Yes,
         TabStop = false
     };
 
-    private static DateTimePicker OptionalDatePicker() => new()
+    private static TransportDatePicker OptionalDatePicker() => new()
     {
         Format = DateTimePickerFormat.Short,
         ShowCheckBox = true,
-        Checked = false,
-        RightToLeft = RightToLeft.Yes,
-        RightToLeftLayout = true
+        Checked = false
     };
 
     private static void AddReadOnlyColumn(DataGridView grid, string header, string propertyName, int? width = null)
