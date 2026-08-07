@@ -73,7 +73,6 @@ partial class UcCountries
         tblData.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         tblData.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        // إضافة حقول الدول فقط. بقية الأدوات تأتي من screenShell.
         AddField(tblData, "كود الدولة *", txtCountryCode, 0, 0);
         AddField(tblData, "الاسم العربي *", txtNameAr, 2, 0);
         AddField(tblData, "الاسم الإنجليزي", txtNameEn, 0, 1);
@@ -85,7 +84,7 @@ partial class UcCountries
 
         var lblNotes = CreateLabel("الملاحظات");
         tblData.Controls.Add(lblNotes, 0, 4);
-        ConfigureTextBox(txtNotes, false);
+        ConfigureTextBox(txtNotes);
         txtNotes.Multiline = true;
         txtNotes.ScrollBars = ScrollBars.Vertical;
         tblData.Controls.Add(txtNotes, 1, 4);
@@ -93,11 +92,11 @@ partial class UcCountries
 
         ConfigureRequiredTextBox(txtCountryCode);
         ConfigureRequiredTextBox(txtNameAr);
-        ConfigureTextBox(txtNameEn, false);
-        ConfigureTextBox(txtIso2, true);
-        ConfigureTextBox(txtIso3, true);
-        ConfigureTextBox(txtDialCode, true);
-        ConfigureTextBox(txtCurrencyCode, true);
+        ConfigureTextBox(txtNameEn);
+        ConfigureTextBox(txtIso2);
+        ConfigureTextBox(txtIso3);
+        ConfigureTextBox(txtDialCode);
+        ConfigureTextBox(txtCurrencyCode);
         ConfigureComboBox(cmbStatus);
         cmbStatus.Items.AddRange(new object[] { "نشط", "موقوف" });
 
@@ -147,7 +146,7 @@ partial class UcCountries
     };
 
     /// <summary>
-    /// تجهيز الحقل الإلزامي الموحد الموجود في Toolbox.
+    /// تجهيز الحقل الإلزامي الموحد الموجود في Toolbox، مع محاذاة النص يمين دائمًا.
     /// </summary>
     private static void ConfigureRequiredTextBox(RequiredTextBox textBox)
     {
@@ -158,14 +157,15 @@ partial class UcCountries
     }
 
     /// <summary>
-    /// تجهيز الحقول النصية العادية، مع السماح بالمحاذاة اليسرى للقيم اللاتينية الصرفة.
+    /// تجهيز جميع الحقول النصية بمحاذاة يمين ثابتة، بما فيها ISO والعملة ومفتاح الاتصال.
+    /// هذا يطبق القرار الموحد بأن الكتابة داخل الحقول تبدأ من اليمين في جميع الشاشات.
     /// </summary>
-    private static void ConfigureTextBox(TextBox textBox, bool latinValue)
+    private static void ConfigureTextBox(TextBox textBox)
     {
         textBox.Dock = DockStyle.Fill;
         textBox.Margin = new Padding(4, 5, 8, 5);
-        textBox.RightToLeft = latinValue ? RightToLeft.No : RightToLeft.Yes;
-        textBox.TextAlign = latinValue ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        textBox.RightToLeft = RightToLeft.Yes;
+        textBox.TextAlign = HorizontalAlignment.Right;
     }
 
     /// <summary>
