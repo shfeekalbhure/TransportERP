@@ -18,6 +18,7 @@
     <Folder Include="Services\" />
     <Folder Include="Resources\" />
     <Folder Include="Themes\" />
+    <Folder Include="Views\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,9 +26,4 @@
     <EmbeddedResource Remove="Forms\Accounting\**\*.resx" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Update="Forms\\FrmCountries.cs"><SubType>Form</SubType></Compile>
-    <Compile Update="Forms\Setup\Geographic\FrmAreas.cs"><SubType>Form</SubType></Compile>
-    <Compile Update="Forms\Setup\Geographic\FrmDirectorates.cs"><SubType>Form</SubType></Compile>
-  </ItemGroup>
 </Project>
