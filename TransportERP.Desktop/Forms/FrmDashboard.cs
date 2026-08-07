@@ -11,6 +11,7 @@ public partial class FrmDashboard : Form
 {
     private const string DashboardTabKey = "DASHBOARD";
     private const string CountriesTabKey = "GEN-003";
+    private const string DirectoratesTabKey = "GEN-005";
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
@@ -93,7 +94,16 @@ public partial class FrmDashboard : Form
         };
         countriesItem.Click += (_, _) => OpenCountriesView();
 
+        var directoratesItem = new ToolStripMenuItem("المديريات")
+        {
+            Name = "mnuDirectorates",
+            ToolTipText = "GEN-005 — المديريات",
+            RightToLeft = RightToLeft.Yes
+        };
+        directoratesItem.Click += (_, _) => OpenDirectoratesView();
+
         geographicDataItem.DropDownItems.Add(countriesItem);
+        geographicDataItem.DropDownItems.Add(directoratesItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
         generalSetupButton.Click -= GeneralSetupButton_Click;
@@ -112,6 +122,9 @@ public partial class FrmDashboard : Form
 
     private void OpenCountriesView() =>
         OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
+
+    private void OpenDirectoratesView() =>
+        OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
 
     /// <summary>
     /// يفتح شاشة عمل داخل مساحة النظام. شاشات العمل يجب أن تكون UserControl وليست Form.
