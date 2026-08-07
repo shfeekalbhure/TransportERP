@@ -74,7 +74,6 @@ public sealed class TransportReferenceScreenShell : UserControl
         DataHost.RightToLeft = RightToLeft.Yes;
 
         // أي جدول حقول يضاف إلى البيانات الرئيسية يطبق عليه القالب تلقائيًا.
-        // الهدف هو توحيد المسافة بين الصفوف إلى 1.5 مم من مكان واحد فقط.
         DataHost.ControlAdded += (_, e) => ApplyMainDataSpacing(e.Control);
         DataGroup.Controls.Add(DataHost);
 
@@ -107,8 +106,8 @@ public sealed class TransportReferenceScreenShell : UserControl
     }
 
     /// <summary>
-    /// يطبق المسافة الرأسية المعتمدة 1.5 مم تقريبًا بين صفوف البيانات الرئيسية.
-    /// يتم استدعاؤه تلقائيًا عند إضافة جدول حقول لأي شاشة إلى DataHost.
+    /// يطبق المسافة الرأسية الموحدة بين صفوف البيانات الرئيسية.
+    /// صف الملاحظات متعدد الأسطر يحتفظ بالارتفاع الذي تحدده الشاشة نفسها.
     /// </summary>
     private static void ApplyMainDataSpacing(Control control)
     {
@@ -117,18 +116,15 @@ public sealed class TransportReferenceScreenShell : UserControl
             return;
         }
 
-        // الصفوف الثابتة تستخدم ارتفاع الحقل 8 مم + مسافة 1.5 مم.
-        // الصف المرن الأخير مثل الملاحظات لا نغيره حتى يملأ المساحة المتبقية.
         for (var row = 0; row < table.RowStyles.Count; row++)
         {
             var style = table.RowStyles[row];
-            if (style.SizeType == SizeType.Absolute)
+            if (style.SizeType == SizeType.Absolute && !IsMultilineRow(table, row))
             {
                 style.Height = TransportUiMetrics.MainDataRowHeight;
             }
         }
 
-        // توزيع 6 بكسل بالتساوي أعلى وأسفل كل أداة يعطي فراغًا بصريًا ثابتًا بين الصفوف.
         foreach (Control child in table.Controls)
         {
             var current = child.Margin;
@@ -138,6 +134,19 @@ public sealed class TransportReferenceScreenShell : UserControl
                 current.Right,
                 TransportUiMetrics.MainDataVerticalMargin);
         }
+    }
+
+    private static bool IsMultilineRow(TableLayoutPanel table, int row)
+    {
+        foreach (Control child in table.Controls)
+        {
+            if (table.GetRow(child) == row && child is TextBox textBox && textBox.Multiline)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static GroupBox CreateGroupBox(string title) => new()
