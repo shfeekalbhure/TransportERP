@@ -34,40 +34,20 @@ public sealed class TransportSearchPanel : UserControl
         InitializeLayout();
     }
 
-    /// <summary>
-    /// يرسل قيمة البحث للشاشة عند تغير النص.
-    /// </summary>
     public event EventHandler<SearchTextChangedEventArgs>? SearchTextChanged;
-
-    /// <summary>
-    /// يرسل قيمة الحالة للشاشة عند تغير الفلتر.
-    /// </summary>
     public event EventHandler? StatusChanged;
 
-    /// <summary>
-    /// قيمة البحث الحالية بدون النص الإرشادي.
-    /// </summary>
     [Browsable(false)]
     public string SearchText => _searchBox.SearchText;
 
-    /// <summary>
-    /// قيمة حالة السجل المختارة مثل الكل أو نشط أو موقوف.
-    /// </summary>
     [Browsable(false)]
     public string SelectedStatus => _statusComboBox.SelectedItem?.ToString() ?? "الكل";
 
-    /// <summary>
-    /// مساحة عامة لإضافة الفلاتر الخاصة بالشاشة من الـDesigner أو من كود الشاشة.
-    /// لا نضع الفلاتر الخاصة داخل المكون نفسه حتى يبقى عامًا وقابلًا لإعادة الاستخدام.
-    /// </summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
     [Category("TransportERP")]
     [Description("الحاوية المخصصة لإضافة فلاتر الشاشة الإضافية.")]
     public FlowLayoutPanel ExtraFiltersHost => _extraFiltersHost;
 
-    /// <summary>
-    /// تغيير النص الإرشادي لمربع البحث عندما تحتاج الشاشة توضيحًا أدق.
-    /// </summary>
     [Category("TransportERP")]
     [Description("النص الإرشادي داخل مربع البحث.")]
     public string SearchPlaceholder
@@ -92,9 +72,7 @@ public sealed class TransportSearchPanel : UserControl
         _statusComboBox.SelectedIndex = 0;
     }
 
-    /// <summary>
-    /// إعادة البحث والتصفية إلى الوضع الافتراضي.
-    /// </summary>
+    /// <summary>إعادة البحث والتصفية إلى الوضع الافتراضي.</summary>
     public void ResetFilters()
     {
         _searchBox.ClearSearch();
@@ -105,15 +83,15 @@ public sealed class TransportSearchPanel : UserControl
     }
 
     /// <summary>
-    /// إنشاء التخطيط الداخلي الثابت للحاوية.
+    /// إنشاء الحاوية بارتفاع 10 مم تقريبًا، وجميع الحقول داخلها بارتفاع 8 مم تقريبًا.
     /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
-        Dock = DockStyle.Top;
-        Height = 64;
-        MinimumSize = new Size(0, 64);
-        Padding = new Padding(10, 10, 10, 8);
+        Dock = DockStyle.Fill;
+        Height = TransportUiMetrics.Container10Mm;
+        MinimumSize = new Size(0, TransportUiMetrics.Container10Mm);
+        Padding = new Padding(8, 4, 8, 4);
         RightToLeft = RightToLeft.Yes;
 
         _layout.Dock = DockStyle.Fill;
@@ -121,22 +99,23 @@ public sealed class TransportSearchPanel : UserControl
         _layout.RightToLeft = RightToLeft.Yes;
         _layout.WrapContents = false;
 
-        _searchBox.Width = 320;
-        _searchBox.Margin = new Padding(6, 0, 6, 0);
+        _searchBox.Width = 300;
+        _searchBox.Height = TransportUiMetrics.Control8Mm;
+        _searchBox.Margin = new Padding(4, 0, 4, 0);
         _searchBox.SearchTextChanged += (_, e) => SearchTextChanged?.Invoke(this, e);
 
         _statusLabel.AutoSize = false;
-        _statusLabel.Font = UiTheme.CreateRegularFont(10F);
-        _statusLabel.Margin = new Padding(8, 0, 4, 0);
-        _statusLabel.Size = new Size(58, 40);
+        _statusLabel.Font = UiTheme.CreateRegularFont(9.5F);
+        _statusLabel.Margin = new Padding(6, 0, 2, 0);
+        _statusLabel.Size = new Size(54, TransportUiMetrics.Control8Mm);
         _statusLabel.Text = "الحالة:";
         _statusLabel.TextAlign = ContentAlignment.MiddleRight;
 
         _statusComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-        _statusComboBox.Font = UiTheme.CreateRegularFont(10F);
-        _statusComboBox.Margin = new Padding(4, 0, 8, 0);
+        _statusComboBox.Font = UiTheme.CreateRegularFont(9.5F);
+        _statusComboBox.Margin = new Padding(2, 0, 6, 0);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
-        _statusComboBox.Size = new Size(145, 40);
+        _statusComboBox.Size = new Size(140, TransportUiMetrics.Control8Mm);
         _statusComboBox.Items.AddRange(new object[] { "الكل", "نشط", "موقوف" });
         _statusComboBox.SelectedIndex = 0;
         _statusComboBox.SelectedIndexChanged += (_, _) => StatusChanged?.Invoke(this, EventArgs.Empty);
