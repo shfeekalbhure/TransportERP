@@ -16,11 +16,24 @@ partial class UcNotificationTemplates
             new SecurityTabDefinition[]
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "تعريف القالب ونوعه وإصداره."),
-                new("محتوى القالب", SecurityTabKind.Details, "عنوان الرسالة والمحتوى والنص البديل."),
+                new("محتوى القالب", SecurityTabKind.Details, "عنوان الرسالة والمحتوى والنص البديل.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("عنوان الرسالة", SecurityFieldKind.RequiredText),
+                        new("المحتوى", SecurityFieldKind.Multiline),
+                        new("النص البديل", SecurityFieldKind.Multiline),
+                        new("تنسيق المحتوى", SecurityFieldKind.Choice, new[] { "نص", "HTML", "Markdown" }),
+                        new("الحد الأقصى للطول"),
+                        new("رابط الإجراء"),
+                        new("ملاحظات المصمم", SecurityFieldKind.Multiline)
+                    },
+                    Actions: new[] { "معاينة", "اختبار القالب" }),
                 new("المتغيرات", SecurityTabKind.CheckList, "المتغيرات المسموحة والإلزامية."),
                 new("القنوات واللغات", SecurityTabKind.CheckList, "القنوات واللغات المدعومة."),
-                new("الإصدارات والمعاينة", SecurityTabKind.Details, "الإصدارات ومعاينة بيانات الاختبار."),
-                new("سجل العمليات", SecurityTabKind.Audit, "إنشاء وتعديل واعتماد وإيقاف الإصدارات.")
+                new("الإصدارات والمعاينة", SecurityTabKind.Details, "الإصدارات ومعاينة بيانات الاختبار.",
+                    Columns: new[] { "الإصدار", "الحالة", "اللغة", "القناة", "تاريخ الإنشاء", "تاريخ الاعتماد", "اعتمد بواسطة", "تاريخ السريان" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "إنشاء وتعديل واعتماد وإيقاف الإصدارات.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الإصدار", "الحالة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
