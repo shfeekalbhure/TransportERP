@@ -27,6 +27,7 @@ internal static class TransportUiMetrics
     internal const int ToolbarButtonHeight = 28;
     internal const int ToolbarButtonWidth = 78;
     internal const int ToolbarButtonGap = 4;
+    internal const int ToolbarVerticalPadding = (ToolbarHeight - ToolbarButtonHeight) / 2;
 
     // البيانات الرئيسية: الحقل 6 مم، والمسافة بين الصفوف 1.5 مم تقريبًا.
     // الحد الأعلى ثلاثة أعمدة حقول وخمسة صفوف في التبويب الرئيسي.
@@ -64,6 +65,10 @@ internal static class TransportUiMetrics
     internal const int SearchControlHeight = Control8Mm;
     internal const int SearchStatusControlHeight = Control6Mm;
     internal const int SearchStatusVerticalMargin = (SearchControlHeight - SearchStatusControlHeight) / 2;
+    internal const int SearchMinimumWidth = 180;
+    internal const int SearchPreferredWidth = 300;
+    internal const int SearchStatusLabelWidth = 54;
+    internal const int SearchStatusWidth = 140;
 
     // التنقل: الحاوية 10 مم والأزرار 8 مم.
     internal const int PaginationHeight = Container10Mm;
@@ -76,6 +81,8 @@ internal static class TransportUiMetrics
     // الإشعارات: الحاوية 12 مم والمحتوى 9 مم.
     internal const int AlertBarHeight = Container12Mm;
     internal const int AlertContentHeight = Control9Mm;
+    internal const int AlertHorizontalPadding = 8;
+    internal const int AlertVerticalPadding = (AlertBarHeight - AlertContentHeight) / 2;
 
     // الجدول: ارتفاعات مؤسسية مضغوطة وواضحة.
     internal const int GridHeaderHeight = 34;
