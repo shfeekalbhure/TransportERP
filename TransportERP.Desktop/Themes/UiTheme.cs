@@ -30,7 +30,14 @@ internal static class UiTheme
     internal static Color ActionClose => Color.FromArgb(71, 85, 105);
     internal static Color ActionCloseHover => Color.FromArgb(51, 65, 85);
 
+    // الأسطح والحاويات: معرفة مركزيًا حتى لا تمتلك كل وحدة Theme فرعيًا خاصًا بها.
     internal static Color WindowBackground => Color.FromArgb(239, 245, 252);
+    internal static Color WorkspaceBackground => Color.FromArgb(247, 249, 252);
+    internal static Color SurfaceBackground => Color.White;
+    internal static Color GroupBorder => Color.FromArgb(214, 222, 233); // #D6DEE9
+    internal static Color GroupText => Color.FromArgb(45, 55, 72);
+    internal static Color ControlBorder => Color.FromArgb(203, 213, 225);
+
     internal static Color HeadingText => Color.FromArgb(17, 43, 78);
     internal static Color SecondaryText => Color.FromArgb(91, 111, 139);
     internal static Color BrandGradientStart => Color.FromArgb(17, 58, 140);
