@@ -8,7 +8,7 @@ namespace TransportERP.Desktop;
 
 /// <summary>
 /// شاشة GEN-003 — الدول.
-/// بُنيت من الصفر بواجهة عربية كاملة واتجاه RTL وأزرار تبدأ من أقصى اليمين.
+/// شاشة عربية RTL لتعريف الدول والرموز الدولية ومفاتيح الاتصال والعملات.
 /// </summary>
 public sealed class FrmCountries : Form
 {
@@ -17,7 +17,6 @@ public sealed class FrmCountries : Form
     private readonly TransportToolbar _toolbar = new();
     private readonly SearchBox _search = new();
     private readonly TransportDataGrid _grid = new();
-    private readonly TransportStatusBar _statusBar = new();
 
     private readonly RequiredTextBox _code = Required("يرجى إدخال كود الدولة.");
     private readonly RequiredTextBox _nameAr = Required("يرجى إدخال اسم الدولة بالعربية.");
@@ -44,30 +43,22 @@ public sealed class FrmCountries : Form
     private CountryRow? _selected;
     private bool _hostedInsideDashboard;
 
-    /// <summary>
-    /// إنشاء الشاشة وتجهيز التصميم والبيانات التجريبية.
-    /// </summary>
     public FrmCountries()
     {
         ConfigureForm();
+        ConfigureFieldRules();
         BuildLayout();
         RegisterEvents();
         LoadData();
         StartNewRecord();
     }
 
-    /// <summary>
-    /// تطبيق الخط المركزي بعد إظهار الشاشة.
-    /// </summary>
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         UiTypographyService.Apply(this, "GEN-003");
     }
 
-    /// <summary>
-    /// ضبط خصائص النافذة بالعربية واتجاه اليمين إلى اليسار.
-    /// </summary>
     private void ConfigureForm()
     {
         Name = "FrmCountries";
@@ -82,16 +73,25 @@ public sealed class FrmCountries : Form
         KeyPreview = true;
     }
 
-    /// <summary>
-    /// بناء جميع أجزاء الشاشة من الصفر.
-    /// </summary>
+    private void ConfigureFieldRules()
+    {
+        _code.MaxLength = 20;
+        _nameAr.MaxLength = 150;
+        _nameEn.MaxLength = 150;
+        _iso2.MaxLength = 2;
+        _iso3.MaxLength = 3;
+        _callingCode.MaxLength = 8;
+        _currencyCode.MaxLength = 3;
+        _notes.MaxLength = 500;
+    }
+
     private void BuildLayout()
     {
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 6,
+            RowCount = 5,
             Padding = new Padding(16),
             BackColor = UiTheme.WindowBackground,
             RightToLeft = RightToLeft.Yes
@@ -100,9 +100,8 @@ public sealed class FrmCountries : Form
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58F));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 288F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 300F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
 
         _title.SetContent(
             "الدول",
@@ -117,25 +116,9 @@ public sealed class FrmCountries : Form
         root.Controls.Add(BuildDataCard(), 0, 3);
         root.Controls.Add(BuildGridCard(), 0, 4);
 
-        _statusBar.Dock = DockStyle.Fill;
-        _statusBar.UpdateContext(
-            "الشركة الحالية",
-            "الفرع الحالي",
-            DateTime.Today.Year.ToString(),
-            "الفترة الحالية",
-            "المستخدم الحالي",
-            "الدور الحالي",
-            "TransportERP",
-            "1.0.0",
-            false);
-        root.Controls.Add(_statusBar, 0, 5);
-
         Controls.Add(root);
     }
 
-    /// <summary>
-    /// إنشاء شريط البحث أعلى البيانات.
-    /// </summary>
     private Control BuildSearchBar()
     {
         var panel = new Panel
@@ -145,9 +128,9 @@ public sealed class FrmCountries : Form
             Padding = new Padding(14, 8, 14, 8)
         };
 
-        _search.PlaceholderText = "ابحث بالكود أو الاسم أو ISO...";
+        _search.PlaceholderText = "ابحث بالكود أو الاسم أو ISO أو العملة أو مفتاح الاتصال...";
         _search.Dock = DockStyle.Right;
-        _search.Width = 440;
+        _search.Width = 520;
         _recordCount.Dock = DockStyle.Left;
         _recordCount.Width = 220;
 
@@ -156,9 +139,6 @@ public sealed class FrmCountries : Form
         return panel;
     }
 
-    /// <summary>
-    /// إنشاء بطاقة الحقول الرئيسية في عمودين متساويين.
-    /// </summary>
     private Control BuildDataCard()
     {
         var card = new Panel
@@ -229,9 +209,6 @@ public sealed class FrmCountries : Form
         return card;
     }
 
-    /// <summary>
-    /// إنشاء جدول الدول وأزرار التنقل العربية.
-    /// </summary>
     private Control BuildGridCard()
     {
         var card = new Panel
@@ -254,18 +231,16 @@ public sealed class FrmCountries : Form
         };
 
         pager.Controls.Add(PagerButton("الأول", () => SelectRow(0)));
-        pager.Controls.Add(PagerButton(
-            "السابق",
-            () => SelectRow(Math.Max(0, (_grid.CurrentRow?.Index ?? 0) - 1))));
+        pager.Controls.Add(PagerButton("السابق", () =>
+            SelectRow(Math.Max(0, (_grid.CurrentRow?.Index ?? 0) - 1))));
 
         _pageNumber.Width = 90;
         _pageNumber.Height = 34;
         _pageNumber.TextAlign = ContentAlignment.MiddleCenter;
         pager.Controls.Add(_pageNumber);
 
-        pager.Controls.Add(PagerButton(
-            "التالي",
-            () => SelectRow(Math.Min(_grid.Rows.Count - 1, (_grid.CurrentRow?.Index ?? -1) + 1))));
+        pager.Controls.Add(PagerButton("التالي", () =>
+            SelectRow(Math.Min(_grid.Rows.Count - 1, (_grid.CurrentRow?.Index ?? -1) + 1))));
         pager.Controls.Add(PagerButton("الأخير", () => SelectRow(_grid.Rows.Count - 1)));
 
         card.Controls.Add(_grid);
@@ -273,9 +248,6 @@ public sealed class FrmCountries : Form
         return card;
     }
 
-    /// <summary>
-    /// إنشاء عناوين الجدول باللغة العربية.
-    /// </summary>
     private void ConfigureGridColumns()
     {
         _grid.AutoGenerateColumns = false;
@@ -290,14 +262,11 @@ public sealed class FrmCountries : Form
         AddColumn(nameof(CountryRow.Status), "الحالة", 90);
     }
 
-    /// <summary>
-    /// تسجيل أحداث الأزرار والبحث والجدول.
-    /// </summary>
     private void RegisterEvents()
     {
         _toolbar.NewRequested += (_, _) => StartNewRecord();
         _toolbar.SaveRequested += (_, _) => SaveRecord();
-        _toolbar.EditRequested += (_, _) => EnableFields(true);
+        _toolbar.EditRequested += (_, _) => EditSelectedRecord();
         _toolbar.DisableRequested += (_, _) => StopRecord();
         _toolbar.DeleteRequested += (_, _) => DeleteRecord();
         _toolbar.PrintRequested += (_, _) => PrintRecord();
@@ -307,24 +276,17 @@ public sealed class FrmCountries : Form
         KeyDown += HandleShortcuts;
     }
 
-    /// <summary>
-    /// تحميل حالات السجل وبيانات تجريبية مؤقتة.
-    /// </summary>
     private void LoadData()
     {
         _status.BindItems(new[] { "نشط", "موقوف" });
-        _countries.Add(new CountryRow("YE", "اليمن", "Yemen", "YE", "YEM", "+967", "YER", "نشط", ""));
-        _countries.Add(new CountryRow("SA", "المملكة العربية السعودية", "Saudi Arabia", "SA", "SAU", "+966", "SAR", "نشط", ""));
-        _countries.Add(new CountryRow("AE", "الإمارات العربية المتحدة", "United Arab Emirates", "AE", "ARE", "+971", "AED", "نشط", ""));
         Bind(_countries);
     }
 
-    /// <summary>
-    /// بدء إدخال سجل جديد.
-    /// </summary>
     private void StartNewRecord()
     {
         _selected = null;
+        _grid.ClearSelection();
+
         foreach (var field in TextFields())
         {
             field.ResetField();
@@ -335,45 +297,71 @@ public sealed class FrmCountries : Form
         _createdInfo.Text = "بيانات الإنشاء: لم يتم الحفظ بعد";
         _modifiedInfo.Text = "بيانات التعديل: لا توجد تعديلات";
         _editCount.Text = "عدد مرات التعديل: 0";
+        _printCount.Text = "عدد مرات الطباعة: 0";
+        UpdatePage();
         _code.Focus();
     }
 
-    /// <summary>
-    /// حفظ سجل جديد أو تعديل السجل المحدد.
-    /// </summary>
+    private void EditSelectedRecord()
+    {
+        if (!EnsureSelection())
+        {
+            return;
+        }
+
+        EnableFields(true);
+        _code.Focus();
+    }
+
     private void SaveRecord()
     {
-        if (!ValidateFields())
+        NormalizeFields();
+
+        if (!ValidateFields() || !ValidateFormats() || !ValidateUniqueCode())
         {
             return;
         }
 
         if (_selected is null)
         {
-            _selected = ReadForm();
-            _countries.Add(_selected);
-            _createdInfo.Text = $"بيانات الإنشاء: المستخدم الحالي — {DateTime.Now:yyyy/MM/dd HH:mm}";
+            var row = ReadForm();
+            row.CreatedAt = DateTime.Now;
+            _countries.Add(row);
+            _selected = row;
         }
         else
         {
             WriteForm(_selected);
             _selected.EditCount++;
-            _modifiedInfo.Text = $"بيانات التعديل: المستخدم الحالي — {DateTime.Now:yyyy/MM/dd HH:mm}";
-            _editCount.Text = $"عدد مرات التعديل: {_selected.EditCount}";
+            _selected.ModifiedAt = DateTime.Now;
         }
 
         Bind(_countries);
+        SelectBoundRow(_selected);
         EnableFields(false);
+        UpdateAuditLabels();
+
         MessageBox.Show(
             "تم حفظ بيانات الدولة بنجاح.",
             "الدول",
             MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+            MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
-    /// <summary>
-    /// التحقق من الحقول الإلزامية.
-    /// </summary>
+    private void NormalizeFields()
+    {
+        _code.Text = _code.Text.Trim().ToUpperInvariant();
+        _nameAr.Text = _nameAr.Text.Trim();
+        _nameEn.Text = _nameEn.Text.Trim();
+        _iso2.Text = _iso2.Text.Trim().ToUpperInvariant();
+        _iso3.Text = _iso3.Text.Trim().ToUpperInvariant();
+        _callingCode.Text = _callingCode.Text.Trim();
+        _currencyCode.Text = _currencyCode.Text.Trim().ToUpperInvariant();
+        _notes.Text = _notes.Text.Trim();
+    }
+
     private bool ValidateFields() =>
         _code.ValidateRequired()
         && _nameAr.ValidateRequired()
@@ -384,34 +372,89 @@ public sealed class FrmCountries : Form
         && _currencyCode.ValidateRequired()
         && _status.ValidateSelection();
 
-    /// <summary>
-    /// تحميل الصف المحدد إلى الحقول.
-    /// </summary>
+    private bool ValidateFormats()
+    {
+        if (_iso2.Text.Length != 2)
+        {
+            return ValidationMessage(_iso2, "رمز ISO2 يجب أن يتكون من حرفين بالضبط.");
+        }
+
+        if (_iso3.Text.Length != 3)
+        {
+            return ValidationMessage(_iso3, "رمز ISO3 يجب أن يتكون من ثلاثة أحرف بالضبط.");
+        }
+
+        if (_currencyCode.Text.Length != 3)
+        {
+            return ValidationMessage(_currencyCode, "رمز العملة يجب أن يتكون من ثلاثة أحرف.");
+        }
+
+        if (!_iso2.Text.All(char.IsLetter) || !_iso3.Text.All(char.IsLetter) || !_currencyCode.Text.All(char.IsLetter))
+        {
+            return ValidationMessage(_iso2, "رموز ISO والعملات يجب أن تحتوي على أحرف فقط.");
+        }
+
+        if (!_callingCode.Text.StartsWith('+')
+            || _callingCode.Text.Length < 2
+            || !_callingCode.Text[1..].All(char.IsDigit))
+        {
+            return ValidationMessage(_callingCode, "مفتاح الاتصال يجب أن يبدأ بعلامة + ثم أرقام فقط، مثل +967.");
+        }
+
+        return true;
+    }
+
+    private bool ValidateUniqueCode()
+    {
+        var duplicate = _countries.Any(row =>
+            !ReferenceEquals(row, _selected)
+            && string.Equals(row.Code, _code.Text, StringComparison.OrdinalIgnoreCase));
+
+        if (!duplicate)
+        {
+            return true;
+        }
+
+        return ValidationMessage(_code, "كود الدولة مستخدم مسبقًا. يرجى إدخال كود فريد.");
+    }
+
+    private static bool ValidationMessage(Control control, string message)
+    {
+        MessageBox.Show(
+            message,
+            "الدول",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        control.Focus();
+        return false;
+    }
+
     private void LoadSelectedRecord()
     {
-        _selected = _grid.GetSelectedItem<CountryRow>();
-        if (_selected is null)
+        var selected = _grid.GetSelectedItem<CountryRow>();
+        if (selected is null)
         {
+            UpdatePage();
             return;
         }
 
-        _code.Text = _selected.Code;
-        _nameAr.Text = _selected.NameAr;
-        _nameEn.Text = _selected.NameEn;
-        _iso2.Text = _selected.Iso2;
-        _iso3.Text = _selected.Iso3;
-        _callingCode.Text = _selected.CallingCode;
-        _currencyCode.Text = _selected.CurrencyCode;
-        _status.SelectedItem = _selected.Status;
-        _notes.Text = _selected.Notes;
-        _editCount.Text = $"عدد مرات التعديل: {_selected.EditCount}";
+        _selected = selected;
+        _code.Text = selected.Code;
+        _nameAr.Text = selected.NameAr;
+        _nameEn.Text = selected.NameEn;
+        _iso2.Text = selected.Iso2;
+        _iso3.Text = selected.Iso3;
+        _callingCode.Text = selected.CallingCode;
+        _currencyCode.Text = selected.CurrencyCode;
+        _status.SelectedItem = selected.Status;
+        _notes.Text = selected.Notes;
         EnableFields(false);
+        UpdateAuditLabels();
         UpdatePage();
     }
 
-    /// <summary>
-    /// إيقاف السجل المحدد.
-    /// </summary>
     private void StopRecord()
     {
         if (!EnsureSelection())
@@ -419,14 +462,19 @@ public sealed class FrmCountries : Form
             return;
         }
 
-        _selected!.Status = "موقوف";
+        if (string.Equals(_selected!.Status, "موقوف", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _selected.Status = "موقوف";
+        _selected.EditCount++;
+        _selected.ModifiedAt = DateTime.Now;
         _status.SelectedItem = "موقوف";
         _grid.Refresh();
+        UpdateAuditLabels();
     }
 
-    /// <summary>
-    /// حذف السجل المحدد بعد التأكيد.
-    /// </summary>
     private void DeleteRecord()
     {
         if (!EnsureSelection())
@@ -452,9 +500,6 @@ public sealed class FrmCountries : Form
         StartNewRecord();
     }
 
-    /// <summary>
-    /// تسجيل عملية طباعة تجريبية.
-    /// </summary>
     private void PrintRecord()
     {
         if (!EnsureSelection())
@@ -463,17 +508,16 @@ public sealed class FrmCountries : Form
         }
 
         _selected!.PrintCount++;
-        _printCount.Text = $"عدد مرات الطباعة: {_selected.PrintCount}";
+        UpdateAuditLabels();
         MessageBox.Show(
             "تم تجهيز بيانات الدولة للطباعة.",
             "طباعة",
             MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+            MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
-    /// <summary>
-    /// البحث الفوري في حقول الدولة الأساسية.
-    /// </summary>
     private void Filter(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -483,20 +527,19 @@ public sealed class FrmCountries : Form
         }
 
         var value = text.Trim();
-        var result = _countries.Where(x =>
-            x.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
-            || x.NameAr.Contains(value, StringComparison.OrdinalIgnoreCase)
-            || x.NameEn.Contains(value, StringComparison.OrdinalIgnoreCase)
-            || x.Iso2.Contains(value, StringComparison.OrdinalIgnoreCase)
-            || x.Iso3.Contains(value, StringComparison.OrdinalIgnoreCase))
+        var result = _countries.Where(row =>
+            row.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.NameAr.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.NameEn.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.Iso2.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.Iso3.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.CallingCode.Contains(value, StringComparison.OrdinalIgnoreCase)
+            || row.CurrencyCode.Contains(value, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         Bind(result);
     }
 
-    /// <summary>
-    /// ربط البيانات بالجدول وتحديث العدد.
-    /// </summary>
     private void Bind(object source)
     {
         _grid.BindData(source);
@@ -504,9 +547,23 @@ public sealed class FrmCountries : Form
         UpdatePage();
     }
 
-    /// <summary>
-    /// تحديد صف حسب رقمه.
-    /// </summary>
+    private void SelectBoundRow(CountryRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < _grid.Rows.Count; index++)
+        {
+            if (ReferenceEquals(_grid.Rows[index].DataBoundItem, row))
+            {
+                SelectRow(index);
+                return;
+            }
+        }
+    }
+
     private void SelectRow(int index)
     {
         if (index < 0 || index >= _grid.Rows.Count)
@@ -516,22 +573,40 @@ public sealed class FrmCountries : Form
 
         _grid.ClearSelection();
         _grid.Rows[index].Selected = true;
-        _grid.CurrentCell = _grid.Rows[index].Cells[0];
+        if (_grid.Rows[index].Cells.Count > 0)
+        {
+            _grid.CurrentCell = _grid.Rows[index].Cells[0];
+        }
         UpdatePage();
     }
 
-    /// <summary>
-    /// تحديث مؤشر السجل الحالي.
-    /// </summary>
     private void UpdatePage()
     {
         var current = _grid.CurrentRow is null ? 0 : _grid.CurrentRow.Index + 1;
         _pageNumber.Text = $"{current} / {_grid.Rows.Count}";
     }
 
-    /// <summary>
-    /// تهيئة الشاشة للعرض داخل تبويب Dashboard.
-    /// </summary>
+    private void UpdateAuditLabels()
+    {
+        if (_selected is null)
+        {
+            _createdInfo.Text = "بيانات الإنشاء: لم يتم الحفظ بعد";
+            _modifiedInfo.Text = "بيانات التعديل: لا توجد تعديلات";
+            _editCount.Text = "عدد مرات التعديل: 0";
+            _printCount.Text = "عدد مرات الطباعة: 0";
+            return;
+        }
+
+        _createdInfo.Text = _selected.CreatedAt is null
+            ? "بيانات الإنشاء: غير متوفرة"
+            : $"بيانات الإنشاء: المستخدم الحالي — {_selected.CreatedAt:yyyy/MM/dd HH:mm}";
+        _modifiedInfo.Text = _selected.ModifiedAt is null
+            ? "بيانات التعديل: لا توجد تعديلات"
+            : $"بيانات التعديل: المستخدم الحالي — {_selected.ModifiedAt:yyyy/MM/dd HH:mm}";
+        _editCount.Text = $"عدد مرات التعديل: {_selected.EditCount}";
+        _printCount.Text = $"عدد مرات الطباعة: {_selected.PrintCount}";
+    }
+
     public void ConfigureForTabHosting()
     {
         if (_hostedInsideDashboard)
@@ -545,31 +620,30 @@ public sealed class FrmCountries : Form
         Dock = DockStyle.Fill;
         WindowState = FormWindowState.Normal;
         ShowInTaskbar = false;
-        _statusBar.Visible = false;
     }
 
     private CountryRow ReadForm() => new(
-        _code.Text.Trim(),
-        _nameAr.Text.Trim(),
-        _nameEn.Text.Trim(),
-        _iso2.Text.Trim().ToUpperInvariant(),
-        _iso3.Text.Trim().ToUpperInvariant(),
-        _callingCode.Text.Trim(),
-        _currencyCode.Text.Trim().ToUpperInvariant(),
+        _code.Text,
+        _nameAr.Text,
+        _nameEn.Text,
+        _iso2.Text,
+        _iso3.Text,
+        _callingCode.Text,
+        _currencyCode.Text,
         _status.SelectedItem?.ToString() ?? "نشط",
-        _notes.Text.Trim());
+        _notes.Text);
 
     private void WriteForm(CountryRow row)
     {
-        row.Code = _code.Text.Trim();
-        row.NameAr = _nameAr.Text.Trim();
-        row.NameEn = _nameEn.Text.Trim();
-        row.Iso2 = _iso2.Text.Trim().ToUpperInvariant();
-        row.Iso3 = _iso3.Text.Trim().ToUpperInvariant();
-        row.CallingCode = _callingCode.Text.Trim();
-        row.CurrencyCode = _currencyCode.Text.Trim().ToUpperInvariant();
+        row.Code = _code.Text;
+        row.NameAr = _nameAr.Text;
+        row.NameEn = _nameEn.Text;
+        row.Iso2 = _iso2.Text;
+        row.Iso3 = _iso3.Text;
+        row.CallingCode = _callingCode.Text;
+        row.CurrencyCode = _currencyCode.Text;
         row.Status = _status.SelectedItem?.ToString() ?? "نشط";
-        row.Notes = _notes.Text.Trim();
+        row.Notes = _notes.Text;
     }
 
     private bool EnsureSelection()
@@ -706,9 +780,6 @@ public sealed class FrmCountries : Form
         });
     }
 
-    /// <summary>
-    /// نموذج العرض المحلي إلى حين إنشاء DTO وربط API.
-    /// </summary>
     private sealed class CountryRow
     {
         public CountryRow(
@@ -765,5 +836,11 @@ public sealed class FrmCountries : Form
 
         [Browsable(false)]
         public int PrintCount { get; set; }
+
+        [Browsable(false)]
+        public DateTime? CreatedAt { get; set; }
+
+        [Browsable(false)]
+        public DateTime? ModifiedAt { get; set; }
     }
 }
