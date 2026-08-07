@@ -11,7 +11,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportToolbar : UserControl
 {
-    // حاوية الأزرار؛ اتجاه RightToLeft يضمن أن زر "جديد" يبدأ من أقصى اليمين.
+    // هذه الحاوية تجمع الأزرار نفسها، وتثبت ككتلة كاملة في أقصى يمين الشريط.
     private readonly FlowLayoutPanel _buttonsPanel = new();
 
     public PrimaryButton NewButton { get; } = CreateButton("جديد", ToolbarAction.New);
@@ -49,8 +49,8 @@ public sealed class TransportToolbar : UserControl
     }
 
     /// <summary>
-    /// يثبت الشريط أعلى الشاشة، ويضع الأزرار من اليمين إلى اليسار.
-    /// ارتفاع الحاوية 12 مم، وارتفاع كل زر 9 مم حسب القرار المعتمد.
+    /// يثبت شريط الأوامر أعلى الشاشة، ويثبت كتلة الأزرار نفسها في أقصى اليمين.
+    /// استخدام Dock=Right للحاوية الداخلية يمنع ظهور الأزرار من اليسار عند اختلاف اتجاه الحاوية الأب.
     /// </summary>
     private void InitializeLayout()
     {
@@ -62,9 +62,11 @@ public sealed class TransportToolbar : UserControl
         Padding = new Padding(10, 5, 10, 5);
         RightToLeft = RightToLeft.Yes;
 
-        _buttonsPanel.AutoScroll = true;
+        _buttonsPanel.AutoSize = true;
+        _buttonsPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _buttonsPanel.AutoScroll = false;
         _buttonsPanel.BackColor = Color.Transparent;
-        _buttonsPanel.Dock = DockStyle.Fill;
+        _buttonsPanel.Dock = DockStyle.Right;
         _buttonsPanel.FlowDirection = FlowDirection.RightToLeft;
         _buttonsPanel.RightToLeft = RightToLeft.Yes;
         _buttonsPanel.WrapContents = false;
@@ -93,10 +95,6 @@ public sealed class TransportToolbar : UserControl
         CloseButton.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>
-    /// ينشئ زرًا موحدًا ويعطي كل عملية لونها الدلالي.
-    /// الأزرق للعمليات العامة، الأخضر للحفظ، الكهرماني للتعديل، البرتقالي للإيقاف، الأحمر للحذف.
-    /// </summary>
     private static PrimaryButton CreateButton(string text, ToolbarAction action)
     {
         var (normal, hover) = action switch
