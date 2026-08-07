@@ -2,28 +2,45 @@ namespace TransportERP.Desktop.Views.Setup.Geographic;
 
 /// <summary>
 /// GEN-006 — المدن.
-/// شاشة عمل داخل الـ Main Shell وتُصمم عبر Windows Forms Designer/Toolbox.
+/// الشاشة تحتفظ فقط بحقول المدينة، بينما الأدوات العامة تأتي من القالب المشترك.
 /// </summary>
 public partial class UcCities : UserControl
 {
     public UcCities()
     {
         InitializeComponent();
+        ConfigureSharedControls();
         ConfigureRuntimeDefaults();
     }
 
+    /// <summary>
+    /// ربط أحداث الأدوات المشتركة بوظائف شاشة المدن.
+    /// </summary>
+    private void ConfigureSharedControls()
+    {
+        screenShell.Toolbar.NewRequested += (_, _) => ClearEditor();
+        screenShell.Toolbar.CloseRequested += (_, _) => CloseHostTab();
+        screenShell.SearchPanel.SearchTextChanged += (_, _) => HandleSearchChanged();
+        screenShell.SearchPanel.StatusChanged += (_, _) => HandleSearchChanged();
+    }
+
+    /// <summary>
+    /// ضبط القيم الافتراضية للشاشة.
+    /// </summary>
     private void ConfigureRuntimeDefaults()
     {
         RightToLeft = RightToLeft.Yes;
         cmbStatus.SelectedIndex = 0;
-        cmbStatusFilter.SelectedIndex = 0;
-        lblCreatedValue.Text = "—";
-        lblModifiedValue.Text = "—";
-        lblEditCountValue.Text = "0";
-        lblPrintCountValue.Text = "0";
+        screenShell.SearchPanel.SetStatusItems("نشط", "موقوف");
+        screenShell.SearchPanel.SearchPlaceholder = "ابحث بكود المدينة أو الاسم...";
+        screenShell.Pagination.SetPageInfo(1, 1, 0, 0, 0);
+        screenShell.AuditPanel.ClearAuditInfo();
     }
 
-    private void btnNew_Click(object? sender, EventArgs e)
+    /// <summary>
+    /// تفريغ حقول المدينة عند الضغط على زر جديد الموحد.
+    /// </summary>
+    private void ClearEditor()
     {
         cmbCountry.SelectedIndex = -1;
         cmbGovernorate.SelectedIndex = -1;
@@ -33,11 +50,27 @@ public partial class UcCities : UserControl
         txtNameEn.Clear();
         txtNotes.Clear();
         cmbStatus.SelectedIndex = 0;
+        screenShell.AlertBar.HideMessage();
+        screenShell.AuditPanel.ClearAuditInfo();
         cmbCountry.Focus();
     }
 
-    private void txtSearch_TextChanged(object? sender, EventArgs e)
+    /// <summary>
+    /// نقطة الربط المستقبلية مع API للبحث والتصفية.
+    /// </summary>
+    private void HandleSearchChanged()
     {
-        // البحث الحقيقي سيتم ربطه لاحقًا عبر API.
+        // لاحقًا نرسل SearchText وSelectedStatus إلى API.
+    }
+
+    /// <summary>
+    /// إغلاق تبويب الشاشة الحالي داخل الـMain Shell.
+    /// </summary>
+    private void CloseHostTab()
+    {
+        if (Parent is not TabPage page || page.Parent is not TabControl tabs) return;
+        tabs.TabPages.Remove(page);
+        Dispose();
+        page.Dispose();
     }
 }
