@@ -7,19 +7,11 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 /// </summary>
 internal static class TransportUiMetrics
 {
-    // 12 مم تقريبًا = 45 بكسل: ارتفاع حاوية الأزرار والتنبيهات وبيانات التدقيق.
     internal const int Container12Mm = 45;
-
-    // 10 مم تقريبًا = 38 بكسل: ارتفاع حاوية البحث والتصفية وحاوية التنقل.
     internal const int Container10Mm = 38;
-
-    // 9 مم تقريبًا = 34 بكسل: ارتفاع الأزرار والمحتوى داخل الحاويات ذات ارتفاع 12 مم.
     internal const int Control9Mm = 34;
-
-    // 8 مم تقريبًا = 30 بكسل: ارتفاع الحقول وأزرار التنقل داخل الحاويات ذات ارتفاع 10 مم.
     internal const int Control8Mm = 30;
 
-    // أسماء دلالية تستخدمها المكونات حتى يكون معنى الرقم واضحًا داخل الكود.
     internal const int ToolbarHeight = Container12Mm;
     internal const int ToolbarButtonHeight = Control9Mm;
     internal const int SearchPanelHeight = Container10Mm;
@@ -31,9 +23,14 @@ internal static class TransportUiMetrics
     internal const int AlertBarHeight = Container12Mm;
     internal const int AlertContentHeight = Control9Mm;
 
-    // المسافة الداخلية القياسية الصغيرة بين حدود الحاوية والعناصر.
-    internal const int CompactPadding = 4;
+    // مساحة عنوان وحدود GroupBox فوق الحاوية الداخلية.
+    internal const int GroupBoxHeaderSpace = 24;
 
-    // المسافة الأفقية القياسية بين العناصر المتجاورة.
+    // الارتفاع الخارجي للحاويات التي أصبحت داخل GroupBox.
+    internal const int SearchGroupHeight = SearchPanelHeight + GroupBoxHeaderSpace;
+    internal const int AuditGroupHeight = AuditPanelHeight + GroupBoxHeaderSpace;
+    internal const int AlertGroupHeight = AlertBarHeight + GroupBoxHeaderSpace;
+
+    internal const int CompactPadding = 4;
     internal const int CompactGap = 6;
 }
