@@ -19,6 +19,7 @@ internal static class TransportUiMetrics
     internal const int GroupHorizontalPadding = 6;
     internal const int GroupTopPadding = 4;
     internal const int GroupBottomPadding = 4;
+    internal const int GroupVerticalPadding = GroupTopPadding + GroupBottomPadding;
     internal const int SectionGap = 6; // قرابة 1.5 مم بين الحاويات حتى لا تلتصق الحدود.
 
     // شريط الأوامر مصغر حتى يحافظ على مساحة الجدول.
@@ -72,11 +73,12 @@ internal static class TransportUiMetrics
     internal const int GridRowHeight = 32;
     internal const int GridCellHorizontalPadding = 6;
 
-    // عنوان وحدود GroupBox بدون هدر رأسي.
+    // ارتفاع GroupBox = ارتفاع المحتوى + مساحة العنوان + Padding الفعلي أعلى وأسفل.
+    // إبقاء المعادلة هنا يمنع قص المحتوى أو اختلاف الحاويات بين الشاشات.
     internal const int GroupBoxHeaderSpace = 20;
-    internal const int SearchGroupHeight = SearchPanelHeight + GroupBoxHeaderSpace;
-    internal const int AuditGroupHeight = AuditPanelHeight + GroupBoxHeaderSpace;
-    internal const int AlertGroupHeight = AlertBarHeight + GroupBoxHeaderSpace;
+    internal const int SearchGroupHeight = SearchPanelHeight + GroupBoxHeaderSpace + GroupVerticalPadding;
+    internal const int AuditGroupHeight = AuditPanelHeight + GroupBoxHeaderSpace + GroupVerticalPadding;
+    internal const int AlertGroupHeight = AlertBarHeight + GroupBoxHeaderSpace + GroupVerticalPadding;
 
     // الصف العلوي يضم الإشعارات والتنقل معًا.
     internal const int TopUtilityRowHeight = AlertGroupHeight;
