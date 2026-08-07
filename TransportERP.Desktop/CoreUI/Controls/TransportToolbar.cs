@@ -103,11 +103,11 @@ public sealed class TransportToolbar : UserControl
 
         return new PrimaryButton
         {
-            CornerRadius = 7,
+            CornerRadius = 6,
             Height = TransportUiMetrics.ToolbarButtonHeight,
-            MinimumSize = new Size(78, TransportUiMetrics.ToolbarButtonHeight),
-            Width = 86,
-            Margin = new Padding(3, 0, 3, 0),
+            MinimumSize = new Size(70, TransportUiMetrics.ToolbarButtonHeight),
+            Width = 78,
+            Margin = new Padding(2, 0, 2, 0),
             Text = text,
             NormalBackColor = normal,
             HoverBackColor = hover
