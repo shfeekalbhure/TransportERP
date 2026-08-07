@@ -16,9 +16,23 @@ partial class UcFailedLoginAttempts
             new SecurityTabDefinition[]
             {
                 new("المحاولات والحالة", SecurityTabKind.Details, "محاولات الدخول الفاشلة وحالة الحساب للقراءة فقط."),
-                new("إدارة الحظر والمعالجة", SecurityTabKind.Details, "إجراءات الحظر والرفع مع السبب والتدقيق."),
-                new("الأنماط والمصادر", SecurityTabKind.Details, "تجميع المحاولات حسب المصدر أو الحساب والاتجاه."),
-                new("سجل العمليات", SecurityTabKind.Audit, "الحظر والتمديد والرفع والوصول للبيانات الحساسة.")
+                new("إدارة الحظر والمعالجة", SecurityTabKind.Details, "إجراءات الحظر والرفع مع السبب والتدقيق.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("نوع الحظر", SecurityFieldKind.Choice, new[] { "لا يوجد", "حساب", "مصدر/IP" }),
+                        new("بداية الحظر", SecurityFieldKind.Date),
+                        new("نهاية الحظر", SecurityFieldKind.Date),
+                        new("مدة الحظر بالدقائق"),
+                        new("المسؤول"),
+                        new("سبب الحظر / الرفع", SecurityFieldKind.Multiline),
+                        new("المرجع"),
+                        new("إنشاء تنبيه أمني", SecurityFieldKind.Boolean)
+                    },
+                    Actions: new[] { "حظر حساب", "حظر IP", "تمديد الحظر", "رفع الحظر" }),
+                new("الأنماط والمصادر", SecurityTabKind.Details, "تجميع المحاولات حسب المصدر أو الحساب والاتجاه.",
+                    Columns: new[] { "المصدر / IP", "المستخدم / المعرف", "عدد المحاولات", "أول محاولة", "آخر محاولة", "الموقع", "الجهاز", "مستوى الخطورة" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "الحظر والتمديد والرفع والوصول للبيانات الحساسة.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الحساب / IP", "نفذ بواسطة", "النتيجة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
