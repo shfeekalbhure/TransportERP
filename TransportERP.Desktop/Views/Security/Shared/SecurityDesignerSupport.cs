@@ -151,6 +151,15 @@ internal static class SecurityDesignerSupport
             textBox.TextAlign = HorizontalAlignment.Right;
         }
 
+        // حالات الحقول موحدة من CoreUI؛ لا توجد ألوان Required/ReadOnly محلية داخل شاشات الأمن.
+        var visualState = definition.Kind switch
+        {
+            SecurityFieldKind.RequiredText => TransportFieldVisualState.Required,
+            SecurityFieldKind.Masked => TransportFieldVisualState.ReadOnly,
+            _ => TransportFieldVisualState.Normal
+        };
+        TransportFieldState.Apply(editor, visualState);
+
         return editor;
     }
 
@@ -167,19 +176,23 @@ internal static class SecurityDesignerSupport
     }
 
     /// <summary>
-    /// كل تبويب متخصص يبدأ بحاوية عامة، ثم شريط وصف مركزي، ثم محتوى متخصص داخل حاوية.
+    /// كل تبويب متخصص يبدأ بحاوية عامة، ثم وصف بارتفاع مركزي، ثم محتوى متخصص داخل حاوية.
     /// </summary>
     private static Control CreateSpecializedWorkspace(SecurityTabDefinition definition)
     {
         var section = CreateSection(definition.Title);
-        var host = CreateSingleColumnLayout(TransportUiMetrics.AlertBarHeight);
+        var host = CreateSingleColumnLayout(TransportUiMetrics.TabDescriptionHeight);
 
-        var description = new TransportAlertBar
+        var description = new Label
         {
             Dock = DockStyle.Fill,
-            Margin = Padding.Empty
+            Margin = Padding.Empty,
+            Padding = new Padding(TransportUiMetrics.CompactPadding),
+            RightToLeft = RightToLeft.Yes,
+            Text = definition.Description,
+            TextAlign = ContentAlignment.MiddleRight,
+            ForeColor = SystemColors.GrayText
         };
-        description.ShowInfo(definition.Description);
 
         var content = definition.Kind switch
         {
@@ -321,6 +334,7 @@ internal static class SecurityDesignerSupport
             Text = title,
             Margin = Padding.Empty
         };
+        TransportFieldState.Apply(text, TransportFieldVisualState.ReadOnly);
 
         section.Controls.Add(text);
         return section;
