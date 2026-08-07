@@ -16,9 +16,32 @@ partial class UcPasswordManagement
             new SecurityTabDefinition[]
             {
                 new("طلبات إعادة التعيين", SecurityTabKind.Details, "طلبات إعادة التعيين وحالتها."),
-                new("المستخدم والحالة", SecurityTabKind.Details, "حالة المستخدم والقفل والانتهاء."),
-                new("الموافقة والتنفيذ", SecurityTabKind.Details, "الموافقة والتنفيذ الآمن دون عرض السر."),
-                new("سجل العمليات", SecurityTabKind.Audit, "الطلب والموافقة والرفض والإصدار والإلغاء.")
+                new("المستخدم والحالة", SecurityTabKind.Details, "حالة المستخدم والقفل والانتهاء.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("المستخدم"),
+                        new("حالة الحساب", SecurityFieldKind.Choice, new[] { "نشط", "موقوف", "مقفل" }),
+                        new("حالة القفل", SecurityFieldKind.Choice, new[] { "مفتوح", "مقفل" }),
+                        new("وقت القفل", SecurityFieldKind.Date),
+                        new("انتهاء كلمة المرور", SecurityFieldKind.Date),
+                        new("آخر تغيير لكلمة المرور", SecurityFieldKind.Date),
+                        new("عدد محاولات الدخول الفاشلة"),
+                        new("يتطلب تغييرًا عند الدخول", SecurityFieldKind.Boolean)
+                    }),
+                new("الموافقة والتنفيذ", SecurityTabKind.Details, "الموافقة والتنفيذ الآمن دون عرض السر.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("حالة الموافقة", SecurityFieldKind.Choice, new[] { "بانتظار الموافقة", "معتمد", "مرفوض" }),
+                        new("المعتمد بواسطة"),
+                        new("تاريخ الاعتماد", SecurityFieldKind.Date),
+                        new("قناة التسليم", SecurityFieldKind.Choice, new[] { "داخل النظام", "بريد إلكتروني", "رسالة" }),
+                        new("صلاحية الرمز المؤقت بالدقائق"),
+                        new("يتطلب تغييرًا عند أول دخول", SecurityFieldKind.Boolean),
+                        new("سبب الرفض / الإلغاء", SecurityFieldKind.Multiline)
+                    },
+                    Actions: new[] { "موافقة", "رفض", "إصدار رمز مؤقت" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "الطلب والموافقة والرفض والإصدار والإلغاء.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "حالة الطلب", "نفذ بواسطة", "قناة التنفيذ", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
