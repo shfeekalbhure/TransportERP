@@ -5,15 +5,12 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// عنصر التصفح الموحد بين صفحات السجلات.
-/// يعتمد أزرارًا مختصرة بالأسهم لتقليل المساحة والحفاظ على شكل موحد في جميع الشاشات.
+/// يعرض أسهمًا مختصرة في مساحة صغيرة حتى يظهر بجانب حاوية الإشعارات أعلى الشاشة.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportPagination : UserControl
 {
-    // الحاوية التي تضع أزرار التصفح في صف واحد في منتصف الشاشة.
     private readonly FlowLayoutPanel _layout = new();
-
-    // الأسهم ثابتة في جميع الشاشات: أول، سابق، التالي، أخير.
     private readonly Button _firstButton = CreateButton("⏮", "الأول");
     private readonly Button _previousButton = CreateButton("◀", "السابق");
     private readonly Label _pageLabel = new();
@@ -25,9 +22,6 @@ public sealed class TransportPagination : UserControl
     private int _currentPage = 1;
     private int _totalPages = 1;
 
-    /// <summary>
-    /// إنشاء عنصر التصفح وربط أزراره بأحداث عامة تستخدمها أي شاشة.
-    /// </summary>
     public TransportPagination()
     {
         InitializeLayout();
@@ -40,24 +34,15 @@ public sealed class TransportPagination : UserControl
     public event EventHandler? NextRequested;
     public event EventHandler? LastRequested;
 
-    [Browsable(false)]
-    public int CurrentPage => _currentPage;
+    [Browsable(false)] public int CurrentPage => _currentPage;
+    [Browsable(false)] public int TotalPages => _totalPages;
 
-    [Browsable(false)]
-    public int TotalPages => _totalPages;
-
-    /// <summary>
-    /// تحديث معلومات الصفحة والعداد السفلي بعد جلب البيانات من API.
-    /// </summary>
     public void SetPageInfo(int currentPage, int totalPages, int fromRecord, int toRecord, int totalRecords)
     {
         _currentPage = Math.Max(1, currentPage);
         _totalPages = Math.Max(1, totalPages);
-
-        _pageLabel.Text = $"{_currentPage} / {_totalPages}";
-        _recordsLabel.Text = totalRecords <= 0
-            ? "لا توجد سجلات"
-            : $"عرض {Math.Max(1, fromRecord)} - {Math.Max(fromRecord, toRecord)} من {totalRecords}";
+        _pageLabel.Text = $"{_currentPage}/{_totalPages}";
+        _recordsLabel.Text = totalRecords <= 0 ? "0 سجل" : $"{totalRecords} سجل";
 
         _firstButton.Enabled = _currentPage > 1;
         _previousButton.Enabled = _currentPage > 1;
@@ -65,16 +50,12 @@ public sealed class TransportPagination : UserControl
         _lastButton.Enabled = _currentPage < _totalPages;
     }
 
-    /// <summary>
-    /// الحاوية ارتفاعها 10 مم تقريبًا، وأزرار الأسهم وبيانات الصفحة بارتفاع 8 مم تقريبًا.
-    /// توضع في الأسفل أسفل الجدول مباشرة.
-    /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
         Dock = DockStyle.Fill;
-        Height = TransportUiMetrics.Container10Mm;
-        MinimumSize = new Size(0, TransportUiMetrics.Container10Mm);
+        Height = TransportUiMetrics.PaginationHeight;
+        MinimumSize = new Size(0, TransportUiMetrics.PaginationHeight);
         RightToLeft = RightToLeft.Yes;
 
         _layout.AutoSize = true;
@@ -84,16 +65,16 @@ public sealed class TransportPagination : UserControl
         _layout.WrapContents = false;
 
         _pageLabel.AutoSize = false;
-        _pageLabel.Font = UiTheme.CreateBoldFont(9.5F);
-        _pageLabel.Margin = new Padding(5, 0, 5, 0);
-        _pageLabel.Size = new Size(72, TransportUiMetrics.Control8Mm);
+        _pageLabel.Font = UiTheme.CreateBoldFont(9F);
+        _pageLabel.Margin = new Padding(3, 0, 3, 0);
+        _pageLabel.Size = new Size(50, TransportUiMetrics.PaginationButtonHeight);
         _pageLabel.TextAlign = ContentAlignment.MiddleCenter;
 
         _recordsLabel.AutoSize = false;
-        _recordsLabel.Font = UiTheme.CreateRegularFont(9F);
+        _recordsLabel.Font = UiTheme.CreateRegularFont(8.5F);
         _recordsLabel.ForeColor = UiTheme.SecondaryText;
-        _recordsLabel.Margin = new Padding(14, 0, 6, 0);
-        _recordsLabel.Size = new Size(185, TransportUiMetrics.Control8Mm);
+        _recordsLabel.Margin = new Padding(6, 0, 2, 0);
+        _recordsLabel.Size = new Size(72, TransportUiMetrics.PaginationButtonHeight);
         _recordsLabel.TextAlign = ContentAlignment.MiddleRight;
 
         _toolTip.SetToolTip(_firstButton, "الأول");
@@ -118,11 +99,9 @@ public sealed class TransportPagination : UserControl
         centeringPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         centeringPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
         centeringPanel.Controls.Add(_layout, 1, 0);
-
         Controls.Add(centeringPanel);
     }
 
-    /// <summary>ربط النقر على الأسهم بأحداث عامة بدل تكرار نفس الأحداث في كل شاشة.</summary>
     private void RegisterEvents()
     {
         _firstButton.Click += (_, _) => FirstRequested?.Invoke(this, EventArgs.Empty);
@@ -131,17 +110,14 @@ public sealed class TransportPagination : UserControl
         _lastButton.Click += (_, _) => LastRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>
-    /// إنشاء زر سهم بارتفاع 8 مم تقريبًا مع Tooltip عربي يوضح وظيفته.
-    /// </summary>
     private static Button CreateButton(string symbol, string accessibleName) => new()
     {
         AccessibleName = accessibleName,
         AutoSize = false,
         FlatStyle = FlatStyle.System,
-        Font = UiTheme.CreateBoldFont(10F),
-        Margin = new Padding(3, 0, 3, 0),
-        Size = new Size(42, TransportUiMetrics.Control8Mm),
+        Font = UiTheme.CreateBoldFont(9F),
+        Margin = new Padding(2, 0, 2, 0),
+        Size = new Size(34, TransportUiMetrics.PaginationButtonHeight),
         Text = symbol,
         UseVisualStyleBackColor = true
     };
