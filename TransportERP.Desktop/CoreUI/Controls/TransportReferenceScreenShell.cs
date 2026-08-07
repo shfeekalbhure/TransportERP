@@ -98,7 +98,12 @@ public sealed class TransportReferenceScreenShell : UserControl
         DataHost.Padding = new Padding(TransportUiMetrics.MainDataHostPadding);
         DataHost.RightToLeft = RightToLeft.Yes;
 
-        // أي محتوى يضاف إلى البيانات الرئيسية يأخذ المقاسات العالمية ويعيد حساب الارتفاع تلقائيًا.
+        // الحافة العليا للبيانات ثابتة، والمحتوى يرتب من الأعلى؛ أي زيادة في الارتفاع
+        // تحرك الحافة السفلية فقط إلى الأسفل وتدفع البحث والجدول إلى الأسفل بصورة محسوبة.
+        DataGroup.AutoSize = false;
+        DataGroup.Dock = DockStyle.Fill;
+        DataGroup.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
         DataHost.ControlAdded += HandleDataHostControlAdded;
         DataHost.ControlRemoved += (_, _) => RecalculateDataGroupHeight();
         DataHost.Layout += (_, _) => RecalculateDataGroupHeight();
@@ -150,7 +155,6 @@ public sealed class TransportReferenceScreenShell : UserControl
 
         if (expandDataWorkspace)
         {
-            // الشاشات الشجرية/الإعدادات المتخصصة تحتاج مساحة عمل كاملة، لذلك يوقف AutoFit مؤقتًا.
             _root.RowStyles[2].SizeType = SizeType.Percent;
             _root.RowStyles[2].Height = 100F;
             _root.RowStyles[4].SizeType = SizeType.Absolute;
@@ -174,8 +178,8 @@ public sealed class TransportReferenceScreenShell : UserControl
     }
 
     /// <summary>
-    /// يحسب ارتفاع البيانات من المحتوى الفعلي ويزيد الصف إلى الأسفل فقط.
-    /// لا يوجد حد تمرير داخل البيانات الرئيسية؛ البيانات الثانوية يجب أن تنتقل إلى تبويب إضافي.
+    /// يحسب ارتفاع البيانات من المحتوى الفعلي، مع تثبيت أعلى الحاوية.
+    /// التمدد يحدث إلى الأسفل فقط وبحد أقصى خمسة صفوف؛ لا Scroll داخل البيانات الرئيسية.
     /// </summary>
     private void RecalculateDataGroupHeight()
     {
@@ -184,7 +188,6 @@ public sealed class TransportReferenceScreenShell : UserControl
             return;
         }
 
-        // لا نتدخل عندما تكون منطقة البيانات نفسها في وضع Percent للشاشات المتخصصة.
         if (_root.RowStyles[2].SizeType == SizeType.Percent)
         {
             return;
@@ -213,17 +216,24 @@ public sealed class TransportReferenceScreenShell : UserControl
                 continue;
             }
 
+            // للحاويات العامة المعروفة نستخدم ارتفاع المحتوى المحسوب منها مباشرة.
+            // للمحتوى المتخصص لا نسمح لـGetPreferredSize غير المقيد بتضخيم الحاوية؛
+            // نستخدم ارتفاعه الفعلي الحالي، ثم يطبق الحد الأعلى المركزي لاحقًا.
             var preferredHeight = child switch
             {
                 TransportDataEntryPanel entryPanel => entryPanel.PreferredContentHeight,
                 TransportAdaptiveDataSection adaptiveSection => adaptiveSection.GetPreferredSize(new Size(DataHost.ClientSize.Width, 0)).Height,
-                _ => child.GetPreferredSize(new Size(DataHost.ClientSize.Width, 0)).Height
+                _ when child.Height > 0 => child.Height,
+                _ => TransportUiMetrics.MainDataRowHeight
             };
 
             totalHeight += Math.Max(TransportUiMetrics.MainDataRowHeight, preferredHeight);
         }
 
-        return Math.Max(TransportUiMetrics.MainDataRowHeight, totalHeight);
+        return Math.Clamp(
+            Math.Max(TransportUiMetrics.MainDataRowHeight, totalHeight),
+            TransportUiMetrics.MainDataRowHeight,
+            TransportUiMetrics.MainDataMaxContentHeight);
     }
 
     /// <summary>
