@@ -17,9 +17,23 @@ partial class UcApiKeysIntegration
             {
                 new("البيانات الرئيسية", SecurityTabKind.Details, "هوية المفتاح والعميل دون حفظ السر الخام."),
                 new("النطاقات والصلاحيات", SecurityTabKind.CheckList, "الصلاحيات والنطاقات وفق مبدأ أقل صلاحية."),
-                new("القيود والدوران", SecurityTabKind.Settings, "IP ومعدل الطلبات والانتهاء والدوران."),
-                new("سجل الاستخدام", SecurityTabKind.Audit, "الاستخدام والأخطاء دون عرض السر."),
-                new("سجل العمليات", SecurityTabKind.Audit, "الإنشاء والكشف الأول والدوران والإلغاء وتغيير النطاق.")
+                new("القيود والدوران", SecurityTabKind.Settings, "IP ومعدل الطلبات والانتهاء والدوران.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("عناوين IP المسموحة", SecurityFieldKind.Multiline),
+                        new("الحد الأقصى للطلبات في الدقيقة"),
+                        new("تاريخ الانتهاء", SecurityFieldKind.Date),
+                        new("سياسة الدوران", SecurityFieldKind.Choice, new[] { "يدوي", "دوري", "عند الاشتباه" }),
+                        new("دورية الدوران بالأيام"),
+                        new("تاريخ الدوران القادم", SecurityFieldKind.Date),
+                        new("السماح من شبكات خارجية", SecurityFieldKind.Boolean),
+                        new("حظر المفتاح عند تجاوز المعدل", SecurityFieldKind.Boolean)
+                    },
+                    Actions: new[] { "اختبار القيود", "تدوير الآن" }),
+                new("سجل الاستخدام", SecurityTabKind.Audit, "الاستخدام والأخطاء دون عرض السر.",
+                    Columns: new[] { "التاريخ والوقت", "العميل", "المسار / العملية", "IP", "النتيجة", "زمن الاستجابة", "رمز الخطأ", "معرف الطلب" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "الإنشاء والكشف الأول والدوران والإلغاء وتغيير النطاق.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الحالة السابقة", "الحالة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
