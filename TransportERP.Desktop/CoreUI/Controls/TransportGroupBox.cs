@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.CoreUI.Controls;
 
@@ -9,18 +10,16 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportGroupBox : GroupBox
 {
-    // لون الحواف المعتمد: رمادي مزرق هادئ وواضح بدون أن يكون ثقيلًا بصريًا.
-    private static readonly Color BorderColor = Color.FromArgb(214, 222, 233); // #D6DEE9
-
     public TransportGroupBox()
     {
         SetStyle(ControlStyles.UserPaint |
                  ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.OptimizedDoubleBuffer, true);
 
-        BackColor = Color.White;
-        ForeColor = Color.FromArgb(45, 55, 72);
-        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        // جميع الخصائص البصرية العامة تأتي من UiTheme ولا تُعرّف داخل وحدات الأعمال.
+        BackColor = UiTheme.SurfaceBackground;
+        ForeColor = UiTheme.GroupText;
+        Font = UiTheme.CreateBoldFont(9.5F);
         Padding = new Padding(
             TransportUiMetrics.GroupHorizontalPadding,
             TransportUiMetrics.GroupTopPadding,
@@ -44,7 +43,7 @@ public sealed class TransportGroupBox : GroupBox
             ? Math.Max(8, Width - Padding.Right - textSize.Width - 10)
             : Padding.Left + 10;
 
-        using var pen = new Pen(BorderColor, 1F);
+        using var pen = new Pen(UiTheme.GroupBorder, 1F);
 
         e.Graphics.DrawLine(pen, 0, borderY, 0, Height - 1);
         e.Graphics.DrawLine(pen, Width - 1, borderY, Width - 1, Height - 1);
