@@ -25,13 +25,17 @@ internal static class SecurityDesignerSupport
 
         ConfigureTabs(tabs);
 
+        // إذا كانت الشاشة تحتوي تبويب أعضاء متخصصًا، تنتقل أوامر الإضافة والإزالة إليه
+        // بدل إظهارها داخل تبويب البيانات الرئيسية.
+        var hasMembersTab = tabDefinitions.Any(definition => IsMembersTab(definition.Title));
+
         for (var i = 0; i < tabDefinitions.Count; i++)
         {
             var definition = tabDefinitions[i];
             var page = CreateTabPage(definition.Title);
             var workspace = i == 0
-                ? CreateFieldWorkspace(fields, specialActions)
-                : CreateSpecializedWorkspace(definition);
+                ? CreateFieldWorkspace(fields, hasMembersTab ? Array.Empty<string>() : specialActions)
+                : CreateSpecializedWorkspace(definition, specialActions);
 
             // لا توضع أداة وظيفية مباشرة على TabPage؛ الحاوية هي الابن المباشر الوحيد.
             page.Controls.Add(workspace);
@@ -177,8 +181,11 @@ internal static class SecurityDesignerSupport
 
     /// <summary>
     /// كل تبويب متخصص يبدأ بحاوية عامة، ثم وصف بارتفاع مركزي، ثم محتوى متخصص داخل حاوية.
+    /// تبويب الأعضاء له معالجة خاصة لأنه يحتاج أوامر مستقلة وجدول أعضاء كامل المساحة.
     /// </summary>
-    private static Control CreateSpecializedWorkspace(SecurityTabDefinition definition)
+    private static Control CreateSpecializedWorkspace(
+        SecurityTabDefinition definition,
+        IReadOnlyList<string> specialActions)
     {
         var section = CreateSection(definition.Title);
         var host = CreateSingleColumnLayout(TransportUiMetrics.TabDescriptionHeight);
@@ -194,25 +201,87 @@ internal static class SecurityDesignerSupport
             ForeColor = SystemColors.GrayText
         };
 
-        var content = definition.Kind switch
+        Control content;
+        if (IsMembersTab(definition.Title))
         {
-            SecurityTabKind.Tree => CreateTreeWorkspace(),
-            SecurityTabKind.CheckList => CreateCheckListWorkspace(),
-            SecurityTabKind.Comparison => CreateComparisonWorkspace(),
-            SecurityTabKind.Settings => CreateSettingsWorkspace(),
-            SecurityTabKind.Audit => CreateGridWorkspace(
-                "سجل العمليات",
-                new[] { "التاريخ والوقت", "المستخدم", "العملية", "السبب / المرجع" }),
-            _ => CreateGridWorkspace(
-                "التفاصيل",
-                new[] { "العنصر", "القيمة / الحالة", "ملاحظات" })
-        };
+            content = CreateMembersWorkspace(specialActions);
+        }
+        else
+        {
+            content = definition.Kind switch
+            {
+                SecurityTabKind.Tree => CreateTreeWorkspace(),
+                SecurityTabKind.CheckList => CreateCheckListWorkspace(),
+                SecurityTabKind.Comparison => CreateComparisonWorkspace(),
+                SecurityTabKind.Settings => CreateSettingsWorkspace(),
+                SecurityTabKind.Audit => CreateGridWorkspace(
+                    "سجل العمليات",
+                    new[] { "التاريخ والوقت", "المستخدم", "العملية", "السبب / المرجع" }),
+                _ => CreateGridWorkspace(
+                    "التفاصيل",
+                    new[] { "العنصر", "القيمة / الحالة", "ملاحظات" })
+            };
+        }
 
         host.Controls.Add(description, 0, 0);
         host.Controls.Add(content, 0, 1);
         section.Controls.Add(host);
         return section;
     }
+
+    /// <summary>
+    /// يبني تبويب الأعضاء بصورة مؤسسية موحدة:
+    /// شريط إجراءات صغير أعلى التبويب من اليمين، وجدول أعضاء يملأ بقية المساحة.
+    /// هذا يمنع ظهور قائمة ضيقة أو حقل طويل كما كان يحدث في القالب العام السابق.
+    /// </summary>
+    private static Control CreateMembersWorkspace(IReadOnlyList<string> specialActions)
+    {
+        var section = CreateSection("أعضاء المجموعة");
+        var layout = CreateSingleColumnLayout(TransportUiMetrics.ActionPanelHeight);
+
+        var actions = new TransportActionPanel
+        {
+            Dock = DockStyle.Fill,
+            Visible = specialActions.Count > 0
+        };
+
+        foreach (var action in specialActions)
+        {
+            actions.AddAction(action);
+        }
+
+        var grid = new TransportDataGrid
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            Margin = Padding.Empty,
+            EmptyStateText = "لا يوجد أعضاء ضمن المجموعة"
+        };
+
+        var columns = new[]
+        {
+            "العضو",
+            "نوع العضو",
+            "الشركة",
+            "الفرع",
+            "الحالة",
+            "تاريخ الإضافة",
+            "أضيف بواسطة"
+        };
+
+        foreach (var column in columns)
+        {
+            grid.Columns.Add($"col{grid.Columns.Count + 1}", column);
+        }
+
+        layout.Controls.Add(actions, 0, 0);
+        layout.Controls.Add(grid, 0, 1);
+        section.Controls.Add(layout);
+        return section;
+    }
+
+    private static bool IsMembersTab(string title) =>
+        string.Equals(title?.Trim(), "الأعضاء", StringComparison.Ordinal);
 
     private static Control CreateTreeWorkspace()
     {
