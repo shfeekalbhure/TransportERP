@@ -11,10 +11,10 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 [ToolboxItem(true)]
 public sealed class TransportAlertBar : UserControl
 {
-    // هذا النص هو الرسالة التي يراها المستخدم داخل شريط التنبيه.
+    // النص الذي يراه المستخدم داخل شريط التنبيه.
     private readonly Label _messageLabel = new();
 
-    // هذا الزر يسمح للمستخدم بإخفاء الرسالة دون التأثير على بقية الشاشة.
+    // زر إغلاق التنبيه دون التأثير على بقية الشاشة.
     private readonly Button _closeButton = new();
 
     /// <summary>
@@ -26,28 +26,13 @@ public sealed class TransportAlertBar : UserControl
         HideMessage();
     }
 
-    /// <summary>
-    /// عرض رسالة نجاح، وتستخدم بعد اكتمال عملية مثل الحفظ بنجاح.
-    /// </summary>
     public void ShowSuccess(string message) => ShowMessage(message, AlertKind.Success);
-
-    /// <summary>
-    /// عرض رسالة معلومات عامة لا تمثل خطأ أو تحذيرًا.
-    /// </summary>
     public void ShowInfo(string message) => ShowMessage(message, AlertKind.Info);
-
-    /// <summary>
-    /// عرض رسالة تحذير عند وجود حالة تحتاج انتباه المستخدم.
-    /// </summary>
     public void ShowWarning(string message) => ShowMessage(message, AlertKind.Warning);
-
-    /// <summary>
-    /// عرض رسالة خطأ عند فشل عملية أو وجود بيانات غير صحيحة.
-    /// </summary>
     public void ShowError(string message) => ShowMessage(message, AlertKind.Error);
 
     /// <summary>
-    /// إخفاء الشريط عندما لا توجد رسالة يجب عرضها.
+    /// إخفاء الشريط عندما لا توجد رسالة، بحيث لا يحجز مساحة من الجدول أو بقية الشاشة.
     /// </summary>
     public void HideMessage()
     {
@@ -56,27 +41,29 @@ public sealed class TransportAlertBar : UserControl
     }
 
     /// <summary>
-    /// تجهيز الحاوية الداخلية للشريط مرة واحدة ليتم إعادة استخدامها في جميع الشاشات.
+    /// الحاوية ارتفاعها 12 مم تقريبًا، وزر الإغلاق والمحتوى بارتفاع 9 مم تقريبًا.
     /// </summary>
     private void InitializeLayout()
     {
-        Dock = DockStyle.Top;
-        Height = 42;
-        MinimumSize = new Size(0, 42);
-        Padding = new Padding(10, 6, 10, 6);
+        Dock = DockStyle.Fill;
+        Height = TransportUiMetrics.Container12Mm;
+        MinimumSize = new Size(0, TransportUiMetrics.Container12Mm);
+        Padding = new Padding(8, 5, 8, 5);
         RightToLeft = RightToLeft.Yes;
 
         _closeButton.Dock = DockStyle.Left;
         _closeButton.FlatStyle = FlatStyle.Flat;
         _closeButton.FlatAppearance.BorderSize = 0;
-        _closeButton.Font = UiTheme.CreateBoldFont(10F);
+        _closeButton.Font = UiTheme.CreateBoldFont(9.5F);
         _closeButton.Text = "×";
-        _closeButton.Width = 34;
+        _closeButton.Width = TransportUiMetrics.Control9Mm;
+        _closeButton.Height = TransportUiMetrics.Control9Mm;
         _closeButton.Cursor = Cursors.Hand;
         _closeButton.Click += (_, _) => HideMessage();
 
         _messageLabel.Dock = DockStyle.Fill;
-        _messageLabel.Font = UiTheme.CreateRegularFont(10F);
+        _messageLabel.Font = UiTheme.CreateRegularFont(9.5F);
+        _messageLabel.MinimumSize = new Size(0, TransportUiMetrics.Control9Mm);
         _messageLabel.TextAlign = ContentAlignment.MiddleRight;
         _messageLabel.RightToLeft = RightToLeft.Yes;
 
@@ -107,9 +94,7 @@ public sealed class TransportAlertBar : UserControl
     }
 }
 
-/// <summary>
-/// أنواع الرسائل التي يدعمها شريط التنبيهات داخل الشاشة.
-/// </summary>
+/// <summary>أنواع الرسائل التي يدعمها شريط التنبيهات داخل الشاشة.</summary>
 public enum AlertKind
 {
     Info,
