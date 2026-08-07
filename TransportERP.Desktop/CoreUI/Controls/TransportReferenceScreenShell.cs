@@ -12,11 +12,11 @@ public sealed class TransportReferenceScreenShell : UserControl
     private readonly TableLayoutPanel _root = new();
     private readonly TableLayoutPanel _topUtilityRow = new();
 
-    public TransportGroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
-    public TransportGroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
-    public TransportGroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
-    public TransportGroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
-    public TransportGroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
+    public GroupBox NotificationGroup { get; } = CreateGroupBox("الإشعارات");
+    public GroupBox DataGroup { get; } = CreateGroupBox("البيانات الرئيسية");
+    public GroupBox SearchGroup { get; } = CreateGroupBox("البحث والتصفية");
+    public GroupBox GridGroup { get; } = CreateGroupBox("قائمة السجلات");
+    public GroupBox AuditGroup { get; } = CreateGroupBox("معلومات الإنشاء والتعديل");
 
     public TransportAlertBar AlertBar { get; } = new();
     public TransportToolbar Toolbar { get; } = new();
@@ -44,15 +44,12 @@ public sealed class TransportReferenceScreenShell : UserControl
     {
         BackColor = Color.FromArgb(247, 249, 252);
         Dock = DockStyle.Fill;
-        // هامش خارجي بسيط فقط؛ لا نترك فراغات بين الحاويات الداخلية.
-        Padding = new Padding(6);
+        Padding = new Padding(12);
         RightToLeft = RightToLeft.Yes;
 
         _root.ColumnCount = 1;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         _root.Dock = DockStyle.Fill;
-        _root.Margin = Padding.Empty;
-        _root.Padding = Padding.Empty;
         _root.RowCount = 6;
         _root.RightToLeft = RightToLeft.Yes;
 
@@ -67,68 +64,72 @@ public sealed class TransportReferenceScreenShell : UserControl
         _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 72F));
         _topUtilityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
         _topUtilityRow.Dock = DockStyle.Fill;
-        _topUtilityRow.Margin = Padding.Empty;
-        _topUtilityRow.Padding = Padding.Empty;
         _topUtilityRow.RightToLeft = RightToLeft.Yes;
         _topUtilityRow.RowCount = 1;
         _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         DataHost.BackColor = Color.White;
         DataHost.Dock = DockStyle.Fill;
-        DataHost.Margin = Padding.Empty;
         DataHost.Padding = new Padding(4);
         DataHost.RightToLeft = RightToLeft.Yes;
-
-        // أي جدول حقول يضاف إلى البيانات الرئيسية يطبق عليه القالب تلقائيًا.
         DataHost.ControlAdded += (_, e) => ApplyMainDataSpacing(e.Control);
         DataGroup.Controls.Add(DataHost);
 
         AlertBar.Dock = DockStyle.Fill;
-        AlertBar.Margin = Padding.Empty;
         NotificationGroup.Controls.Add(AlertBar);
-
         SearchPanel.Dock = DockStyle.Fill;
-        SearchPanel.Margin = Padding.Empty;
         SearchGroup.Controls.Add(SearchPanel);
-
         Grid.Dock = DockStyle.Fill;
-        Grid.Margin = Padding.Empty;
         GridGroup.Controls.Add(Grid);
-
         AuditPanel.Dock = DockStyle.Fill;
-        AuditPanel.Margin = Padding.Empty;
         AuditGroup.Controls.Add(AuditPanel);
-
         Toolbar.Dock = DockStyle.Fill;
-        Toolbar.Margin = Padding.Empty;
         Pagination.Dock = DockStyle.Fill;
-        Pagination.Margin = Padding.Empty;
 
         _topUtilityRow.Controls.Add(NotificationGroup, 0, 0);
         _topUtilityRow.Controls.Add(Pagination, 1, 0);
-
         _root.Controls.Add(_topUtilityRow, 0, 0);
         _root.Controls.Add(Toolbar, 0, 1);
         _root.Controls.Add(DataGroup, 0, 2);
         _root.Controls.Add(SearchGroup, 0, 3);
         _root.Controls.Add(GridGroup, 0, 4);
         _root.Controls.Add(AuditGroup, 0, 5);
-
         Controls.Add(_root);
     }
 
     /// <summary>
-    /// يطبق المسافة الرأسية الموحدة بين صفوف البيانات الرئيسية.
-    /// صف الملاحظات متعدد الأسطر يحتفظ بالارتفاع الذي تحدده الشاشة نفسها.
+    /// يكيّف القالب للشاشات المتخصصة مثل الإعدادات والشاشات الشجرية
+    /// من دون إنشاء قالب مكرر خارج CoreUI.
     /// </summary>
+    public void ConfigureWorkspaceMode(bool showSearch, bool showGrid, bool expandDataWorkspace)
+    {
+        SearchGroup.Visible = showSearch;
+        GridGroup.Visible = showGrid;
+        _root.RowStyles[3].SizeType = SizeType.Absolute;
+        _root.RowStyles[3].Height = showSearch ? TransportUiMetrics.SearchGroupHeight : 0F;
+
+        if (expandDataWorkspace)
+        {
+            _root.RowStyles[2].SizeType = SizeType.Percent;
+            _root.RowStyles[2].Height = 100F;
+            _root.RowStyles[4].SizeType = SizeType.Absolute;
+            _root.RowStyles[4].Height = 0F;
+        }
+        else
+        {
+            _root.RowStyles[2].SizeType = SizeType.Absolute;
+            _root.RowStyles[2].Height = 230F;
+            _root.RowStyles[4].SizeType = SizeType.Percent;
+            _root.RowStyles[4].Height = showGrid ? 100F : 0F;
+        }
+    }
+
     private static void ApplyMainDataSpacing(Control control)
     {
         if (control is not TableLayoutPanel table)
         {
             return;
         }
-
-        table.Margin = Padding.Empty;
 
         for (var row = 0; row < table.RowStyles.Count; row++)
         {
@@ -142,11 +143,7 @@ public sealed class TransportReferenceScreenShell : UserControl
         foreach (Control child in table.Controls)
         {
             var current = child.Margin;
-            child.Margin = new Padding(
-                current.Left,
-                TransportUiMetrics.MainDataVerticalMargin,
-                current.Right,
-                TransportUiMetrics.MainDataVerticalMargin);
+            child.Margin = new Padding(current.Left, TransportUiMetrics.MainDataVerticalMargin, current.Right, TransportUiMetrics.MainDataVerticalMargin);
         }
     }
 
@@ -163,10 +160,13 @@ public sealed class TransportReferenceScreenShell : UserControl
         return false;
     }
 
-    private static TransportGroupBox CreateGroupBox(string title) => new()
+    private static GroupBox CreateGroupBox(string title) => new()
     {
+        BackColor = Color.White,
         Dock = DockStyle.Fill,
-        Margin = Padding.Empty,
+        Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+        Padding = new Padding(8, 6, 8, 6),
+        RightToLeft = RightToLeft.Yes,
         Text = title
     };
 }

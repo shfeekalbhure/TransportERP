@@ -58,9 +58,7 @@ public sealed class TransportAuditPanel : UserControl
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.AuditPanelHeight;
         MinimumSize = new Size(0, TransportUiMetrics.AuditPanelHeight);
-
-        // نرفع محتوى الإنشاء والتعديل قليلًا داخل الحاوية.
-        Padding = new Padding(6, 0, 6, 6);
+        Padding = new Padding(6, 3, 6, 3);
         RightToLeft = RightToLeft.Yes;
 
         var table = new TableLayoutPanel

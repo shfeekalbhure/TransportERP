@@ -54,9 +54,7 @@ public sealed class TransportToolbar : UserControl
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.ToolbarHeight;
         MinimumSize = new Size(0, TransportUiMetrics.ToolbarHeight);
-
-        // نرفع الأزرار قليلًا داخل الحاوية: فراغ أعلى أقل وفراغ أسفل أكبر.
-        Padding = new Padding(6, 1, 6, 7);
+        Padding = new Padding(6, 4, 6, 4);
         RightToLeft = RightToLeft.Yes;
 
         _buttonsPanel.AutoSize = true;
@@ -68,7 +66,6 @@ public sealed class TransportToolbar : UserControl
         _buttonsPanel.RightToLeft = RightToLeft.Yes;
         _buttonsPanel.WrapContents = false;
         _buttonsPanel.Padding = Padding.Empty;
-        _buttonsPanel.Margin = Padding.Empty;
 
         // بسبب اتجاه FlowLayoutPanel من اليمين إلى اليسار، نضيف الأزرار بترتيب عكسي
         // حتى يظهر الترتيب البصري الفعلي من أقصى اليمين كما هو معتمد:
