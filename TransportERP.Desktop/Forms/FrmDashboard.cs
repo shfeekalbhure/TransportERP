@@ -14,6 +14,7 @@ public partial class FrmDashboard : Form
     private const string GovernoratesTabKey = "GEN-004";
     private const string DirectoratesTabKey = "GEN-005";
     private const string CitiesTabKey = "GEN-006";
+    private const string AreasTabKey = "GEN-007";
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
@@ -81,42 +82,26 @@ public partial class FrmDashboard : Form
             RightToLeft = RightToLeft.Yes
         };
 
-        var countriesItem = new ToolStripMenuItem("الدول")
-        {
-            Name = "mnuCountries",
-            ToolTipText = "GEN-003 — الدول",
-            RightToLeft = RightToLeft.Yes
-        };
+        var countriesItem = new ToolStripMenuItem("الدول") { Name = "mnuCountries", ToolTipText = "GEN-003 — الدول", RightToLeft = RightToLeft.Yes };
         countriesItem.Click += (_, _) => OpenCountriesView();
 
-        var governoratesItem = new ToolStripMenuItem("المحافظات")
-        {
-            Name = "mnuGovernorates",
-            ToolTipText = "GEN-004 — المحافظات",
-            RightToLeft = RightToLeft.Yes
-        };
+        var governoratesItem = new ToolStripMenuItem("المحافظات") { Name = "mnuGovernorates", ToolTipText = "GEN-004 — المحافظات", RightToLeft = RightToLeft.Yes };
         governoratesItem.Click += (_, _) => OpenGovernoratesView();
 
-        var directoratesItem = new ToolStripMenuItem("المديريات")
-        {
-            Name = "mnuDirectorates",
-            ToolTipText = "GEN-005 — المديريات",
-            RightToLeft = RightToLeft.Yes
-        };
+        var directoratesItem = new ToolStripMenuItem("المديريات") { Name = "mnuDirectorates", ToolTipText = "GEN-005 — المديريات", RightToLeft = RightToLeft.Yes };
         directoratesItem.Click += (_, _) => OpenDirectoratesView();
 
-        var citiesItem = new ToolStripMenuItem("المدن")
-        {
-            Name = "mnuCities",
-            ToolTipText = "GEN-006 — المدن",
-            RightToLeft = RightToLeft.Yes
-        };
+        var citiesItem = new ToolStripMenuItem("المدن") { Name = "mnuCities", ToolTipText = "GEN-006 — المدن", RightToLeft = RightToLeft.Yes };
         citiesItem.Click += (_, _) => OpenCitiesView();
+
+        var areasItem = new ToolStripMenuItem("المناطق") { Name = "mnuAreas", ToolTipText = "GEN-007 — المناطق", RightToLeft = RightToLeft.Yes };
+        areasItem.Click += (_, _) => OpenAreasView();
 
         geographicDataItem.DropDownItems.Add(countriesItem);
         geographicDataItem.DropDownItems.Add(governoratesItem);
         geographicDataItem.DropDownItems.Add(directoratesItem);
         geographicDataItem.DropDownItems.Add(citiesItem);
+        geographicDataItem.DropDownItems.Add(areasItem);
         _generalSetupMenu.Items.Add(geographicDataItem);
 
         generalSetupButton.Click -= GeneralSetupButton_Click;
@@ -129,17 +114,11 @@ public partial class FrmDashboard : Form
         _generalSetupMenu.Show(button, new Point(0, button.Height));
     }
 
-    private void OpenCountriesView() =>
-        OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
-
-    private void OpenGovernoratesView() =>
-        OpenWorkspaceView(GovernoratesTabKey, "المحافظات", new UcGovernorates());
-
-    private void OpenDirectoratesView() =>
-        OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
-
-    private void OpenCitiesView() =>
-        OpenWorkspaceView(CitiesTabKey, "المدن", new UcCities());
+    private void OpenCountriesView() => OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
+    private void OpenGovernoratesView() => OpenWorkspaceView(GovernoratesTabKey, "المحافظات", new UcGovernorates());
+    private void OpenDirectoratesView() => OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
+    private void OpenCitiesView() => OpenWorkspaceView(CitiesTabKey, "المدن", new UcCities());
+    private void OpenAreasView() => OpenWorkspaceView(AreasTabKey, "المناطق", new UcAreas());
 
     public void OpenWorkspaceView(string screenKey, string title, UserControl view)
     {
@@ -260,11 +239,8 @@ public partial class FrmDashboard : Form
             MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
     }
 
-    private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e) =>
-        DrawPreviewLineChart(e.Graphics, pnlRevenueChart.ClientRectangle);
-
-    private void pnlActivityChart_Paint(object? sender, PaintEventArgs e) =>
-        DrawPreviewActivityChart(e.Graphics, pnlActivityChart.ClientRectangle);
+    private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e) => DrawPreviewLineChart(e.Graphics, pnlRevenueChart.ClientRectangle);
+    private void pnlActivityChart_Paint(object? sender, PaintEventArgs e) => DrawPreviewActivityChart(e.Graphics, pnlActivityChart.ClientRectangle);
 
     private static void DrawPreviewLineChart(Graphics graphics, Rectangle bounds)
     {
