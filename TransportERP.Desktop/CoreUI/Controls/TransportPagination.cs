@@ -5,21 +5,22 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 
 /// <summary>
 /// عنصر التصفح الموحد بين صفحات السجلات.
-/// يستخدم نفس الأسماء والترتيب في كل شاشة: الأول، السابق، رقم الصفحة، التالي، الأخير.
+/// يعتمد أزرارًا مختصرة بالأسهم لتقليل المساحة والحفاظ على شكل موحد في جميع الشاشات.
 /// </summary>
 [ToolboxItem(true)]
 public sealed class TransportPagination : UserControl
 {
-    // الحاوية التي تضع أزرار التصفح في صف واحد ثابت.
+    // الحاوية التي تضع أزرار التصفح في صف واحد في منتصف الشاشة.
     private readonly FlowLayoutPanel _layout = new();
 
-    // الأزرار التالية ثابتة في جميع الشاشات ولا يعاد إنشاؤها داخل كل Designer.
-    private readonly Button _firstButton = CreateButton("الأول");
-    private readonly Button _previousButton = CreateButton("السابق");
+    // الأسهم ثابتة في جميع الشاشات: أول، سابق، التالي، أخير.
+    private readonly Button _firstButton = CreateButton("⏮", "الأول");
+    private readonly Button _previousButton = CreateButton("◀", "السابق");
     private readonly Label _pageLabel = new();
-    private readonly Button _nextButton = CreateButton("التالي");
-    private readonly Button _lastButton = CreateButton("الأخير");
+    private readonly Button _nextButton = CreateButton("▶", "التالي");
+    private readonly Button _lastButton = CreateButton("⏭", "الأخير");
     private readonly Label _recordsLabel = new();
+    private readonly ToolTip _toolTip = new();
 
     private int _currentPage = 1;
     private int _totalPages = 1;
@@ -39,26 +40,15 @@ public sealed class TransportPagination : UserControl
     public event EventHandler? NextRequested;
     public event EventHandler? LastRequested;
 
-    /// <summary>
-    /// رقم الصفحة الحالية المعروض للمستخدم.
-    /// </summary>
     [Browsable(false)]
     public int CurrentPage => _currentPage;
 
-    /// <summary>
-    /// إجمالي عدد الصفحات.
-    /// </summary>
     [Browsable(false)]
     public int TotalPages => _totalPages;
 
     /// <summary>
     /// تحديث معلومات الصفحة والعداد السفلي بعد جلب البيانات من API.
     /// </summary>
-    /// <param name="currentPage">الصفحة الحالية.</param>
-    /// <param name="totalPages">إجمالي الصفحات.</param>
-    /// <param name="fromRecord">رقم أول سجل ظاهر.</param>
-    /// <param name="toRecord">رقم آخر سجل ظاهر.</param>
-    /// <param name="totalRecords">إجمالي عدد السجلات.</param>
     public void SetPageInfo(int currentPage, int totalPages, int fromRecord, int toRecord, int totalRecords)
     {
         _currentPage = Math.Max(1, currentPage);
@@ -69,7 +59,6 @@ public sealed class TransportPagination : UserControl
             ? "لا توجد سجلات"
             : $"عرض {Math.Max(1, fromRecord)} - {Math.Max(fromRecord, toRecord)} من {totalRecords}";
 
-        // تعطيل الأزرار غير الممكنة يمنع إرسال طلبات تصفح غير صحيحة.
         _firstButton.Enabled = _currentPage > 1;
         _previousButton.Enabled = _currentPage > 1;
         _nextButton.Enabled = _currentPage < _totalPages;
@@ -77,14 +66,15 @@ public sealed class TransportPagination : UserControl
     }
 
     /// <summary>
-    /// تجهيز الشكل الموحد ومحاذاة التصفح في منتصف الشاشة.
+    /// الحاوية ارتفاعها 10 مم تقريبًا، وأزرار الأسهم وبيانات الصفحة بارتفاع 8 مم تقريبًا.
+    /// توضع في الأسفل أسفل الجدول مباشرة.
     /// </summary>
     private void InitializeLayout()
     {
         BackColor = Color.White;
-        Dock = DockStyle.Top;
-        Height = 52;
-        MinimumSize = new Size(0, 52);
+        Dock = DockStyle.Fill;
+        Height = TransportUiMetrics.Container10Mm;
+        MinimumSize = new Size(0, TransportUiMetrics.Container10Mm);
         RightToLeft = RightToLeft.Yes;
 
         _layout.AutoSize = true;
@@ -94,17 +84,22 @@ public sealed class TransportPagination : UserControl
         _layout.WrapContents = false;
 
         _pageLabel.AutoSize = false;
-        _pageLabel.Font = UiTheme.CreateBoldFont(10F);
-        _pageLabel.Margin = new Padding(6, 4, 6, 4);
-        _pageLabel.Size = new Size(82, 34);
+        _pageLabel.Font = UiTheme.CreateBoldFont(9.5F);
+        _pageLabel.Margin = new Padding(5, 0, 5, 0);
+        _pageLabel.Size = new Size(72, TransportUiMetrics.Control8Mm);
         _pageLabel.TextAlign = ContentAlignment.MiddleCenter;
 
         _recordsLabel.AutoSize = false;
-        _recordsLabel.Font = UiTheme.CreateRegularFont(9.5F);
+        _recordsLabel.Font = UiTheme.CreateRegularFont(9F);
         _recordsLabel.ForeColor = UiTheme.SecondaryText;
-        _recordsLabel.Margin = new Padding(18, 4, 6, 4);
-        _recordsLabel.Size = new Size(190, 34);
+        _recordsLabel.Margin = new Padding(14, 0, 6, 0);
+        _recordsLabel.Size = new Size(185, TransportUiMetrics.Control8Mm);
         _recordsLabel.TextAlign = ContentAlignment.MiddleRight;
+
+        _toolTip.SetToolTip(_firstButton, "الأول");
+        _toolTip.SetToolTip(_previousButton, "السابق");
+        _toolTip.SetToolTip(_nextButton, "التالي");
+        _toolTip.SetToolTip(_lastButton, "الأخير");
 
         _layout.Controls.Add(_firstButton);
         _layout.Controls.Add(_previousButton);
@@ -113,7 +108,6 @@ public sealed class TransportPagination : UserControl
         _layout.Controls.Add(_lastButton);
         _layout.Controls.Add(_recordsLabel);
 
-        // استخدام TableLayoutPanel يجعل مجموعة الأزرار في المنتصف مهما تغير عرض الشاشة.
         var centeringPanel = new TableLayoutPanel
         {
             ColumnCount = 3,
@@ -128,9 +122,7 @@ public sealed class TransportPagination : UserControl
         Controls.Add(centeringPanel);
     }
 
-    /// <summary>
-    /// ربط النقر على الأزرار بأحداث عامة بدل كتابة نفس الأحداث في كل شاشة.
-    /// </summary>
+    /// <summary>ربط النقر على الأسهم بأحداث عامة بدل تكرار نفس الأحداث في كل شاشة.</summary>
     private void RegisterEvents()
     {
         _firstButton.Click += (_, _) => FirstRequested?.Invoke(this, EventArgs.Empty);
@@ -140,16 +132,17 @@ public sealed class TransportPagination : UserControl
     }
 
     /// <summary>
-    /// إنشاء زر تصفح بنفس الحجم والخط لجميع الشاشات.
+    /// إنشاء زر سهم بارتفاع 8 مم تقريبًا مع Tooltip عربي يوضح وظيفته.
     /// </summary>
-    private static Button CreateButton(string text) => new()
+    private static Button CreateButton(string symbol, string accessibleName) => new()
     {
+        AccessibleName = accessibleName,
         AutoSize = false,
         FlatStyle = FlatStyle.System,
-        Font = UiTheme.CreateRegularFont(9.5F),
-        Margin = new Padding(4),
-        Size = new Size(78, 34),
-        Text = text,
+        Font = UiTheme.CreateBoldFont(10F),
+        Margin = new Padding(3, 0, 3, 0),
+        Size = new Size(42, TransportUiMetrics.Control8Mm),
+        Text = symbol,
         UseVisualStyleBackColor = true
     };
 }
