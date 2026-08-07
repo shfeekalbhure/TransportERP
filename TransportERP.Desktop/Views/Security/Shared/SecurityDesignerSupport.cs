@@ -1,11 +1,12 @@
+using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
 
 namespace TransportERP.Desktop.Views.Security.Shared;
 
 /// <summary>
 /// أدوات تصميم مشتركة لشاشات الأمن والإدارة.
-/// تستدعى من ملفات Designer لتجنب تكرار بناء التبويبات والحقول المتخصصة،
-/// مع إبقاء شريط الأوامر والبحث والجدول والتنقل والتدقيق داخل CoreUI.
+/// تعتمد حصريًا على مكونات CoreUI للأجزاء العامة، وتسمح فقط بالأدوات المتخصصة
+/// مثل TreeView وCheckedListBox داخل حاويات منظمة وليست مباشرة على الشاشة أو التبويب.
 /// </summary>
 internal static class SecurityDesignerSupport
 {
@@ -22,29 +23,22 @@ internal static class SecurityDesignerSupport
         shell.RightToLeft = RightToLeft.Yes;
         shell.DataGroupTitle = "تفاصيل الشاشة";
 
-        tabs.Dock = DockStyle.Fill;
-        tabs.RightToLeft = RightToLeft.Yes;
-        tabs.RightToLeftLayout = true;
-        tabs.Multiline = false;
-        tabs.Padding = new Point(16, 5);
+        ConfigureTabs(tabs);
 
         for (var i = 0; i < tabDefinitions.Count; i++)
         {
             var definition = tabDefinitions[i];
             var page = CreateTabPage(definition.Title);
+            var workspace = i == 0
+                ? CreateFieldWorkspace(fields, specialActions)
+                : CreateSpecializedWorkspace(definition);
 
-            if (i == 0)
-            {
-                page.Controls.Add(CreateFieldWorkspace(fields, specialActions));
-            }
-            else
-            {
-                page.Controls.Add(CreateSpecializedWorkspace(definition));
-            }
-
+            // لا توضع أداة وظيفية مباشرة على TabPage؛ الحاوية هي الابن المباشر الوحيد.
+            page.Controls.Add(workspace);
             tabs.TabPages.Add(page);
         }
 
+        // شاشة الـUserControl تحتوي القالب العام فقط؛ والتبويبات تستضاف داخل DataHost.
         shell.DataHost.Controls.Add(tabs);
 
         shell.Grid.AutoGenerateColumns = false;
@@ -60,109 +54,75 @@ internal static class SecurityDesignerSupport
             expandDataWorkspace: mode is SecurityWorkspaceMode.Settings or SecurityWorkspaceMode.Tree);
     }
 
+    private static void ConfigureTabs(TabControl tabs)
+    {
+        tabs.Dock = DockStyle.Fill;
+        tabs.RightToLeft = RightToLeft.Yes;
+        tabs.RightToLeftLayout = true;
+        tabs.Multiline = false;
+        tabs.Padding = new Point(
+            TransportUiMetrics.TabHorizontalPadding,
+            TransportUiMetrics.TabVerticalPadding);
+        tabs.Margin = Padding.Empty;
+    }
+
     private static TabPage CreateTabPage(string title) => new()
     {
         Text = title,
         BackColor = Color.White,
         RightToLeft = RightToLeft.Yes,
-        Padding = new Padding(8)
+        Padding = new Padding(TransportUiMetrics.TabContentPadding)
     };
 
+    /// <summary>
+    /// يبني التبويب الرئيسي من TransportActionPanel وTransportDataEntryPanel.
+    /// بهذه الطريقة تبقى الأزرار والحقول والمقاسات مرتبطة مباشرة بالـCoreUI.
+    /// </summary>
     private static Control CreateFieldWorkspace(
         IReadOnlyList<SecurityFieldDefinition> fields,
         IReadOnlyList<string> specialActions)
     {
-        var host = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.White,
-            RightToLeft = RightToLeft.Yes,
-            ColumnCount = 1,
-            RowCount = 2
-        };
-        host.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, specialActions.Count == 0 ? 0F : 38F));
-        host.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        var section = CreateSection("بيانات الشاشة");
+        var layout = CreateSingleColumnLayout(specialActions.Count == 0 ? 0 : TransportUiMetrics.ActionPanelHeight);
 
-        var actionStrip = new FlowLayoutPanel
+        var actions = new TransportActionPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft,
-            RightToLeft = RightToLeft.Yes,
-            WrapContents = false,
-            AutoScroll = true,
-            Padding = new Padding(2)
+            Visible = specialActions.Count > 0
         };
 
         foreach (var action in specialActions)
         {
-            actionStrip.Controls.Add(new Button
-            {
-                AutoSize = true,
-                Height = 30,
-                Text = action,
-                RightToLeft = RightToLeft.Yes,
-                FlatStyle = FlatStyle.System,
-                Tag = action
-            });
+            actions.AddAction(action);
         }
 
-        var scroll = new Panel
+        var scrollHost = new Panel
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
             BackColor = Color.White,
-            RightToLeft = RightToLeft.Yes
-        };
-
-        var table = new TableLayoutPanel
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 4,
-            Dock = DockStyle.Top,
             RightToLeft = RightToLeft.Yes,
-            Padding = new Padding(4)
+            Padding = Padding.Empty,
+            Margin = Padding.Empty
         };
 
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145F));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145F));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-
-        var rows = (fields.Count + 1) / 2;
-        table.RowCount = rows;
-        for (var row = 0; row < rows; row++)
+        var dataEntry = new TransportDataEntryPanel
         {
-            table.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.MainDataRowHeight));
-        }
+            Dock = DockStyle.Top,
+            Margin = Padding.Empty
+        };
 
         for (var index = 0; index < fields.Count; index++)
         {
-            var row = index / 2;
-            var pair = index % 2;
-            var labelColumn = pair == 0 ? 0 : 2;
-            var fieldColumn = labelColumn + 1;
             var definition = fields[index];
-
-            var label = new Label
-            {
-                Dock = DockStyle.Fill,
-                Margin = new Padding(4),
-                Text = definition.Label,
-                TextAlign = ContentAlignment.MiddleRight,
-                RightToLeft = RightToLeft.Yes
-            };
-
-            var editor = CreateEditor(definition);
-            table.Controls.Add(label, labelColumn, row);
-            table.Controls.Add(editor, fieldColumn, row);
+            dataEntry.AddField(definition.Label, CreateEditor(definition), index);
         }
 
-        scroll.Controls.Add(table);
-        host.Controls.Add(actionStrip, 0, 0);
-        host.Controls.Add(scroll, 0, 1);
-        return host;
+        scrollHost.Controls.Add(dataEntry);
+        layout.Controls.Add(actions, 0, 0);
+        layout.Controls.Add(scrollHost, 0, 1);
+        section.Controls.Add(layout);
+        return section;
     }
 
     private static Control CreateEditor(SecurityFieldDefinition definition)
@@ -171,31 +131,19 @@ internal static class SecurityDesignerSupport
         {
             SecurityFieldKind.RequiredText => new RequiredTextBox(),
             SecurityFieldKind.Choice => CreateChoice(definition.Items),
-            SecurityFieldKind.Date => new DateTimePicker
-            {
-                Format = DateTimePickerFormat.Custom,
-                CustomFormat = "yyyy/MM/dd",
-                ShowCheckBox = true
-            },
+            SecurityFieldKind.Date => new TransportDatePicker { ShowCheckBox = true },
             SecurityFieldKind.Boolean => CreateChoice(new[] { "نعم", "لا" }),
-            SecurityFieldKind.Multiline => new TextBox
+            SecurityFieldKind.Multiline => new TransportMultilineTextBox(),
+            SecurityFieldKind.Masked => new TransportTextBox
             {
-                Multiline = true,
-                ScrollBars = ScrollBars.Vertical,
-                Height = 58
+                ReadOnly = true,
+                UseSystemPasswordChar = true
             },
-            SecurityFieldKind.Masked => new TextBox
-            {
-                UseSystemPasswordChar = true,
-                ReadOnly = true
-            },
-            _ => new TextBox()
+            _ => new TransportTextBox()
         };
 
         editor.Name = $"fld{definition.Label.GetHashCode():X8}";
         editor.Tag = definition.Label;
-        editor.Dock = DockStyle.Fill;
-        editor.Margin = new Padding(4, TransportUiMetrics.MainDataVerticalMargin, 8, TransportUiMetrics.MainDataVerticalMargin);
         editor.RightToLeft = RightToLeft.Yes;
 
         if (editor is TextBox textBox)
@@ -206,13 +154,9 @@ internal static class SecurityDesignerSupport
         return editor;
     }
 
-    private static ComboBox CreateChoice(IReadOnlyList<string>? items)
+    private static TransportComboBox CreateChoice(IReadOnlyList<string>? items)
     {
-        var combo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            RightToLeft = RightToLeft.Yes
-        };
+        var combo = new TransportComboBox();
 
         if (items is not null)
         {
@@ -222,146 +166,201 @@ internal static class SecurityDesignerSupport
         return combo;
     }
 
+    /// <summary>
+    /// كل تبويب متخصص يبدأ بحاوية عامة، ثم شريط وصف مركزي، ثم محتوى متخصص داخل حاوية.
+    /// </summary>
     private static Control CreateSpecializedWorkspace(SecurityTabDefinition definition)
     {
-        var host = new TableLayoutPanel
-        {
-            ColumnCount = 1,
-            Dock = DockStyle.Fill,
-            RowCount = 2,
-            RightToLeft = RightToLeft.Yes,
-            BackColor = Color.White
-        };
-        host.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-        host.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        var section = CreateSection(definition.Title);
+        var host = CreateSingleColumnLayout(TransportUiMetrics.AlertBarHeight);
 
-        host.Controls.Add(new Label
+        var description = new TransportAlertBar
         {
             Dock = DockStyle.Fill,
-            Text = definition.Description,
-            TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = Color.FromArgb(80, 88, 102),
-            RightToLeft = RightToLeft.Yes
-        }, 0, 0);
+            Margin = Padding.Empty
+        };
+        description.ShowInfo(definition.Description);
 
-        Control content = definition.Kind switch
+        var content = definition.Kind switch
         {
-            SecurityTabKind.Tree => CreateTree(),
-            SecurityTabKind.CheckList => CreateCheckList(),
-            SecurityTabKind.Comparison => CreateComparison(),
-            SecurityTabKind.Settings => CreateSettingsPanel(),
-            SecurityTabKind.Audit => CreateAuditList(),
-            _ => CreateDetailsList()
+            SecurityTabKind.Tree => CreateTreeWorkspace(),
+            SecurityTabKind.CheckList => CreateCheckListWorkspace(),
+            SecurityTabKind.Comparison => CreateComparisonWorkspace(),
+            SecurityTabKind.Settings => CreateSettingsWorkspace(),
+            SecurityTabKind.Audit => CreateGridWorkspace(
+                "سجل العمليات",
+                new[] { "التاريخ والوقت", "المستخدم", "العملية", "السبب / المرجع" }),
+            _ => CreateGridWorkspace(
+                "التفاصيل",
+                new[] { "العنصر", "القيمة / الحالة", "ملاحظات" })
         };
 
+        host.Controls.Add(description, 0, 0);
         host.Controls.Add(content, 0, 1);
-        return host;
+        section.Controls.Add(host);
+        return section;
     }
 
-    private static TreeView CreateTree() => new()
+    private static Control CreateTreeWorkspace()
     {
-        Dock = DockStyle.Fill,
-        CheckBoxes = true,
-        FullRowSelect = true,
-        HideSelection = false,
-        RightToLeft = RightToLeft.Yes,
-        BorderStyle = BorderStyle.FixedSingle
-    };
+        var section = CreateSection("الشجرة");
+        var host = CreateContentHost();
 
-    private static CheckedListBox CreateCheckList() => new()
-    {
-        Dock = DockStyle.Fill,
-        CheckOnClick = true,
-        RightToLeft = RightToLeft.Yes,
-        BorderStyle = BorderStyle.FixedSingle
-    };
-
-    private static ListView CreateDetailsList()
-    {
-        var list = new ListView
+        var tree = new TreeView
         {
             Dock = DockStyle.Fill,
+            CheckBoxes = true,
             FullRowSelect = true,
-            GridLines = true,
             HideSelection = false,
             RightToLeft = RightToLeft.Yes,
-            View = View.Details
+            BorderStyle = BorderStyle.FixedSingle
         };
-        list.Columns.Add("العنصر", 240, HorizontalAlignment.Right);
-        list.Columns.Add("القيمة / الحالة", 420, HorizontalAlignment.Right);
-        list.Columns.Add("ملاحظات", 320, HorizontalAlignment.Right);
-        return list;
+
+        host.Controls.Add(tree);
+        section.Controls.Add(host);
+        return section;
     }
 
-    private static ListView CreateAuditList()
+    private static Control CreateCheckListWorkspace()
     {
-        var list = new ListView
+        var section = CreateSection("العناصر المتاحة");
+        var host = CreateContentHost();
+
+        var list = new CheckedListBox
         {
             Dock = DockStyle.Fill,
-            FullRowSelect = true,
-            GridLines = true,
-            HideSelection = false,
+            CheckOnClick = true,
             RightToLeft = RightToLeft.Yes,
-            View = View.Details
+            BorderStyle = BorderStyle.FixedSingle
         };
-        list.Columns.Add("التاريخ والوقت", 160, HorizontalAlignment.Right);
-        list.Columns.Add("المستخدم", 180, HorizontalAlignment.Right);
-        list.Columns.Add("العملية", 220, HorizontalAlignment.Right);
-        list.Columns.Add("السبب / المرجع", 380, HorizontalAlignment.Right);
-        return list;
+
+        host.Controls.Add(list);
+        section.Controls.Add(host);
+        return section;
     }
 
-    private static Control CreateSettingsPanel()
+    private static Control CreateGridWorkspace(string title, IReadOnlyList<string> columns)
     {
-        var panel = new FlowLayoutPanel
+        var section = CreateSection(title);
+        var grid = new TransportDataGrid
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            AutoScroll = true,
-            RightToLeft = RightToLeft.Yes,
-            Padding = new Padding(12)
+            AutoGenerateColumns = false,
+            Margin = Padding.Empty
         };
 
-        foreach (var text in new[] { "تفعيل الإعداد ضمن النطاق", "الوراثة من المستوى الأعلى", "يتطلب اعتمادًا قبل التطبيق" })
+        foreach (var column in columns)
         {
-            panel.Controls.Add(new CheckBox
-            {
-                AutoSize = true,
-                Text = text,
-                RightToLeft = RightToLeft.Yes,
-                Margin = new Padding(6)
-            });
+            grid.Columns.Add($"col{grid.Columns.Count + 1}", column);
         }
 
-        return panel;
+        section.Controls.Add(grid);
+        return section;
     }
 
-    private static Control CreateComparison()
+    private static Control CreateSettingsWorkspace()
     {
+        var section = CreateSection("الإعدادات");
+        var scrollHost = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = Color.White,
+            RightToLeft = RightToLeft.Yes,
+            Padding = Padding.Empty,
+            Margin = Padding.Empty
+        };
+
+        var dataEntry = new TransportDataEntryPanel
+        {
+            Dock = DockStyle.Top,
+            Margin = Padding.Empty
+        };
+
+        var settings = new[]
+        {
+            "تفعيل الإعداد ضمن النطاق",
+            "الوراثة من المستوى الأعلى",
+            "يتطلب اعتمادًا قبل التطبيق"
+        };
+
+        for (var index = 0; index < settings.Length; index++)
+        {
+            dataEntry.AddField(settings[index], CreateChoice(new[] { "نعم", "لا" }), index);
+        }
+
+        scrollHost.Controls.Add(dataEntry);
+        section.Controls.Add(scrollHost);
+        return section;
+    }
+
+    private static Control CreateComparisonWorkspace()
+    {
+        var section = CreateSection("المقارنة");
         var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
             RightToLeft = RightToLeft.Yes,
-            SplitterDistance = 480
+            Margin = Padding.Empty
         };
 
-        split.Panel1.Controls.Add(CreateReadOnlyBox("القيم قبل العملية"));
-        split.Panel2.Controls.Add(CreateReadOnlyBox("القيم بعد العملية"));
-        return split;
+        split.Panel1.Controls.Add(CreateReadOnlySection("القيم قبل العملية"));
+        split.Panel2.Controls.Add(CreateReadOnlySection("القيم بعد العملية"));
+        section.Controls.Add(split);
+        return section;
     }
 
-    private static TextBox CreateReadOnlyBox(string placeholder) => new()
+    private static Control CreateReadOnlySection(string title)
+    {
+        var section = CreateSection(title);
+        var text = new TransportMultilineTextBox
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            Text = title,
+            Margin = Padding.Empty
+        };
+
+        section.Controls.Add(text);
+        return section;
+    }
+
+    private static TransportGroupBox CreateSection(string title) => new()
     {
         Dock = DockStyle.Fill,
-        Multiline = true,
-        ReadOnly = true,
-        ScrollBars = ScrollBars.Both,
-        RightToLeft = RightToLeft.Yes,
-        TextAlign = HorizontalAlignment.Right,
-        Text = placeholder
+        Margin = Padding.Empty,
+        Text = title,
+        RightToLeft = RightToLeft.Yes
     };
+
+    private static Panel CreateContentHost() => new()
+    {
+        Dock = DockStyle.Fill,
+        BackColor = Color.White,
+        RightToLeft = RightToLeft.Yes,
+        Padding = new Padding(TransportUiMetrics.CompactPadding),
+        Margin = Padding.Empty
+    };
+
+    private static TableLayoutPanel CreateSingleColumnLayout(int firstRowHeight)
+    {
+        var layout = new TableLayoutPanel
+        {
+            ColumnCount = 1,
+            RowCount = 2,
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            RightToLeft = RightToLeft.Yes,
+            Padding = Padding.Empty,
+            Margin = Padding.Empty
+        };
+
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, firstRowHeight));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        return layout;
+    }
 }
 
 internal enum SecurityFieldKind
