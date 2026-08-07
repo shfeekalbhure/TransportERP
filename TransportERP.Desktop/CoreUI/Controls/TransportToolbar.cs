@@ -67,13 +67,16 @@ public sealed class TransportToolbar : UserControl
         _buttonsPanel.WrapContents = false;
         _buttonsPanel.Padding = Padding.Empty;
 
-        _buttonsPanel.Controls.Add(NewButton);
-        _buttonsPanel.Controls.Add(SaveButton);
-        _buttonsPanel.Controls.Add(EditButton);
-        _buttonsPanel.Controls.Add(DisableButton);
-        _buttonsPanel.Controls.Add(DeleteButton);
-        _buttonsPanel.Controls.Add(PrintButton);
+        // بسبب اتجاه FlowLayoutPanel من اليمين إلى اليسار، نضيف الأزرار بترتيب عكسي
+        // حتى يظهر الترتيب البصري الفعلي من أقصى اليمين كما هو معتمد:
+        // جديد ← حفظ ← تعديل ← إيقاف ← حذف ← طباعة ← إغلاق
         _buttonsPanel.Controls.Add(CloseButton);
+        _buttonsPanel.Controls.Add(PrintButton);
+        _buttonsPanel.Controls.Add(DeleteButton);
+        _buttonsPanel.Controls.Add(DisableButton);
+        _buttonsPanel.Controls.Add(EditButton);
+        _buttonsPanel.Controls.Add(SaveButton);
+        _buttonsPanel.Controls.Add(NewButton);
 
         Controls.Add(_buttonsPanel);
     }
