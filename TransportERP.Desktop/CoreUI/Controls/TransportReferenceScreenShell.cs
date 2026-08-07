@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.CoreUI.Controls;
 
@@ -43,7 +44,7 @@ public sealed class TransportReferenceScreenShell : UserControl
 
     private void InitializeLayout()
     {
-        BackColor = Color.FromArgb(247, 249, 252);
+        BackColor = UiTheme.WorkspaceBackground;
         Dock = DockStyle.Fill;
         Padding = new Padding(TransportUiMetrics.ScreenOuterPadding);
         RightToLeft = RightToLeft.Yes;
@@ -73,7 +74,7 @@ public sealed class TransportReferenceScreenShell : UserControl
         _topUtilityRow.RowCount = 1;
         _topUtilityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        DataHost.BackColor = Color.White;
+        DataHost.BackColor = UiTheme.SurfaceBackground;
         DataHost.Dock = DockStyle.Fill;
         DataHost.Margin = Padding.Empty;
         DataHost.Padding = new Padding(TransportUiMetrics.CompactPadding);
