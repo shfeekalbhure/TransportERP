@@ -68,7 +68,7 @@ public sealed class TransportSearchPanel : UserControl
 
     private void InitializeLayout()
     {
-        BackColor = Color.White;
+        BackColor = UiTheme.SurfaceBackground;
         Dock = DockStyle.Fill;
         Height = TransportUiMetrics.SearchPanelHeight;
         MinimumSize = new Size(0, TransportUiMetrics.SearchPanelHeight);
@@ -90,16 +90,19 @@ public sealed class TransportSearchPanel : UserControl
         _searchBox.RightToLeft = RightToLeft.Yes;
         _searchBox.SearchTextChanged += (_, e) => SearchTextChanged?.Invoke(this, e);
 
+        // حقل الحالة أقل ارتفاعًا من مربع البحث؛ لذلك يتم توسيطه رأسيًا من المقاس المركزي.
+        var statusVerticalMargin = TransportUiMetrics.SearchStatusVerticalMargin;
+
         _statusLabel.AutoSize = false;
         _statusLabel.Font = UiTheme.CreateRegularFont(9.5F);
-        _statusLabel.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, 0, 2, 0);
+        _statusLabel.Margin = new Padding(TransportUiMetrics.MainDataHorizontalMargin, statusVerticalMargin, 2, statusVerticalMargin);
         _statusLabel.Size = new Size(54, TransportUiMetrics.SearchStatusControlHeight);
         _statusLabel.Text = "الحالة:";
         _statusLabel.TextAlign = ContentAlignment.MiddleRight;
 
         _statusComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _statusComboBox.Font = UiTheme.CreateRegularFont(9.5F);
-        _statusComboBox.Margin = new Padding(2, 0, TransportUiMetrics.MainDataHorizontalMargin, 0);
+        _statusComboBox.Margin = new Padding(2, statusVerticalMargin, TransportUiMetrics.MainDataHorizontalMargin, statusVerticalMargin);
         _statusComboBox.RightToLeft = RightToLeft.Yes;
         _statusComboBox.Size = new Size(140, TransportUiMetrics.SearchStatusControlHeight);
         _statusComboBox.MinimumSize = new Size(140, TransportUiMetrics.SearchStatusControlHeight);
