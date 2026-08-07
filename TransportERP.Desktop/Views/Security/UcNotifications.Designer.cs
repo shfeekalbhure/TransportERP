@@ -18,9 +18,23 @@ partial class UcNotifications
                 new("البيانات الرئيسية", SecurityTabKind.Details, "بيانات الإشعار ومحتواه الأساسي."),
                 new("المستلمون", SecurityTabKind.CheckList, "المستخدمون والأدوار والمجموعات المستلمة."),
                 new("قنوات الإرسال", SecurityTabKind.CheckList, "القنوات المعتمدة للإرسال."),
-                new("المعاينة والجدولة", SecurityTabKind.Details, "معاينة وجدولة الإشعار قبل الإرسال."),
-                new("سجل الإرسال والقراءة", SecurityTabKind.Audit, "نتيجة التسليم والقراءة حسب القناة."),
-                new("سجل العمليات", SecurityTabKind.Audit, "إنشاء وتعديل وجدولة وإرسال وإلغاء الإشعار.")
+                new("المعاينة والجدولة", SecurityTabKind.Details, "معاينة وجدولة الإشعار قبل الإرسال.",
+                    Fields: new SecurityFieldDefinition[]
+                    {
+                        new("تاريخ ووقت الجدولة", SecurityFieldKind.Date),
+                        new("تاريخ الانتهاء", SecurityFieldKind.Date),
+                        new("المنطقة الزمنية"),
+                        new("أولوية الإرسال", SecurityFieldKind.Choice, new[] { "عادية", "عالية", "حرجة" }),
+                        new("يتطلب إقرارًا", SecurityFieldKind.Boolean),
+                        new("إعادة المحاولة عند الفشل", SecurityFieldKind.Boolean),
+                        new("عدد محاولات الإعادة"),
+                        new("معاينة النص", SecurityFieldKind.Multiline)
+                    },
+                    Actions: new[] { "معاينة", "جدولة", "إلغاء الجدولة" }),
+                new("سجل الإرسال والقراءة", SecurityTabKind.Audit, "نتيجة التسليم والقراءة حسب القناة.",
+                    Columns: new[] { "المستلم", "القناة", "وقت الإرسال", "حالة التسليم", "وقت التسليم", "وقت القراءة", "عدد المحاولات", "الخطأ" }),
+                new("سجل العمليات", SecurityTabKind.Audit, "إنشاء وتعديل وجدولة وإرسال وإلغاء الإشعار.",
+                    Columns: new[] { "التاريخ والوقت", "المستخدم", "العملية", "الحالة السابقة", "الحالة الجديدة", "السبب / المرجع" })
             },
             new SecurityFieldDefinition[]
             {
