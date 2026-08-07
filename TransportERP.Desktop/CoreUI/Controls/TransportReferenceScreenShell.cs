@@ -178,7 +178,7 @@ public sealed class TransportReferenceScreenShell : UserControl
     /// </summary>
     private static void ApplyStandardControlMetrics(Control control)
     {
-        var isMultiline = control is TextBox textBox && textBox.Multiline;
+        var isMultiline = control is TextBox currentTextBox && currentTextBox.Multiline;
         control.Margin = new Padding(
             TransportUiMetrics.MainDataHorizontalMargin,
             TransportUiMetrics.MainDataVerticalMargin,
@@ -195,9 +195,9 @@ public sealed class TransportReferenceScreenShell : UserControl
                 textBox.TextAlign = HorizontalAlignment.Right;
                 break;
 
-            case TextBox textBox when textBox.Multiline:
-                textBox.MinimumSize = new Size(textBox.MinimumSize.Width, TransportUiMetrics.MainDataMultilineMinHeight);
-                textBox.TextAlign = HorizontalAlignment.Right;
+            case TextBox multilineTextBox when multilineTextBox.Multiline:
+                multilineTextBox.MinimumSize = new Size(multilineTextBox.MinimumSize.Width, TransportUiMetrics.MainDataMultilineMinHeight);
+                multilineTextBox.TextAlign = HorizontalAlignment.Right;
                 break;
 
             case ComboBox comboBox:
