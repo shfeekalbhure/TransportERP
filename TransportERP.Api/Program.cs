@@ -1,43 +1,25 @@
-using TransportERP.Application.Setup.ExchangeRates;
-using TransportERP.Application.Setup.Currencies;
-using TransportERP.Application.Setup.VehicleTypes;
-using TransportERP.Application.AccessControl;
+namespace TransportERP.Api;
 
-namespace TransportERP.Api
+public class Program
 {
-    public class Program
+    public static void Main(string[] args)
     {
-        public static void Main(string[] args)
+        var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.AddControllers();
+        builder.Services.AddOpenApi();
+
+        var app = builder.Build();
+
+        if (app.Environment.IsDevelopment())
         {
-            var builder = WebApplication.CreateBuilder(args);
-
-            // Add services to the container.
-            builder.Services.AddScoped<IAccessControlService, ApprovedStorageBlockedAccessControlService>();
-
-            builder.Services.AddControllers();
-            builder.Services.AddScoped<TransportERP.Application.Accounting.IJournalReportQueryService, TransportERP.Application.Accounting.JournalReportQueryService>();
-            builder.Services.AddScoped<IVehicleTypeService, VehicleTypeService>();
-            builder.Services.AddScoped<ICurrencyService, CurrencyService>();
-            builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
-
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-            }
-
-            app.UseHttpsRedirection();
-
-            app.UseAuthorization();
-
-
-            app.MapControllers();
-
-            app.Run();
+            app.MapOpenApi();
         }
+
+        app.UseHttpsRedirection();
+        app.UseAuthorization();
+        app.MapControllers();
+
+        app.Run();
     }
 }
