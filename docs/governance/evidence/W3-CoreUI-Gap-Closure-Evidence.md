@@ -34,7 +34,7 @@ All references are declared in `TransportERP.Desktop/CoreUI/Architecture/Referen
 3. proves a duplicate reference fails validation.
 
 The branch workflow `.github/workflows/build-validation.yml` must run:
-`dotnet test TransportERP.slnx --configuration Debug --no-build`.
+`dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build`.
 
 ## Independent verification record
 - QA reviewer must confirm the workflow run for the resulting commit is successful and inspect the three passing tests.
