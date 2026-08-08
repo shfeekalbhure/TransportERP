@@ -248,10 +248,10 @@ public static class TransportScreenProfilePolicy
         {
             TransportLayoutRole.Toolbar or
             TransportLayoutRole.Search or
-            TransportLayoutRole.Pagination => VerticalSizingBehavior.Fixed,
+            TransportLayoutRole.Pagination or
+            TransportLayoutRole.ActionPanel => VerticalSizingBehavior.Fixed,
             TransportLayoutRole.Audit or
-            TransportLayoutRole.Alerts or
-            TransportLayoutRole.ActionPanel => VerticalSizingBehavior.Content,
+            TransportLayoutRole.Alerts => VerticalSizingBehavior.Content,
             TransportLayoutRole.TreeHost => VerticalSizingBehavior.Fill,
             _ => VerticalSizingBehavior.Fixed
         };
