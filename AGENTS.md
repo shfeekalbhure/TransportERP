@@ -32,6 +32,22 @@ No seventh ScreenProfile may be introduced without evidence of a structural diff
 - The General Supervisor resolves conflicts and issues the final integrated decision.
 - The same role must not be the sole author and sole approver of a critical architectural decision.
 
+## Permanent specialist roles
+- `docs/agents/GENERAL_SUPERVISOR.md`
+- `docs/agents/SOLUTION_ARCHITECT.md`
+- `docs/agents/SCREEN_COREUI_ARCHITECT.md`
+- `docs/agents/DATA_MYSQL_ARCHITECT.md`
+- `docs/agents/ACCOUNTING_CONSULTANT.md`
+- `docs/agents/API_SECURITY_REVIEWER.md`
+- `docs/agents/UX_UI_REVIEWER.md`
+- `docs/agents/QA_TESTING_REVIEWER.md`
+- `docs/agents/RELEASE_INTEGRATION_REVIEWER.md`
+
+Routing and recommended independent review pairs are defined in `docs/agents/TEAM_ROSTER.md`.
+
+## Work-package rule
+Every delegated multi-role task must be expressed as a Work Package using `docs/governance/WORK_PACKAGE_TEMPLATE.md`, including objective, scope, governing references, assigned author/reviewer, dependencies, outputs, acceptance criteria, target Gate, and open gaps.
+
 ## Change safety
 - Never silently modify Frozen classifications, numbering, ownership, contracts, or database invariants.
 - Never overwrite unrelated repository changes.
@@ -40,8 +56,8 @@ No seventh ScreenProfile may be introduced without evidence of a structural diff
 ## Required evidence before completion
 A work package is complete only when its required artifacts, traceability, tests/checks, and Gate criteria are satisfied and no unresolved Critical/High blocker remains for that Gate.
 
-## Agent role files
-Detailed role instructions live under `docs/agents/`.
+## Multi-agent truthfulness
+These files define roles and orchestration rules. They do not by themselves create runtime agents. A supervisor may claim that multiple agents worked only when the execution environment actually invoked separate agents; otherwise the roles must be treated as structured review perspectives within one execution.
 
 ## Governance workflow
 Review and approval flow is defined in `docs/governance/REVIEW_WORKFLOW.md`.
