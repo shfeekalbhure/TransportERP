@@ -85,7 +85,7 @@ internal static class GeneralSetupScreenBuilder
 
         for (var index = 0; index < tabs.Count; index++)
         {
-            tabControl.TabPages.Add(CreateTab(tabs[index], metadata, index == 0));
+            tabControl.TabPages.Add(CreateTab(tabs[index], metadata));
         }
 
         shell.DataHost.Controls.Add(tabControl);
@@ -95,6 +95,9 @@ internal static class GeneralSetupScreenBuilder
 
         if (metadata is not null)
         {
+            // MainData هي المنطقة المالكة للمحتوى، أما DataEntryPanel فهو مصدر Preferred Content داخلها.
+            metadata.SetLayoutRole(shell.DataHost, TransportLayoutRole.MainData);
+            metadata.SetLayoutRole(tabControl, TransportLayoutRole.TabsHost);
             metadata.SetLayoutRole(shell.Toolbar, TransportLayoutRole.Toolbar);
             metadata.SetLayoutRole(shell.SearchPanel, TransportLayoutRole.Search);
             metadata.SetLayoutRole(shell.Grid, TransportLayoutRole.Grid);
@@ -144,7 +147,7 @@ internal static class GeneralSetupScreenBuilder
     internal static FieldSpec Picture(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
         new(caption, FieldKind.Picture, null, profile);
 
-    private static TabPage CreateTab(TabSpec spec, TransportLayoutRoleProvider? metadata, bool isPrimary)
+    private static TabPage CreateTab(TabSpec spec, TransportLayoutRoleProvider? metadata)
     {
         var page = new TabPage
         {
@@ -178,12 +181,13 @@ internal static class GeneralSetupScreenBuilder
             throw new InvalidOperationException($"التبويب '{spec.Title}' يتجاوز الحد الحاكم البالغ {TransportUiMetrics.MainDataMaxRows} صفوف.");
         }
 
+        // في مسار Profile يصبح ContentHost وسيط Fill فقط؛ لا يملك Height ولا AutoSize chain.
         var root = new TableLayoutPanel
         {
             ColumnCount = 1,
             RowCount = spec.ActionButtons is { Length: > 0 } ? 2 : 1,
-            Dock = DockStyle.Top,
-            AutoSize = true,
+            Dock = metadata is null ? DockStyle.Top : DockStyle.Fill,
+            AutoSize = metadata is null,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             AutoScroll = false,
             BackColor = UiTheme.SurfaceBackground,
@@ -202,11 +206,6 @@ internal static class GeneralSetupScreenBuilder
             Margin = Padding.Empty,
             Padding = Padding.Empty
         };
-
-        if (metadata is not null && isPrimary)
-        {
-            metadata.SetLayoutRole(dataEntry, TransportLayoutRole.MainData);
-        }
 
         for (var index = 0; index < spec.Fields.Length; index++)
         {
@@ -227,7 +226,10 @@ internal static class GeneralSetupScreenBuilder
         {
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ActionPanelHeight));
             var actions = new TransportActionPanel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-            foreach (var caption in buttons) actions.AddAction(caption);
+            foreach (var caption in buttons)
+            {
+                actions.AddAction(caption);
+            }
             root.Controls.Add(actions, 0, 1);
         }
 
@@ -250,7 +252,13 @@ internal static class GeneralSetupScreenBuilder
                 TextAlign = HorizontalAlignment.Right,
                 RightToLeft = RightToLeft.Yes
             },
-            FieldKind.Check => new CheckBox { Text = "نعم", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, RightToLeft = RightToLeft.Yes },
+            FieldKind.Check => new CheckBox
+            {
+                Text = "نعم",
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleRight,
+                RightToLeft = RightToLeft.Yes
+            },
             FieldKind.Multiline => new TransportMultilineTextBox(),
             FieldKind.Picture => new PictureBox
             {
@@ -270,13 +278,21 @@ internal static class GeneralSetupScreenBuilder
     private static TransportComboBox CreateCombo(string[]? items)
     {
         var combo = new TransportComboBox();
-        if (items is { Length: > 0 }) combo.Items.AddRange(items.Cast<object>().ToArray());
+        if (items is { Length: > 0 })
+        {
+            combo.Items.AddRange(items.Cast<object>().ToArray());
+        }
         return combo;
     }
 
     private static TransportDataGrid CreateLogGrid()
     {
-        var grid = new TransportDataGrid { Dock = DockStyle.Fill, AutoGenerateColumns = false, Margin = Padding.Empty };
+        var grid = new TransportDataGrid
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            Margin = Padding.Empty
+        };
         AddColumn(grid, "التاريخ", 145);
         AddColumn(grid, "المستخدم", 150);
         AddColumn(grid, "العملية", 130);
@@ -290,7 +306,10 @@ internal static class GeneralSetupScreenBuilder
     {
         grid.AutoGenerateColumns = false;
         grid.Columns.Clear();
-        foreach (var header in headers) AddColumn(grid, header, header is "الرمز" or "الحالة" ? 120 : null);
+        foreach (var header in headers)
+        {
+            AddColumn(grid, header, header is "الرمز" or "الحالة" ? 120 : null);
+        }
     }
 
     private static void AddColumn(DataGridView grid, string header, int? width)
@@ -333,7 +352,10 @@ internal static class GeneralSetupScreenBuilder
                     check.Checked = false;
                     break;
             }
-            if (child.HasChildren) ClearEditableFields(child);
+            if (child.HasChildren)
+            {
+                ClearEditableFields(child);
+            }
         }
     }
 

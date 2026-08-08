@@ -11,6 +11,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 public sealed class TransportDataEntryPanel : TableLayoutPanel
 {
     private int _fieldColumnCount = TransportUiMetrics.MainDataMaxFieldColumns;
+    private bool _profileContentSizingEnabled;
 
     public TransportDataEntryPanel()
     {
@@ -53,13 +54,18 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
 
     /// <summary>
     /// الارتفاع الفعلي المطلوب لعرض جميع الصفوف بدون أي Scroll.
-    /// يستخدمه القالب العام لتمديد حاوية البيانات إلى الأسفل تلقائيًا.
+    /// في مسار Profile V1 يصبح هذا هو مصدر الحقيقة الذي تقرأه الـPolicy.
     /// </summary>
     [Browsable(false)]
     public int PreferredContentHeight
     {
         get
         {
+            if (_profileContentSizingEnabled)
+            {
+                return GetProfilePreferredSize(new Size(Math.Max(1, ClientSize.Width), 0)).Height;
+            }
+
             if (RowCount == 0)
             {
                 return TransportUiMetrics.MainDataRowHeight;
@@ -75,6 +81,74 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
 
             return Math.Max(TransportUiMetrics.MainDataRowHeight, total);
         }
+    }
+
+    /// <summary>
+    /// تفعيل سلوك Content للـPilot المعلن فقط. لا يغير السلوك الافتراضي للشاشات غير المهاجرة.
+    /// الحقول تصبح ثابتة رأسيًا ومتمددة أفقيًا، والصفوف تقاس من Preferred Content بدل Dock=Fill رأسيًا.
+    /// </summary>
+    internal void EnableProfileContentSizing()
+    {
+        if (_profileContentSizingEnabled)
+        {
+            return;
+        }
+
+        _profileContentSizingEnabled = true;
+        AutoSize = false;
+        AutoScroll = false;
+        Dock = DockStyle.Top;
+
+        SuspendLayout();
+        try
+        {
+            for (var row = 0; row < RowStyles.Count; row++)
+            {
+                RowStyles[row].SizeType = SizeType.AutoSize;
+                RowStyles[row].Height = 0F;
+            }
+
+            foreach (Control control in Controls)
+            {
+                ConfigureProfileControl(control);
+            }
+        }
+        finally
+        {
+            ResumeLayout(true);
+        }
+    }
+
+    /// <summary>
+    /// يحسب Preferred Size للـPilot من الصفوف الفعلية وأكبر عنصر في كل صف.
+    /// لا يعتمد على Height محلي سحري، ويحتسب Margins/Padding المركزية.
+    /// </summary>
+    internal Size GetProfilePreferredSize(Size proposedSize)
+    {
+        var rowCount = Math.Max(1, RowCount);
+        var rowHeights = new int[rowCount];
+
+        foreach (Control control in Controls)
+        {
+            var row = GetRow(control);
+            if (row < 0 || row >= rowHeights.Length)
+            {
+                continue;
+            }
+
+            var preferredHeight = GetProfileControlHeight(control, proposedSize.Width);
+            var totalHeight = preferredHeight + control.Margin.Vertical;
+            rowHeights[row] = Math.Max(rowHeights[row], totalHeight);
+        }
+
+        var height = Padding.Vertical;
+        for (var row = 0; row < rowHeights.Length; row++)
+        {
+            height += Math.Max(TransportUiMetrics.MainDataRowHeight, rowHeights[row]);
+        }
+
+        var width = proposedSize.Width > 0 ? proposedSize.Width : Math.Max(1, ClientSize.Width);
+        return new Size(width, Math.Max(TransportUiMetrics.MainDataRowHeight, height));
     }
 
     /// <summary>
@@ -135,7 +209,97 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
 
         Controls.Add(label, labelColumn, row);
         Controls.Add(editor, fieldColumn, row);
+
+        if (_profileContentSizingEnabled)
+        {
+            RowStyles[row].SizeType = SizeType.AutoSize;
+            ConfigureProfileControl(label);
+            ConfigureProfileControl(editor);
+        }
+
         PerformLayout();
+    }
+
+    private static void ConfigureProfileControl(Control control)
+    {
+        control.RightToLeft = RightToLeft.Yes;
+
+        if (control is Label label)
+        {
+            label.Dock = DockStyle.None;
+            label.Anchor = AnchorStyles.Right;
+            label.AutoSize = true;
+            label.TextAlign = ContentAlignment.MiddleRight;
+            return;
+        }
+
+        if (control is CheckBox checkBox)
+        {
+            checkBox.Dock = DockStyle.None;
+            checkBox.Anchor = AnchorStyles.Right;
+            checkBox.AutoSize = true;
+            return;
+        }
+
+        control.Dock = DockStyle.None;
+        control.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+
+        switch (control)
+        {
+            case TextBox textBox when textBox.Multiline:
+                textBox.Height = Math.Max(textBox.Height, TransportUiMetrics.MainDataMultilineMinHeight);
+                textBox.MinimumSize = new Size(textBox.MinimumSize.Width, TransportUiMetrics.MainDataMultilineMinHeight);
+                textBox.TextAlign = HorizontalAlignment.Right;
+                break;
+
+            case TextBox textBox:
+                textBox.AutoSize = false;
+                textBox.Height = TransportUiMetrics.MainDataControlHeight;
+                textBox.MinimumSize = new Size(textBox.MinimumSize.Width, TransportUiMetrics.MainDataControlHeight);
+                textBox.MaximumSize = new Size(0, TransportUiMetrics.MainDataControlHeight);
+                textBox.TextAlign = HorizontalAlignment.Right;
+                break;
+
+            case ComboBox comboBox:
+                comboBox.Height = TransportUiMetrics.MainDataControlHeight;
+                comboBox.MinimumSize = new Size(comboBox.MinimumSize.Width, TransportUiMetrics.MainDataControlHeight);
+                comboBox.MaximumSize = new Size(0, TransportUiMetrics.MainDataControlHeight);
+                break;
+
+            case NumericUpDown numericUpDown:
+                numericUpDown.Height = TransportUiMetrics.MainDataControlHeight;
+                numericUpDown.MinimumSize = new Size(numericUpDown.MinimumSize.Width, TransportUiMetrics.MainDataControlHeight);
+                numericUpDown.MaximumSize = new Size(0, TransportUiMetrics.MainDataControlHeight);
+                numericUpDown.TextAlign = HorizontalAlignment.Right;
+                break;
+
+            case DateTimePicker dateTimePicker:
+                dateTimePicker.Height = TransportUiMetrics.MainDataControlHeight;
+                dateTimePicker.MinimumSize = new Size(dateTimePicker.MinimumSize.Width, TransportUiMetrics.MainDataControlHeight);
+                dateTimePicker.MaximumSize = new Size(0, TransportUiMetrics.MainDataControlHeight);
+                dateTimePicker.RightToLeftLayout = true;
+                break;
+
+            case Button button:
+                button.Height = Math.Max(button.MinimumSize.Height, TransportUiMetrics.MainDataControlHeight);
+                break;
+        }
+    }
+
+    private static int GetProfileControlHeight(Control control, int proposedWidth)
+    {
+        return control switch
+        {
+            Label label => Math.Max(label.GetPreferredSize(new Size(Math.Max(1, proposedWidth), 0)).Height, TransportUiMetrics.MainDataControlHeight),
+            TextBox textBox when textBox.Multiline => Math.Max(textBox.Height, TransportUiMetrics.MainDataMultilineMinHeight),
+            TextBox => TransportUiMetrics.MainDataControlHeight,
+            ComboBox => TransportUiMetrics.MainDataControlHeight,
+            NumericUpDown => TransportUiMetrics.MainDataControlHeight,
+            DateTimePicker => TransportUiMetrics.MainDataControlHeight,
+            CheckBox checkBox => Math.Max(checkBox.GetPreferredSize(Size.Empty).Height, TransportUiMetrics.MainDataControlHeight),
+            Button button => Math.Max(button.Height, TransportUiMetrics.MainDataControlHeight),
+            _ => Math.Max(control.GetPreferredSize(new Size(Math.Max(1, proposedWidth), 0)).Height, TransportUiMetrics.MainDataControlHeight)
+        };
     }
 
     private void ConfigureColumns(int fieldColumns)

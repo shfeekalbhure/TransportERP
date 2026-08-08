@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TransportERP.Desktop.CoreUI.Controls;
 
 namespace TransportERP.Desktop.CoreUI.Profiles;
 
@@ -126,9 +127,17 @@ public sealed class TransportLayoutRoleProvider : Component, IExtenderProvider
 
 /// <summary>
 /// Policy V1 تقرأ الإعلان Typed وتطبق السلوك؛ لا تستخدم اسم Control أو Tag أو موقعه للتخمين.
+/// LayoutRole يصف المنطقة، بينما VerticalSizingBehavior مشتق داخليًا من ScreenProfile + LayoutRole.
 /// </summary>
 public static class TransportScreenProfilePolicy
 {
+    private enum VerticalSizingBehavior
+    {
+        Fixed,
+        Content,
+        Fill
+    }
+
     public static void Apply(TransportScreenBase screen, TransportLayoutRoleProvider metadata)
     {
         ArgumentNullException.ThrowIfNull(screen);
@@ -151,44 +160,243 @@ public static class TransportScreenProfilePolicy
                 ApplyGridProfile(pair.Value, grid);
             }
         }
+
+        ConfigureContentPropagation(screen, metadata);
     }
 
     private static void ApplyLayoutRole(TransportScreenProfile screenProfile, TransportLayoutRole role, Control control)
     {
-        if (screenProfile == TransportScreenProfile.MasterData && role == TransportLayoutRole.MainData)
+        var verticalBehavior = ResolveVerticalSizing(screenProfile, role);
+
+        switch (verticalBehavior)
         {
-            control.Dock = DockStyle.Top;
-            if (control is ScrollableControl scrollable) scrollable.AutoScroll = false;
-            if (control is TableLayoutPanel table)
-            {
-                table.AutoSize = true;
-                table.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            }
+            case VerticalSizingBehavior.Fixed:
+                break;
+            case VerticalSizingBehavior.Content:
+                if (control is ScrollableControl scrollable)
+                {
+                    scrollable.AutoScroll = false;
+                }
+                break;
+            case VerticalSizingBehavior.Fill:
+                if (role == TransportLayoutRole.Grid)
+                {
+                    control.Dock = DockStyle.Fill;
+                }
+                break;
+        }
+
+        if (screenProfile == TransportScreenProfile.ReadOnlyLog &&
+            role == TransportLayoutRole.Toolbar &&
+            control is TransportToolbar toolbar)
+        {
+            toolbar.SetActionVisible(ToolbarAction.New, false);
+            toolbar.SetActionVisible(ToolbarAction.Save, false);
+            toolbar.SetActionVisible(ToolbarAction.Edit, false);
+            toolbar.SetActionVisible(ToolbarAction.Disable, false);
+            toolbar.SetActionVisible(ToolbarAction.Delete, false);
+        }
+    }
+
+    private static VerticalSizingBehavior ResolveVerticalSizing(
+        TransportScreenProfile screenProfile,
+        TransportLayoutRole role)
+    {
+        if (role == TransportLayoutRole.Grid)
+        {
+            return VerticalSizingBehavior.Fill;
+        }
+
+        if (screenProfile is TransportScreenProfile.MasterData or TransportScreenProfile.TabbedMaster &&
+            role == TransportLayoutRole.MainData)
+        {
+            return VerticalSizingBehavior.Content;
         }
 
         if (screenProfile == TransportScreenProfile.ReadOnlyLog && role == TransportLayoutRole.Filters)
         {
-            control.Dock = DockStyle.Top;
-            if (control is ScrollableControl scrollable) scrollable.AutoScroll = false;
-            if (control is TableLayoutPanel table)
+            return VerticalSizingBehavior.Content;
+        }
+
+        return role switch
+        {
+            TransportLayoutRole.Toolbar or
+            TransportLayoutRole.Search or
+            TransportLayoutRole.Pagination => VerticalSizingBehavior.Fixed,
+            TransportLayoutRole.Audit or
+            TransportLayoutRole.Alerts or
+            TransportLayoutRole.ActionPanel => VerticalSizingBehavior.Content,
+            TransportLayoutRole.TreeHost or
+            TransportLayoutRole.SettingsHost => VerticalSizingBehavior.Fill,
+            _ => VerticalSizingBehavior.Fixed
+        };
+    }
+
+    /// <summary>
+    /// يطبق Propagation على الشاشات المعلنة فقط: المحتوى يعيد PreferredSize أولًا،
+    /// ثم الـPolicy تطلب من الـShell المركزي إعادة حساب صف البيانات مرة واحدة.
+    /// لا تستخدم Layout/SizeChanged الداخلية كحل ولا تدخل الشاشات غير المهاجرة في هذا المسار.
+    /// </summary>
+    private static void ConfigureContentPropagation(
+        TransportScreenBase screen,
+        TransportLayoutRoleProvider metadata)
+    {
+        var contentRole = screen.ScreenProfile switch
+        {
+            TransportScreenProfile.MasterData or TransportScreenProfile.TabbedMaster => TransportLayoutRole.MainData,
+            TransportScreenProfile.ReadOnlyLog => TransportLayoutRole.Filters,
+            _ => TransportLayoutRole.None
+        };
+
+        if (contentRole == TransportLayoutRole.None)
+        {
+            return;
+        }
+
+        var declaredContent = metadata.LayoutRoles
+            .FirstOrDefault(pair => pair.Value == contentRole)
+            .Key;
+
+        if (declaredContent is null)
+        {
+            return;
+        }
+
+        var shell = FindAncestor<TransportReferenceScreenShell>(declaredContent);
+        if (shell is null)
+        {
+            return;
+        }
+
+        var tabsHost = metadata.LayoutRoles
+            .Where(pair => pair.Value == TransportLayoutRole.TabsHost)
+            .Select(pair => pair.Key)
+            .OfType<TabControl>()
+            .FirstOrDefault(control => IsDescendantOf(control, declaredContent));
+
+        var isRecalculating = false;
+
+        void Recalculate()
+        {
+            if (isRecalculating || screen.IsDisposed)
             {
-                table.AutoSize = true;
-                table.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                return;
+            }
+
+            try
+            {
+                isRecalculating = true;
+                screen.SuspendLayout();
+                shell.SuspendLayout();
+
+                var dataEntry = ResolveActiveDataEntry(declaredContent, tabsHost);
+                if (dataEntry is null)
+                {
+                    return;
+                }
+
+                dataEntry.EnableProfileContentSizing();
+                var availableWidth = Math.Max(
+                    1,
+                    dataEntry.Parent?.ClientSize.Width ?? declaredContent.ClientSize.Width);
+                var preferred = dataEntry.GetProfilePreferredSize(new Size(availableWidth, 0));
+                dataEntry.Height = preferred.Height;
+
+                // الـShell يملك صف MainData فعليًا. نجهز semantics أولًا ثم نطلب منه الحساب المركزي مرة واحدة.
+                shell.AutoFitDataGroup = true;
+                shell.PerformLayout();
+                shell.AutoFitDataGroup = false;
+            }
+            finally
+            {
+                shell.ResumeLayout(true);
+                screen.ResumeLayout(true);
+                isRecalculating = false;
             }
         }
 
-        if (role == TransportLayoutRole.Grid) control.Dock = DockStyle.Fill;
+        Recalculate();
 
-        if (screenProfile == TransportScreenProfile.ReadOnlyLog &&
-            role == TransportLayoutRole.Toolbar &&
-            control is TransportERP.Desktop.CoreUI.Controls.TransportToolbar toolbar)
+        // Events محددة فقط: تغير المحتوى، تغير التبويب النشط، أو Resize فعلي للشاشة.
+        var initialEntry = ResolveActiveDataEntry(declaredContent, tabsHost);
+        if (initialEntry is not null)
         {
-            toolbar.SetActionVisible(TransportERP.Desktop.CoreUI.Controls.ToolbarAction.New, false);
-            toolbar.SetActionVisible(TransportERP.Desktop.CoreUI.Controls.ToolbarAction.Save, false);
-            toolbar.SetActionVisible(TransportERP.Desktop.CoreUI.Controls.ToolbarAction.Edit, false);
-            toolbar.SetActionVisible(TransportERP.Desktop.CoreUI.Controls.ToolbarAction.Disable, false);
-            toolbar.SetActionVisible(TransportERP.Desktop.CoreUI.Controls.ToolbarAction.Delete, false);
+            initialEntry.ControlAdded += (_, _) => Recalculate();
+            initialEntry.ControlRemoved += (_, _) => Recalculate();
         }
+
+        if (tabsHost is not null)
+        {
+            tabsHost.SelectedIndexChanged += (_, _) => Recalculate();
+        }
+
+        screen.SizeChanged += (_, _) => Recalculate();
+    }
+
+    private static TransportDataEntryPanel? ResolveActiveDataEntry(Control declaredContent, TabControl? tabsHost)
+    {
+        if (declaredContent is TransportDataEntryPanel direct)
+        {
+            return direct;
+        }
+
+        if (tabsHost?.SelectedTab is TabPage selectedTab)
+        {
+            return FindDescendant<TransportDataEntryPanel>(selectedTab);
+        }
+
+        return FindDescendant<TransportDataEntryPanel>(declaredContent);
+    }
+
+    private static T? FindAncestor<T>(Control control)
+        where T : Control
+    {
+        Control? current = control;
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
+    private static T? FindDescendant<T>(Control root)
+        where T : Control
+    {
+        foreach (Control child in root.Controls)
+        {
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var nested = FindDescendant<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsDescendantOf(Control control, Control ancestor)
+    {
+        Control? current = control;
+        while (current is not null)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+            current = current.Parent;
+        }
+
+        return false;
     }
 
     private static void ApplyGridProfile(TransportGridProfile profile, DataGridView grid)
@@ -205,7 +413,10 @@ public static class TransportScreenProfilePolicy
         if (profile is TransportGridProfile.Display or TransportGridProfile.Log)
         {
             grid.Dock = DockStyle.Fill;
-            foreach (DataGridViewColumn column in grid.Columns) column.SortMode = DataGridViewColumnSortMode.Automatic;
+            foreach (DataGridViewColumn column in grid.Columns)
+            {
+                column.SortMode = DataGridViewColumnSortMode.Automatic;
+            }
         }
     }
 }
