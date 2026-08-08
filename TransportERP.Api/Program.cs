@@ -1,3 +1,5 @@
+using TransportERP.Api.Policies;
+
 namespace TransportERP.Api;
 
 public class Program
@@ -8,6 +10,14 @@ public class Program
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
+
+        // Outbound calls must use this named client. It has a 15-second timeout and retries
+        // only safe read methods through SafeReadRetryHandler.
+        builder.Services.AddTransient<SafeReadRetryHandler>();
+        builder.Services.AddHttpClient("TransportERP.SafeReadClient", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(OutgoingRequestResiliencePolicy.TimeoutSeconds);
+        }).AddHttpMessageHandler<SafeReadRetryHandler>();
 
         var app = builder.Build();
 
