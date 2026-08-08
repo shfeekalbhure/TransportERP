@@ -1,13 +1,13 @@
 using System.ComponentModel;
 using TransportERP.Desktop.Controls;
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.CoreUI.Profiles;
 using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.Forms.Setup.General;
 
 /// <summary>
-/// منشئ مركزي لمحتوى شاشات المجموعة الثانية. يعتمد على CoreUI للمقاسات والحاويات والحقول العامة،
-/// ويترك لكل شاشة تعريف التبويبات والبيانات المتخصصة فقط.
+/// منشئ مركزي لمحتوى شاشات المجموعة الثانية. دعم الـProfiles اختياري حتى لا تتأثر الشاشات غير المهاجرة.
 /// </summary>
 internal static class GeneralSetupScreenBuilder
 {
@@ -23,7 +23,12 @@ internal static class GeneralSetupScreenBuilder
         Picture
     }
 
-    internal sealed record FieldSpec(string Caption, FieldKind Kind = FieldKind.Text, string[]? Items = null);
+    internal sealed record FieldSpec(
+        string Caption,
+        FieldKind Kind = FieldKind.Text,
+        string[]? Items = null,
+        TransportFieldProfile Profile = TransportFieldProfile.None);
+
     internal sealed record TabSpec(string Title, FieldSpec[] Fields, bool IsLog = false, string[]? ActionButtons = null);
 
     internal static TransportReferenceScreenShell Build(
@@ -32,6 +37,29 @@ internal static class GeneralSetupScreenBuilder
         IReadOnlyList<TabSpec> tabs,
         string searchPlaceholder,
         params string[] gridHeaders)
+        => BuildCore(null, TransportGridProfile.None, screenCode, screenTitle, tabs, searchPlaceholder, gridHeaders);
+
+    /// <summary>
+    /// مسار Migration اختياري للشاشات التي تعلن V1 صراحة. الـMetadata توصف هنا، والـPolicy تطبق لاحقًا من الشاشة.
+    /// </summary>
+    internal static TransportReferenceScreenShell BuildProfiled(
+        TransportLayoutRoleProvider metadata,
+        TransportGridProfile gridProfile,
+        string screenCode,
+        string screenTitle,
+        IReadOnlyList<TabSpec> tabs,
+        string searchPlaceholder,
+        params string[] gridHeaders)
+        => BuildCore(metadata, gridProfile, screenCode, screenTitle, tabs, searchPlaceholder, gridHeaders);
+
+    private static TransportReferenceScreenShell BuildCore(
+        TransportLayoutRoleProvider? metadata,
+        TransportGridProfile gridProfile,
+        string screenCode,
+        string screenTitle,
+        IReadOnlyList<TabSpec> tabs,
+        string searchPlaceholder,
+        IReadOnlyList<string> gridHeaders)
     {
         var shell = new TransportReferenceScreenShell
         {
@@ -55,9 +83,9 @@ internal static class GeneralSetupScreenBuilder
             Padding = new Point(TransportUiMetrics.TabHorizontalPadding, TransportUiMetrics.TabVerticalPadding)
         };
 
-        foreach (var tab in tabs)
+        for (var index = 0; index < tabs.Count; index++)
         {
-            tabControl.TabPages.Add(CreateTab(tab));
+            tabControl.TabPages.Add(CreateTab(tabs[index], metadata, index == 0));
         }
 
         shell.DataHost.Controls.Add(tabControl);
@@ -65,8 +93,17 @@ internal static class GeneralSetupScreenBuilder
         ConfigureMainGrid(shell.Grid, gridHeaders);
         shell.Grid.BindData(new BindingList<PreviewRow>());
 
-        // الأحداث الأساسية هنا لا تنفذ منطق أعمال ولا تتصل بقاعدة البيانات؛
-        // دورها إبقاء الواجهة جاهزة للربط بطبقة HTTP/API لاحقاً.
+        if (metadata is not null)
+        {
+            metadata.SetLayoutRole(shell.Toolbar, TransportLayoutRole.Toolbar);
+            metadata.SetLayoutRole(shell.SearchPanel, TransportLayoutRole.Search);
+            metadata.SetLayoutRole(shell.Grid, TransportLayoutRole.Grid);
+            metadata.SetLayoutRole(shell.Pagination, TransportLayoutRole.Pagination);
+            metadata.SetLayoutRole(shell.AuditPanel, TransportLayoutRole.Audit);
+            metadata.SetLayoutRole(shell.AlertBar, TransportLayoutRole.Alerts);
+            metadata.SetGridProfile(shell.Grid, gridProfile);
+        }
+
         shell.Toolbar.NewRequested += (_, _) => ClearEditableFields(tabControl);
         shell.Toolbar.SaveRequested += (_, _) => shell.AlertBar.Text = $"{screenCode}: الواجهة جاهزة لحفظ البيانات عبر خدمة API.";
         shell.Toolbar.EditRequested += (_, _) => shell.AlertBar.Text = $"{screenCode}: الواجهة في وضع التعديل.";
@@ -80,16 +117,34 @@ internal static class GeneralSetupScreenBuilder
         return shell;
     }
 
-    internal static FieldSpec Required(string caption) => new(caption, FieldKind.RequiredText);
-    internal static FieldSpec Text(string caption) => new(caption, FieldKind.Text);
-    internal static FieldSpec Combo(string caption, params string[] items) => new(caption, FieldKind.Combo, items);
-    internal static FieldSpec Date(string caption) => new(caption, FieldKind.Date);
-    internal static FieldSpec Number(string caption) => new(caption, FieldKind.Number);
-    internal static FieldSpec Check(string caption) => new(caption, FieldKind.Check);
-    internal static FieldSpec Multiline(string caption) => new(caption, FieldKind.Multiline);
-    internal static FieldSpec Picture(string caption) => new(caption, FieldKind.Picture);
+    internal static FieldSpec Required(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.RequiredText, null, profile);
 
-    private static TabPage CreateTab(TabSpec spec)
+    internal static FieldSpec Text(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Text, null, profile);
+
+    internal static FieldSpec Combo(string caption, params string[] items) =>
+        new(caption, FieldKind.Combo, items);
+
+    internal static FieldSpec ProfiledCombo(string caption, TransportFieldProfile profile, params string[] items) =>
+        new(caption, FieldKind.Combo, items, profile);
+
+    internal static FieldSpec Date(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Date, null, profile);
+
+    internal static FieldSpec Number(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Number, null, profile);
+
+    internal static FieldSpec Check(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Check, null, profile);
+
+    internal static FieldSpec Multiline(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Multiline, null, profile);
+
+    internal static FieldSpec Picture(string caption, TransportFieldProfile profile = TransportFieldProfile.None) =>
+        new(caption, FieldKind.Picture, null, profile);
+
+    private static TabPage CreateTab(TabSpec spec, TransportLayoutRoleProvider? metadata, bool isPrimary)
     {
         var page = new TabPage
         {
@@ -102,7 +157,6 @@ internal static class GeneralSetupScreenBuilder
 
         if (spec.IsLog)
         {
-            // TabPage -> Container -> Grid، حتى يبقى مبدأ الحاويات ثابتًا.
             var logHost = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -149,11 +203,22 @@ internal static class GeneralSetupScreenBuilder
             Padding = Padding.Empty
         };
 
+        if (metadata is not null && isPrimary)
+        {
+            metadata.SetLayoutRole(dataEntry, TransportLayoutRole.MainData);
+        }
+
         for (var index = 0; index < spec.Fields.Length; index++)
         {
             var field = spec.Fields[index];
+            var editor = CreateEditor(field);
+            if (metadata is not null && field.Profile != TransportFieldProfile.None)
+            {
+                metadata.SetFieldProfile(editor, field.Profile);
+            }
+
             var label = field.Caption + (field.Kind == FieldKind.RequiredText ? " *" : string.Empty);
-            dataEntry.AddField(label, CreateEditor(field), index);
+            dataEntry.AddField(label, editor, index);
         }
 
         root.Controls.Add(dataEntry, 0, 0);
@@ -162,10 +227,7 @@ internal static class GeneralSetupScreenBuilder
         {
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, TransportUiMetrics.ActionPanelHeight));
             var actions = new TransportActionPanel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-            foreach (var caption in buttons)
-            {
-                actions.AddAction(caption);
-            }
+            foreach (var caption in buttons) actions.AddAction(caption);
             root.Controls.Add(actions, 0, 1);
         }
 
@@ -228,10 +290,7 @@ internal static class GeneralSetupScreenBuilder
     {
         grid.AutoGenerateColumns = false;
         grid.Columns.Clear();
-        foreach (var header in headers)
-        {
-            AddColumn(grid, header, header is "الرمز" or "الحالة" ? 120 : null);
-        }
+        foreach (var header in headers) AddColumn(grid, header, header is "الرمز" or "الحالة" ? 120 : null);
     }
 
     private static void AddColumn(DataGridView grid, string header, int? width)
