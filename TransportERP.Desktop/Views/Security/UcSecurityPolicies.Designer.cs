@@ -62,6 +62,8 @@ partial class UcSecurityPolicies
             },
             new[] { "رمز السياسة", "الاسم", "النطاق", "الحالة", "MFA", "تاريخ السريان" },
             new[] { "محاكاة السياسة", "تفعيل السياسة" }, SecurityWorkspaceMode.Edit);
+        screenShell.DataGroup.Dock = DockStyle.Fill;
+        tabDetails.Dock = DockStyle.Fill;
         AutoScaleMode = AutoScaleMode.Font; BackColor = Color.FromArgb(247, 249, 252); Controls.Add(screenShell); Dock = DockStyle.Fill;
         Font = new Font("Segoe UI", 10F); Name = "UcSecurityPolicies"; RightToLeft = RightToLeft.Yes; Size = new Size(1280, 760); ResumeLayout(false);
     }
