@@ -20,3 +20,5 @@ jobs:
         run: dotnet restore TransportERP.slnx
       - name: Build
         run: dotnet build TransportERP.slnx --configuration Debug --no-restore
+      - name: Test request policy enforcement
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
