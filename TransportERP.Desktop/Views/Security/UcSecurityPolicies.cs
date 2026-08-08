@@ -4,23 +4,25 @@ using TransportERP.Desktop.Views.Security.Shared;
 
 namespace TransportERP.Desktop.Views.Security;
 
-/// <summary>SEC-021 — سياسات الأمان؛ Settings workspace صريحة مع Tabs ممتدة وحاويات داخلية تملأ المساحة دون تمديد الحقول رأسيًا.</summary>
+/// <summary>SEC-021 — سياسات الأمان؛ Settings workspace ممتدة مع إبقاء أقسام الحقول Content-sized.</summary>
 public partial class UcSecurityPolicies : TransportScreenBase
 {
     public UcSecurityPolicies()
     {
         InitializeComponent();
-        ConfigureSettingsTabFillPropagation();
+        ConfigureSettingsTabLayout();
         ConfigureProfileMetadata();
         TransportScreenProfilePolicy.Apply(this, profileMetadata);
         SecurityViewRuntime.Initialize(this, screenShell, "سياسات الأمان", "ابحث في سياسات الأمان...", SecurityWorkspaceMode.Edit);
     }
 
     /// <summary>
-    /// SEC-021 فقط: تمرير Fill عبر الحاويات الوسيطة داخل كل Tab حتى حاوية الحقول.
-    /// الحقول وTransportDataEntryPanel لا تتمدد رأسيًا؛ DataEntry يبقى Content/Top.
+    /// SEC-021 فقط:
+    /// - الـTab والـWorkspace المرن يملآن المساحة.
+    /// - أي فرع يحتوي حقول إدخال يبقى Content/Top ولا يتمدد رأسيًا.
+    /// - Grid/Tree/Audit workspaces تبقى Fill.
     /// </summary>
-    private void ConfigureSettingsTabFillPropagation()
+    private void ConfigureSettingsTabLayout()
     {
         foreach (TabPage page in tabDetails.TabPages)
         {
@@ -28,14 +30,14 @@ public partial class UcSecurityPolicies : TransportScreenBase
 
             foreach (Control child in page.Controls)
             {
-                PromoteIntermediateContainerToFill(child);
+                ConfigureTabBranch(child);
             }
         }
     }
 
-    private static void PromoteIntermediateContainerToFill(Control control)
+    private static void ConfigureTabBranch(Control control)
     {
-        // نقطة التوقف: حاوية الحقول هي مصدر PreferredHeight ولا تصبح Fill رأسيًا.
+        // فرع الحقول كله Content-sized من أول Section يحتوي DataEntry حتى الحقول نفسها.
         if (control is TransportDataEntryPanel dataEntry)
         {
             dataEntry.Dock = DockStyle.Top;
@@ -44,14 +46,31 @@ public partial class UcSecurityPolicies : TransportScreenBase
             return;
         }
 
-        // Workspaces المرنة تملأ المساحة المتاحة بطبيعتها.
+        var containsFields = ContainsDescendant<TransportDataEntryPanel>(control);
+        if (containsFields)
+        {
+            ConfigureFieldContentContainer(control);
+
+            foreach (Control child in control.Controls)
+            {
+                if (child is Label)
+                {
+                    continue;
+                }
+
+                ConfigureTabBranch(child);
+            }
+
+            return;
+        }
+
+        // Workspaces المرنة فقط هي التي تستهلك بقية مساحة التبويب.
         if (control is TransportDataGrid or TreeView or CheckedListBox or SplitContainer)
         {
             control.Dock = DockStyle.Fill;
             return;
         }
 
-        // الحاويات الوسيطة من TabPage وحتى DataEntry/Grid/Tree تمرر المساحة كاملة.
         switch (control)
         {
             case TransportGroupBox group:
@@ -63,7 +82,6 @@ public partial class UcSecurityPolicies : TransportScreenBase
             case TableLayoutPanel layout:
                 layout.AutoSize = false;
                 layout.Dock = DockStyle.Fill;
-                PromoteContentRowsToFill(layout);
                 break;
 
             case Panel panel:
@@ -74,23 +92,46 @@ public partial class UcSecurityPolicies : TransportScreenBase
 
         foreach (Control child in control.Controls)
         {
-            // Labels والأدوات الفعلية تحتفظ بقياسها؛ نعالج فقط الحاويات/Workspaces.
             if (child is Label)
             {
                 continue;
             }
 
-            PromoteIntermediateContainerToFill(child);
+            ConfigureTabBranch(child);
         }
     }
 
-    private static void PromoteContentRowsToFill(TableLayoutPanel layout)
+    private static void ConfigureFieldContentContainer(Control control)
     {
-        // أي Row يحمل DataEntry (مباشرة أو عبر حاوية وسيطة) يصبح المساحة المرنة.
-        // صفوف الوصف/الأوامر ذات Absolute تبقى ثابتة.
+        switch (control)
+        {
+            case TransportGroupBox group:
+                group.Dock = DockStyle.Top;
+                group.AutoSize = true;
+                group.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                break;
+
+            case TableLayoutPanel layout:
+                layout.Dock = DockStyle.Top;
+                layout.AutoSize = true;
+                layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                RestoreFieldRowsToContent(layout);
+                break;
+
+            case Panel panel:
+                // وسيط داخل فرع حقول: لا يملأ الارتفاع المتبقي.
+                panel.Dock = DockStyle.Top;
+                panel.AutoSize = true;
+                panel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                break;
+        }
+    }
+
+    private static void RestoreFieldRowsToContent(TableLayoutPanel layout)
+    {
         foreach (Control child in layout.Controls)
         {
-            if (!ContainsDescendant<TransportDataEntryPanel>(child) && child is not TransportDataEntryPanel)
+            if (child is not TransportDataEntryPanel && !ContainsDescendant<TransportDataEntryPanel>(child))
             {
                 continue;
             }
@@ -101,11 +142,12 @@ public partial class UcSecurityPolicies : TransportScreenBase
                 continue;
             }
 
+            // صف الحقول يقاس من PreferredHeight الحقيقي؛ صفوف الأوامر Absolute تبقى كما هي.
             var style = layout.RowStyles[row];
             if (style.SizeType != SizeType.Absolute)
             {
-                style.SizeType = SizeType.Percent;
-                style.Height = 100F;
+                style.SizeType = SizeType.AutoSize;
+                style.Height = 0F;
             }
         }
     }
@@ -126,7 +168,6 @@ public partial class UcSecurityPolicies : TransportScreenBase
 
     private void ConfigureProfileMetadata()
     {
-        // الإعلان دلالي ومحصور في SEC-021؛ CoreUI Policy تقرأ الأدوار ولا تخمنها من أسماء الأدوات.
         profileMetadata.SetLayoutRole(screenShell.DataHost, TransportLayoutRole.SettingsHost);
         profileMetadata.SetLayoutRole(tabDetails, TransportLayoutRole.TabsHost);
         profileMetadata.SetLayoutRole(screenShell.Toolbar, TransportLayoutRole.Toolbar);
