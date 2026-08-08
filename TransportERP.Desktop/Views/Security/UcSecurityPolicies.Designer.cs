@@ -77,6 +77,10 @@ partial class UcSecurityPolicies
             new[] { "رمز السياسة", "الاسم", "النطاق", "الحالة", "MFA", "تاريخ السريان" },
             new[] { "محاكاة السياسة", "تفعيل السياسة" }, SecurityWorkspaceMode.Settings);
 
+        // تنفيذ مباشر حسب القرار المطلوب لهذه الشاشة: تفاصيل الشاشة والتبويبات تملآن المساحة المتاحة.
+        screenShell.DataGroup.Dock = DockStyle.Fill;
+        tabDetails.Dock = DockStyle.Fill;
+
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = Color.FromArgb(247, 249, 252);
         Controls.Add(screenShell);
