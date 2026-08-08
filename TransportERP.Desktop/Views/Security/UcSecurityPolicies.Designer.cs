@@ -1,4 +1,5 @@
 using TransportERP.Desktop.CoreUI.Controls;
+using TransportERP.Desktop.CoreUI.Profiles;
 using TransportERP.Desktop.Views.Security.Shared;
 
 namespace TransportERP.Desktop.Views.Security;
@@ -8,10 +9,23 @@ partial class UcSecurityPolicies
     private System.ComponentModel.IContainer? components = null;
     private TransportReferenceScreenShell screenShell = null!;
     private TabControl tabDetails = null!;
-    protected override void Dispose(bool disposing) { if (disposing) components?.Dispose(); base.Dispose(disposing); }
+    private TransportLayoutRoleProvider profileMetadata = null!;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) components?.Dispose();
+        base.Dispose(disposing);
+    }
+
     private void InitializeComponent()
     {
-        components = new System.ComponentModel.Container(); screenShell = new TransportReferenceScreenShell(); tabDetails = new TabControl(); SuspendLayout();
+        components = new System.ComponentModel.Container();
+        screenShell = new TransportReferenceScreenShell();
+        tabDetails = new TabControl();
+        profileMetadata = new TransportLayoutRoleProvider();
+        components.Add(profileMetadata);
+        SuspendLayout();
+
         SecurityDesignerSupport.ConfigureScreen(screenShell, tabDetails,
             new SecurityTabDefinition[]
             {
@@ -61,10 +75,17 @@ partial class UcSecurityPolicies
                 new("الحالة", SecurityFieldKind.Choice, new[] { "نشط", "موقوف", "معلق", "منتهي" })
             },
             new[] { "رمز السياسة", "الاسم", "النطاق", "الحالة", "MFA", "تاريخ السريان" },
-            new[] { "محاكاة السياسة", "تفعيل السياسة" }, SecurityWorkspaceMode.Edit);
-        screenShell.DataGroup.Dock = DockStyle.Fill;
-        tabDetails.Dock = DockStyle.Fill;
-        AutoScaleMode = AutoScaleMode.Font; BackColor = Color.FromArgb(247, 249, 252); Controls.Add(screenShell); Dock = DockStyle.Fill;
-        Font = new Font("Segoe UI", 10F); Name = "UcSecurityPolicies"; RightToLeft = RightToLeft.Yes; Size = new Size(1280, 760); ResumeLayout(false);
+            new[] { "محاكاة السياسة", "تفعيل السياسة" }, SecurityWorkspaceMode.Settings);
+
+        AutoScaleMode = AutoScaleMode.Font;
+        BackColor = Color.FromArgb(247, 249, 252);
+        Controls.Add(screenShell);
+        Dock = DockStyle.Fill;
+        Font = new Font("Segoe UI", 10F);
+        Name = "UcSecurityPolicies";
+        RightToLeft = RightToLeft.Yes;
+        ScreenProfile = TransportScreenProfile.Settings;
+        Size = new Size(1280, 760);
+        ResumeLayout(false);
     }
 }
