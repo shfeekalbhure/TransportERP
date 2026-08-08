@@ -179,10 +179,7 @@ public static class TransportScreenProfilePolicy
                 }
                 break;
             case VerticalSizingBehavior.Fill:
-                if (role == TransportLayoutRole.Grid)
-                {
-                    control.Dock = DockStyle.Fill;
-                }
+                ApplyFillRole(screenProfile, role, control);
                 break;
         }
 
@@ -195,6 +192,29 @@ public static class TransportScreenProfilePolicy
             toolbar.SetActionVisible(ToolbarAction.Edit, false);
             toolbar.SetActionVisible(ToolbarAction.Disable, false);
             toolbar.SetActionVisible(ToolbarAction.Delete, false);
+        }
+    }
+
+    private static void ApplyFillRole(
+        TransportScreenProfile screenProfile,
+        TransportLayoutRole role,
+        Control control)
+    {
+        // Fill يطبق على المنطقة التي حسمها Profile + Role فقط؛ لا ينتشر آليًا إلى الأبناء.
+        var canFill = role == TransportLayoutRole.Grid ||
+                      role == TransportLayoutRole.TreeHost ||
+                      (screenProfile == TransportScreenProfile.Settings &&
+                       role is TransportLayoutRole.SettingsHost or TransportLayoutRole.TabsHost);
+
+        if (!canFill)
+        {
+            return;
+        }
+
+        control.Dock = DockStyle.Fill;
+        if (control is ScrollableControl scrollable && role != TransportLayoutRole.SettingsHost)
+        {
+            scrollable.AutoScroll = false;
         }
     }
 
@@ -218,6 +238,12 @@ public static class TransportScreenProfilePolicy
             return VerticalSizingBehavior.Content;
         }
 
+        if (screenProfile == TransportScreenProfile.Settings &&
+            role is TransportLayoutRole.SettingsHost or TransportLayoutRole.TabsHost)
+        {
+            return VerticalSizingBehavior.Fill;
+        }
+
         return role switch
         {
             TransportLayoutRole.Toolbar or
@@ -226,8 +252,7 @@ public static class TransportScreenProfilePolicy
             TransportLayoutRole.Audit or
             TransportLayoutRole.Alerts or
             TransportLayoutRole.ActionPanel => VerticalSizingBehavior.Content,
-            TransportLayoutRole.TreeHost or
-            TransportLayoutRole.SettingsHost => VerticalSizingBehavior.Fill,
+            TransportLayoutRole.TreeHost => VerticalSizingBehavior.Fill,
             _ => VerticalSizingBehavior.Fixed
         };
     }
