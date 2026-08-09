@@ -121,13 +121,29 @@ public sealed class ApiRequestPolicyTests
         allowed.HttpContext.Request.Headers["X-TransportERP-Permission"] = "lookup.read";
         var result = Assert.IsType<OkObjectResult>(allowed.Lookup("Reference").Result);
         var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(result.Value);
-        Assert.Equal(RequestLimitPolicy.MaximumLookupResults, items.Count);
+        Assert.InRange(items.Count, 0, RequestLimitPolicy.MaximumLookupResults);
         Assert.All(items, item =>
         {
             Assert.Equal("north", item.Company);
             Assert.Equal("north-1", item.Branch);
         });
         Assert.IsType<BadRequestObjectResult>(allowed.Lookup(null).Result);
+    }
+
+    [Fact]
+    public void LookupEndpoint_DoesNotReturnMoreThan50WhenTheProviderHasMoreMatches()
+    {
+        var controller = CreateController("north", "north-1", permitted: true, new LargeLookupProvider());
+
+        var result = Assert.IsType<OkObjectResult>(controller.Lookup("Reference").Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(result.Value);
+
+        Assert.Equal(RequestLimitPolicy.MaximumLookupResults, items.Count);
+        Assert.All(items, item =>
+        {
+            Assert.Equal("north", item.Company);
+            Assert.Equal("north-1", item.Branch);
+        });
     }
 
     [Fact]
@@ -143,10 +159,14 @@ public sealed class ApiRequestPolicyTests
         Assert.IsType<ForbidResult>(controller.Lookup("Reference", branch: "north-2").Result);
     }
 
-    private static ReferenceDataController CreateController(string? company = null, string? branch = null, bool permitted = false)
+    private static ReferenceDataController CreateController(
+        string? company = null,
+        string? branch = null,
+        bool permitted = false,
+        IReferenceLookupProvider? lookupProvider = null)
     {
         var context = new DefaultHttpContext { User = CreatePrincipal(company, branch, permitted) };
-        return new ReferenceDataController(new InMemoryReferenceLookupProvider())
+        return new ReferenceDataController(lookupProvider ?? new InMemoryReferenceLookupProvider())
         {
             ControllerContext = new ControllerContext { HttpContext = context }
         };
@@ -159,5 +179,13 @@ public sealed class ApiRequestPolicyTests
         if (!string.IsNullOrWhiteSpace(branch)) claims.Add(new Claim(LookupClaims.Branch, branch));
         if (permitted) claims.Add(new Claim(LookupClaims.Permission, LookupClaims.ReadPermission));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+    }
+
+    private sealed class LargeLookupProvider : IReferenceLookupProvider
+    {
+        public IReadOnlyList<LookupItem> Search(string query, LookupAccessContext access) =>
+            Enumerable.Range(1, RequestLimitPolicy.MaximumLookupResults + 10)
+                .Select(number => new LookupItem(number.ToString(), $"Reference {number}", access.Company, access.Branch))
+                .ToArray();
     }
 }
