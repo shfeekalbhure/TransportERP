@@ -1,7 +1,7 @@
 namespace TransportERP.Api.ReferenceData;
 
-public sealed record LookupItem(string Id, string Name, string Scope);
-public sealed record LookupAccessContext(string Scope, bool CanReadLookups);
+public sealed record LookupItem(string Id, string Name, string Company, string Branch);
+public sealed record LookupAccessContext(string Company, string Branch, bool CanReadLookups);
 
 public interface IReferenceLookupProvider
 {
@@ -15,7 +15,11 @@ public interface IReferenceLookupProvider
 public sealed class InMemoryReferenceLookupProvider : IReferenceLookupProvider
 {
     private static readonly IReadOnlyList<LookupItem> Items = Enumerable.Range(1, 120)
-        .Select(number => new LookupItem(number.ToString(), $"Reference {number}", number <= 60 ? "north" : "south"))
+        .Select(number => new LookupItem(
+            number.ToString(),
+            $"Reference {number}",
+            number <= 60 ? "north" : "south",
+            number <= 30 || (number > 60 && number <= 90) ? "north-1" : "north-2"))
         .ToArray();
 
     public IReadOnlyList<LookupItem> Search(string query, LookupAccessContext access)
@@ -26,7 +30,8 @@ public sealed class InMemoryReferenceLookupProvider : IReferenceLookupProvider
             throw new UnauthorizedAccessException("The lookup.read permission is required.");
         }
 
-        return Items.Where(item => item.Scope == access.Scope)
+        return Items.Where(item => item.Company == access.Company)
+            .Where(item => item.Branch == access.Branch)
             .Where(item => item.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
             .Take(Policies.RequestLimitPolicy.MaximumLookupResults)
             .ToArray();
