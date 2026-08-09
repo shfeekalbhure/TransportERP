@@ -1,4 +1,8 @@
 using TransportERP.Api.Policies;
+using TransportERP.Api.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace TransportERP.Api;
 
@@ -10,13 +14,45 @@ public partial class Program
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
+        var jwtBearerSection = builder.Configuration.GetSection("Authentication:JwtBearer");
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                jwtBearerSection.Bind(options);
+
+                // The claim policy remains unchanged. This merely binds the configured trust
+                // material so the API can validate a server-issued JWT before the policy runs.
+                var signingKey = jwtBearerSection["SigningKey"];
+                if (!string.IsNullOrWhiteSpace(signingKey))
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = jwtBearerSection["Issuer"],
+                        ValidateAudience = true,
+                        ValidAudience = jwtBearerSection["Audience"],
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero
+                    };
+                }
+            });
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(LookupClaims.ReadPolicy, policy =>
+                policy.Requirements.Add(new LookupReadRequirement()));
+        });
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, LookupReadAuthorizationHandler>();
 
         // All outbound API traffic uses the typed IApiClient and this resilience handler.
         builder.Services.AddTransient<SafeReadRetryHandler>();
+        builder.Services.AddSingleton<IResilienceDelay, SystemResilienceDelay>();
         builder.Services.AddHttpClient<Clients.IApiClient, Clients.ApiClient>(client =>
         {
             client.Timeout = OutgoingRequestResiliencePolicy.TotalRequestTimeout;
         }).AddHttpMessageHandler<SafeReadRetryHandler>();
+        builder.Services.AddScoped<Services.IDownstreamStatusService, Services.DownstreamStatusService>();
         builder.Services.AddSingleton<ReferenceData.IReferenceLookupProvider, ReferenceData.InMemoryReferenceLookupProvider>();
 
         var app = builder.Build();
@@ -27,6 +63,7 @@ public partial class Program
         }
 
         app.UseHttpsRedirection();
+        app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
 

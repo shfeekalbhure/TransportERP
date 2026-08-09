@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using TransportERP.Api.Authorization;
 using TransportERP.Api.Controllers;
 using TransportERP.Api.Policies;
 using TransportERP.Api.ReferenceData;
@@ -92,27 +94,98 @@ public sealed class ApiRequestPolicyTests
     }
 
     [Fact]
-    public void LookupEndpoint_RequiresPermissionScopeAndQuery_AndCapsActualResponseAt50()
+    public async Task LookupAuthorizationHandler_AllowsOnlyAnAuthenticatedPrincipalWithTheServerClaim()
+    {
+        var requirement = new LookupReadRequirement();
+        var handler = new LookupReadAuthorizationHandler();
+        var allowedContext = new Microsoft.AspNetCore.Authorization.AuthorizationHandlerContext(
+            [requirement], CreatePrincipal("north", "north-1", true), null);
+        await handler.HandleAsync(allowedContext);
+        Assert.True(allowedContext.HasSucceeded);
+
+        var deniedContext = new Microsoft.AspNetCore.Authorization.AuthorizationHandlerContext(
+            [requirement], CreatePrincipal("north", "north-1", false), null);
+        await handler.HandleAsync(deniedContext);
+        Assert.False(deniedContext.HasSucceeded);
+    }
+
+    [Fact]
+    public void LookupEndpoint_UsesClaimsNotForgedHeaders_AndCapsActualResponseAt50()
     {
         var denied = CreateController();
+        denied.HttpContext.Request.Headers["X-TransportERP-Permission"] = "lookup.read";
+        denied.HttpContext.Request.Headers["X-TransportERP-Scope"] = "south";
         Assert.IsType<ForbidResult>(denied.Lookup("Reference").Result);
 
-        var allowed = CreateController("north", "lookup.read");
+        var allowed = CreateController("north", "north-1", permitted: true);
+        allowed.HttpContext.Request.Headers["X-TransportERP-Permission"] = "lookup.read";
         var result = Assert.IsType<OkObjectResult>(allowed.Lookup("Reference").Result);
         var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(result.Value);
-        Assert.Equal(50, items.Count);
-        Assert.All(items, item => Assert.Equal("north", item.Scope));
+        Assert.InRange(items.Count, 0, RequestLimitPolicy.MaximumLookupResults);
+        Assert.All(items, item =>
+        {
+            Assert.Equal("north", item.Company);
+            Assert.Equal("north-1", item.Branch);
+        });
         Assert.IsType<BadRequestObjectResult>(allowed.Lookup(null).Result);
     }
 
-    private static ReferenceDataController CreateController(string? scope = null, string? permission = null)
+    [Fact]
+    public void LookupEndpoint_DoesNotReturnMoreThan50WhenTheProviderHasMoreMatches()
+    {
+        var controller = CreateController("north", "north-1", permitted: true, new LargeLookupProvider());
+
+        var result = Assert.IsType<OkObjectResult>(controller.Lookup("Reference").Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(result.Value);
+
+        Assert.Equal(RequestLimitPolicy.MaximumLookupResults, items.Count);
+        Assert.All(items, item =>
+        {
+            Assert.Equal("north", item.Company);
+            Assert.Equal("north-1", item.Branch);
+        });
+    }
+
+    [Fact]
+    public void LookupEndpoint_RejectsCrossCompanyAndCrossBranchBeforeMaterialisingResults()
     {
         var context = new DefaultHttpContext();
-        if (scope is not null) context.Request.Headers["X-TransportERP-Scope"] = scope;
-        if (permission is not null) context.Request.Headers["X-TransportERP-Permission"] = permission;
-        return new ReferenceDataController(new InMemoryReferenceLookupProvider())
+        context.User = CreatePrincipal("north", "north-1", true);
+        var controller = new ReferenceDataController(new InMemoryReferenceLookupProvider())
         {
             ControllerContext = new ControllerContext { HttpContext = context }
         };
+        Assert.IsType<ForbidResult>(controller.Lookup("Reference", company: "south").Result);
+        Assert.IsType<ForbidResult>(controller.Lookup("Reference", branch: "north-2").Result);
+    }
+
+    private static ReferenceDataController CreateController(
+        string? company = null,
+        string? branch = null,
+        bool permitted = false,
+        IReferenceLookupProvider? lookupProvider = null)
+    {
+        var context = new DefaultHttpContext { User = CreatePrincipal(company, branch, permitted) };
+        return new ReferenceDataController(lookupProvider ?? new InMemoryReferenceLookupProvider())
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
+        };
+    }
+
+    private static ClaimsPrincipal CreatePrincipal(string? company = null, string? branch = null, bool permitted = false)
+    {
+        var claims = new List<Claim>();
+        if (!string.IsNullOrWhiteSpace(company)) claims.Add(new Claim(LookupClaims.Company, company));
+        if (!string.IsNullOrWhiteSpace(branch)) claims.Add(new Claim(LookupClaims.Branch, branch));
+        if (permitted) claims.Add(new Claim(LookupClaims.Permission, LookupClaims.ReadPermission));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+    }
+
+    private sealed class LargeLookupProvider : IReferenceLookupProvider
+    {
+        public IReadOnlyList<LookupItem> Search(string query, LookupAccessContext access) =>
+            Enumerable.Range(1, RequestLimitPolicy.MaximumLookupResults + 10)
+                .Select(number => new LookupItem(number.ToString(), $"Reference {number}", access.Company, access.Branch))
+                .ToArray();
     }
 }

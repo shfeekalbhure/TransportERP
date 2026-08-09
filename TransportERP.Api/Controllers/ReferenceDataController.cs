@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TransportERP.Api.Authorization;
 using TransportERP.Api.Policies;
 using TransportERP.Api.ReferenceData;
 
@@ -16,20 +18,33 @@ public sealed class ReferenceDataController(IReferenceLookupProvider lookupProvi
     }
 
     [HttpGet("lookup")]
-    public ActionResult<IReadOnlyList<LookupItem>> Lookup([FromQuery] string? query)
+    [Authorize(Policy = LookupClaims.ReadPolicy)]
+    public ActionResult<IReadOnlyList<LookupItem>> Lookup(
+        [FromQuery] string? query,
+        [FromQuery] string? company = null,
+        [FromQuery] string? branch = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
             return BadRequest("A lookup query is required; full-table lookup is not permitted.");
         }
 
-        var scope = Request.Headers["X-TransportERP-Scope"].FirstOrDefault();
-        var permitted = string.Equals(Request.Headers["X-TransportERP-Permission"].FirstOrDefault(), "lookup.read", StringComparison.Ordinal);
-        if (string.IsNullOrWhiteSpace(scope) || !permitted)
+        // Header values are deliberately ignored: all authority originates in the authenticated principal.
+        if (!User.TryGetTrustedScope(out var trustedCompany, out var trustedBranch) ||
+            !User.HasClaim(LookupClaims.Permission, LookupClaims.ReadPermission))
         {
             return Forbid();
         }
 
-        return Ok(lookupProvider.Search(query, new LookupAccessContext(scope, permitted)));
+        if ((!string.IsNullOrWhiteSpace(company) && !string.Equals(company, trustedCompany, StringComparison.Ordinal)) ||
+            (!string.IsNullOrWhiteSpace(branch) && !string.Equals(branch, trustedBranch, StringComparison.Ordinal)))
+        {
+            return Forbid();
+        }
+
+        // The endpoint owns the response boundary as well as the provider: a provider must
+        // never be able to return more than the governing lookup maximum.
+        return Ok(RequestLimitPolicy.LimitLookup(
+            lookupProvider.Search(query, new LookupAccessContext(trustedCompany, trustedBranch, true))));
     }
 }
