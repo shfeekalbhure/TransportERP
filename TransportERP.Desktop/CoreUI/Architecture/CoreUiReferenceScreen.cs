@@ -8,10 +8,11 @@ namespace TransportERP.Desktop.CoreUI.Architecture;
 /// </summary>
 public abstract class CoreUiReferenceScreen : UserControl
 {
-    protected CoreUiReferenceScreen(TransportScreenProfile profile, string title)
+    protected CoreUiReferenceScreen(ScreenDefinition definition)
     {
-        Profile = profile;
-        Title = title;
+        Definition = definition;
+        Profile = definition.Profile;
+        Title = definition.Title;
 
         Dock = DockStyle.Fill;
         RightToLeft = RightToLeft.Yes;
@@ -27,6 +28,7 @@ public abstract class CoreUiReferenceScreen : UserControl
     }
 
     public TransportScreenProfile Profile { get; }
+    public ScreenDefinition Definition { get; }
 
     public string Title { get; }
 

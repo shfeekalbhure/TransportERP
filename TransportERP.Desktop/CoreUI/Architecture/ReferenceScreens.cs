@@ -4,30 +4,30 @@ namespace TransportERP.Desktop.CoreUI.Architecture;
 
 public sealed class Gen003CountriesReferenceScreen : CoreUiReferenceScreen
 {
-    public Gen003CountriesReferenceScreen() : base(TransportScreenProfile.MasterData, "الدول")
+    public Gen003CountriesReferenceScreen() : base(ScreenDefinitions.Gen003)
     {
         ReferenceScreenLayout.ConfigureMasterData(Shell, ["Code", "ArabicName", "EnglishName", "Status", "Notes", "ISO2", "ISO3", "DialingCode"], ["Code", "ArabicName", "EnglishName", "ISO2", "ISO3", "DialingCode", "Status"]);
     }
 }
 public sealed class Acc035ChartOfAccountsReferenceScreen : CoreUiReferenceScreen
 {
-    public Acc035ChartOfAccountsReferenceScreen() : base(TransportScreenProfile.TreeMaster, "دليل الحسابات") => ReferenceScreenLayout.ConfigureTree(Shell);
+    public Acc035ChartOfAccountsReferenceScreen() : base(ScreenDefinitions.Acc035) => ReferenceScreenLayout.ConfigureTree(Shell);
 }
 public sealed class Acc041AccountingPeriodsReferenceScreen : CoreUiReferenceScreen
 {
-    public Acc041AccountingPeriodsReferenceScreen() : base(TransportScreenProfile.ControlApproval, "الفترات المحاسبية") => ReferenceScreenLayout.ConfigurePeriodLifecycle(Shell);
+    public Acc041AccountingPeriodsReferenceScreen() : base(ScreenDefinitions.Acc041) => ReferenceScreenLayout.ConfigurePeriodLifecycle(Shell);
 }
 public sealed class Acc042JournalEntryReferenceScreen : CoreUiReferenceScreen
 {
-    public Acc042JournalEntryReferenceScreen() : base(TransportScreenProfile.Transaction, "القيد اليومي") => ReferenceScreenLayout.ConfigureTransaction(Shell);
+    public Acc042JournalEntryReferenceScreen() : base(ScreenDefinitions.Acc042) => ReferenceScreenLayout.ConfigureTransaction(Shell);
 }
 public sealed class Acc046TrialBalanceReferenceScreen : CoreUiReferenceScreen
 {
-    public Acc046TrialBalanceReferenceScreen() : base(TransportScreenProfile.ReportInquiry, "ميزان المراجعة") => ReferenceScreenLayout.ConfigureReport(Shell);
+    public Acc046TrialBalanceReferenceScreen() : base(ScreenDefinitions.Acc046) => ReferenceScreenLayout.ConfigureReport(Shell);
 }
 public sealed class Gen015OperationalSettingsReferenceScreen : CoreUiReferenceScreen
 {
-    public Gen015OperationalSettingsReferenceScreen() : base(TransportScreenProfile.Settings, "إعدادات التشغيل العامة") => ReferenceScreenLayout.ConfigureScopedSettings(Shell);
+    public Gen015OperationalSettingsReferenceScreen() : base(ScreenDefinitions.Gen015) => ReferenceScreenLayout.ConfigureScopedSettings(Shell);
 }
 
 internal static class ReferenceScreenLayout
