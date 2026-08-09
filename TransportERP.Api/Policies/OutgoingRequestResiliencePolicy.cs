@@ -8,16 +8,19 @@ namespace TransportERP.Api.Policies;
 /// </summary>
 public static class OutgoingRequestResiliencePolicy
 {
-    public const int TimeoutSeconds = 15;
+    public static readonly TimeSpan TotalRequestTimeout = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(10);
     public const int MaximumAttempts = 3;
     public const int MaximumRetries = MaximumAttempts - 1;
-    public const int InitialBackoffMilliseconds = 250;
-    public const int MaximumJitterMilliseconds = 100;
+    public static readonly TimeSpan InitialDelay = TimeSpan.FromSeconds(2);
+    public const bool UseJitter = true;
+    public const int MaximumJitterMilliseconds = 250;
 
-    public static bool IsAutomaticRetryAllowed(HttpMethod method) =>
+    public static bool IsAutomaticRetryAllowed(HttpMethod method, bool hasIdempotencyKey = false) =>
         method == HttpMethod.Get ||
         method == HttpMethod.Head ||
-        method == HttpMethod.Options;
+        method == HttpMethod.Options ||
+        (hasIdempotencyKey && (method == HttpMethod.Post || method == HttpMethod.Put || method.Method == "PATCH" || method == HttpMethod.Delete));
 
     public static bool IsTransient(HttpStatusCode statusCode) =>
         statusCode == HttpStatusCode.RequestTimeout ||
@@ -36,7 +39,7 @@ public static class OutgoingRequestResiliencePolicy
             throw new ArgumentOutOfRangeException(nameof(jitterMilliseconds));
         }
 
-        var exponentialDelay = InitialBackoffMilliseconds * (1 << (retryNumber - 1));
-        return TimeSpan.FromMilliseconds(exponentialDelay + jitterMilliseconds);
+        var exponentialDelay = InitialDelay.TotalMilliseconds * (1 << (retryNumber - 1));
+        return TimeSpan.FromMilliseconds(exponentialDelay + (UseJitter ? jitterMilliseconds : 0));
     }
 }
