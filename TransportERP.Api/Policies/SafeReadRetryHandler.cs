@@ -3,8 +3,8 @@ using System.Net;
 namespace TransportERP.Api.Policies;
 
 /// <summary>
-/// Retries only idempotent read requests after transient failures. POST, PUT, PATCH and DELETE
-/// remain a single attempt even when a downstream service is unavailable.
+/// Applies the approved bounded resilience contract. Unsafe methods can retry only when the
+/// caller explicitly supplies an Idempotency-Key.
 /// </summary>
 public sealed class SafeReadRetryHandler : DelegatingHandler
 {
@@ -14,40 +14,69 @@ public sealed class SafeReadRetryHandler : DelegatingHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!OutgoingRequestResiliencePolicy.IsAutomaticRetryAllowed(request.Method))
+        var canRetry = OutgoingRequestResiliencePolicy.IsAutomaticRetryAllowed(
+            request.Method,
+            request.Headers.Contains("Idempotency-Key"));
+        if (!canRetry)
         {
             return await base.SendAsync(request, cancellationToken);
         }
 
+        using var totalTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        totalTimeout.CancelAfter(OutgoingRequestResiliencePolicy.TotalRequestTimeout);
         for (var attempt = 1; attempt <= OutgoingRequestResiliencePolicy.MaximumAttempts; attempt++)
         {
             try
             {
-                var response = await base.SendAsync(request, cancellationToken);
+                using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(totalTimeout.Token);
+                attemptTimeout.CancelAfter(OutgoingRequestResiliencePolicy.AttemptTimeout);
+                var response = await base.SendAsync(request, attemptTimeout.Token);
                 if (!OutgoingRequestResiliencePolicy.IsTransient(response.StatusCode) ||
                     attempt == OutgoingRequestResiliencePolicy.MaximumAttempts)
                 {
                     return response;
                 }
 
+                var retryAfter = GetRetryAfter(response);
                 response.Dispose();
+                await DelayAsync(retryAfter, attempt, totalTimeout.Token);
             }
             catch (HttpRequestException) when (attempt < OutgoingRequestResiliencePolicy.MaximumAttempts)
             {
-                // The bounded retry below is intentionally limited to safe read methods.
+                await DelayAsync(null, attempt, totalTimeout.Token);
             }
-            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested &&
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested && !totalTimeout.IsCancellationRequested &&
                                                 attempt < OutgoingRequestResiliencePolicy.MaximumAttempts)
             {
-                // A downstream timeout may be retried only while the caller has not cancelled.
+                await DelayAsync(null, attempt, totalTimeout.Token);
             }
-
-            var jitter = Random.Shared.Next(0, OutgoingRequestResiliencePolicy.MaximumJitterMilliseconds + 1);
-            await Task.Delay(
-                OutgoingRequestResiliencePolicy.GetBackoff(attempt, jitter),
-                cancellationToken);
         }
 
         throw new InvalidOperationException("The retry loop ended without a response.");
+    }
+
+    public static TimeSpan GetRetryAfter(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter?.Delta is { } delta)
+        {
+            return delta;
+        }
+
+        if (retryAfter?.Date is { } date)
+        {
+            return date - DateTimeOffset.UtcNow > TimeSpan.Zero ? date - DateTimeOffset.UtcNow : TimeSpan.Zero;
+        }
+
+        return TimeSpan.Zero;
+    }
+
+    private static Task DelayAsync(TimeSpan? retryAfter, int retryNumber, CancellationToken cancellationToken)
+    {
+        var jitter = OutgoingRequestResiliencePolicy.UseJitter
+            ? Random.Shared.Next(0, OutgoingRequestResiliencePolicy.MaximumJitterMilliseconds + 1)
+            : 0;
+        var exponential = OutgoingRequestResiliencePolicy.GetBackoff(retryNumber, jitter);
+        return Task.Delay(retryAfter is { } delay && delay > exponential ? delay : exponential, cancellationToken);
     }
 }
