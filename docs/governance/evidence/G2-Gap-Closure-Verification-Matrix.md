@@ -46,3 +46,29 @@ The W1 source register is `Current Approved References V1.17`; the approved W1 a
 
 ## Prohibited inference
 A passing CI run proves the commands and their included tests succeeded. It does not, by itself, prove runtime endpoint enforcement, runtime retry behavior, or Windows UX/RTL behavior. No item marked other than `VERIFIED` may be represented as closed.
+
+
+## Reverification register — 2026-08-09
+
+**Review snapshot:** `setup/initial-solution-structure` @ `6d395271e80ce4a436ad9b8622038b507aed4eca`. The CI evidence below is the already-completed [Run 31286693059](https://github.com/shfeekalbhure/TransportERP/actions/runs/31286693059) on `b2e7c3f`; it was inspected, not rerun.
+
+| G2 item | Owner | Role-review status | QA verdict | Executable evidence | Remaining action | G2 blocking |
+|---|---|---|---|---|---|---|
+| W1 Integrity | DATA_MYSQL_ARCHITECT | PASS WITH NOTES | INSUFFICIENT | [W1 baseline reference](W1-Approved-Baseline-Reference.md); no persistence/DDL/ORM or competing precision/UUID mapping was found at `6d395271`. | Make all six approved binary sources independently retrievable for QA rehash; when persistence begins, verify migrations/DDL/ORM against Money `DECIMAL(22,6)`, Rate `DECIMAL(20,10)`, Percentage `DECIMAL(12,8)`, and UUIDv7 `BINARY(16)` / swap=0. | YES |
+| OTS-W2-001 | API_SECURITY_REVIEWER | NOT VERIFIED | NOT VERIFIED | `TransportERP.Api/Policies/RequestLimitPolicy.cs::NormalizePageSize` (`550b78e`) clamps to 500, not governing 200; policy-only test `ApiRequestPolicyTests::NormalizePageSize_ClampsValuesAboveTheHardMaximum` (`59f2316`). | Independent remediation WP: bind the governing 200 policy to an inbound API endpoint and add contract/integration evidence. | YES |
+| OTS-W2-002 | API_SECURITY_REVIEWER | NOT VERIFIED | NOT VERIFIED | `RequestLimitPolicy::LimitLookup<T>` (`550b78e`) caps at 100, not governing 50; unit test only. | Independent remediation WP: bind 50-result limit and defined overflow behavior to a real Lookup endpoint/provider, then test it. | YES |
+| OTS-W2-005 | API_SECURITY_REVIEWER | PARTIALLY VERIFIED | NOT VERIFIED | `Program.cs` (`2b346ea`) wires `TransportERP.SafeReadClient`; `SafeReadRetryHandler::SendAsync` (`553c313`) handles safe verbs. Policy uses 15s and 250/500ms rather than total 30s, attempt 10s, and delay 2s; no Retry-After, Idempotency-Key contract, or client consumer test. | Independent remediation WP: implement and test the governing transport contract on a real IApiClient/consumer, including unsafe-operation behavior. | YES |
+| W3-IMP-001 | SCREEN_COREUI_ARCHITECT | CLOSED + VERIFIED | INSUFFICIENT | `TransportERP.Desktop/CoreUI/Controls/TransportReferenceScreenShell.cs` is actual WinForms code; `Views/Setup/Geographic/UcCountries.Designer.cs` instantiates it and `FrmDashboard.cs::OpenWorkspaceView` opens the screen. | Produce independently reproducible Windows runtime evidence for shared-shell behavior; QA then rechecks it. | YES |
+| W3-IMP-002 | SCREEN_COREUI_ARCHITECT | PARTIALLY VERIFIED | NOT VERIFIED | `CoreUI/Architecture/ReferenceScreens.cs` and `CoreUiReferenceScreenCatalog.cs` define/map the six profile families, all via `CoreUiReferenceScreen`. | Independent remediation WP: add an actual display route or executable runtime test and produce Windows UX/RTL evidence for all six named screens. | YES |
+| W3-IMP-003 | SCREEN_COREUI_ARCHITECT | CLOSED + VERIFIED | VERIFIED | `TransportERP.Tests/CoreUiArchitectureTests.cs` has completeness/missing/duplicate checks; Tests project references Desktop; `.github/workflows/build-validation.yml` executes it. CI Run 31286693059: 10/10 tests passed. | None. | NO |
+
+### Independent verification failures / evidence gaps
+
+| ID | Owner | Severity | Required action |
+|---|---|---|---|
+| IV-W1-001 | DATA_MYSQL_ARCHITECT | High | Provide immutable, independently readable W1 source artifacts so QA can recalculate the six hashes; do not modify approved W1 content. |
+| IV-W2-001 | API_SECURITY_REVIEWER | Critical | Reconcile the actual code with approved page/lookup values and prove endpoint enforcement in a separate remediation package. |
+| IV-W2-002 | API_SECURITY_REVIEWER | Critical | Implement and prove the approved HTTP resilience contract, including Retry-After and Idempotency-Key behavior, in a separate remediation package. |
+| IV-W3-001 | SCREEN_COREUI_ARCHITECT | High | Supply reproducible Windows runtime/UX evidence for the shared shell and six named references in a separate remediation package. |
+
+**Gate disposition:** no closure is recorded here. `G2 = NOT READY` is unchanged, and no final readiness review has been run.
