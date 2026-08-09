@@ -7,8 +7,8 @@ namespace TransportERP.Api.Policies;
 public static class RequestLimitPolicy
 {
     public const int DefaultPageSize = 100;
-    public const int MaximumPageSize = 500;
-    public const int MaximumLookupResults = 100;
+    public const int MaximumPageSize = 200;
+    public const int MaximumLookupResults = 50;
 
     /// <summary>
     /// Uses the default only when a caller omitted pageSize. Explicit non-positive values are
