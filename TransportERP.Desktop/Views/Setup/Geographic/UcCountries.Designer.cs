@@ -20,7 +20,6 @@ partial class UcCountries
     private TextBox txtIso2 = null!;
     private TextBox txtIso3 = null!;
     private TextBox txtDialCode = null!;
-    private TextBox txtCurrencyCode = null!;
     private ComboBox cmbStatus = null!;
     private TextBox txtNotes = null!;
 
@@ -45,7 +44,6 @@ partial class UcCountries
         txtIso2 = new TextBox();
         txtIso3 = new TextBox();
         txtDialCode = new TextBox();
-        txtCurrencyCode = new TextBox();
         cmbStatus = new ComboBox();
         txtNotes = new TextBox();
 
@@ -79,8 +77,7 @@ partial class UcCountries
         AddField(tblData, "ISO2", txtIso2, 2, 1);
         AddField(tblData, "ISO3", txtIso3, 0, 2);
         AddField(tblData, "مفتاح الاتصال", txtDialCode, 2, 2);
-        AddField(tblData, "رمز العملة", txtCurrencyCode, 0, 3);
-        AddField(tblData, "الحالة", cmbStatus, 2, 3);
+        AddField(tblData, "الحالة", cmbStatus, 0, 3);
 
         var lblNotes = CreateLabel("الملاحظات");
         tblData.Controls.Add(lblNotes, 0, 4);
@@ -96,7 +93,6 @@ partial class UcCountries
         ConfigureTextBox(txtIso2);
         ConfigureTextBox(txtIso3);
         ConfigureTextBox(txtDialCode);
-        ConfigureTextBox(txtCurrencyCode);
         ConfigureComboBox(cmbStatus);
         cmbStatus.Items.AddRange(new object[] { "نشط", "موقوف" });
 
@@ -111,11 +107,10 @@ partial class UcCountries
         screenShell.Grid.Columns.Add("colIso2", "ISO2");
         screenShell.Grid.Columns.Add("colIso3", "ISO3");
         screenShell.Grid.Columns.Add("colDialCode", "مفتاح الاتصال");
-        screenShell.Grid.Columns.Add("colCurrencyCode", "رمز العملة");
         screenShell.Grid.Columns.Add("colStatus", "الحالة");
 
         AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
+        AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(247, 249, 252);
         Controls.Add(screenShell);
         Font = new Font("Segoe UI", 10F);

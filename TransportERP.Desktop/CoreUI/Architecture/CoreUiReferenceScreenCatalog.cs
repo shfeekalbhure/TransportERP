@@ -9,12 +9,12 @@ public static class CoreUiReferenceScreenCatalog
     private static readonly IReadOnlyDictionary<TransportScreenProfile, Type> ReferenceTypes =
         new Dictionary<TransportScreenProfile, Type>
         {
-            [TransportScreenProfile.MasterData] = typeof(MasterDataReferenceScreen),
-            [TransportScreenProfile.TreeMaster] = typeof(TreeMasterReferenceScreen),
-            [TransportScreenProfile.Transaction] = typeof(TransactionReferenceScreen),
-            [TransportScreenProfile.ControlApproval] = typeof(ControlApprovalReferenceScreen),
-            [TransportScreenProfile.ReportInquiry] = typeof(ReportInquiryReferenceScreen),
-            [TransportScreenProfile.Settings] = typeof(SettingsReferenceScreen)
+            [TransportScreenProfile.MasterData] = typeof(Gen003CountriesReferenceScreen),
+            [TransportScreenProfile.TreeMaster] = typeof(Acc035ChartOfAccountsReferenceScreen),
+            [TransportScreenProfile.Transaction] = typeof(Acc042JournalEntryReferenceScreen),
+            [TransportScreenProfile.ControlApproval] = typeof(Acc041AccountingPeriodsReferenceScreen),
+            [TransportScreenProfile.ReportInquiry] = typeof(Acc046TrialBalanceReferenceScreen),
+            [TransportScreenProfile.Settings] = typeof(Gen015OperationalSettingsReferenceScreen)
         };
 
     public static IReadOnlyDictionary<TransportScreenProfile, Type> All => ReferenceTypes;

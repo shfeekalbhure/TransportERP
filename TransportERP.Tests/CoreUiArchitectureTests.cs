@@ -29,7 +29,7 @@ public sealed class CoreUiArchitectureTests
     public void Duplicate_reference_screen_is_rejected()
     {
         var invalid = CoreUiReferenceScreenCatalog.All.ToDictionary(entry => entry.Key, entry => entry.Value);
-        invalid[TransportScreenProfile.Settings] = typeof(MasterDataReferenceScreen);
+        invalid[TransportScreenProfile.Settings] = typeof(Gen003CountriesReferenceScreen);
 
         Assert.Throws<InvalidOperationException>(() => CoreUiReferenceScreenCatalog.ValidateMappings(invalid));
     }

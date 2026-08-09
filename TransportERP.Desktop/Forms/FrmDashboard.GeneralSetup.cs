@@ -1,4 +1,5 @@
 using TransportERP.Desktop.Forms.Setup.General;
+using TransportERP.Desktop.CoreUI.Architecture;
 
 namespace TransportERP.Desktop;
 
@@ -29,7 +30,7 @@ public partial class FrmDashboard
         _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen012Branches", "GEN-012 — الفروع", () => OpenWorkspaceView("GEN-012", "الفروع", new UcGen012Branches())));
         _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen013FiscalYears", "GEN-013 — السنوات المالية", () => OpenWorkspaceView("GEN-013", "السنوات المالية", new UcGen013FiscalYears())));
         _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen014Numbering", "GEN-014 — الترقيم العام", () => OpenWorkspaceView("GEN-014", "الترقيم العام", new UcGen014Numbering())));
-        _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen015Languages", "GEN-015 — اللغات", () => OpenWorkspaceView("GEN-015", "اللغات", new UcGen015Languages())));
+        _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen015OperationalSettings", "GEN-015 — إعدادات التشغيل العامة", () => OpenWorkspaceView("GEN-015", "إعدادات التشغيل العامة", new Gen015OperationalSettingsReferenceScreen())));
         _generalSetupMenu.Items.Add(CreateSetupItem("mnuGen016GlobalVariables", "GEN-016 — المتغيرات العامة", () => OpenWorkspaceView("GEN-016", "المتغيرات العامة", new UcGen016GlobalVariables())));
     }
 

@@ -59,7 +59,6 @@ public partial class UcCountries : UserControl
         txtIso2.Clear();
         txtIso3.Clear();
         txtDialCode.Clear();
-        txtCurrencyCode.Clear();
         txtNotes.Clear();
         cmbStatus.SelectedIndex = 0;
         screenShell.AlertBar.HideMessage();

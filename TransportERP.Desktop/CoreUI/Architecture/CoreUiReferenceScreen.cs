@@ -15,6 +15,7 @@ public abstract class CoreUiReferenceScreen : UserControl
 
         Dock = DockStyle.Fill;
         RightToLeft = RightToLeft.Yes;
+        AutoScaleMode = AutoScaleMode.Dpi;
 
         Shell = new TransportReferenceScreenShell
         {

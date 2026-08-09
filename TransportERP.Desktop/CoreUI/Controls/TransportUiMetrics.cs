@@ -13,12 +13,12 @@ internal static class TransportUiMetrics
     internal const int Control8Mm = 30;
     internal const int Control6Mm = 23;
 
-    internal const int ScreenOuterPadding = 6;
-    internal const int GroupHorizontalPadding = 6;
+    internal const int ScreenOuterPadding = CoreUIProperties.ContainerPadding;
+    internal const int GroupHorizontalPadding = CoreUIProperties.ContainerPadding;
     internal const int GroupTopPadding = 4;
     internal const int GroupBottomPadding = 4;
     internal const int GroupVerticalPadding = GroupTopPadding + GroupBottomPadding;
-    internal const int SectionGap = 6;
+    internal const int SectionGap = CoreUIProperties.RowGap;
 
     internal const int ToolbarHeight = 36;
     internal const int ToolbarButtonHeight = 28;
@@ -29,12 +29,12 @@ internal static class TransportUiMetrics
     // البيانات الرئيسية: الحقل 6 مم، فجوة الصفوف 1.5 مم، 3 أعمدة و5 صفوف كحد أقصى.
     // لا نفرض ارتفاعًا ثابتًا كبيرًا؛ الحد الأدنى هو صف واحد فعلي + Chrome الحاوية.
     internal const int MainDataDefaultGroupHeight = 230;
-    internal const int MainDataMaxFieldColumns = 3;
+    internal const int MainDataMaxFieldColumns = CoreUIProperties.MaximumInputColumns;
     internal const int MainDataMaxRows = 5;
-    internal const int MainDataControlHeight = Control6Mm;
-    internal const int MainDataRowGap = 6;
+    internal const int MainDataControlHeight = CoreUIProperties.ControlHeight;
+    internal const int MainDataRowGap = CoreUIProperties.RowGap;
     internal const int MainDataVerticalMargin = MainDataRowGap / 2;
-    internal const int MainDataHorizontalMargin = 4;
+    internal const int MainDataHorizontalMargin = CoreUIProperties.ColumnGap / 2;
     internal const int MainDataRowHeight = MainDataControlHeight + MainDataRowGap;
     internal const int MainDataGroupChromeHeight = GroupBoxHeaderSpace + GroupVerticalPadding + (MainDataHostPadding * 2);
     internal const int MainDataMinContentHeight = MainDataRowHeight;
@@ -82,8 +82,8 @@ internal static class TransportUiMetrics
     internal const int AlertHorizontalPadding = 8;
     internal const int AlertVerticalPadding = (AlertBarHeight - AlertContentHeight) / 2;
 
-    internal const int GridHeaderHeight = 34;
-    internal const int GridRowHeight = 32;
+    internal const int GridHeaderHeight = CoreUIProperties.GridHeaderHeight;
+    internal const int GridRowHeight = CoreUIProperties.GridRowHeight;
     internal const int GridCellHorizontalPadding = 6;
 
     internal const int GroupBoxHeaderSpace = 20;
