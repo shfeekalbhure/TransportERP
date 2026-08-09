@@ -72,3 +72,20 @@ A passing CI run proves the commands and their included tests succeeded. It does
 | IV-W3-001 | SCREEN_COREUI_ARCHITECT | High | Supply reproducible Windows runtime/UX evidence for the shared shell and six named references in a separate remediation package. |
 
 **Gate disposition:** no closure is recorded here. `G2 = NOT READY` is unchanged, and no final readiness review has been run.
+
+## Current-state addendum — W1 Integrity evidence completion (2026-08-09)
+
+This addendum supersedes only the historical W1 Integrity entries above. The
+earlier tables remain an accurate record of their respective review snapshots.
+
+| Item | Current status | Verifiable evidence | Remaining action |
+|---|---|---|---|
+| G2C-W1-BASELINE / W1 Integrity | **VERIFIED** | [W1 Evidence Completion Record](W1-Evidence-Completion-Record.md) at `b2174be2c4806bb1fc46a794d7ee95a618ab1258`; six immutable artifacts are byte-for-byte matched to their approved SHA-256 fingerprints. SOLUTION_ARCHITECT and QA_TESTING_REVIEWER each reported a separate clean-checkout reproduction. | None for W1 integrity. Verify physical persistence mapping only when a future DDL/ORM/migration package is introduced. |
+
+### Current W1 disposition
+
+- `W1 Integrity = VERIFIED`.
+- No approved W1 artifact, logical model, ownership decision, constraint, or
+  OTS decision was changed by the evidence package.
+- This closure does not change the W2 or W3 rows, does not run a final G2
+  readiness review, and does not change `G2 = NOT READY`.
