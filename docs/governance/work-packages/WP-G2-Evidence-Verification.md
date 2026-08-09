@@ -31,3 +31,30 @@ Verify exactly four prerequisites before any final rerun of WP-G2-Readiness-Revi
 
 ## Completion rule
 This Work Package records `VERIFIED`, `NOT VERIFIED`, or `BLOCKED` for the four prerequisites. It does not close G2. Only when all four are VERIFIED may GENERAL_SUPERVISOR commission a final, independent rerun of `WP-G2-Readiness-Review`.
+
+
+## Reverification execution record — 2026-08-09
+
+**Reviewed branch / evidence snapshot:** `setup/initial-solution-structure` @ `6d395271e80ce4a436ad9b8622038b507aed4eca`.  
+**Existing CI evidence retained (not rerun):** [Run 31286693059](https://github.com/shfeekalbhure/TransportERP/actions/runs/31286693059) on `b2e7c3f`: `dotnet build` PASS and `dotnet test` PASS, 10/10 tests.
+
+| Prerequisite | Result | Independent evidence | Disposition |
+|---|---|---|---|
+| CI execution | VERIFIED | Workflow job `build` succeeded; its Build and Test steps are visible in the run. | Retained; no rerun performed. |
+| QA evidence review | NOT VERIFIED | QA_TESTING_REVIEWER independently rechecked the seven G2 items against source, tests, and the retained CI evidence. Only W3-IMP-003 is VERIFIED; W2 executable-contract and Windows runtime evidence are missing or nonconforming. | Does not satisfy completion rule. |
+| W1 baseline review | NOT VERIFIED | DATA_MYSQL_ARCHITECT returned `PASS WITH NOTES`: no silent implementation delta was found because no persistence/DDL/ORM exists. SOLUTION_ARCHITECT had matched six source SHA-256 fingerprints; QA could not reproduce those hashes from repository-accessible binary sources. | Publish or immutably link the six binary sources for independent QA rehash; revisit with the future persistence WP. |
+| Gap register traceability | VERIFIED | `G2-Gap-Closure-Verification-Matrix.md` is repository-fixed and was independently checked by QA. | Retained. |
+
+### Role-review evidence
+
+| Role | Result | Bound evidence |
+|---|---|---|
+| DATA_MYSQL_ARCHITECT | `PASS WITH NOTES` | No EF/MySQL provider, DbContext, migration, DDL, entity mapping, or competing UUID/precision mapping found in Domain, Infrastructure, Api, Application, or Contracts at `6d395271`; baseline is [W1-Approved-Baseline-Reference.md](../evidence/W1-Approved-Baseline-Reference.md). |
+| API_SECURITY_REVIEWER | `NOT VERIFIED / PARTIALLY VERIFIED` | `RequestLimitPolicy` implements 500 and 100 rather than the governing 200 and 50, with no inbound endpoint or lookup consumer. The named retry client/handler exists but differs from the governing HTTP policy and lacks the required executable contract evidence. |
+| SCREEN_COREUI_ARCHITECT | `VERIFIED / PARTIALLY VERIFIED / VERIFIED` | Actual CoreUI is used by `UcCountries` through `TransportReferenceScreenShell`; six reference types exist but lack a display route/runtime UX evidence; architecture tests run in retained CI. |
+| QA_TESTING_REVIEWER | `INSUFFICIENT / NOT VERIFIED / NOT VERIFIED / NOT VERIFIED / INSUFFICIENT / NOT VERIFIED / VERIFIED` | QA independently reviewed the same source and CI evidence. It did not accept specification-only, mapping-only, or unrepeatable evidence. |
+
+### Explicit non-disposition
+- No G2 gap is closed by this record.
+- `G2 = NOT READY` remains unchanged.
+- No final `WP-G2-Readiness-Review` is authorized by this work package execution.
