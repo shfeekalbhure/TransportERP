@@ -35,7 +35,7 @@ work only; it must not amend W1.
 - `docs/agents/QA_TESTING_REVIEWER.md`
 - `docs/governance/REVIEW_WORKFLOW.md`
 - `docs/governance/evidence/W1-Approved-Baseline-Reference.md`
-- Current Approved References V1.17 and its W1 artifacts.
+- Current Approved References V1.20 and its W1 artifacts.
 
 ## Assigned roles
 - **Primary specialist/author:** DATA_MYSQL_ARCHITECT
@@ -74,7 +74,7 @@ work only; it must not amend W1.
 ## Review record
 
 ### Author result
-- **Status:** `PASS WITH NOTES` pending independent reviews.
+- **Status:** `PASS WITH NOTES`.
 - **Findings:** All six copied bytes match their approved SHA-256 fingerprints.
   No EF/MySQL provider, DbContext, migration, DDL, ORM mapping, or competing
   precision/UUID mapping is present in the reviewed implementation snapshot.
@@ -84,10 +84,22 @@ work only; it must not amend W1.
   introduced; this is not evidence of an existing silent change.
 
 ### Independent review
-- **Reviewer:** SOLUTION_ARCHITECT — pending assignment/completion.
-- **QA rehash:** QA_TESTING_REVIEWER — pending after solution review.
+- **SOLUTION_ARCHITECT:** `VERIFIED` at evidence commit
+  `885c4ffed8f608004b079b420a94cb9fde940a20`. Independently calculated all
+  six SHA-256 values, matched the approved manifest, and confirmed that the
+  evidence-only diff contains no undocumented W1 architectural or data-model
+  change.
+- **QA_TESTING_REVIEWER:** `VERIFIED` at the same evidence commit. Recalculated
+  all six SHA-256 values from a separate clean-checkout procedure and confirmed
+  that every value matches the approved manifest.
 
 ## General Supervisor disposition
-- **Final status:** Pending.
-- **Readiness for target Gate:** Pending independent reviews; no Gate decision.
-- **Next Work Package:** resume `WP-G2-Evidence-Verification` after both reviews.
+- **Final status:** `COMPLETED — W1 Integrity VERIFIED`.
+- **Readiness for target Gate:** The W1 integrity evidence prerequisite is
+  satisfied. This package does not issue a G2 Gate decision.
+- **Boundary:** The verdict verifies the immutable approved W1 baseline and the
+  absence of an undocumented W1 delta in this evidence-only PR. Executable
+  persistence/DDL/ORM verification remains deferred until the relevant future
+  implementation package.
+- **Next Gate work:** W3 Windows runtime and UX verification remains the
+  outstanding G2 evidence path. `G2 = NOT READY` remains unchanged.
