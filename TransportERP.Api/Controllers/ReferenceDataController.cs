@@ -42,6 +42,9 @@ public sealed class ReferenceDataController(IReferenceLookupProvider lookupProvi
             return Forbid();
         }
 
-        return Ok(lookupProvider.Search(query, new LookupAccessContext(trustedCompany, trustedBranch, true)));
+        // The endpoint owns the response boundary as well as the provider: a provider must
+        // never be able to return more than the governing lookup maximum.
+        return Ok(RequestLimitPolicy.LimitLookup(
+            lookupProvider.Search(query, new LookupAccessContext(trustedCompany, trustedBranch, true))));
     }
 }
