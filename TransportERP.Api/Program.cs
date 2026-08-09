@@ -1,6 +1,8 @@
 using TransportERP.Api.Policies;
 using TransportERP.Api.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace TransportERP.Api;
 
@@ -12,8 +14,30 @@ public partial class Program
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
+        var jwtBearerSection = builder.Configuration.GetSection("Authentication:JwtBearer");
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options => builder.Configuration.GetSection("Authentication:JwtBearer").Bind(options));
+            .AddJwtBearer(options =>
+            {
+                jwtBearerSection.Bind(options);
+
+                // The claim policy remains unchanged. This merely binds the configured trust
+                // material so the API can validate a server-issued JWT before the policy runs.
+                var signingKey = jwtBearerSection["SigningKey"];
+                if (!string.IsNullOrWhiteSpace(signingKey))
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = jwtBearerSection["Issuer"],
+                        ValidateAudience = true,
+                        ValidAudience = jwtBearerSection["Audience"],
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero
+                    };
+                }
+            });
         builder.Services.AddAuthorization(options =>
         {
             options.AddPolicy(LookupClaims.ReadPolicy, policy =>
