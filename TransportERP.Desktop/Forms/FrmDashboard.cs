@@ -232,7 +232,8 @@ public partial class FrmDashboard : Form
     {
         if (sender is not Button button) return;
 
-        if (button.Text.Contains("المحاسبة", StringComparison.Ordinal))
+        if (button.Text.Contains("المحاسبة", StringComparison.Ordinal)
+            || button.Text.Contains("الحسابات", StringComparison.Ordinal))
         {
             ShowAccountingReferenceMenu(button);
             return;
