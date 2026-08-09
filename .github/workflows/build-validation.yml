@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - setup/initial-solution-structure
+  pull_request:
+    branches:
+      - setup/initial-solution-structure
   workflow_dispatch:
 
 jobs:
