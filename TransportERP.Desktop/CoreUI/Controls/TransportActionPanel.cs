@@ -34,7 +34,7 @@ public sealed class TransportActionPanel : FlowLayoutPanel
             MinimumSize = new Size(TransportUiMetrics.ActionButtonMinWidth, TransportUiMetrics.ActionButtonHeight),
             Text = text,
             RightToLeft = RightToLeft.Yes,
-            FlatStyle = FlatStyle.System,
+            FlatStyle = FlatStyle.Flat,
             Margin = new Padding(TransportUiMetrics.ActionButtonGap, 0, 0, 0),
             Tag = text
         };

@@ -81,7 +81,7 @@ namespace TransportERP.Desktop
             tblRoot.Controls.Add(statusBar, 0, 1);
             tblRoot.SetColumnSpan(statusBar, 2);
 
-            AutoScaleMode = AutoScaleMode.Font;
+            AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Color.FromArgb(247, 249, 252);
             ClientSize = new Size(1600, 960);
             Controls.Add(tblRoot);

@@ -123,7 +123,7 @@ public sealed class TransportPagination : UserControl
     {
         AccessibleName = accessibleName,
         AutoSize = false,
-        FlatStyle = FlatStyle.System,
+        FlatStyle = FlatStyle.Flat,
         Font = UiTheme.CreateBoldFont(9F),
         Margin = new Padding(2, 0, 2, 0),
         Size = new Size(34, TransportUiMetrics.PaginationButtonHeight),

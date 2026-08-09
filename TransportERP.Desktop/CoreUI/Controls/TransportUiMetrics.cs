@@ -11,7 +11,6 @@ internal static class TransportUiMetrics
     internal const int Container10Mm = 38;
     internal const int Control9Mm = 34;
     internal const int Control8Mm = 30;
-    internal const int Control6Mm = 23;
 
     internal const int ScreenOuterPadding = CoreUIProperties.ContainerPadding;
     internal const int GroupHorizontalPadding = CoreUIProperties.ContainerPadding;
@@ -64,7 +63,7 @@ internal static class TransportUiMetrics
 
     internal const int SearchPanelHeight = Container10Mm;
     internal const int SearchControlHeight = Control8Mm;
-    internal const int SearchStatusControlHeight = Control6Mm;
+    internal const int SearchStatusControlHeight = CoreUIProperties.ControlHeight;
     internal const int SearchStatusVerticalMargin = (SearchControlHeight - SearchStatusControlHeight) / 2;
     internal const int SearchMinimumWidth = 180;
     internal const int SearchPreferredWidth = 300;

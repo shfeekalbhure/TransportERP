@@ -114,7 +114,7 @@ public partial class FrmDashboard : Form
         _generalSetupMenu.Show(button, new Point(0, button.Height));
     }
 
-    private void OpenCountriesView() => OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
+    private void OpenCountriesView() => OpenWorkspaceView(CountriesTabKey, "الدول", new Gen003CountriesReferenceScreen());
     private void OpenGovernoratesView() => OpenWorkspaceView(GovernoratesTabKey, "المحافظات", new UcGovernorates());
     private void OpenDirectoratesView() => OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
     private void OpenCitiesView() => OpenWorkspaceView(CitiesTabKey, "المدن", new UcCities());
