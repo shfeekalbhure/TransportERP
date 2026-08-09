@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using TransportERP.Desktop.CoreUI.Architecture;
 using TransportERP.Desktop.Views.Setup.Geographic;
 
 namespace TransportERP.Desktop;
@@ -18,6 +19,7 @@ public partial class FrmDashboard : Form
 
     private TabControl? _workspaceTabs;
     private ContextMenuStrip? _generalSetupMenu;
+    private ContextMenuStrip? _accountingReferenceMenu;
 
     public FrmDashboard()
     {
@@ -114,7 +116,7 @@ public partial class FrmDashboard : Form
         _generalSetupMenu.Show(button, new Point(0, button.Height));
     }
 
-    private void OpenCountriesView() => OpenWorkspaceView(CountriesTabKey, "الدول", new UcCountries());
+    private void OpenCountriesView() => OpenWorkspaceView(CountriesTabKey, "الدول", new Gen003CountriesReferenceScreen());
     private void OpenGovernoratesView() => OpenWorkspaceView(GovernoratesTabKey, "المحافظات", new UcGovernorates());
     private void OpenDirectoratesView() => OpenWorkspaceView(DirectoratesTabKey, "المديريات", new UcDirectorates());
     private void OpenCitiesView() => OpenWorkspaceView(CitiesTabKey, "المدن", new UcCities());
@@ -230,6 +232,12 @@ public partial class FrmDashboard : Form
     {
         if (sender is not Button button) return;
 
+        if (button.Text.Contains("المحاسبة", StringComparison.Ordinal))
+        {
+            ShowAccountingReferenceMenu(button);
+            return;
+        }
+
         MessageBox.Show(
             $"الاختصار «{button.Text.Replace("\r\n", " ", StringComparison.Ordinal)}» غير مفعل في النطاق الحالي.",
             "TransportERP",
@@ -237,6 +245,29 @@ public partial class FrmDashboard : Form
             MessageBoxIcon.Information,
             MessageBoxDefaultButton.Button1,
             MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+    }
+
+    private void ShowAccountingReferenceMenu(Button button)
+    {
+        _accountingReferenceMenu ??= CreateAccountingReferenceMenu();
+        _accountingReferenceMenu.Show(button, new Point(0, button.Height));
+    }
+
+    private ContextMenuStrip CreateAccountingReferenceMenu()
+    {
+        var menu = new ContextMenuStrip { RightToLeft = RightToLeft.Yes, ShowImageMargin = false };
+        AddReferenceItem(menu, "ACC-035", "دليل الحسابات", () => new Acc035ChartOfAccountsReferenceScreen());
+        AddReferenceItem(menu, "ACC-041", "الفترات المحاسبية", () => new Acc041AccountingPeriodsReferenceScreen());
+        AddReferenceItem(menu, "ACC-042", "القيد اليومي", () => new Acc042JournalEntryReferenceScreen());
+        AddReferenceItem(menu, "ACC-046", "ميزان المراجعة", () => new Acc046TrialBalanceReferenceScreen());
+        return menu;
+    }
+
+    private void AddReferenceItem(ContextMenuStrip menu, string code, string title, Func<UserControl> factory)
+    {
+        var item = new ToolStripMenuItem($"{code} — {title}") { RightToLeft = RightToLeft.Yes };
+        item.Click += (_, _) => OpenWorkspaceView(code, title, factory());
+        menu.Items.Add(item);
     }
 
     private void pnlRevenueChart_Paint(object? sender, PaintEventArgs e) => DrawPreviewLineChart(e.Graphics, pnlRevenueChart.ClientRectangle);

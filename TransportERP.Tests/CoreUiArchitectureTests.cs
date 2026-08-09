@@ -29,8 +29,24 @@ public sealed class CoreUiArchitectureTests
     public void Duplicate_reference_screen_is_rejected()
     {
         var invalid = CoreUiReferenceScreenCatalog.All.ToDictionary(entry => entry.Key, entry => entry.Value);
-        invalid[TransportScreenProfile.Settings] = typeof(MasterDataReferenceScreen);
+        invalid[TransportScreenProfile.Settings] = typeof(Gen003CountriesReferenceScreen);
 
         Assert.Throws<InvalidOperationException>(() => CoreUiReferenceScreenCatalog.ValidateMappings(invalid));
+    }
+
+    [Fact]
+    public void Reference_screens_cover_the_six_named_W3_pilot_screens()
+    {
+        var definitions = CoreUiReferenceScreenCatalog.All.Values
+            .Select(type => ((CoreUiReferenceScreen)Activator.CreateInstance(type)!).Definition)
+            .ToDictionary(definition => definition.Code, definition => definition.Profile);
+
+        Assert.Equal(6, definitions.Count);
+        Assert.Equal(TransportScreenProfile.MasterData, definitions["GEN-003"]);
+        Assert.Equal(TransportScreenProfile.TreeMaster, definitions["ACC-035"]);
+        Assert.Equal(TransportScreenProfile.ControlApproval, definitions["ACC-041"]);
+        Assert.Equal(TransportScreenProfile.Transaction, definitions["ACC-042"]);
+        Assert.Equal(TransportScreenProfile.ReportInquiry, definitions["ACC-046"]);
+        Assert.Equal(TransportScreenProfile.Settings, definitions["GEN-015"]);
     }
 }

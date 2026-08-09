@@ -1,31 +1,37 @@
 namespace TransportERP.Desktop.CoreUI.Architecture;
 
-public sealed class MasterDataReferenceScreen : CoreUiReferenceScreen
+public sealed class Gen003CountriesReferenceScreen : CoreUiReferenceScreen
 {
-    public MasterDataReferenceScreen() : base(TransportScreenProfile.MasterData, "البيانات الأساسية") { }
+    public Gen003CountriesReferenceScreen() : base(new("GEN-003", "الدول", TransportScreenProfile.MasterData,
+        ["كود الدولة", "الاسم العربي", "الاسم الإنجليزي", "رمز ISO", "الحالة"], ["الكود", "الاسم", "ISO", "الحالة"])) { }
 }
 
-public sealed class TreeMasterReferenceScreen : CoreUiReferenceScreen
+public sealed class Acc035ChartOfAccountsReferenceScreen : CoreUiReferenceScreen
 {
-    public TreeMasterReferenceScreen() : base(TransportScreenProfile.TreeMaster, "البيانات الشجرية") { }
+    public Acc035ChartOfAccountsReferenceScreen() : base(new("ACC-035", "دليل الحسابات", TransportScreenProfile.TreeMaster,
+        ["رمز الحساب", "اسم الحساب", "نوع الحساب", "الحساب الأب"], ["الرمز", "الحساب", "النوع", "الرصيد"], UsesTree: true)) { }
 }
 
-public sealed class TransactionReferenceScreen : CoreUiReferenceScreen
+public sealed class Acc041AccountingPeriodsReferenceScreen : CoreUiReferenceScreen
 {
-    public TransactionReferenceScreen() : base(TransportScreenProfile.Transaction, "العملية") { }
+    public Acc041AccountingPeriodsReferenceScreen() : base(new("ACC-041", "الفترات المحاسبية", TransportScreenProfile.ControlApproval,
+        ["السنة المالية", "اسم الفترة", "من تاريخ", "إلى تاريخ", "حالة الفترة"], ["الفترة", "من", "إلى", "الحالة"])) { }
 }
 
-public sealed class ControlApprovalReferenceScreen : CoreUiReferenceScreen
+public sealed class Acc042JournalEntryReferenceScreen : CoreUiReferenceScreen
 {
-    public ControlApprovalReferenceScreen() : base(TransportScreenProfile.ControlApproval, "الرقابة والاعتماد") { }
+    public Acc042JournalEntryReferenceScreen() : base(new("ACC-042", "القيد اليومي", TransportScreenProfile.Transaction,
+        ["رقم القيد", "التاريخ", "العملة", "الوصف", "حالة القيد"], ["الحساب", "مدين", "دائن", "البيان"])) { }
 }
 
-public sealed class ReportInquiryReferenceScreen : CoreUiReferenceScreen
+public sealed class Acc046TrialBalanceReferenceScreen : CoreUiReferenceScreen
 {
-    public ReportInquiryReferenceScreen() : base(TransportScreenProfile.ReportInquiry, "التقرير والاستعلام") { }
+    public Acc046TrialBalanceReferenceScreen() : base(new("ACC-046", "ميزان المراجعة", TransportScreenProfile.ReportInquiry,
+        ["من تاريخ", "إلى تاريخ", "الفرع", "مستوى الحساب"], ["الحساب", "مدين", "دائن", "الرصيد"], IsReadOnly: true)) { }
 }
 
-public sealed class SettingsReferenceScreen : CoreUiReferenceScreen
+public sealed class Gen015OperationalSettingsReferenceScreen : CoreUiReferenceScreen
 {
-    public SettingsReferenceScreen() : base(TransportScreenProfile.Settings, "الإعدادات") { }
+    public Gen015OperationalSettingsReferenceScreen() : base(new("GEN-015", "إعدادات التشغيل العامة", TransportScreenProfile.Settings,
+        ["النطاق", "القيمة", "الأولوية", "الحالة"], ["النطاق", "المفتاح", "القيمة", "المصدر"], IsReadOnly: false)) { }
 }
