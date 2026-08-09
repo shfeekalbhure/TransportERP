@@ -63,13 +63,13 @@ mapping is approved.
 
 | Required independent role | Required action | Status | Verdict |
 |---|---|---|---|
-| SOLUTION_ARCHITECT | Independently inspect the fixed artifact manifest and current branch for an undocumented W1 architectural/data-model delta. | PENDING | — |
-| QA_TESTING_REVIEWER | From a clean checkout, independently run the reproduction command and compare all six values to this manifest; verify the reviewer result is traceable to the evidence commit. | PENDING | — |
+| SOLUTION_ARCHITECT | Independently inspect the fixed artifact manifest and current branch for an undocumented W1 architectural/data-model delta. | COMPLETED at `885c4ff` | VERIFIED — all six independently calculated SHA-256 values match the manifest; evidence-only diff confirmed. |
+| QA_TESTING_REVIEWER | From a clean checkout, independently run the reproduction command and compare all six values to this manifest; verify the reviewer result is traceable to the evidence commit. | COMPLETED at `885c4ff` | VERIFIED — all six independently calculated SHA-256 values match the manifest; evidence-only diff confirmed. |
 
-## Current disposition
+## General Supervisor disposition
 
-- No W1 document was changed.
-- No W1 gap is closed by this record.
-- `G2 = NOT READY` remains unchanged.
-- `G2C-W1-BASELINE` remains pending until both independent review rows are
-  completed and the operational Gap Closure Matrix is updated by its owner.
+- The two required independent reviews agree at evidence commit `885c4ffed8f608004b079b420a94cb9fde940a20`.
+- **W1 Integrity: `VERIFIED`.** The published immutable baseline evidence is reproducible and no undocumented W1 change is present in this evidence-only PR.
+- This verdict is limited to the approved logical baseline and evidence integrity. Executable physical persistence mapping remains deferred until the relevant future work package.
+- No approved W1 document was changed.
+- `G2 = NOT READY` remains unchanged; this record does not run or replace the final G2 readiness review.
