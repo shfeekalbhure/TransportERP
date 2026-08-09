@@ -75,3 +75,14 @@ This Work Package records `VERIFIED`, `NOT VERIFIED`, or `BLOCKED` for the four 
 | OTS-W2-005 | NOT VERIFIED | Typed `IApiClient` and policy wiring exist, but no executable proof covers timeout, three-attempt/backoff, applied Retry-After, or an operational API consumer flow. |
 
 No final readiness review is authorized by this record.
+
+
+## W2 synchronized remediation status
+
+- **Synchronized branch:** `g2/w2-runtime-remediation-sync`
+- **Published commit:** `d21b64791c090a695f2a0bd68a59fa167c85702b`, created by safe cherry-pick equivalent of local `72b31f6f` on current remote base `eaf4dba`.
+- **PR:** [#2](https://github.com/shfeekalbhure/TransportERP/pull/2), draft, targeting `setup/initial-solution-structure`.
+- **History safety:** no force push; base history is an ancestor and the change is limited to OTS-W2-002, OTS-W2-005, their tests, and their Work Package.
+- **CI status:** BLOCKED. `.github/workflows/build-validation.yml` triggers only on `push` to `setup/initial-solution-structure` or authenticated `workflow_dispatch`; it has no `pull_request` trigger. Consequently no Actions run exists for `d21b647`.
+- **QA status:** PENDING; QA may begin only after CI for this exact published commit succeeds.
+- **Gate:** `G2 = NOT READY` unchanged. No final readiness review is authorized.
