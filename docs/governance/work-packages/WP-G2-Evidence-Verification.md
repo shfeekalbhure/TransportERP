@@ -58,3 +58,20 @@ This Work Package records `VERIFIED`, `NOT VERIFIED`, or `BLOCKED` for the four 
 - No G2 gap is closed by this record.
 - `G2 = NOT READY` remains unchanged.
 - No final `WP-G2-Readiness-Review` is authorized by this work package execution.
+
+
+## Current verification status — b982ba31
+
+- **Gate state:** `G2 = NOT READY` — unchanged.
+- **W2 CI:** [Run 31289357965](https://github.com/shfeekalbhure/TransportERP/actions/runs/31289357965), commit `b982ba31a80b564705cc55a72601abf54a8c842a`, workflow **Build validation**, job `build`: **Build PASS**; **Test request policy and CoreUI architecture enforcement PASS**; 16/16 tests passed.
+- **W1 publication:** `BLOCKED BY GITHUB AUTHENTICATION`. Prepared commit is `5e44415`; its local files are not final evidence. After publishing, SOLUTION_ARCHITECT and QA_TESTING_REVIEWER must independently rehash the six repository artifacts.
+- **W3 runtime:** Windows/WinForms runtime evidence is unavailable in the current environment. The Windows-verification package identifies six required screens and documents that no opening route is present for them. No claim of Windows execution is made.
+- **W3-IMP-003:** already CLOSED + VERIFIED; not re-executed.
+
+| W2 item | QA independent verdict | Evidence / exact gap |
+|---|---|---|
+| OTS-W2-001 | VERIFIED | `ReferenceDataController.GetRecords` calls `NormalizePageSize` and applies `Take`; policy caps at 200; `RecordsEndpoint_ClampsTheActualApiResponseTo200` verifies the action response. |
+| OTS-W2-002 | NOT VERIFIED | Cap 50, query, and scope filtering execute, but permission is a forgeable `X-TransportERP-Permission` header rather than authenticated claims/authorization policy. |
+| OTS-W2-005 | NOT VERIFIED | Typed `IApiClient` and policy wiring exist, but no executable proof covers timeout, three-attempt/backoff, applied Retry-After, or an operational API consumer flow. |
+
+No final readiness review is authorized by this record.
