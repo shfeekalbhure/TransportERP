@@ -86,3 +86,17 @@ No final readiness review is authorized by this record.
 - **CI status:** BLOCKED. `.github/workflows/build-validation.yml` triggers only on `push` to `setup/initial-solution-structure` or authenticated `workflow_dispatch`; it has no `pull_request` trigger. Consequently no Actions run exists for `d21b647`.
 - **QA status:** PENDING; QA may begin only after CI for this exact published commit succeeds.
 - **Gate:** `G2 = NOT READY` unchanged. No final readiness review is authorized.
+
+
+### workflow_dispatch attempt — PR #2 head
+
+Attempted **Build validation** workflow dispatch for branch `g2/w2-runtime-remediation-sync`, head `ecc6bf6` (W2 remediation implementation `d21b647`). Dispatch could not be submitted because the available GitHub session is signed out; the workflow page exposes no **Run workflow** control. No Run ID exists, and no QA review may start.
+
+| Field | Result |
+|---|---|
+| Workflow | `.github/workflows/build-validation.yml` / Build validation |
+| Requested ref | `g2/w2-runtime-remediation-sync` @ `ecc6bf6` |
+| Dispatch result | BLOCKED BY GITHUB AUTHENTICATION |
+| Restore / Build / Test | Not executed |
+| QA | Not started |
+| Merge | PR #2 remains draft and unmerged |
