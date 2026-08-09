@@ -94,6 +94,9 @@ public sealed class ApiRuntimeIntegrationTests
         Assert.Equal(HttpStatusCode.ServiceUnavailable, unsafeResponse.StatusCode);
         Assert.Equal(1, factory.Downstream.RequestCount);
 
+        // The unprotected write must leave its scripted success response untouched because it
+        // did not retry. Start the protected-write scenario with an explicit response script.
+        factory.Downstream.ClearResponses();
         factory.Downstream.Enqueue(HttpStatusCode.ServiceUnavailable);
         factory.Downstream.Enqueue(HttpStatusCode.OK);
         using var idempotentRequest = new HttpRequestMessage(HttpMethod.Post, "https://downstream.test/status")
@@ -190,6 +193,8 @@ public sealed class ApiRuntimeIntegrationTests
         public int RequestCount { get; private set; }
 
         public void Enqueue(HttpStatusCode status, TimeSpan? retryAfter = null) => _responses.Enqueue((status, retryAfter));
+
+        public void ClearResponses() => _responses.Clear();
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
