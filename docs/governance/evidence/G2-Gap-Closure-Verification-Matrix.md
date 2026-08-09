@@ -25,7 +25,7 @@ The W1 source register is `Current Approved References V1.17`; the approved W1 a
 | CI execution | VERIFIED | Run `31286693059`, job `build`, completed successfully. Steps **Build** and **Test request policy and CoreUI architecture enforcement** both succeeded. The workflow invokes `dotnet build TransportERP.slnx --configuration Debug --no-restore` and `dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build`. | None for this prerequisite. Track the separate `NU1903` dependency warning as a risk. |
 | Independent QA evidence review | PARTIALLY VERIFIED | QA_TESTING_REVIEWER independently reviewed current W2/W3 code, tests, and CI. It verified CI and W3 architecture tests, and identified missing API integration and Windows UX/runtime evidence. | Complete the listed independent evidence and re-review. |
 | Independent W1 baseline review | VERIFIED AS REFERENCE | SOLUTION_ARCHITECT independently retrieved the six approved W1 sources and matched all recorded SHA-256 fingerprints. | DATA_MYSQL_ARCHITECT must still compare the reviewed branch against that baseline to establish no silent material data-model delta. |
-| Gap register traceability | PENDING INDEPENDENT REVIEW | This immutable repository record now lists every G2 closure item and its current state. | QA_TESTING_REVIEWER reviews this record in a subsequent verification pass. |
+| Gap register traceability | VERIFIED | QA_TESTING_REVIEWER independently verified this fixed repository record at commit `41796420fba0ef93179ccae2f5fa4bcd2bd46c7a`; it contains all seven G2 closure items and matches its evidence-review findings. | None for this prerequisite. |
 
 ## Closure-item register
 
