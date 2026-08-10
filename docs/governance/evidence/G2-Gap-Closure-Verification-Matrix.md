@@ -7,7 +7,7 @@
 - **Independent matrix reviewer:** QA_TESTING_REVIEWER
 - **Bound branch and evidence commit:** `setup/initial-solution-structure` @ `b2e7c3ff362f1f1910a0b7797d853bca97d44662`
 - **Gate state:** `G2 = NOT READY` — unchanged.
-- **Decision rule:** This is the operational closure-state register for the seven items in `WP-G2-Gap-Closure`. It records verification findings only; it neither changes approved W1/W2/W3 documents nor grants a Gate decision. GENERAL_SUPERVISOR alone may commission the final independent readiness review.
+- **Decision rule:** This is an evidence-verification working record only. It neither replaces the authoritative Gap Closure Matrix nor changes approved W1/W2/W3 documents or grants a Gate decision.
 
 ## Stable governing references
 - [WP-G2-Gap-Closure](../work-packages/WP-G2-Gap-Closure.md)
@@ -16,15 +16,15 @@
 - [CI workflow](https://github.com/shfeekalbhure/TransportERP/blob/b2e7c3ff362f1f1910a0b7797d853bca97d44662/.github/workflows/build-validation.yml)
 - [CI run 31286693059](https://github.com/shfeekalbhure/TransportERP/actions/runs/31286693059)
 
-The W1 source register is `Current Approved References V1.17`; the approved W1 artifacts and six SHA-256 values are linked from the W1 baseline reference above. This matrix is the fixed, repository-reviewable G2 operational register; it does not replace the underlying approved W1 source set.
+The W1 source register is `Current Approved References V1.20`; the approved W1 artifacts and six SHA-256 values are linked from the W1 baseline reference above. This evidence record does not replace the authoritative Gap Closure Matrix or the approved W1 source set.
 
 ## Evidence-verification prerequisites
 
 | Prerequisite | Status | Evidence / finding | Remaining action |
 |---|---|---|---|
 | CI execution | VERIFIED | Run `31286693059`, job `build`, completed successfully. Steps **Build** and **Test request policy and CoreUI architecture enforcement** both succeeded. The workflow invokes `dotnet build TransportERP.slnx --configuration Debug --no-restore` and `dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build`. | None for this prerequisite. Track the separate `NU1903` dependency warning as a risk. |
-| Independent QA evidence review | PARTIALLY VERIFIED | QA_TESTING_REVIEWER independently reviewed current W2/W3 code, tests, and CI. It verified CI and W3 architecture tests, and identified missing API integration and Windows UX/runtime evidence. | Complete the listed independent evidence and re-review. |
-| Independent W1 baseline review | VERIFIED AS REFERENCE | SOLUTION_ARCHITECT independently retrieved the six approved W1 sources and matched all recorded SHA-256 fingerprints. | DATA_MYSQL_ARCHITECT must still compare the reviewed branch against that baseline to establish no silent material data-model delta. |
+| Independent QA evidence review | PENDING | No traceable independent QA review evidence is asserted by this publication record. | Obtain and link a traceable independent review. |
+| Independent W1 baseline review | PENDING | No traceable independent solution-architecture review evidence is asserted by this publication record. | Obtain and link a traceable independent review. |
 | Gap register traceability | VERIFIED | QA_TESTING_REVIEWER independently verified this fixed repository record at commit `41796420fba0ef93179ccae2f5fa4bcd2bd46c7a`; it contains all seven G2 closure items and matches its evidence-review findings. | None for this prerequisite. |
 
 ## Closure-item register
@@ -40,9 +40,9 @@ The W1 source register is `Current Approved References V1.17`; the approved W1 a
 | G2C-W3-003 Architecture tests in CI | SCREEN_COREUI_ARCHITECT | QA_TESTING_REVIEWER | VERIFIED | [CoreUiArchitectureTests](https://github.com/shfeekalbhure/TransportERP/blob/b2e7c3ff362f1f1910a0b7797d853bca97d44662/TransportERP.Tests/CoreUiArchitectureTests.cs) executes in the passing CI test step and covers positive, missing-profile, and duplicate-profile conditions. | None for this item. |
 
 ## Independent-review records
-- **QA_TESTING_REVIEWER:** `PARTIALLY VERIFIED`. CI succeeded; W2 inbound enforcement and retry integration evidence, and W3 Windows UX/runtime evidence, remain insufficient.
-- **SOLUTION_ARCHITECT:** `VERIFIED AS REFERENCE`. The six approved W1 artifact hashes match; no data-model delta conclusion was made.
-- **GENERAL_SUPERVISOR disposition:** no closure is declared by this record. G2 remains `NOT READY`.
+- **QA_TESTING_REVIEWER:** `PENDING` — no traceable independent review is asserted by this publication record.
+- **SOLUTION_ARCHITECT:** `PENDING` — no traceable independent review is asserted by this publication record.
+- **GENERAL_SUPERVISOR disposition:** `PENDING` — no closure is declared by this publication record. G2 remains `NOT READY`.
 
 ## Prohibited inference
 A passing CI run proves the commands and their included tests succeeded. It does not, by itself, prove runtime endpoint enforcement, runtime retry behavior, or Windows UX/RTL behavior. No item marked other than `VERIFIED` may be represented as closed.
