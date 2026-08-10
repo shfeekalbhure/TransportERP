@@ -163,5 +163,10 @@ namespace TransportERP.Desktop
             control.Region?.Dispose();
             control.Region = new Region(path);
         }
+
+        private void lnkForgotPassword_LinkClicked_1(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+
+        }
     }
 }
