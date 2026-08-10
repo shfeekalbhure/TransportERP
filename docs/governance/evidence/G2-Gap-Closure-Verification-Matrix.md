@@ -16,7 +16,7 @@
 - [CI workflow](https://github.com/shfeekalbhure/TransportERP/blob/b2e7c3ff362f1f1910a0b7797d853bca97d44662/.github/workflows/build-validation.yml)
 - [CI run 31286693059](https://github.com/shfeekalbhure/TransportERP/actions/runs/31286693059)
 
-The W1 source register is `Current Approved References V1.20`; the approved W1 artifacts and six SHA-256 values are linked from the W1 baseline reference above. This evidence record does not replace the authoritative Gap Closure Matrix or the approved W1 source set.
+The W1 source register is `Current Approved References V1.21`; the approved W1 artifacts and six SHA-256 values are linked from the W1 baseline reference above. This evidence record does not replace the authoritative Gap Closure Matrix or the approved W1 source set.
 
 ## Evidence-verification prerequisites
 
