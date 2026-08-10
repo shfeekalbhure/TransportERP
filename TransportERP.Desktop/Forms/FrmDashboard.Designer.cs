@@ -131,13 +131,7 @@ namespace TransportERP.Desktop
             flpMenu.Padding = new Padding(0, 8, 0, 8);
             flpMenu.BackColor = Color.Transparent;
 
-            var menuItems = new[]
-            {
-                "⌂  الرئيسية", "◈  الإدارة والأمن", "⚙  التهيئة العامة", "▦  المحاسبة",
-                "▥  السقوف والميزانيات", "🛒  المبيعات", "▣  المشتريات", "▦  المخزون",
-                "🚚  النقل والشحن", "▤  التذاكر والسفريات", "▧  المركبات والصيانة",
-                "▥  التقارير والتحليلات", "⚙  الإعدادات"
-            };
+            var menuItems = new[] { "⌂  الرئيسية" };
 
             for (var i = 0; i < menuItems.Length; i++)
             {
