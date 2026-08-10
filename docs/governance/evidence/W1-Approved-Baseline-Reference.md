@@ -4,8 +4,8 @@
 This is a read-only evidence index for `G2C-W1-BASELINE`. It does not amend any approved W1 decision, model, constraint, ownership, or gap state.
 
 ## Current-approved source record
-- **Register:** Current Approved References V1.17
-- **Authoritative gap register:** Gap_Closure_Matrix_TransportERP_V1.2.xlsx
+- **Register:** Current Approved References V1.21
+- **Authoritative gap register:** Gap_Closure_Matrix_TransportERP_V1.5.xlsx
 - **Scope:** logical data model, constraint architecture, ownership and traceability baseline required for the G2 silent-change comparison.
 
 ## Immutable source fingerprints
