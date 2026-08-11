@@ -32,7 +32,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     {
         // Each approved geography entity owns its explicitly named table; no hierarchy table or
         // discriminator is permitted by the GEO execution contract.
-        modelBuilder.Entity<GeoEntity>().UseTpcMappingStrategy();
+        ConfigureGeoRoot(modelBuilder);
         Configure<Country>(modelBuilder, "countries", builder => { builder.Property(x => x.NationalityName).HasColumnName("nationality_name").HasMaxLength(200); });
         Configure<Governorate>(modelBuilder, "governorates", builder => { builder.Property(x => x.CountryId).HasColumnName("country_id").HasColumnType("binary(16)"); builder.HasIndex(x => new { x.CountryId, x.Code }).IsUnique(); builder.HasIndex(x => new { x.CountryId, x.IsActive, x.Code }); builder.HasOne(x => x.Country).WithMany(x => x.Governorates).HasForeignKey(x => x.CountryId).OnDelete(DeleteBehavior.Restrict); });
         Configure<Directorate>(modelBuilder, "directorates", builder => { builder.Property(x => x.GovernorateId).HasColumnName("governorate_id").HasColumnType("binary(16)"); builder.HasIndex(x => new { x.GovernorateId, x.Code }).IsUnique(); builder.HasIndex(x => new { x.GovernorateId, x.IsActive, x.Code }); builder.HasOne(x => x.Governorate).WithMany(x => x.Directorates).HasForeignKey(x => x.GovernorateId).OnDelete(DeleteBehavior.Restrict); });
@@ -41,10 +41,22 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         ConfigureBusinessAuditEvents(modelBuilder);
     }
 
+    private static void ConfigureGeoRoot(ModelBuilder modelBuilder)
+    {
+        var b = modelBuilder.Entity<GeoEntity>();
+        b.UseTpcMappingStrategy();
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever();
+        b.Property(x => x.Code).HasColumnName("code").HasMaxLength(64).IsRequired();
+        b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+        b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200);
+        b.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
+        b.Property(x => x.Version).HasColumnName("version").HasColumnType("int unsigned").IsConcurrencyToken().IsRequired();
+    }
+
     private static void Configure<TEntity>(ModelBuilder modelBuilder, string table, Action<Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity>> configure) where TEntity : GeoEntity
     {
-        var b = modelBuilder.Entity<TEntity>(); b.ToTable(table); b.HasCharSet("utf8mb4"); b.HasKey(x => x.Id);
-        b.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever(); b.Property(x => x.Code).HasColumnName("code").HasMaxLength(64).IsRequired(); b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired(); b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200); b.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired(); b.Property(x => x.Version).HasColumnName("version").HasColumnType("int unsigned").IsConcurrencyToken().IsRequired();
+        var b = modelBuilder.Entity<TEntity>(); b.ToTable(table); b.HasCharSet("utf8mb4");
         if (typeof(TEntity) == typeof(Country)) { b.HasIndex(x => x.Code).IsUnique(); b.HasIndex(x => new { x.IsActive, x.Code }); }
         configure(b);
     }

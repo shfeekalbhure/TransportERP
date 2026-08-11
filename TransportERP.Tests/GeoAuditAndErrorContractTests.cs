@@ -88,25 +88,45 @@ public sealed class GeoAuditAndErrorContractTests
     }
 
     [Fact]
-    public async Task AuditStorageIsAppendOnly()
+    public void GeoTpcModelBuildsWithTheKeyOnTheRootEntity()
     {
         var options = new DbContextOptionsBuilder<TransportErpDbContext>()
             .UseMySql("Server=localhost;Database=transporterp_tests;User=root;Password=;", new MySqlServerVersion(new Version(8, 0, 0)))
             .Options;
+        using var db = new TransportErpDbContext(options);
+
+        var geoRoot = db.Model.FindEntityType(typeof(GeoEntity));
+        Assert.NotNull(geoRoot);
+        var rootKey = geoRoot!.FindPrimaryKey();
+        Assert.NotNull(rootKey);
+        Assert.Equal(nameof(GeoEntity.Id), rootKey!.Properties.Single().Name);
+        Assert.Equal(typeof(GeoEntity), rootKey.Properties.Single().DeclaringType.ClrType);
+        Assert.All(new[] { typeof(Country), typeof(Governorate), typeof(Directorate), typeof(City), typeof(Area) }, type => Assert.Equal(typeof(GeoEntity), db.Model.FindEntityType(type)!.BaseType!.ClrType));
+    }
+
+    [Fact]
+    public async Task AuditStorageIsAppendOnly()
+    {
+        var options = new DbContextOptionsBuilder<TransportErpDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
         await using var db = new TransportErpDbContext(options);
         var auditEvent = NewAuditEvent();
         await new EfBusinessAuditWriter(db).AppendAsync(auditEvent);
         Assert.Equal(EntityState.Added, db.Entry(auditEvent).State);
+        await db.SaveChangesAsync();
+        Assert.Equal(EntityState.Unchanged, db.Entry(auditEvent).State);
+
         db.ChangeTracker.Clear();
-        db.Attach(auditEvent);
-        db.Entry(auditEvent).State = EntityState.Modified;
+        var persistedForUpdate = await db.Set<BusinessAuditEvent>().SingleAsync(x => x.EventId == auditEvent.EventId);
+        db.Entry(persistedForUpdate).State = EntityState.Modified;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
 
         db.ChangeTracker.Clear();
-        var persistedAuditEvent = NewAuditEvent();
-        db.Attach(persistedAuditEvent);
-        db.Entry(persistedAuditEvent).State = EntityState.Deleted;
+        var persistedForDelete = await db.Set<BusinessAuditEvent>().SingleAsync(x => x.EventId == auditEvent.EventId);
+        db.Entry(persistedForDelete).State = EntityState.Deleted;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
     }
