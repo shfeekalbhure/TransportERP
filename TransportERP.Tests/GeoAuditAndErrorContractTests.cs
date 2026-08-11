@@ -94,12 +94,24 @@ public sealed class GeoAuditAndErrorContractTests
             .UseMySql("Server=localhost;Database=transporterp_tests;User=root;Password=;", new MySqlServerVersion(new Version(8, 0, 0)))
             .Options;
         await using var db = new TransportErpDbContext(options);
-        var auditEvent = new BusinessAuditEvent(Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, Guid.CreateVersion7(), Guid.CreateVersion7(), "Country", Guid.CreateVersion7(), "Create", Guid.CreateVersion7(), null, null, null);
+        var auditEvent = NewAuditEvent();
         await new EfBusinessAuditWriter(db).AppendAsync(auditEvent);
+        Assert.Equal(EntityState.Added, db.Entry(auditEvent).State);
+        db.ChangeTracker.Clear();
+        db.Attach(auditEvent);
         db.Entry(auditEvent).State = EntityState.Modified;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+
+        db.ChangeTracker.Clear();
+        var persistedAuditEvent = NewAuditEvent();
+        db.Attach(persistedAuditEvent);
+        db.Entry(persistedAuditEvent).State = EntityState.Deleted;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
     }
+
+    private static BusinessAuditEvent NewAuditEvent() => new(Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, Guid.CreateVersion7(), Guid.CreateVersion7(), "Country", Guid.CreateVersion7(), "Create", Guid.CreateVersion7(), null, null, null);
 
     private static DefaultHttpContext AuthorizedContext(string? permission, Guid correlation)
     {
