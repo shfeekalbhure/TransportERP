@@ -1,0 +1,79 @@
+using System.Text.Json;
+using TransportERP.Contracts.Core;
+
+namespace TransportERP.Tests;
+
+public sealed class W1CoreContractTests
+{
+    [Fact]
+    public void OperationContext_RequiresIdentityScopeAndCorrelation()
+    {
+        var valid = NewContext();
+        valid.EnsureComplete();
+
+        var missingScope = valid with { BranchId = Guid.Empty };
+        Assert.Throws<ArgumentException>(missingScope.EnsureComplete);
+    }
+
+    [Fact]
+    public void CapabilityState_RepresentsPresentationOnlyStates()
+    {
+        Assert.False(CapabilityState.Hidden.IsVisible);
+        Assert.True(CapabilityState.Enabled.IsVisible);
+        Assert.True(CapabilityState.Enabled.IsEnabled);
+
+        var disabled = CapabilityState.Disabled("PERIOD_CLOSED");
+        Assert.True(disabled.IsVisible);
+        Assert.False(disabled.IsEnabled);
+        Assert.Equal("PERIOD_CLOSED", disabled.ReasonCode);
+        Assert.Throws<ArgumentException>(() => CapabilityState.Disabled(" "));
+    }
+
+    [Fact]
+    public void TransportError_UsesOnlyTheApprovedStandardCodesAndCorrelation()
+    {
+        var error = new TransportError(
+            TransportErrorCode.ConcurrencyConflict,
+            Guid.CreateVersion7(),
+            "errors.concurrencyConflict");
+
+        error.EnsureComplete();
+        Assert.Equal(4, Enum.GetValues<TransportErrorCode>().Length);
+        Assert.Throws<ArgumentException>(() => new TransportError(
+            TransportErrorCode.ScopeDenied,
+            Guid.Empty,
+            "errors.scopeDenied").EnsureComplete());
+    }
+
+    [Fact]
+    public void BusinessAuditEvent_CarriesRequiredAppendOnlyAuditMetadata()
+    {
+        using var before = JsonDocument.Parse("{\"active\":true}");
+        using var after = JsonDocument.Parse("{\"active\":false}");
+        var auditEvent = new BusinessAuditEvent(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            DateTimeOffset.UtcNow,
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "FiscalPeriod",
+            Guid.CreateVersion7(),
+            "Close",
+            Guid.CreateVersion7(),
+            "Year-end close",
+            before.RootElement.Clone(),
+            after.RootElement.Clone());
+
+        auditEvent.EnsureComplete();
+        Assert.Equal("FiscalPeriod", auditEvent.EntityType);
+        Assert.Equal("Close", auditEvent.Action);
+        Assert.True(auditEvent.BeforeState.HasValue);
+        Assert.True(auditEvent.AfterState.HasValue);
+    }
+
+    private static OperationContext NewContext() => new(
+        Guid.CreateVersion7(),
+        Guid.CreateVersion7(),
+        Guid.CreateVersion7(),
+        Guid.CreateVersion7());
+}
