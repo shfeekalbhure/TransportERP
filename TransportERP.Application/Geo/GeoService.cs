@@ -17,13 +17,6 @@ public interface IGeoRepository
     Task SaveAsync(CancellationToken cancellationToken);
 }
 
-public interface IGeoAuditSink { Task WriteAsync(BusinessAuditEvent auditEvent, CancellationToken cancellationToken); }
-public sealed class GeoAuditSink : IGeoAuditSink
-{
-    // The shared BusinessAuditEvent is the only audit shape; this sink intentionally does not add a parallel model.
-    public Task WriteAsync(BusinessAuditEvent auditEvent, CancellationToken cancellationToken) { auditEvent.EnsureComplete(); return Task.CompletedTask; }
-}
-
 public interface IGeoService
 {
     Task<PagedResponse<GeoDto>> ListAsync(GeoResource resource, PagedQueryRequest query, OperationContext context, CancellationToken cancellationToken);
@@ -33,7 +26,7 @@ public interface IGeoService
     Task<GeoDto?> DisableAsync(GeoResource resource, Guid id, DisableRequest request, OperationContext context, CancellationToken cancellationToken);
 }
 
-public sealed class GeoService(IGeoRepository repository, IGeoAuditSink auditSink) : IGeoService
+public sealed class GeoService(IGeoRepository repository, IBusinessAuditWriter auditWriter) : IGeoService
 {
     public Task<PagedResponse<GeoDto>> ListAsync(GeoResource resource, PagedQueryRequest query, OperationContext context, CancellationToken cancellationToken)
     {
@@ -56,8 +49,8 @@ public sealed class GeoService(IGeoRepository repository, IGeoAuditSink auditSin
         await EnsureParentAndCodeAsync(resource, entity, null, cancellationToken);
         entity.Id = Guid.CreateVersion7();
         await repository.AddAsync(resource, entity, cancellationToken);
-        await repository.SaveAsync(cancellationToken);
         await AuditAsync(entity, "Create", null, context, null, cancellationToken);
+        await repository.SaveAsync(cancellationToken);
         return ToDto(entity);
     }
 
@@ -72,8 +65,8 @@ public sealed class GeoService(IGeoRepository repository, IGeoAuditSink auditSin
         ApplyUpdate(resource, entity, request); Validate(entity);
         await EnsureParentAndCodeAsync(resource, entity, id, cancellationToken);
         entity.Version++;
-        await repository.SaveAsync(cancellationToken);
         await AuditAsync(entity, "Update", before, context, null, cancellationToken);
+        await repository.SaveAsync(cancellationToken);
         return ToDto(entity);
     }
 
@@ -85,8 +78,8 @@ public sealed class GeoService(IGeoRepository repository, IGeoAuditSink auditSin
         if (entity is null) return null;
         if (entity.Version != request.ExpectedVersion) throw new InvalidOperationException("CONCURRENCY_CONFLICT");
         var before = ToJson(entity); entity.IsActive = false; entity.Version++;
-        await repository.SaveAsync(cancellationToken);
         await AuditAsync(entity, "Disable", before, context, request.Reason, cancellationToken);
+        await repository.SaveAsync(cancellationToken);
         return ToDto(entity);
     }
 
@@ -116,6 +109,11 @@ public sealed class GeoService(IGeoRepository repository, IGeoAuditSink auditSin
         switch (r, e, x) { case (GeoResource.Countries, Country a, UpdateCountryRequest b): a.Code=b.Code;a.ArabicName=b.ArabicName;a.EnglishName=b.EnglishName;a.NationalityName=b.NationalityName;break; case (GeoResource.Governorates, Governorate a, UpdateGovernorateRequest b): a.CountryId=b.CountryId;a.Code=b.Code;a.ArabicName=b.ArabicName;a.EnglishName=b.EnglishName;break; case (GeoResource.Directorates, Directorate a, UpdateDirectorateRequest b): a.GovernorateId=b.GovernorateId;a.Code=b.Code;a.ArabicName=b.ArabicName;a.EnglishName=b.EnglishName;break; case (GeoResource.Cities, City a, UpdateCityRequest b): a.DirectorateId=b.DirectorateId;a.Code=b.Code;a.ArabicName=b.ArabicName;a.EnglishName=b.EnglishName;break; case (GeoResource.Areas, Area a, UpdateAreaRequest b): a.CityId=b.CityId;a.Code=b.Code;a.ArabicName=b.ArabicName;a.EnglishName=b.EnglishName;break; default: throw new ArgumentException("Request does not match the resource."); }
     }
     private static GeoDto ToDto(GeoEntity e) => e switch { Country x => new CountryDto(x.Id,x.Code,x.ArabicName,x.EnglishName,x.NationalityName,x.IsActive,x.Version), Governorate x => new GovernorateDto(x.Id,x.CountryId,x.Code,x.ArabicName,x.EnglishName,x.IsActive,x.Version), Directorate x => new DirectorateDto(x.Id,x.GovernorateId,x.Code,x.ArabicName,x.EnglishName,x.IsActive,x.Version), City x => new CityDto(x.Id,x.DirectorateId,x.Code,x.ArabicName,x.EnglishName,x.IsActive,x.Version), Area x => new AreaDto(x.Id,x.CityId,x.Code,x.ArabicName,x.EnglishName,x.IsActive,x.Version), _ => throw new ArgumentOutOfRangeException(nameof(e)) };
-    private async Task AuditAsync(GeoEntity entity, string action, JsonElement? before, OperationContext context, string? reason, CancellationToken ct) => await auditSink.WriteAsync(new BusinessAuditEvent(Guid.CreateVersion7(), context.UserId, DateTimeOffset.UtcNow, context.CompanyId, context.BranchId, entity.GetType().Name, entity.Id, action, context.CorrelationId, reason, before, ToJson(entity)), ct);
+    private async Task AuditAsync(GeoEntity entity, string action, JsonElement? before, OperationContext context, string? reason, CancellationToken ct)
+    {
+        var auditEvent = new BusinessAuditEvent(Guid.CreateVersion7(), context.UserId, DateTimeOffset.UtcNow, context.CompanyId, context.BranchId, entity.GetType().Name, entity.Id, action, context.CorrelationId, reason, before, ToJson(entity));
+        auditEvent.EnsureComplete();
+        await auditWriter.AppendAsync(auditEvent, ct);
+    }
     private static JsonElement ToJson(GeoEntity entity) => JsonSerializer.SerializeToElement(ToDto(entity));
 }

@@ -5,7 +5,8 @@ public enum TransportErrorCode
     ValidationFailed,
     PermissionDenied,
     ScopeDenied,
-    ConcurrencyConflict
+    ConcurrencyConflict,
+    NotFound
 }
 
 /// <summary>

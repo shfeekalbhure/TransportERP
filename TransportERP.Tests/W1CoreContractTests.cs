@@ -38,7 +38,8 @@ public sealed class W1CoreContractTests
             "errors.concurrencyConflict");
 
         error.EnsureComplete();
-        Assert.Equal(4, Enum.GetValues<TransportErrorCode>().Length);
+        Assert.Equal(5, Enum.GetValues<TransportErrorCode>().Length);
+        new TransportError(TransportErrorCode.NotFound, Guid.CreateVersion7(), "error.notFound").EnsureComplete();
         Assert.Throws<ArgumentException>(() => new TransportError(
             TransportErrorCode.ScopeDenied,
             Guid.Empty,

@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using TransportERP.Application.Geo;
+using TransportERP.Contracts.Core;
 using TransportERP.Infrastructure.Geo;
 
 namespace TransportERP.Api;
@@ -56,8 +57,8 @@ public partial class Program
         builder.Services.AddDbContext<TransportErpDbContext>(options =>
             options.UseMySql(geoConnection, new MySqlServerVersion(new Version(8, 0, 0))));
         builder.Services.AddScoped<IGeoRepository, EfGeoRepository>();
+        builder.Services.AddScoped<IBusinessAuditWriter, EfBusinessAuditWriter>();
         builder.Services.AddScoped<IGeoService, GeoService>();
-        builder.Services.AddSingleton<IGeoAuditSink, GeoAuditSink>();
 
         // All outbound API traffic uses the typed IApiClient and this resilience handler.
         builder.Services.AddTransient<SafeReadRetryHandler>();

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TransportERP.Api.Authorization;
+using TransportERP.Contracts.Core;
 using TransportERP.Application.Geo;
 using TransportERP.Contracts.Geo;
 
@@ -9,22 +10,36 @@ public abstract class GeoControllerBase(IGeoService service) : ControllerBase
 {
     protected async Task<ActionResult<PagedResponse<GeoDto>>> List(GeoResource resource, string screen, [FromQuery] PagedQueryRequest query, CancellationToken ct)
     {
-        if (!Authorize(screen + ".View", out var context)) return Forbid();
+        if (!TryAuthorize(screen + ".View", out var context, out var authorizationError)) return Forbidden(authorizationError!);
         try { return Ok(await service.ListAsync(resource, query with { PageSize = Math.Min(query.PageSize, 200) }, context, ct)); } catch (ArgumentOutOfRangeException) { return BadRequest(); }
     }
     protected async Task<ActionResult<GeoDto>> Get(GeoResource resource, string screen, Guid id, CancellationToken ct)
-    { if (!Authorize(screen + ".View", out var context)) return Forbid(); var item = await service.GetAsync(resource, id, context, ct); return item is null ? NotFound() : Ok(item); }
+    { if (!TryAuthorize(screen + ".View", out var context, out var authorizationError)) return Forbidden(authorizationError!); var item = await service.GetAsync(resource, id, context, ct); return item is null ? NotFound(context) : Ok(item); }
     protected async Task<ActionResult<GeoDto>> Create(GeoResource resource, string screen, object request, CancellationToken ct)
-    { if (!Authorize(screen + ".Create", out var context)) return Forbid(); try { return Created(string.Empty, await service.CreateAsync(resource, request, context, ct)); } catch (ArgumentException) { return BadRequest(); } }
+    { if (!TryAuthorize(screen + ".Create", out var context, out var authorizationError)) return Forbidden(authorizationError!); try { return Created(string.Empty, await service.CreateAsync(resource, request, context, ct)); } catch (ArgumentException) { return BadRequest(); } }
     protected async Task<ActionResult<GeoDto>> Update(GeoResource resource, string screen, Guid id, object request, CancellationToken ct)
-    { if (!Authorize(screen + ".Edit", out var context)) return Forbid(); try { var item = await service.UpdateAsync(resource, id, request, context, ct); return item is null ? NotFound() : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
+    { if (!TryAuthorize(screen + ".Edit", out var context, out var authorizationError)) return Forbidden(authorizationError!); try { var item = await service.UpdateAsync(resource, id, request, context, ct); return item is null ? NotFound(context) : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
     protected async Task<ActionResult<GeoDto>> Disable(GeoResource resource, string screen, Guid id, DisableRequest request, CancellationToken ct)
-    { if (!Authorize(screen + ".Disable", out var context)) return Forbid(); try { var item = await service.DisableAsync(resource, id, request, context, ct); return item is null ? NotFound() : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
-    private bool Authorize(string permission, out TransportERP.Contracts.Core.OperationContext context)
+    { if (!TryAuthorize(screen + ".Disable", out var context, out var authorizationError)) return Forbidden(authorizationError!); try { var item = await service.DisableAsync(resource, id, request, context, ct); return item is null ? NotFound(context) : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
+    private bool TryAuthorize(string permission, out OperationContext context, out TransportError? error)
     {
         context = default!;
-        return User.HasPermission(permission) && User.TryGetOperationContext(Request, out context);
+        if (!User.HasPermission(permission))
+        {
+            error = new TransportError(TransportErrorCode.PermissionDenied, CorrelationId(), "error.permissionDenied");
+            return false;
+        }
+        if (!User.TryGetOperationContext(Request, out context))
+        {
+            error = new TransportError(TransportErrorCode.ScopeDenied, CorrelationId(), "error.scopeDenied");
+            return false;
+        }
+        error = null;
+        return true;
     }
+    private ObjectResult NotFound(OperationContext context) => StatusCode(StatusCodes.Status404NotFound, new TransportError(TransportErrorCode.NotFound, context.CorrelationId, "error.notFound"));
+    private ObjectResult Forbidden(TransportError error) => StatusCode(StatusCodes.Status403Forbidden, error);
+    private Guid CorrelationId() => Request.Headers.TryGetValue("X-Correlation-Id", out var value) && Guid.TryParse(value, out var correlation) ? correlation : Guid.CreateVersion7();
 }
 
 [ApiController, Route("api/v1/general/countries")] public sealed class CountriesController(IGeoService service) : GeoControllerBase(service)
