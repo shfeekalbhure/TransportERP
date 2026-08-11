@@ -9,7 +9,7 @@ namespace TransportERP.Desktop.CoreUI.Controls;
 /// تستخدم لاختيار الشركات والفروع والعملات والحسابات والعملاء والموردين وغيرها.
 /// </summary>
 [ToolboxItem(true)]
-public sealed class LookupComboBox : ComboBox
+public sealed class LookupComboBox : ComboBox, ITransportPresentationAware
 {
     private bool _isRequired = true;
     private string _requiredMessage = "يرجى اختيار قيمة من القائمة.";
@@ -74,6 +74,12 @@ public sealed class LookupComboBox : ComboBox
 
         PresentationContract = contract;
         BindItems(items, selectFirstItem);
+    }
+
+    public void ApplyPresentationContext(TransportPresentationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        RightToLeft = context.RightToLeft;
     }
 
     public void BindItems<TItem>(IEnumerable<TItem> items, bool selectFirstItem = true)
@@ -147,13 +153,11 @@ public sealed class LookupComboBox : ComboBox
 
     private void HandleEnter(object? sender, EventArgs e)
     {
-        RightToLeft = RightToLeft.Yes;
         BackColor = UiTheme.FocusedInputBackground;
     }
 
     private void HandleLeave(object? sender, EventArgs e)
     {
-        RightToLeft = RightToLeft.Yes;
         UpdateVisualState();
     }
 

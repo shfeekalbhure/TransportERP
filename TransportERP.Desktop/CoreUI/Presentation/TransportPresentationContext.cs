@@ -86,6 +86,11 @@ public static class TransportPresentationPolicy
 
         control.RightToLeft = context.RightToLeft;
 
+        if (control is ITransportPresentationAware presentationAware)
+        {
+            presentationAware.ApplyPresentationContext(context);
+        }
+
         switch (control)
         {
             case TextBox textBox:
@@ -115,4 +120,12 @@ public static class TransportPresentationPolicy
         control.Visible = isVisible;
         control.Parent?.PerformLayout();
     }
+}
+
+/// <summary>
+/// تتبناه المكونات المشتركة التي تحتاج الاحتفاظ بسياق العرض خلال تفاعلاتها الداخلية.
+/// </summary>
+public interface ITransportPresentationAware
+{
+    void ApplyPresentationContext(TransportPresentationContext context);
 }

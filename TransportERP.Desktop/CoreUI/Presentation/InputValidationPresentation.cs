@@ -28,12 +28,17 @@ public sealed record InputValidationPresentation(string FieldKey, TransportField
 /// </summary>
 public static class InputValidationPresenter
 {
-    public static void Apply(Control control, InputValidationPresentation presentation)
+    public static void Apply(
+        Control control,
+        InputValidationPresentation presentation,
+        TransportPresentationContext context)
     {
         ArgumentNullException.ThrowIfNull(control);
         ArgumentNullException.ThrowIfNull(presentation);
+        ArgumentNullException.ThrowIfNull(context);
         presentation.EnsureComplete();
 
         TransportFieldState.Apply(control, presentation.VisualState);
+        TransportPresentationPolicy.Apply(control, context);
     }
 }
