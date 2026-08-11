@@ -3,6 +3,9 @@ using TransportERP.Api.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using TransportERP.Application.Geo;
+using TransportERP.Infrastructure.Geo;
 
 namespace TransportERP.Api;
 
@@ -44,6 +47,17 @@ public partial class Program
                 policy.Requirements.Add(new LookupReadRequirement()));
         });
         builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, LookupReadAuthorizationHandler>();
+
+        var geoConnection = builder.Configuration.GetConnectionString("TransportERP")
+            ?? builder.Configuration["ConnectionStrings:TransportERP"]
+            ?? "Server=localhost;Database=transporterp;User=root;Password=;";
+        // Server version is fixed here so API startup never probes a database; migrations and
+        // connection validation remain explicit development/test operations.
+        builder.Services.AddDbContext<TransportErpDbContext>(options =>
+            options.UseMySql(geoConnection, new MySqlServerVersion(new Version(8, 0, 0))));
+        builder.Services.AddScoped<IGeoRepository, EfGeoRepository>();
+        builder.Services.AddScoped<IGeoService, GeoService>();
+        builder.Services.AddSingleton<IGeoAuditSink, GeoAuditSink>();
 
         // All outbound API traffic uses the typed IApiClient and this resilience handler.
         builder.Services.AddTransient<SafeReadRetryHandler>();

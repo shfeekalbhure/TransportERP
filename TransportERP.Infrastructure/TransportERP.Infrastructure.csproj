@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TransportERP.Application\TransportERP.Application.csproj" />
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
     <ProjectReference Include="..\TransportERP\TransportERP.Domain.csproj" />
