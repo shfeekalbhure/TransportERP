@@ -20,7 +20,11 @@ public abstract class GeoControllerBase(IGeoService service) : ControllerBase
     { if (!Authorize(screen + ".Edit", out var context)) return Forbid(); try { var item = await service.UpdateAsync(resource, id, request, context, ct); return item is null ? NotFound() : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
     protected async Task<ActionResult<GeoDto>> Disable(GeoResource resource, string screen, Guid id, DisableRequest request, CancellationToken ct)
     { if (!Authorize(screen + ".Disable", out var context)) return Forbid(); try { var item = await service.DisableAsync(resource, id, request, context, ct); return item is null ? NotFound() : Ok(item); } catch (ArgumentException) { return BadRequest(); } catch (InvalidOperationException) { return Conflict(); } }
-    private bool Authorize(string permission, out TransportERP.Contracts.Core.OperationContext context) => User.HasPermission(permission) && User.TryGetOperationContext(Request, out context);
+    private bool Authorize(string permission, out TransportERP.Contracts.Core.OperationContext context)
+    {
+        context = default!;
+        return User.HasPermission(permission) && User.TryGetOperationContext(Request, out context);
+    }
 }
 
 [ApiController, Route("api/v1/general/countries")] public sealed class CountriesController(IGeoService service) : GeoControllerBase(service)
