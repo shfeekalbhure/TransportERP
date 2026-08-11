@@ -43,6 +43,10 @@ public sealed class W1CoreContractTests
             TransportErrorCode.ScopeDenied,
             Guid.Empty,
             "errors.scopeDenied").EnsureComplete());
+        Assert.Throws<ArgumentException>(() => new TransportError(
+            (TransportErrorCode)999,
+            Guid.CreateVersion7(),
+            "errors.unknown").EnsureComplete());
     }
 
     [Fact]
@@ -69,6 +73,10 @@ public sealed class W1CoreContractTests
         Assert.Equal("Close", auditEvent.Action);
         Assert.True(auditEvent.BeforeState.HasValue);
         Assert.True(auditEvent.AfterState.HasValue);
+        Assert.Throws<ArgumentException>(() => (auditEvent with
+        {
+            OccurredAt = default
+        }).EnsureComplete());
     }
 
     private static OperationContext NewContext() => new(

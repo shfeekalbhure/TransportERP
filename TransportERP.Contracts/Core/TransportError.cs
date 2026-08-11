@@ -19,6 +19,11 @@ public sealed record TransportError(
 {
     public void EnsureComplete()
     {
+        if (!Enum.IsDefined(Code))
+        {
+            throw new ArgumentException("A defined transport error code is required.", nameof(Code));
+        }
+
         if (CorrelationId == Guid.Empty)
         {
             throw new ArgumentException("A correlation identifier is required.", nameof(CorrelationId));

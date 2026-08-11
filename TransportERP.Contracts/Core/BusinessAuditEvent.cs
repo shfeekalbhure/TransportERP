@@ -27,6 +27,11 @@ public sealed record BusinessAuditEvent(
             throw new ArgumentException("Audit identity, actor, scope, record, and correlation are required.");
         }
 
+        if (OccurredAt == default)
+        {
+            throw new ArgumentException("An occurrence time is required.", nameof(OccurredAt));
+        }
+
         if (string.IsNullOrWhiteSpace(EntityType))
         {
             throw new ArgumentException("An entity type is required.", nameof(EntityType));
