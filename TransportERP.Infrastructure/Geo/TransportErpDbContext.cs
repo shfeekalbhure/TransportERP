@@ -27,7 +27,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
 
     private static void Configure<TEntity>(ModelBuilder modelBuilder, string table, Action<Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity>> configure) where TEntity : GeoEntity
     {
-        var b = modelBuilder.Entity<TEntity>(); b.ToTable(table).HasCharSet("utf8mb4"); b.HasKey(x => x.Id);
+        var b = modelBuilder.Entity<TEntity>(); b.ToTable(table); b.HasCharSet("utf8mb4"); b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever(); b.Property(x => x.Code).HasColumnName("code").HasMaxLength(64).IsRequired(); b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired(); b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200); b.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired(); b.Property(x => x.Version).HasColumnName("version").HasColumnType("int unsigned").IsConcurrencyToken().IsRequired();
         if (typeof(TEntity) == typeof(Country)) { b.HasIndex(x => x.Code).IsUnique(); b.HasIndex(x => new { x.IsActive, x.Code }); }
         configure(b);
