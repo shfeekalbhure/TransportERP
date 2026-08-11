@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TransportERP.Desktop.CoreUI.Presentation;
 using TransportERP.Desktop.Themes;
 
 namespace TransportERP.Desktop.CoreUI.Controls;
@@ -46,6 +47,33 @@ public sealed class LookupComboBox : ComboBox
         set => _requiredMessage = string.IsNullOrWhiteSpace(value)
             ? "يرجى اختيار قيمة من القائمة."
             : value.Trim();
+    }
+
+    /// <summary>
+    /// العقد الحالي للعرض والاختيار فقط. لا يعرّف أو يستدعي مصدر البيانات.
+    /// </summary>
+    [Browsable(false)]
+    public LookupPresentationContract? PresentationContract { get; private set; }
+
+    [Browsable(false)]
+    public LookupPresentationItem? SelectedPresentationItem => SelectedItem as LookupPresentationItem;
+
+    [Browsable(false)]
+    public LookupPresentationSelection? SelectedPresentation =>
+        PresentationContract is not null && SelectedPresentationItem is not null
+            ? new LookupPresentationSelection(PresentationContract, SelectedPresentationItem.Id)
+            : null;
+
+    public void BindPresentationItems(
+        LookupPresentationContract contract,
+        IEnumerable<LookupPresentationItem> items,
+        bool selectFirstItem = true)
+    {
+        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(items);
+
+        PresentationContract = contract;
+        BindItems(items, selectFirstItem);
     }
 
     public void BindItems<TItem>(IEnumerable<TItem> items, bool selectFirstItem = true)
