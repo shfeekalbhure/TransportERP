@@ -6,7 +6,17 @@ public enum TransportErrorCode
     PermissionDenied,
     ScopeDenied,
     ConcurrencyConflict,
-    NotFound
+    NotFound,
+    // W1-CORE LIMITED CROSS-CUTTING AMENDMENT UNDER W1-SETUP-ORG (ORG-OD-003A).
+    Conflict,
+    StateTransitionInvalid,
+    ApprovalStateInvalid,
+    PeriodClosed,
+    SelfApprovalDenied,
+    DuplicateNumber,
+    NumberSequenceInactive,
+    NumberingStateInvalid,
+    IdempotencyConflict
 }
 
 /// <summary>

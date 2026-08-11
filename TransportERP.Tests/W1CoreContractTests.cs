@@ -38,12 +38,43 @@ public sealed class W1CoreContractTests
             "errors.concurrencyConflict");
 
         error.EnsureComplete();
-        Assert.Equal(5, Enum.GetValues<TransportErrorCode>().Length);
-        new TransportError(TransportErrorCode.NotFound, Guid.CreateVersion7(), "error.notFound").EnsureComplete();
+        var approvedCodes = new[]
+        {
+            TransportErrorCode.ValidationFailed,
+            TransportErrorCode.PermissionDenied,
+            TransportErrorCode.ScopeDenied,
+            TransportErrorCode.ConcurrencyConflict,
+            TransportErrorCode.NotFound,
+            TransportErrorCode.Conflict,
+            TransportErrorCode.StateTransitionInvalid,
+            TransportErrorCode.ApprovalStateInvalid,
+            TransportErrorCode.PeriodClosed,
+            TransportErrorCode.SelfApprovalDenied,
+            TransportErrorCode.DuplicateNumber,
+            TransportErrorCode.NumberSequenceInactive,
+            TransportErrorCode.NumberingStateInvalid,
+            TransportErrorCode.IdempotencyConflict
+        };
+
+        Assert.Equal(approvedCodes, Enum.GetValues<TransportErrorCode>());
+        foreach (var code in approvedCodes)
+        {
+            new TransportError(code, Guid.CreateVersion7(), "error.contract").EnsureComplete();
+        }
+
+        // MessageKey is presentation-safe metadata rather than raw exception detail.
+        Assert.Equal("error.contract", new TransportError(
+            TransportErrorCode.NotFound,
+            Guid.CreateVersion7(),
+            "error.contract").MessageKey);
         Assert.Throws<ArgumentException>(() => new TransportError(
             TransportErrorCode.ScopeDenied,
             Guid.Empty,
             "errors.scopeDenied").EnsureComplete());
+        Assert.Throws<ArgumentException>(() => new TransportError(
+            TransportErrorCode.ScopeDenied,
+            Guid.CreateVersion7(),
+            " ").EnsureComplete());
         Assert.Throws<ArgumentException>(() => new TransportError(
             (TransportErrorCode)999,
             Guid.CreateVersion7(),

@@ -3,6 +3,7 @@ using TransportERP.Application.Geo;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Geo;
 using TransportERP.Domain.Geo;
+using TransportERP.Domain.Org;
 using System.Text.Json;
 
 namespace TransportERP.Infrastructure.Geo;
@@ -14,6 +15,16 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<Directorate> Directorates => Set<Directorate>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Area> Areas => Set<Area>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<Company> Companies => Set<Company>();
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<FiscalYear> FiscalYears => Set<FiscalYear>();
+    public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
+    public DbSet<NumberReservation> NumberReservations => Set<NumberReservation>();
+    public DbSet<Language> Languages => Set<Language>();
+    public DbSet<SettingDefinition> SettingDefinitions => Set<SettingDefinition>();
+    public DbSet<SettingOverride> SettingOverrides => Set<SettingOverride>();
     internal DbSet<BusinessAuditEvent> BusinessAuditEvents => Set<BusinessAuditEvent>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -39,6 +50,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         Configure<City>(modelBuilder, "cities", builder => { builder.Property(x => x.DirectorateId).HasColumnName("directorate_id").HasColumnType("binary(16)"); builder.HasIndex(x => new { x.DirectorateId, x.Code }).IsUnique(); builder.HasIndex(x => new { x.DirectorateId, x.IsActive, x.Code }); builder.HasOne(x => x.Directorate).WithMany(x => x.Cities).HasForeignKey(x => x.DirectorateId).OnDelete(DeleteBehavior.Restrict); });
         Configure<Area>(modelBuilder, "areas", builder => { builder.Property(x => x.CityId).HasColumnName("city_id").HasColumnType("binary(16)"); builder.HasIndex(x => new { x.CityId, x.Code }).IsUnique(); builder.HasIndex(x => new { x.CityId, x.IsActive, x.Code }); builder.HasOne(x => x.City).WithMany(x => x.Areas).HasForeignKey(x => x.CityId).OnDelete(DeleteBehavior.Restrict); });
         ConfigureBusinessAuditEvents(modelBuilder);
+        ConfigureOrg(modelBuilder);
     }
 
     private static void ConfigureGeoRoot(ModelBuilder modelBuilder)
@@ -77,6 +89,138 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         b.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(1000);
         b.Property(x => x.BeforeState).HasColumnName("before_state").HasColumnType("json").HasConversion(value => SerializeJson(value), value => DeserializeJson(value));
         b.Property(x => x.AfterState).HasColumnName("after_state").HasColumnType("json").HasConversion(value => SerializeJson(value), value => DeserializeJson(value));
+    }
+
+    private static void ConfigureOrg(ModelBuilder modelBuilder)
+    {
+        ConfigureOrgEntity<Currency>(modelBuilder, "gen_currencies", b =>
+        {
+            b.Property(x => x.Code).HasColumnName("code").HasMaxLength(3).IsRequired();
+            b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.Symbol).HasColumnName("symbol").HasMaxLength(16);
+            b.Property(x => x.DecimalPlaces).HasColumnName("decimal_places").HasColumnType("tinyint unsigned");
+            b.HasIndex(x => x.Code).IsUnique();
+        });
+        ConfigureOrgEntity<Company>(modelBuilder, "gen_companies", b =>
+        {
+            b.Property(x => x.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+            b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.LegalName).HasColumnName("legal_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.TaxNumber).HasColumnName("tax_number").HasMaxLength(100);
+            b.Property(x => x.BaseCurrencyId).HasColumnName("base_currency_id").HasColumnType("binary(16)");
+            b.Property(x => x.LogoUri).HasColumnName("logo_uri").HasMaxLength(500);
+            b.Property(x => x.Notes).HasColumnName("notes").HasMaxLength(2000);
+            b.HasIndex(x => x.Code).IsUnique();
+            b.HasOne<Currency>().WithMany().HasForeignKey(x => x.BaseCurrencyId).OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureOrgEntity<Branch>(modelBuilder, "gen_branches", b =>
+        {
+            b.Property(x => x.CompanyId).HasColumnName("company_id").HasColumnType("binary(16)");
+            b.Property(x => x.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+            b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.TimeZone).HasColumnName("time_zone").HasMaxLength(64);
+            b.Property(x => x.Notes).HasColumnName("notes").HasMaxLength(2000);
+            b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+            b.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureOrgEntity<ExchangeRate>(modelBuilder, "gen_exchange_rates", b =>
+        {
+            b.Property(x => x.CompanyId).HasColumnName("company_id").HasColumnType("binary(16)");
+            b.Property(x => x.BaseCurrencyId).HasColumnName("base_currency_id").HasColumnType("binary(16)");
+            b.Property(x => x.QuoteCurrencyId).HasColumnName("quote_currency_id").HasColumnType("binary(16)");
+            b.Property(x => x.Rate).HasColumnName("rate").HasPrecision(20, 10);
+            b.Property(x => x.EffectiveFrom).HasColumnName("effective_from").HasColumnType("date");
+            b.Property(x => x.EffectiveTo).HasColumnName("effective_to").HasColumnType("date");
+            b.Property(x => x.MinimumRate).HasColumnName("minimum_rate").HasPrecision(20, 10);
+            b.Property(x => x.MaximumRate).HasColumnName("maximum_rate").HasPrecision(20, 10);
+            b.Property(x => x.Source).HasColumnName("source").HasMaxLength(100).IsRequired();
+            b.HasIndex(x => new { x.CompanyId, x.BaseCurrencyId, x.QuoteCurrencyId, x.EffectiveFrom });
+            b.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Currency>().WithMany().HasForeignKey(x => x.BaseCurrencyId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Currency>().WithMany().HasForeignKey(x => x.QuoteCurrencyId).OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureOrgEntity<FiscalYear>(modelBuilder, "gen_fiscal_years", b =>
+        {
+            b.Property(x => x.CompanyId).HasColumnName("company_id").HasColumnType("binary(16)");
+            b.Property(x => x.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+            b.Property(x => x.StartDate).HasColumnName("start_date").HasColumnType("date");
+            b.Property(x => x.EndDate).HasColumnName("end_date").HasColumnType("date");
+            b.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(16).IsRequired();
+            b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+            b.HasIndex(x => new { x.CompanyId, x.StartDate, x.EndDate });
+            b.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureOrgEntity<NumberSequence>(modelBuilder, "gen_number_sequences", b =>
+        {
+            b.Property(x => x.Code).HasColumnName("code").HasMaxLength(100).IsRequired();
+            b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.ScopeType).HasColumnName("scope_type").HasMaxLength(32).IsRequired();
+            b.Property(x => x.DocumentType).HasColumnName("document_type").HasMaxLength(32);
+            b.Property(x => x.CompanyId).HasColumnName("company_id").HasColumnType("binary(16)");
+            b.Property(x => x.BranchId).HasColumnName("branch_id").HasColumnType("binary(16)");
+            b.Property(x => x.FiscalYearId).HasColumnName("fiscal_year_id").HasColumnType("binary(16)");
+            b.Property(x => x.Prefix).HasColumnName("prefix").HasMaxLength(32);
+            b.Property(x => x.LastNumber).HasColumnName("last_number").HasColumnType("bigint unsigned");
+            b.Property(x => x.ResetPolicy).HasColumnName("reset_policy").HasMaxLength(32);
+            // MySQL treats NULLs as distinct in a compound unique index. The contract requires
+            // a null-safe scope identity, so the database owns a generated key for it.
+            b.Property<string>("ScopeKey").HasColumnName("scope_key")
+                .HasMaxLength(512)
+                .HasComputedColumnSql("CONCAT_WS('|', code, COALESCE(HEX(company_id), '-'), COALESCE(HEX(branch_id), '-'), COALESCE(HEX(fiscal_year_id), '-'), COALESCE(document_type, '-'))", stored: true);
+            b.HasIndex("ScopeKey").IsUnique();
+        });
+        ConfigureNumberReservations(modelBuilder);
+        ConfigureOrgEntity<Language>(modelBuilder, "gen_languages", b =>
+        {
+            b.Property(x => x.LanguageCode).HasColumnName("language_code").HasMaxLength(35).IsRequired();
+            b.Property(x => x.ArabicName).HasColumnName("arabic_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.EnglishName).HasColumnName("english_name").HasMaxLength(200).IsRequired();
+            b.Property(x => x.Direction).HasColumnName("direction").HasMaxLength(3).IsRequired();
+            b.HasIndex(x => x.LanguageCode).IsUnique();
+        });
+        ConfigureSettings(modelBuilder);
+    }
+
+    private static void ConfigureOrgEntity<TEntity>(ModelBuilder modelBuilder, string table, Action<Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity>> configure) where TEntity : OrgEntity
+    {
+        var b = modelBuilder.Entity<TEntity>();
+        b.ToTable(table); b.HasCharSet("utf8mb4"); b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever();
+        b.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
+        b.Property(x => x.Version).HasColumnName("version").HasColumnType("int unsigned").IsConcurrencyToken().IsRequired();
+        b.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").HasColumnType("datetime(6)").IsRequired();
+        b.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc").HasColumnType("datetime(6)").IsRequired();
+        configure(b);
+    }
+
+    private static void ConfigureNumberReservations(ModelBuilder modelBuilder)
+    {
+        var b = modelBuilder.Entity<NumberReservation>(); b.ToTable("gen_number_reservations"); b.HasCharSet("utf8mb4"); b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever();
+        b.Property(x => x.SequenceId).HasColumnName("sequence_id").HasColumnType("binary(16)");
+        b.Property(x => x.NumberValue).HasColumnName("number_value").HasColumnType("bigint unsigned");
+        b.Property(x => x.RenderedNumber).HasColumnName("rendered_number").HasMaxLength(128).IsRequired();
+        b.Property(x => x.State).HasColumnName("state").HasConversion<string>().HasMaxLength(16).IsRequired();
+        b.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(128).IsRequired();
+        b.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(1000);
+        b.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").HasColumnType("datetime(6)").IsRequired();
+        b.HasIndex(x => new { x.SequenceId, x.NumberValue }).IsUnique(); b.HasIndex(x => new { x.SequenceId, x.IdempotencyKey }).IsUnique();
+        b.HasOne<NumberSequence>().WithMany().HasForeignKey(x => x.SequenceId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureSettings(ModelBuilder modelBuilder)
+    {
+        var d = modelBuilder.Entity<SettingDefinition>(); d.ToTable("gen_setting_definitions"); d.HasCharSet("utf8mb4"); d.HasKey(x => x.Id);
+        d.Property(x => x.Id).HasColumnName("id").HasColumnType("binary(16)").ValueGeneratedNever();
+        d.Property(x => x.PropertyCode).HasColumnName("property_code").HasMaxLength(128).IsRequired(); d.HasIndex(x => x.PropertyCode).IsUnique();
+        d.Property(x => x.Group).HasColumnName("group_name").HasMaxLength(100).IsRequired(); d.Property(x => x.ValueType).HasColumnName("value_type").HasMaxLength(32).IsRequired();
+        d.Property(x => x.BuiltInDefault).HasColumnName("built_in_default").HasMaxLength(4000).IsRequired(); d.Property(x => x.AllowedScopes).HasColumnName("allowed_scopes").HasMaxLength(128).IsRequired(); d.Property(x => x.ResolutionPolicy).HasColumnName("resolution_policy").HasMaxLength(32).IsRequired();
+        d.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").HasColumnType("datetime(6)").IsRequired(); d.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc").HasColumnType("datetime(6)").IsRequired();
+        ConfigureOrgEntity<SettingOverride>(modelBuilder, "gen_setting_overrides", b => { b.Property(x => x.DefinitionId).HasColumnName("definition_id").HasColumnType("binary(16)"); b.Property(x => x.ScopeType).HasColumnName("scope_type").HasMaxLength(16).IsRequired(); b.Property(x => x.ScopeId).HasColumnName("scope_id").HasColumnType("binary(16)"); b.Property(x => x.TypedValue).HasColumnName("typed_value").HasMaxLength(4000).IsRequired(); b.Property(x => x.EffectiveFrom).HasColumnName("effective_from").HasColumnType("date"); b.Property(x => x.EffectiveTo).HasColumnName("effective_to").HasColumnType("date"); b.HasIndex(x => new { x.DefinitionId, x.ScopeType, x.ScopeId }).IsUnique(); b.HasOne<SettingDefinition>().WithMany().HasForeignKey(x => x.DefinitionId).OnDelete(DeleteBehavior.Restrict); });
     }
 
     private static string? SerializeJson(JsonElement? value) => value.HasValue ? value.Value.GetRawText() : null;
