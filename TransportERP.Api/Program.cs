@@ -5,8 +5,10 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using TransportERP.Application.Geo;
+using TransportERP.Application.Org;
 using TransportERP.Contracts.Core;
 using TransportERP.Infrastructure.Geo;
+using TransportERP.Infrastructure.Org;
 
 namespace TransportERP.Api;
 
@@ -16,7 +18,7 @@ public partial class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddControllers();
+        builder.Services.AddControllers(options => options.Filters.Add<StructuredErrorFilter>());
         builder.Services.AddOpenApi();
         var jwtBearerSection = builder.Configuration.GetSection("Authentication:JwtBearer");
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -59,6 +61,8 @@ public partial class Program
         builder.Services.AddScoped<IGeoRepository, EfGeoRepository>();
         builder.Services.AddScoped<IBusinessAuditWriter, EfBusinessAuditWriter>();
         builder.Services.AddScoped<IGeoService, GeoService>();
+        builder.Services.AddScoped<IOrgRepository, EfOrgRepository>();
+        builder.Services.AddScoped<IOrgService, OrgService>();
 
         // All outbound API traffic uses the typed IApiClient and this resilience handler.
         builder.Services.AddTransient<SafeReadRetryHandler>();
