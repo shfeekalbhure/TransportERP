@@ -45,6 +45,17 @@ dotnet list TransportERP.slnx package --vulnerable --include-transitive
 
 The UX reviewer must additionally exercise shared components at 100%, 125%, 150%, and 200% DPI in Arabic RTL and English LTR, with long text and dynamic visibility, recording no clipping, overlap, or hidden required content.
 
+## Findings register
+
+| Finding ID | Independent review | Status | Resolution / required next action |
+|---|---|---|---|
+| `QA-PLAT-001` | QA / Solution Architecture / UX | CLOSED | `LookupComboBox` no longer forces RTL during Enter/Leave; component-level RTL/LTR interaction test added in `46c16bd…`. |
+| `QA-PLAT-002` | QA | CLOSED | Added direct tests for applying presentation direction, caller-supplied lookup selection, validation state, dynamic visibility, and long text presence in `46c16bd…`. |
+| `QA-PLAT-004` | QA | CLOSED | Traceability now identifies the external frozen pack and its verified SHA-256. |
+| `QA-PLAT-003` | QA | OPEN — external verification required | On the final pushed HEAD, run Windows Restore/Build/Full Tests/W1-PLATFORM/W1-CORE/W3, runtime RTL/LTR+DPI evidence, and dependency scan. This is not a code finding and cannot be closed in this non-Windows, no-.NET environment. |
+
+Static independent conclusions for the current code: `SOLUTION_ARCHITECT = VERIFIED`, `UX_UI_REVIEWER = VERIFIED`, and `API_SECURITY_REVIEWER = VERIFIED`. QA confirms the code findings are closed while retaining `QA-PLAT-003` as the external evidence gate.
+
 ## Required final evidence
 
 - Authorized base, merge-base, final HEAD, Base→Head commit list/diff, changed-files list, `git diff --check`, and clean-worktree proof.
