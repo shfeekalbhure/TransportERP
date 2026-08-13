@@ -37,7 +37,8 @@ jobs:
             local rep="$1"
             docker rm -f poc14-pg >/dev/null 2>&1 || true
             docker run -d --name poc14-pg --cpus=2 --memory=2g -e POSTGRES_PASSWORD=poc14 -e POSTGRES_USER=poc14 -e POSTGRES_DB=poc14 -p 55432:5432 postgis/postgis:18-3.6 > poc14-results/pg-container-${rep}.txt
-            for i in $(seq 1 90); do docker exec poc14-pg pg_isready -U poc14 -d poc14 >/dev/null 2>&1 && break; sleep 1; done
+            for i in $(seq 1 90); do docker exec poc14-pg psql -U poc14 -d poc14 -Atc "select 1" >/dev/null 2>&1 && break; sleep 1; done
+            docker exec poc14-pg psql -U poc14 -d poc14 -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS postgis;" >/dev/null
             docker exec poc14-pg psql -U poc14 -d poc14 -Atc "select current_setting('server_version'), postgis_lib_version();" | tee poc14-results/pg-runtime-version-${rep}.txt
             /usr/bin/time -v python3 poc14/benchmark.py --engine postgres --host 127.0.0.1 --port 55432 --user poc14 --password poc14 --database poc14 --run-id "pg-${rep}" --output "poc14-results/pg-${rep}.json" 2> "poc14-results/pg-time-${rep}.txt"
             docker stats --no-stream poc14-pg | tee poc14-results/pg-stats-${rep}.txt
@@ -62,7 +63,7 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
-          import glob,json,csv,os,statistics
+          import glob,json,csv,statistics
           rows=[]
           for f in sorted(glob.glob('poc14-results/*.json')):
               try:
