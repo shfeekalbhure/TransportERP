@@ -1,0 +1,92 @@
+name: POC14 measured database benchmark
+on:
+  push:
+    branches: [poc/poc14-measured-benchmark]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measured-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record immutable execution revision
+        run: |
+          mkdir -p poc14-results
+          echo "GITHUB_SHA=$GITHUB_SHA" | tee poc14-results/execution-revision.txt
+          uname -a | tee poc14-results/uname.txt
+          lscpu | tee poc14-results/lscpu.txt
+          free -h | tee poc14-results/memory.txt
+          docker version | tee poc14-results/docker-version.txt
+      - name: Install benchmark clients
+        run: |
+          python3 -m pip install --disable-pip-version-check 'psycopg[binary]' mysql-connector-python
+          python3 -m pip freeze | sort | tee poc14-results/python-packages.txt
+      - name: Pull exact database candidate images
+        run: |
+          docker pull postgis/postgis:18-3.6
+          docker pull mysql:8.4.10
+          docker image inspect postgis/postgis:18-3.6 --format '{{json .RepoDigests}}' | tee poc14-results/postgres-image-digest.txt
+          docker image inspect mysql:8.4.10 --format '{{json .RepoDigests}}' | tee poc14-results/mysql-image-digest.txt
+      - name: Execute five alternating repetitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_pg() {
+            local rep="$1"
+            docker rm -f poc14-pg >/dev/null 2>&1 || true
+            docker run -d --name poc14-pg --cpus=2 --memory=2g -e POSTGRES_PASSWORD=poc14 -e POSTGRES_USER=poc14 -e POSTGRES_DB=poc14 -p 55432:5432 postgis/postgis:18-3.6 > poc14-results/pg-container-${rep}.txt
+            for i in $(seq 1 90); do docker exec poc14-pg pg_isready -U poc14 -d poc14 >/dev/null 2>&1 && break; sleep 1; done
+            docker exec poc14-pg psql -U poc14 -d poc14 -Atc "select current_setting('server_version'), postgis_lib_version();" | tee poc14-results/pg-runtime-version-${rep}.txt
+            /usr/bin/time -v python3 poc14/benchmark.py --engine postgres --host 127.0.0.1 --port 55432 --user poc14 --password poc14 --database poc14 --run-id "pg-${rep}" --output "poc14-results/pg-${rep}.json" 2> "poc14-results/pg-time-${rep}.txt"
+            docker stats --no-stream poc14-pg | tee poc14-results/pg-stats-${rep}.txt
+            docker logs poc14-pg > "poc14-results/pg-log-${rep}.txt" 2>&1 || true
+            docker rm -f poc14-pg >/dev/null
+          }
+          run_my() {
+            local rep="$1"
+            docker rm -f poc14-my >/dev/null 2>&1 || true
+            docker run -d --name poc14-my --cpus=2 --memory=2g -e MYSQL_ROOT_PASSWORD=poc14root -e MYSQL_DATABASE=poc14 -e MYSQL_USER=poc14 -e MYSQL_PASSWORD=poc14 -p 53306:3306 mysql:8.4.10 > poc14-results/my-container-${rep}.txt
+            for i in $(seq 1 120); do docker exec poc14-my mysqladmin ping -h127.0.0.1 -uroot -ppoc14root --silent >/dev/null 2>&1 && break; sleep 1; done
+            docker exec poc14-my mysql -uroot -ppoc14root -Nse "select version(), @@version_comment;" poc14 | tee poc14-results/my-runtime-version-${rep}.txt
+            /usr/bin/time -v python3 poc14/benchmark.py --engine mysql --host 127.0.0.1 --port 53306 --user poc14 --password poc14 --database poc14 --run-id "my-${rep}" --output "poc14-results/my-${rep}.json" 2> "poc14-results/my-time-${rep}.txt"
+            docker stats --no-stream poc14-my | tee poc14-results/my-stats-${rep}.txt
+            docker logs poc14-my > "poc14-results/my-log-${rep}.txt" 2>&1 || true
+            docker rm -f poc14-my >/dev/null
+          }
+          for rep in 1 2 3 4 5; do
+            if (( rep % 2 == 1 )); then run_pg "$rep"; run_my "$rep"; else run_my "$rep"; run_pg "$rep"; fi
+          done
+      - name: Aggregate measured evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob,json,csv,os,statistics
+          rows=[]
+          for f in sorted(glob.glob('poc14-results/*.json')):
+              try:
+                  d=json.load(open(f))
+              except Exception:
+                  continue
+              for r in d.get('results',[]):
+                  rows.append({'engine':d['engine'],'run_id':d['run_id'],'versions':' | '.join(d.get('versions',[])),'database_bytes':d.get('database_bytes'),'integrity_pass':d.get('mandatory_subset_integrity_pass'),'workload':r.get('workload'),'operations':r.get('operations'),'elapsed_s':r.get('elapsed_s'),'ops_per_s':r.get('ops_per_s'),'p50_ms':r.get('p50_ms'),'p95_ms':r.get('p95_ms'),'p99_ms':r.get('p99_ms')})
+          if rows:
+              with open('poc14-results/measured-results.csv','w',newline='') as h:
+                  w=csv.DictWriter(h,fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+              agg={}
+              for row in rows:
+                  k=(row['engine'],row['workload']); agg.setdefault(k,[]).append(float(row['ops_per_s']))
+              with open('poc14-results/median-throughput.csv','w',newline='') as h:
+                  w=csv.writer(h); w.writerow(['engine','workload','median_ops_per_s','repetitions'])
+                  for (engine,wl),vals in sorted(agg.items()): w.writerow([engine,wl,statistics.median(vals),len(vals)])
+          print('result files',len(glob.glob('poc14-results/*.json')))
+          PY
+          sha256sum poc14/MEASURED_EXECUTION_SUPPLEMENT_FREEZE.md poc14/benchmark.py .github/workflows/poc14-measured-benchmark.yml | tee poc14-results/execution-files-sha256.txt
+      - name: Upload raw POC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poc14-measured-pilot-${{ github.sha }}
+          path: poc14-results/
+          retention-days: 30
