@@ -1,0 +1,2 @@
+# TransportERP Offline POC Wave-02
+POC-only integration evidence. No product code, Preservation, W1/W2/W3 baseline, or production dependency is modified. Target lanes: .NET 10 runtime, HTTP API, durable local SQLite, PostgreSQL 18.4, MySQL 8.4.10, duplicate/lost-ack replay. Android/MAUI device runtime remains a separate evidence gate unless an actual device/emulator lane is executed.
