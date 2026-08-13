@@ -1,0 +1,50 @@
+name: Offline POC Wave-02 integration
+on:
+  push:
+    branches: [poc/offline-wave02-integration]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Start real database engines
+        run: |
+          docker run -d --name wave-pg -e POSTGRES_PASSWORD=poc -e POSTGRES_USER=poc -e POSTGRES_DB=poc -p 55432:5432 postgres:18.4
+          docker run -d --name wave-my -e MYSQL_ROOT_PASSWORD=rootpoc -e MYSQL_DATABASE=poc -e MYSQL_USER=poc -e MYSQL_PASSWORD=poc -p 53306:3306 mysql:8.4.10
+          for i in $(seq 1 120); do docker exec wave-pg pg_isready -U poc -d poc >/dev/null 2>&1 && break; sleep 1; done
+          for i in $(seq 1 180); do docker exec wave-my mysqladmin ping -uroot -prootpoc --silent >/dev/null 2>&1 && break; sleep 1; done
+      - name: Restore and build isolated Wave-02 harness
+        run: dotnet build poc-wave02/Wave02.csproj -c Release
+      - name: Execute PostgreSQL integration lane
+        env:
+          ENGINE: postgres
+          DBCS: Host=127.0.0.1;Port=55432;Username=poc;Password=poc;Database=poc
+        run: |
+          mkdir -p wave02-results
+          dotnet run --project poc-wave02/Wave02.csproj -c Release --no-build | tee wave02-results/postgres.json
+      - name: Execute MySQL integration lane
+        env:
+          ENGINE: mysql
+          DBCS: Server=127.0.0.1;Port=53306;User ID=poc;Password=poc;Database=poc;SslMode=None
+        run: dotnet run --project poc-wave02/Wave02.csproj -c Release --no-build | tee wave02-results/mysql.json
+      - name: Record environment and explicit mobile gate
+        if: always()
+        run: |
+          dotnet --info > wave02-results/dotnet-info.txt
+          docker exec wave-pg psql -U poc -d poc -Atc 'select version();' > wave02-results/postgresql.txt || true
+          docker exec wave-my mysql -uroot -prootpoc -Nse 'select version();' poc > wave02-results/mysql.txt || true
+          echo 'MAUI_ANDROID_DEVICE_RUNTIME=NOT_EXECUTED' > wave02-results/mobile-runtime-gate.txt
+          sha256sum poc-wave02/Wave02.csproj poc-wave02/Program.cs .github/workflows/offline-wave02-integration.yml > wave02-results/hashes.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-wave02-${{ github.sha }}
+          path: wave02-results/
+          retention-days: 30
