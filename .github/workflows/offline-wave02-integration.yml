@@ -22,21 +22,37 @@ jobs:
           for i in $(seq 1 180); do docker exec wave-my mysqladmin ping -uroot -prootpoc --silent >/dev/null 2>&1 && break; sleep 1; done
       - name: Restore and build isolated Wave-02 harness
         run: dotnet build poc-wave02/Wave02.csproj -c Release
-      - name: Execute PostgreSQL integration lane
+      - name: Execute PostgreSQL integration lane with assertions
         env:
           ENGINE: postgres
           DBCS: Host=127.0.0.1;Port=55432;Username=poc;Password=poc;Database=poc
         run: |
+          set -euo pipefail
           mkdir -p wave02-results
           dotnet run --project poc-wave02/Wave02.csproj -c Release --no-build | tee wave02-results/postgres.json
-      - name: Execute MySQL integration lane
+          test -s wave02-results/postgres.json
+          grep -q '"engine":"postgres"' wave02-results/postgres.json
+          grep -q '"centralEffects":500' wave02-results/postgres.json
+          grep -q '"pending":0' wave02-results/postgres.json
+          grep -q '"duplicateReplays":25' wave02-results/postgres.json
+          grep -q '"pass":true' wave02-results/postgres.json
+      - name: Execute MySQL integration lane with assertions
         env:
           ENGINE: mysql
           DBCS: Server=127.0.0.1;Port=53306;User ID=poc;Password=poc;Database=poc;SslMode=None
-        run: dotnet run --project poc-wave02/Wave02.csproj -c Release --no-build | tee wave02-results/mysql.json
+        run: |
+          set -euo pipefail
+          dotnet run --project poc-wave02/Wave02.csproj -c Release --no-build | tee wave02-results/mysql.json
+          test -s wave02-results/mysql.json
+          grep -q '"engine":"mysql"' wave02-results/mysql.json
+          grep -q '"centralEffects":500' wave02-results/mysql.json
+          grep -q '"pending":0' wave02-results/mysql.json
+          grep -q '"duplicateReplays":25' wave02-results/mysql.json
+          grep -q '"pass":true' wave02-results/mysql.json
       - name: Record environment and explicit mobile gate
         if: always()
         run: |
+          mkdir -p wave02-results
           dotnet --info > wave02-results/dotnet-info.txt
           docker exec wave-pg psql -U poc -d poc -Atc 'select version();' > wave02-results/postgresql.txt || true
           docker exec wave-my mysql -uroot -prootpoc -Nse 'select version();' poc > wave02-results/mysql.txt || true
