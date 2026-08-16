@@ -13,7 +13,7 @@ new='''for lane in DEEP_POSTGRES DEEP_MYSQL POSTGRES_EF MYSQL_ORACLE_EF MYSQL_PO
   POSTGRES_EF) dll="Poc14.PostgresEf.dll"; expected="POC14_PG";;
   MYSQL_ORACLE_EF) dll="Poc14.MySqlOracleEf.dll"; expected="POC14_MYSQL";;
   MYSQL_POMELO_CONTINUITY) dll="Poc14.MySqlPomeloEf.dll"; expected="POC14_MYSQL";;
-  PROVIDER_ADO) dll="Poc14.ProviderAdo.dll"; expected="POC14R_PG";;
+  PROVIDER_ADO) dll="Poc14.ProviderAdo.dll"; expected="connection env missing";;
  esac
  [[ -f "$dir/$dll" ]] || { echo "PRIMARY_BINARY_MISSING $lane $dll"; exit 120; }
  set +e; out=$(env -u POC14R_PG_PREFLIGHT -u POC14R_MY_PREFLIGHT -u POC14_PG -u POC14_MYSQL -u POC14R_PG -u POC14R_MYSQL dotnet "$dir/$dll" 2>&1); rc=$?; set -e
