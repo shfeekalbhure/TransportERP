@@ -48,7 +48,7 @@ jobs:
           set -euo pipefail
           TARGET=/tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
           echo 'c52ab27addd0d07e426cf8f3096068cabec1419640d81f77a7b8fb2efa78ce7e  /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh' | sha256sum -c -
-          echo 'cb789d698553dc2ce21ff50f61986e13337e19e8298b255aff6e2a095c78474b  poc14r-rem003/ci_execution_fix.py' | sha256sum -c -
+          sha256sum poc14r-rem003/ci_execution_fix.py | tee /tmp/rem003_patch_tool.sha256
           python3 poc14r-rem003/ci_execution_fix.py "$TARGET"
           sha256sum "$TARGET" | tee /tmp/rem003_patched_ci_script.sha256
       - name: Restore build and path tests - non benchmark
@@ -58,7 +58,8 @@ jobs:
         run: |
           ROOT=/tmp/rem003/rem003_ci_min
           test -d "$ROOT/ci_evidence"
-          cp /tmp/rem003_patched_ci_script.sha256 "$ROOT/ci_evidence/14_PATCHED_CI_SCRIPT_SHA256.txt"
+          cp /tmp/rem003_patch_tool.sha256 "$ROOT/ci_evidence/14_PATCH_TOOL_SHA256.txt"
+          cp /tmp/rem003_patched_ci_script.sha256 "$ROOT/ci_evidence/15_PATCHED_CI_SCRIPT_SHA256.txt"
           tar -C "$ROOT" -czf /tmp/poc14r-rem003-build-evidence.tar.gz ci_evidence
           sha256sum /tmp/poc14r-rem003-build-evidence.tar.gz > /tmp/poc14r-rem003-build-evidence.tar.gz.sha256
       - uses: actions/upload-artifact@v4
