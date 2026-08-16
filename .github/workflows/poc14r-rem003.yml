@@ -25,6 +25,23 @@ jobs:
           echo 'dd823312fdf7bc6bbdc18d49dcf46180ffc4036f8f1498bc928fd443508d912f  /tmp/rem003_ci_min.zip' | sha256sum -c -
           unzip -q /tmp/rem003_ci_min.zip -d /tmp/rem003
           chmod +x /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+      - name: Apply REM003 Harness compile correction and bind source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=/tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs')
+          s=p.read_text()
+          s=s.replace('static object IdVal(string provider,string g)=>IdVal(provider,Guid.Parse(g));', 'static object IdText(string provider,string g)=>IdVal(provider,Guid.Parse(g));')
+          s=s.replace('const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar mode=', 'const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\nvar mode=')
+          s=s.replace(' var required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\n', '')
+          s=s.replace('IdVal(provider,company)', 'IdText(provider,company)')
+          s=s.replace('IdVal(provider,branch)', 'IdText(provider,branch)')
+          p.write_text(s)
+          PY
+          echo 'cc44d543249b55d6351e9427a7d72285dea53ea06db2098eb721f1770cb5d2ad  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs' | sha256sum -c -
       - name: Restore build and path tests - non benchmark
         run: /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
       - name: Package evidence
