@@ -25,6 +25,30 @@ jobs:
           echo 'dd823312fdf7bc6bbdc18d49dcf46180ffc4036f8f1498bc928fd443508d912f  /tmp/rem003_ci_min.zip' | sha256sum -c -
           unzip -q /tmp/rem003_ci_min.zip -d /tmp/rem003
           chmod +x /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+      - name: Rebind REM003 final Freeze identity and contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root=Path('/tmp/rem003/rem003_ci_min')
+          old='POC14R-REM003-VF-20260814-2320-01'
+          new='POC14R-REM003-VF-20260816-0528-01'
+          old_contract='84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32'
+          contract=root/'sources/harness/TransportERP.Poc14R.Rerun9/rerun9_workloads.json'
+          b=contract.read_bytes().replace(old.encode(),new.encode())
+          contract.write_bytes(b)
+          ch=hashlib.sha256(b).hexdigest()
+          if ch!='2cf3ae275bcda0c9734ef4381b32604f2a0b9b5d8a92dc5884b7d8e175afc79c': raise SystemExit('CONTRACT_SHA_MISMATCH')
+          bi=root/'REM003_BUILD_INPUT.json'
+          bi.write_text(bi.read_text().replace(old,new).replace(old_contract,ch))
+          p=root/'sources/harness/TransportERP.Poc14R.Rerun9/Program.cs'
+          p.write_text(p.read_text().replace(old,new).replace(old_contract,ch))
+          PY
+          echo '2cf3ae275bcda0c9734ef4381b32604f2a0b9b5d8a92dc5884b7d8e175afc79c  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/rerun9_workloads.json' | sha256sum -c -
+          echo '2769788b7e2cd2131815c89ccf7e0b1815c389c8e32dc92795c332f9a856e51a  /tmp/rem003/rem003_ci_min/REM003_BUILD_INPUT.json' | sha256sum -c -
+          ! grep -R -F 'POC14R-REM003-VF-20260814-2320-01' /tmp/rem003/rem003_ci_min/REM003_BUILD_INPUT.json /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/rerun9_workloads.json
       - name: Apply REM003 Harness compile correction and bind source SHA
         shell: bash
         run: |
@@ -35,13 +59,13 @@ jobs:
           p=Path('/tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs')
           s=p.read_text()
           s=s.replace('static object IdVal(string provider,string g)=>IdVal(provider,Guid.Parse(g));', 'static object IdText(string provider,string g)=>IdVal(provider,Guid.Parse(g));')
-          s=s.replace('const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar mode=', 'const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\nvar mode=')
+          s=s.replace('const string ContractSha256="2cf3ae275bcda0c9734ef4381b32604f2a0b9b5d8a92dc5884b7d8e175afc79c";\nvar mode=', 'const string ContractSha256="2cf3ae275bcda0c9734ef4381b32604f2a0b9b5d8a92dc5884b7d8e175afc79c";\nvar required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\nvar mode=')
           s=s.replace(' var required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\n', '')
           s=s.replace('IdVal(provider,company)', 'IdText(provider,company)')
           s=s.replace('IdVal(provider,branch)', 'IdText(provider,branch)')
           p.write_text(s)
           PY
-          echo 'cc44d543249b55d6351e9427a7d72285dea53ea06db2098eb721f1770cb5d2ad  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs' | sha256sum -c -
+          echo '349f4fbd1e14e8b7536713fabf69c5f009d64fd54e98012477244069cde325cf  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs' | sha256sum -c -
       - name: Correct primary binary execution evidence binding
         shell: bash
         run: |
