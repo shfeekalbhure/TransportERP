@@ -13,3 +13,55 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.302'
+      - name: Verify exact build input and reconstruct
+        shell: bash
+        run: |
+          set -euo pipefail
+          for p in 00 01 02 04; do test $(wc -c < poc14r-rem003/piece_${p}.b64) -eq 7000; done
+          test $(wc -c < poc14r-rem003/piece_03a.b64) -eq 3500
+          test $(wc -c < poc14r-rem003/piece_03b.b64) -eq 3500
+          test $(wc -c < poc14r-rem003/piece_05.b64) -eq 3284
+          cat poc14r-rem003/piece_00.b64 poc14r-rem003/piece_01.b64 poc14r-rem003/piece_02.b64 poc14r-rem003/piece_03a.b64 poc14r-rem003/piece_03b.b64 poc14r-rem003/piece_04.b64 poc14r-rem003/piece_05.b64 | base64 -d > /tmp/rem003_ci_min.zip
+          echo 'dd823312fdf7bc6bbdc18d49dcf46180ffc4036f8f1498bc928fd443508d912f  /tmp/rem003_ci_min.zip' | sha256sum -c -
+          unzip -q /tmp/rem003_ci_min.zip -d /tmp/rem003
+          chmod +x /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+      - name: Apply REM003 Harness compile correction and bind source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=/tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs')
+          s=p.read_text()
+          s=s.replace('static object IdVal(string provider,string g)=>IdVal(provider,Guid.Parse(g));', 'static object IdText(string provider,string g)=>IdVal(provider,Guid.Parse(g));')
+          s=s.replace('const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar mode=', 'const string ContractSha256="84e14a9e0938b74275087624ee7d2b00154d6401cf95267af07f94fa20951b32";\nvar required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\nvar mode=')
+          s=s.replace(' var required=new[]{"W-001","W-014","W-016","W-017","W-018","W-021","W-022","W-028","W-029"};\n', '')
+          s=s.replace('IdVal(provider,company)', 'IdText(provider,company)')
+          s=s.replace('IdVal(provider,branch)', 'IdText(provider,branch)')
+          p.write_text(s)
+          PY
+          echo 'cc44d543249b55d6351e9427a7d72285dea53ea06db2098eb721f1770cb5d2ad  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs' | sha256sum -c -
+      - name: Correct primary binary execution evidence binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 poc14r-rem003/ci_execution_fix.py /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+          echo 'b233aea8193322ac7cc90e7e56bab54ad1ebdf7e4b659514a42b619fc294d1b0  /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh' | sha256sum -c -
+      - name: Restore build and path tests - non benchmark
+        run: /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+      - name: Package evidence
+        if: always()
+        run: |
+          ROOT=/tmp/rem003/rem003_ci_min
+          test -d "$ROOT/ci_evidence"
+          tar -C "$ROOT" -czf /tmp/poc14r-rem003-build-evidence.tar.gz ci_evidence
+          sha256sum /tmp/poc14r-rem003-build-evidence.tar.gz > /tmp/poc14r-rem003-build-evidence.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: poc14r-rem003-build-evidence
+          path: |
+            /tmp/poc14r-rem003-build-evidence.tar.gz
+            /tmp/poc14r-rem003-build-evidence.tar.gz.sha256
+          if-no-files-found: error
