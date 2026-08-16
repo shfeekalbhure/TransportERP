@@ -42,6 +42,12 @@ jobs:
           p.write_text(s)
           PY
           echo 'cc44d543249b55d6351e9427a7d72285dea53ea06db2098eb721f1770cb5d2ad  /tmp/rem003/rem003_ci_min/sources/harness/TransportERP.Poc14R.Rerun9/Program.cs' | sha256sum -c -
+      - name: Correct primary binary execution evidence binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 poc14r-rem003/ci_execution_fix.py /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
+          echo 'b233aea8193322ac7cc90e7e56bab54ad1ebdf7e4b659514a42b619fc294d1b0  /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh' | sha256sum -c -
       - name: Restore build and path tests - non benchmark
         run: /tmp/rem003/rem003_ci_min/ci/rem003_ci.sh
       - name: Package evidence
