@@ -1,0 +1,13 @@
+Screen_ID,Screen_Arabic,Screen_Code,Image_File,Aspect_Ratio,Device,Visual_Status,Contract_Status,Traceability
+W3-P1-001,تسجيل الدخول,Login,W3-P1-001_Login.png,16:9,Desktop/Mobile,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-001
+W3-P1-002,المستخدمون,Users,W3-P1-002_Users.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-002
+W3-P1-003,الأدوار والصلاحيات,RolesPermissions,W3-P1-003_RolesPermissions.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-003
+W3-P1-004,المؤسسات والفروع,OrganizationsBranches,W3-P1-004_OrganizationsBranches.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-004
+W3-P1-005,الإعدادات العامة,GlobalSettings,W3-P1-005_GlobalSettings.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-005
+W3-P1-006,إعدادات المؤسسة والفرع,ScopedSettings,W3-P1-006_ScopedSettings.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-006
+W3-P1-007,دليل الحسابات,ChartOfAccounts,W3-P1-007_ChartOfAccounts.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-007
+W3-P1-008,الفترات والعملات والأبعاد,FiscalCurrenciesDimensions,W3-P1-008_FiscalCurrenciesDimensions.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-008
+W3-P1-009,القيود اليومية,JournalEntries,W3-P1-009_JournalEntries.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-009
+W3-P1-010,سندات القبض والصرف,ReceiptPaymentVouchers,W3-P1-010_ReceiptPaymentVouchers.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-010
+W3-P1-011,سجل التدقيق,AuditLog,W3-P1-011_AuditLog.png,16:9,Desktop,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-011
+W3-P1-012,حالة المزامنة,SyncStatus,W3-P1-012_SyncOperations.png,16:9,Desktop/Mobile,ORIGINAL_RTL_MOCKUP,READY_FOR_OWNER_ACCEPTANCE,Fields/States/Actions/Permissions from W3-P1-012
