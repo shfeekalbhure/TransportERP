@@ -1,0 +1,11 @@
+﻿Requirement_ID,Requirement_Arabic,Domain,Coverage_In_Unified_Register,Evidence_Source,Status,Decision_Needed,Decision_Notes
+REQ-P3-001,البوليصة متعددة الأصناف والترحيل حسب الصنف أو البوليصة وعلى عدة رحلات,TRN,Waybills; WaybillItems; ShipmentSplits; FreightManifestItems; TRN-003..TRN-010,ملحق حاكم البوالص؛ سجل الجداول القديم,COVERED_IN_BASELINE,NO,يجب الحفاظ على قيود عدم تجاوز الكميات.
+REQ-P3-002,طرق الدفع الست المختلطة نقد/بنك/آجل,FIN,Payments; PaymentAllocations; PaymentMethods,رسالة المالك؛ ملحق البوالص,COVERED_WITH_PROPOSED_ENTITY,YES,اعتماد الأكواد وقواعد المزج.
+REQ-P3-003,جهات التحصيل ونقاط الاستلام وسياسة الاستحقاق,FIN,CashCollections; CollectionPolicies; OpenItems,رسالة المالك؛ ملحق السداد,COVERED_WITH_PROPOSED_ENTITY,YES,تثبيت الجهات الخمس وتاريخ الاستحقاق.
+REQ-P3-004,الأصناف الممنوعة والمقيدة والتنبيه والمنع,TRN/CUS,WaybillItems; RestrictedItems,رسالة المالك؛ ملحق المنع والتسعير والجمارك,COVERED_WITH_PROPOSED_ENTITY,YES,اعتماد القائمة وصلاحية التجاوز.
+REQ-P3-005,التسعير الآلي واليدوي واقتراح النظام متعدد العوامل,PRC,PricingRules; PricingTiers; PricingEvaluations,رسالة المالك؛ ملحق المنع والتسعير والجمارك,COVERED_WITH_PROPOSED_ENTITY,YES,اعتماد أولوية العوامل عند التعارض.
+REQ-P3-006,الجمارك داخل بيانات البوليصة مع مستندات ورسوم ومسارات,CUS,CustomsClearanceFiles; CustomsDeclarations; WaybillCustomsData,رسالة المالك؛ ملحق الجمارك,COVERED_WITH_PROPOSED_ENTITY,YES,اعتماد المسارات والأصناف المحلية.
+REQ-P3-007,السداد بالاسم أو المرجع وتجميع مستندات الشخص,FIN,OpenItems; OpenItemAllocations; Payments; ACC-018..ACC-020,رسالة المالك؛ ملحق السداد,COVERED_IN_BASELINE,NO,يتطلب فهرس بحث طبيعي ضمن التطبيق لا جدولًا مستقلًا بالضرورة.
+REQ-P3-008,توافق الخصم الثنائي وإشعار الجهة المرسلة,FIN/PLT,DiscountApprovalCases; ApprovalRequests; Notifications,رسالة المالك؛ ملحق السداد,COVERED_WITH_PROPOSED_ENTITY,YES,قناة الإشعار، مدة الاستجابة، وحد الاعتماد الثالث.
+REQ-P3-009,تعدد الشركات والفروع ودليل الحسابات ومراكز التكلفة والأبعاد,PLT/ORG/ACC,Companies; Branches; ChartOfAccounts; CostCenters; FinancialDimensions,رسالة المالك؛ المصفوفة المؤسسية,COVERED_IN_BASELINE,NO,تفاصيل النطاق والصلاحيات ستغلق داخل W1/W2.
+REQ-P3-010,Online/Offline والمزامنة والتعارضات,OFF,SyncOperations; SyncStatus; SyncP1Operations,رسالة المالك؛ W1-P1-017,COVERED_WITH_NEW_DESIGN,YES,اعتماد حل التعارض والاحتفاظ وإعادة المحاولة.
