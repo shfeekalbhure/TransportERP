@@ -1,0 +1,10 @@
+RR4 independent evidence SHA-256
+Source commit: 5c5aa2e76c058f1350896bf98125c710a71596a7
+
+2bd8be66f512b0aa6f34f270f75ce00c8df392acf8b72897d8b33c3e1e8f4dc8  RR4_SOURCE5C_INDEPENDENT_STATUS.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  RR4_SOURCE5C_CLEAN.log
+7eaca2c5c9375380532f978e62490bef9b80b0e688d38f809cdb0d0a9575d20d  RR4_SOURCE5C_BUILD.log
+bb528d619976fddbbadffcacf5c7c8ee2ed9ed56c12398323d9bc8c448e9a608  RR4_SOURCE5C_TEST_DEFAULT.log
+8dd7f218fc2781e0adf676fd825da1c8f3b943a562b82aab1f527a4d8bfccbd4  RR4_SOURCE5C_DOTNET_INFO.log
+
+The SHA-256 values above are the hashes of the raw independent-run evidence files. Final hashes for RR4 documents and the independent report are recorded in P1_AUDIT_SYNC_RR4_EVIDENCE_MANIFEST_2026-08-19.txt.
