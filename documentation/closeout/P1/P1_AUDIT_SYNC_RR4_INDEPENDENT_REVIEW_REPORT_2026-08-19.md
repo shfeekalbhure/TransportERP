@@ -34,7 +34,7 @@
 ```bash
 export PATH=/home/ubuntu/.dotnet:$PATH
 export DOTNET_ROOT=/home/ubuntu/.dotnet
-export TRANSPORTERP_TEST_CONNSTR="Host=127.0.0.1;Port=15432;Database=poc14_pg_test;Username=poc14user;Password=poc14pass"
+export TRANSPORTERP_TEST_CONNSTR="<TEST_CONNECTION_STRING_SUPPLIED_OUT_OF_BAND>"
 dotnet clean TransportERP.Tests/TransportERP.Tests.csproj -v quiet
 dotnet build TransportERP.Tests/TransportERP.Tests.csproj -v normal
 dotnet test TransportERP.Tests/TransportERP.Tests.csproj -v normal
