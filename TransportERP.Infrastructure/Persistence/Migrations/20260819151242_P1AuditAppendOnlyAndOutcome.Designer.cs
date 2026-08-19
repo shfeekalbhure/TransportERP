@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TransportERP.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransportErpDbContext))]
-    partial class TransportErpDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260819151242_P1AuditAppendOnlyAndOutcome")]
+    partial class P1AuditAppendOnlyAndOutcome
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -425,84 +428,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.ToTable("company_settings", "transport_erp", t =>
                         {
                             t.HasCheckConstraint("ck_company_settings_status", "\"Status\" IN ('ACTIVE','INACTIVE')");
-                        });
-                });
-
-            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ConflictCase", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<long?>("BaseVersion")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid?>("BranchId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ConflictReason")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
-
-                    b.Property<string>("DeviceSnapshot")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ReplacedByOperationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Resolution")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTimeOffset?>("ResolvedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResolvedBy")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<string>("ServerSnapshot")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("SyncOperationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamptz");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("ReplacedByOperationId");
-
-                    b.HasIndex("SyncOperationId")
-                        .IsUnique();
-
-                    b.HasIndex("CompanyId", "BranchId", "Status", "CreatedAt");
-
-                    b.ToTable("conflict_cases", "transport_erp", t =>
-                        {
-                            t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
                         });
                 });
 
@@ -1271,6 +1196,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ConflictCaseId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamptz");
 
@@ -1595,33 +1523,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ConflictCase", b =>
-                {
-                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TransportERP.Infrastructure.Persistence.SyncOperation", null)
-                        .WithMany()
-                        .HasForeignKey("ReplacedByOperationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TransportERP.Infrastructure.Persistence.SyncOperation", "SyncOperation")
-                        .WithOne("ConflictCase")
-                        .HasForeignKey("TransportERP.Infrastructure.Persistence.ConflictCase", "SyncOperationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("SyncOperation");
-                });
-
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.FinancialDimension", b =>
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
@@ -1848,11 +1749,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncOperation", b =>
-                {
-                    b.Navigation("ConflictCase");
                 });
 #pragma warning restore 612, 618
         }

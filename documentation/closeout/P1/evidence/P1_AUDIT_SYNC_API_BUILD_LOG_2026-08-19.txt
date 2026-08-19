@@ -1,0 +1,27 @@
+/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-6588-8gv4-xfgh
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf
+  TransportERP.Infrastructure -> /home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/bin/Debug/net10.0/TransportERP.Infrastructure.dll
+  TransportERP.Api -> /home/ubuntu/repo_review/TransportERP/TransportERP.Api/bin/Debug/net10.0/TransportERP.Api.dll
+
+Build succeeded.
+
+/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-6588-8gv4-xfgh
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v
+/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 9.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf
+    9 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.27

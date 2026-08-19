@@ -25,6 +25,29 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<PaymentVoucher> PaymentVouchers => Set<PaymentVoucher>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
+    public DbSet<ConflictCase> ConflictCases => Set<ConflictCase>();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RejectAuditMutation();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RejectAuditMutation();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void RejectAuditMutation()
+    {
+        var illegal = ChangeTracker.Entries<AuditEvent>()
+            .Where(x => x.State is EntityState.Modified or EntityState.Deleted)
+            .Select(x => x.Entity.Id)
+            .ToArray();
+        if (illegal.Length > 0)
+            throw new InvalidOperationException($"AuditEvent is append-only; mutation denied: {string.Join(',', illegal)}");
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,7 +65,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(Role), typeof(Permission),
             typeof(GlobalSetting), typeof(CompanySetting), typeof(BranchSetting), typeof(ChartOfAccount),
             typeof(FiscalPeriod), typeof(FinancialDimension), typeof(JournalEntry), typeof(ReceiptVoucher),
-            typeof(PaymentVoucher), typeof(SyncOperation) })
+            typeof(PaymentVoucher), typeof(SyncOperation), typeof(ConflictCase) })
         {
             var entity = mb.Entity(type);
             entity.Property<byte[]>("RowVersion").HasColumnType("bytea").IsConcurrencyToken();
@@ -307,6 +330,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         audit.HasKey(x => x.Id);
         audit.Property(x => x.OccurredAt).HasColumnType("timestamptz");
         audit.Property(x => x.Action).HasMaxLength(120).IsRequired();
+        audit.Property(x => x.Outcome).HasMaxLength(40).IsRequired();
         audit.Property(x => x.EntityType).HasMaxLength(120).IsRequired();
         audit.Property(x => x.DeviceId).HasMaxLength(120);
         audit.Property(x => x.BeforeJson).HasColumnType("text");
@@ -344,5 +368,23 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         sync.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
         sync.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+
+        var conflict = mb.Entity<ConflictCase>();
+        conflict.ToTable("conflict_cases", t => t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')"));
+        conflict.HasKey(x => x.Id);
+        conflict.Property(x => x.DeviceSnapshot).HasColumnType("text").IsRequired();
+        conflict.Property(x => x.ServerSnapshot).HasColumnType("text").IsRequired();
+        conflict.Property(x => x.ConflictReason).HasMaxLength(500).IsRequired();
+        conflict.Property(x => x.Resolution).HasMaxLength(1000);
+        conflict.Property(x => x.ResolvedBy).HasMaxLength(120);
+        conflict.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        conflict.HasIndex(x => x.SyncOperationId).IsUnique();
+        conflict.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status, x.CreatedAt });
+        conflict.HasOne(x => x.SyncOperation).WithOne(x => x.ConflictCase)
+            .HasForeignKey<ConflictCase>(x => x.SyncOperationId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<SyncOperation>().WithMany()
+            .HasForeignKey(x => x.ReplacedByOperationId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
     }
 }
