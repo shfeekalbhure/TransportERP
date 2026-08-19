@@ -67,23 +67,23 @@ T-W1-013-05,W1_LIFECYCLE,W1-P1-013,القيد اليومي,MEDIUM,BLOCKED_NOT_IM
 T-W1-014-01,W1_SCHEMA,W1-P1-014,سند القبض,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-014-02,W1_SCOPE,W1-P1-014,سند القبض,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-014-03,W1_CONCURRENCY,W1-P1-014,سند القبض,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-014-04,W1_AUDIT,W1-P1-014,سند القبض,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-014-05,W1_LIFECYCLE,W1-P1-014,سند القبض,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W1-014-04,W1_AUDIT,W1-P1-014,سند القبض,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-W1-014-05,W1_LIFECYCLE,W1-P1-014,سند القبض,MEDIUM,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W1-015-01,W1_SCHEMA,W1-P1-015,سند الصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-015-02,W1_SCOPE,W1-P1-015,سند الصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-015-03,W1_CONCURRENCY,W1-P1-015,سند الصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-015-04,W1_AUDIT,W1-P1-015,سند الصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-015-05,W1_LIFECYCLE,W1-P1-015,سند الصرف,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W1-015-04,W1_AUDIT,W1-P1-015,سند الصرف,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-W1-015-05,W1_LIFECYCLE,W1-P1-015,سند الصرف,MEDIUM,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W1-016-01,W1_SCHEMA,W1-P1-016,سجل التدقيق,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-016-02,W1_SCOPE,W1-P1-016,سجل التدقيق,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-016-03,W1_CONCURRENCY,W1-P1-016,سجل التدقيق,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-016-04,W1_AUDIT,W1-P1-016,سجل التدقيق,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W1-016-04,W1_AUDIT,W1-P1-016,سجل التدقيق,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Audit_events_are_append_only_and_hash_chain_verifies,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W1-016-05,W1_LIFECYCLE,W1-P1-016,سجل التدقيق,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-017-01,W1_SCHEMA,W1-P1-017,عملية المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-017-02,W1_SCOPE,W1-P1-017,عملية المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W1-017-03,W1_CONCURRENCY,W1-P1-017,عملية المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-017-04,W1_AUDIT,W1-P1-017,عملية المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W1-017-05,W1_LIFECYCLE,W1-P1-017,عملية المزامنة,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W1-017-04,W1_AUDIT,W1-P1-017,عملية المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_operation_supports_lifecycle_retry_and_conflict_resolution,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-W1-017-05,W1_LIFECYCLE,W1-P1-017,عملية المزامنة,MEDIUM,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_operation_supports_lifecycle_retry_and_conflict_resolution,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W2-001-01,W2_HAPPY_PATH,W2-P1-001,تسجيل الدخول,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Authenticate_creates_scoped_session_and_audit_event,Behavior covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W2-001-02,W2_NEGATIVE,W2-P1-001,تسجيل الدخول,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Authenticate_creates_scoped_session_and_audit_event,Behavior covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W2-001-03,W2_IDEMPOTENCY,W2-P1-001,تسجيل الدخول,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Authenticate_creates_scoped_session_and_audit_event,Behavior covered by the provider-neutral in-memory baseline and passed by dotnet test.
@@ -177,8 +177,8 @@ T-W3-008-02,W3_VALIDATION_PERMISSION,W3-P1-008,الفترات والعملات �
 T-W3-008-03,W3_STATE_ACTIONS,W3-P1-008,الفترات والعملات والأبعاد,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-008-04,W3_RTL_ACCESSIBILITY,W3-P1-008,الفترات والعملات والأبعاد,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-009-01,W3_LOAD_STATE,W3-P1-009,القيود اليومية,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W3-009-02,W3_VALIDATION_PERMISSION,W3-P1-009,القيود اليومية,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W3-009-03,W3_STATE_ACTIONS,W3-P1-009,القيود اليومية,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W3-009-02,W3_VALIDATION_PERMISSION,W3-P1-009,القيود اليومية,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.W3_journal_screen_state_enforces_workflow_and_permission,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-W3-009-03,W3_STATE_ACTIONS,W3-P1-009,القيود اليومية,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.W3_journal_screen_state_enforces_workflow_and_permission,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W3-009-04,W3_RTL_ACCESSIBILITY,W3-P1-009,القيود اليومية,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-010-01,W3_LOAD_STATE,W3-P1-010,سندات القبض والصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-010-02,W3_VALIDATION_PERMISSION,W3-P1-010,سندات القبض والصرف,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
@@ -189,16 +189,16 @@ T-W3-011-02,W3_VALIDATION_PERMISSION,W3-P1-011,سجل التدقيق,HIGH,BLOCKE
 T-W3-011-03,W3_STATE_ACTIONS,W3-P1-011,سجل التدقيق,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-011-04,W3_RTL_ACCESSIBILITY,W3-P1-011,سجل التدقيق,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-W3-012-01,W3_LOAD_STATE,W3-P1-012,حالة المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W3-012-02,W3_VALIDATION_PERMISSION,W3-P1-012,حالة المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-W3-012-03,W3_STATE_ACTIONS,W3-P1-012,حالة المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-W3-012-02,W3_VALIDATION_PERMISSION,W3-P1-012,حالة المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.W3_sync_screen_state_supports_offline_retry_resolution_and_permission,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-W3-012-03,W3_STATE_ACTIONS,W3-P1-012,حالة المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.W3_sync_screen_state_supports_offline_retry_resolution_and_permission,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-W3-012-04,W3_RTL_ACCESSIBILITY,W3-P1-012,حالة المزامنة,MEDIUM,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-SYNC-001,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-SYNC-002,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-SYNC-001,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_accepts_first_operation_repeats_same_hash_and_flags_conflict,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-SYNC-002,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_accepts_first_operation_repeats_same_hash_and_flags_conflict,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-SYNC-003,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-SYNC-004,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-SYNC-005,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-SYNC-006,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-SYNC-007,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
-T-SYNC-008,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
+T-SYNC-007,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_operation_supports_lifecycle_retry_and_conflict_resolution,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
+T-SYNC-008,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,PASS_BASELINE_BEHAVIOR,P1InMemoryBaselineBehaviorTests.Sync_operation_supports_lifecycle_retry_and_conflict_resolution,Specific acceptance behavior is covered by the provider-neutral in-memory baseline and passed by dotnet test.
 T-SYNC-009,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
 T-SYNC-010,SYNC,W1-P1-017/W2-P1-015/W3-P1-012,المزامنة,HIGH,BLOCKED_NOT_IMPLEMENTED,,No executable provider-neutral implementation exists yet for this contract/scenario.
