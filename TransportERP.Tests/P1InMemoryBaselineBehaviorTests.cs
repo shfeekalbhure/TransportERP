@@ -94,6 +94,47 @@ public sealed class P1InMemoryBaselineBehaviorTests
     }
 
     [Fact]
+    public void Organization_role_permissions_and_version_conflicts_are_enforced()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var updatedBranch = service.UpdateBranch(companyId, branchId, "B001-UPDATED", "فرع محدث", true, 1);
+        Assert.Equal(2, updatedBranch.Version);
+        Assert.Throws<P1RuleException>(() => service.UpdateBranch(companyId, branchId, "B001-STALE", "فرع قديم", true, 1));
+        var role = service.RegisterRole("R-OPS", "مشغل", new[] { "settings.write", "audit.read" });
+        Assert.Contains("settings.write", role.Permissions);
+        var user = service.UpdateUser(companyId, "U-001", "owner-renamed", true, 1);
+        Assert.Contains("R-OPS", service.AssignRoles(companyId, "U-001", new[] { "R-OPS" }, "system", user.Version));
+        Assert.Throws<P1RuleException>(() => service.AssignRoles(companyId, "U-001", new[] { "R-OPS" }, "system", 1));
+    }
+
+    [Fact]
+    public void Settings_require_matching_versions_for_updates()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var global = service.SaveGlobalSetting("default.currency", "YER");
+        var globalUpdated = service.SaveGlobalSetting("default.currency", "USD", global.Version);
+        Assert.Equal(2, globalUpdated.Version);
+        Assert.Throws<P1RuleException>(() => service.SaveGlobalSetting("default.currency", "SAR", global.Version));
+        var scoped = service.SaveScopedSetting("branch", branchId, "cash.policy", "CASH", companyId);
+        var scopedUpdated = service.SaveScopedSetting("branch", branchId, "cash.policy", "BANK", companyId, scoped.Version);
+        Assert.Equal(2, scopedUpdated.Version);
+        Assert.Throws<P1RuleException>(() => service.SaveScopedSetting("branch", branchId, "cash.policy", "CREDIT", companyId, scoped.Version));
+    }
+
+    [Fact]
+    public void Audit_query_supports_action_branch_and_paging_filters()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        service.SaveGlobalSetting("default.currency", "YER", "actor-a");
+        service.SaveScopedSetting("branch", branchId, "cash.policy", "CASH", companyId, "actor-b");
+        var settings = service.ReadAuditEvents(companyId, "SaveScopedSettings", branchId, 0, 10);
+        Assert.Single(settings);
+        Assert.Equal("actor-b", settings[0].ActorId);
+        Assert.Empty(service.ReadAuditEvents(companyId, "SaveGlobalSettings", branchId, 0, 10));
+        Assert.Throws<P1RuleException>(() => service.ReadAuditEvents(companyId, null, null, -1, 10));
+    }
+
+    [Fact]
     public void Settings_support_global_and_company_or_branch_scope_and_reject_invalid_scope()
     {
         var (service, companyId, branchId, _, _, _) = Seed();
