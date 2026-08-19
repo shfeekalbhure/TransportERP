@@ -4,7 +4,7 @@
 
 | الحالة | العدد |
 |---|---:|
-| BLOCKED_NOT_IMPLEMENTED | 163 |
-| PASS_BASELINE_BEHAVIOR | 40 |
+| BLOCKED_NOT_IMPLEMENTED | 143 |
+| PASS_BASELINE_BEHAVIOR | 60 |
 
 > `PASS_BASELINE_BEHAVIOR` ليس اعتماد قبول إنتاجي؛ هو نجاح سلوكي داخل baseline مؤقت. `BLOCKED_NOT_IMPLEMENTED` يعني أن الحالة لا يمكن تنفيذها بصدق قبل إضافة التنفيذ المطلوب.
