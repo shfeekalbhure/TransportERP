@@ -155,4 +155,92 @@ public sealed class P1InMemoryBaselineBehaviorTests
         service.CreateVoucher(companyId, branchId, "R-001", 25m, "CASH", "REF-001", true);
         Assert.Throws<P1RuleException>(() => service.CreateVoucher(companyId, branchId, "R-002", 25m, "CASH", "REF-001", true));
     }
+
+    [Fact]
+    public void Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var draft = service.CreateVoucher(companyId, branchId, "R-010", 100m, "CASH", "EXT-010", true);
+        Assert.Equal(P1VoucherState.Draft, draft.Status);
+        var approved = service.ApproveVoucher(companyId, draft.Id);
+        Assert.Equal(P1VoucherState.Approved, approved.Status);
+        var posted = service.PostVoucher(companyId, draft.Id);
+        Assert.Equal(P1VoucherState.Posted, posted.Status);
+        Assert.Throws<P1RuleException>(() => service.UpdateVoucherDraft(companyId, draft.Id, 120m, "BANK", posted.Version));
+        Assert.Throws<P1RuleException>(() => service.CancelVoucher(companyId, draft.Id, "محاولة إلغاء مرحّل"));
+    }
+
+    [Fact]
+    public void Voucher_idempotency_returns_same_draft_and_rejects_changed_payload()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var first = service.CreateVoucherIdempotent(companyId, branchId, "R-011", 75m, "CASH", "EXT-011", false);
+        var repeated = service.CreateVoucherIdempotent(companyId, branchId, "R-012", 75m, "CASH", "EXT-011", false);
+        Assert.Equal(first.Id, repeated.Id);
+        Assert.Throws<P1RuleException>(() => service.CreateVoucherIdempotent(companyId, branchId, "R-013", 76m, "CASH", "EXT-011", false));
+    }
+
+    [Fact]
+    public void Audit_events_are_append_only_and_hash_chain_verifies()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        service.SaveGlobalSetting("audit.test", "one");
+        service.SaveScopedSetting("branch", branchId, "audit.test", "two", companyId);
+        var events = service.ExportAuditEvents(companyId);
+        Assert.NotEmpty(events);
+        Assert.All(events, e => Assert.False(string.IsNullOrWhiteSpace(e.Hash)));
+        Assert.True(service.VerifyAuditHashChain(companyId));
+    }
+
+    [Fact]
+    public void Sync_operation_supports_lifecycle_retry_and_conflict_resolution()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var queued = service.EnqueueSyncOperation(new P1SyncOperation("D-002", "client-002", "hash-002", "UPDATE", companyId, branchId, "1"));
+        Assert.Equal(P1SyncStatus.Queued, queued.Status);
+        var sending = service.TransitionSyncOperation(queued.ClientOperationId, P1SyncStatus.Sending);
+        var failed = service.TransitionSyncOperation(sending.ClientOperationId, P1SyncStatus.Failed);
+        var retried = service.RetrySyncOperation(failed.ClientOperationId);
+        Assert.Equal(1, retried.RetryCount);
+        var conflict = service.TransitionSyncOperation(retried.ClientOperationId, P1SyncStatus.Conflict);
+        var resolved = service.ResolveSyncConflict(conflict.ClientOperationId, "USE_SERVER_VERSION");
+        Assert.Equal(P1SyncStatus.Resolved, resolved.Status);
+    }
+
+    [Fact]
+    public void Sync_operation_rejects_invalid_transitions()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var queued = service.EnqueueSyncOperation(new P1SyncOperation("D-003", "client-003", "hash-003", "UPDATE", companyId, branchId, "1"));
+        Assert.Throws<P1RuleException>(() => service.TransitionSyncOperation(queued.ClientOperationId, P1SyncStatus.Succeeded));
+    }
+
+    [Fact]
+    public void W3_journal_screen_state_enforces_workflow_and_permission()
+    {
+        var (service, _, _, _, _, _) = Seed();
+        Assert.Equal(P1ScreenPhase.Loading, service.InitializeScreen("W3-P1-009").Phase);
+        service.TransitionScreen("W3-P1-009", P1ScreenPhase.Ready);
+        service.RequireScreenPermission("W3-P1-009", "create", new HashSet<string> { "accounting.journal.create" }, true);
+        service.TransitionScreen("W3-P1-009", P1ScreenPhase.DraftEditing);
+        service.TransitionScreen("W3-P1-009", P1ScreenPhase.Checked);
+        service.TransitionScreen("W3-P1-009", P1ScreenPhase.Approved);
+        service.TransitionScreen("W3-P1-009", P1ScreenPhase.Posted);
+        Assert.Throws<P1RuleException>(() => service.TransitionScreen("W3-P1-009", P1ScreenPhase.DraftEditing));
+        Assert.Throws<P1RuleException>(() => service.RequireScreenPermission("W3-P1-009", "post", new HashSet<string> { "accounting.journal.post" }, false));
+    }
+
+    [Fact]
+    public void W3_sync_screen_state_supports_offline_retry_resolution_and_permission()
+    {
+        var (service, _, _, _, _, _) = Seed();
+        service.InitializeScreen("W3-P1-012");
+        service.TransitionScreen("W3-P1-012", P1ScreenPhase.Offline, isOffline: true);
+        service.TransitionScreen("W3-P1-012", P1ScreenPhase.Ready, isOffline: true);
+        service.RequireScreenPermission("W3-P1-012", "retry", new HashSet<string> { "sync.operations.execute" }, true);
+        service.TransitionScreen("W3-P1-012", P1ScreenPhase.Retrying);
+        var resolved = service.TransitionScreen("W3-P1-012", P1ScreenPhase.Resolved);
+        Assert.Equal(P1ScreenPhase.Resolved, resolved.Phase);
+        Assert.Throws<P1RuleException>(() => service.RequireScreenPermission("W3-P1-012", "resolve", new HashSet<string> { "sync.conflicts.resolve" }, false));
+    }
 }

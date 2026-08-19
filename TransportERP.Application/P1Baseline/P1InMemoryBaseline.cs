@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace TransportERP.Application.P1Baseline;
 
@@ -13,10 +15,49 @@ public sealed record P1FiscalPeriod(string Id, string CompanyId, DateOnly Start,
 public enum P1JournalState { Draft, Checked, Posted, Reversed }
 public sealed record P1JournalLine(string AccountId, decimal Debit, decimal Credit, string? Dimension = null);
 public sealed record P1JournalEntry(string Id, string CompanyId, string? BranchId, string ClientOperationId, string Reference, string PeriodId, IReadOnlyList<P1JournalLine> Lines, P1JournalState State = P1JournalState.Draft, string? ReversalOf = null, long Version = 1);
-public sealed record P1Voucher(string Id, string CompanyId, string? BranchId, decimal Amount, string PaymentMethod, string Reference, bool Receipt, long Version = 1);
-public sealed record P1AuditEvent(string Id, string Action, string EntityId, string ActorId, string CompanyId, string? BranchId, string CorrelationId, DateTimeOffset At, string Outcome);
-public sealed record P1SyncOperation(string DeviceId, string ClientOperationId, string PayloadHash, string Action, string CompanyId, string? BranchId, string BaseVersion);
+public enum P1VoucherState { Draft, Approved, Posted, Cancelled }
+public sealed record P1Voucher(
+    string Id,
+    string CompanyId,
+    string? BranchId,
+    decimal Amount,
+    string PaymentMethod,
+    string Reference,
+    bool Receipt,
+    long Version = 1,
+    P1VoucherState Status = P1VoucherState.Draft,
+    string? CancellationReason = null);
+public sealed record P1AuditEvent(
+    string Id,
+    string Action,
+    string EntityId,
+    string ActorId,
+    string CompanyId,
+    string? BranchId,
+    string CorrelationId,
+    DateTimeOffset At,
+    string Outcome,
+    string Hash = "",
+    string? PreviousHash = null,
+    string? Reason = null);
+public enum P1SyncStatus { Queued, Sending, Succeeded, Failed, Conflict, Rejected, Resolved }
+public sealed record P1SyncOperation(
+    string DeviceId,
+    string ClientOperationId,
+    string PayloadHash,
+    string Action,
+    string CompanyId,
+    string? BranchId,
+    string BaseVersion,
+    P1SyncStatus Status = P1SyncStatus.Queued,
+    int RetryCount = 0,
+    DateTimeOffset? NextRetryAt = null,
+    string? ErrorCode = null,
+    string? ConflictCaseId = null,
+    long Version = 1);
 public sealed record P1SyncResult(string ClientOperationId, string Status, string? ErrorCode = null);
+public enum P1ScreenPhase { Loading, Online, Offline, Ready, Empty, Error, Editing, DraftEditing, Saved, Conflict, Closed, Checked, Approved, Posted, Reversed, Cancelled, Detail, Retrying, Resolved }
+public sealed record P1ScreenState(string ScreenId, P1ScreenPhase Phase, string? ErrorCode = null, bool IsOffline = false, long Version = 1);
 public sealed record P1Role(string Id, string Name, IReadOnlySet<string> Permissions, long Version = 1)
 {
     public P1Role(string id, string name, long version = 1) : this(id, name, new HashSet<string>(), version) { }
@@ -46,13 +87,97 @@ public sealed class P1InMemoryStore
     internal ConcurrentDictionary<string, P1Setting> GlobalSettings { get; } = new();
     internal ConcurrentDictionary<string, P1ScopedSetting> ScopedSettings { get; } = new();
     internal ConcurrentBag<P1AuditEvent> AuditEvents { get; } = new();
+    internal List<P1AuditEvent> AuditSequence { get; } = new();
+    internal ConcurrentDictionary<string, P1ScreenState> ScreenStates { get; } = new();
 }
 
 public sealed class P1InMemoryService
 {
     private readonly P1InMemoryStore _store;
+    private readonly object _auditLock = new();
 
     public P1InMemoryService(P1InMemoryStore? store = null) => _store = store ?? new P1InMemoryStore();
+
+    public P1ScreenState InitializeScreen(string screenId)
+    {
+        ValidateScreenId(screenId);
+        var state = new P1ScreenState(screenId, P1ScreenPhase.Loading);
+        _store.ScreenStates[screenId] = state;
+        return state;
+    }
+
+    public P1ScreenState TransitionScreen(string screenId, P1ScreenPhase newPhase, string? errorCode = null, bool isOffline = false, string actorId = "screen")
+    {
+        ValidateScreenId(screenId);
+        if (!_store.ScreenStates.TryGetValue(screenId, out var current))
+            throw new P1RuleException("SCREEN_NOT_INITIALIZED", screenId);
+        if (!IsAllowedScreenTransition(screenId, current.Phase, newPhase))
+            throw new P1RuleException("INVALID_STATE_TRANSITION", screenId);
+        if (newPhase == P1ScreenPhase.Error && string.IsNullOrWhiteSpace(errorCode))
+            throw new P1RuleException("ERROR_CODE_REQUIRED", screenId);
+        var updated = current with { Phase = newPhase, ErrorCode = errorCode, IsOffline = isOffline, Version = current.Version + 1 };
+        _store.ScreenStates[screenId] = updated;
+        return updated;
+    }
+
+    public P1ScreenState GetScreenState(string screenId)
+    {
+        ValidateScreenId(screenId);
+        if (!_store.ScreenStates.TryGetValue(screenId, out var state)) throw new P1RuleException("SCREEN_NOT_INITIALIZED", screenId);
+        return state;
+    }
+
+    public void RequireScreenPermission(string screenId, string action, IReadOnlySet<string> permissions, bool online)
+    {
+        ValidateScreenId(screenId);
+        var required = (screenId, action) switch
+        {
+            ("W3-P1-008", "manage") => new[] { "accounting.period.manage", "accounting.reference.manage" },
+            ("W3-P1-009", "create") => new[] { "accounting.journal.create" },
+            ("W3-P1-009", "post") => new[] { "accounting.journal.post" },
+            ("W3-P1-009", "reverse") => new[] { "accounting.journal.reverse" },
+            ("W3-P1-010", "receipt") => new[] { "accounting.receipts.create" },
+            ("W3-P1-010", "payment") => new[] { "accounting.payments.create" },
+            ("W3-P1-011", "read") => new[] { "audit.events.read" },
+            ("W3-P1-012", "retry") => new[] { "sync.operations.execute" },
+            ("W3-P1-012", "resolve") => new[] { "sync.conflicts.resolve" },
+            _ => Array.Empty<string>()
+        };
+        if (required.Length == 0) throw new P1RuleException("ACTION_NOT_DEFINED", $"{screenId}:{action}");
+        if (!required.Any(permissions.Contains)) throw new P1RuleException("PERMISSION_DENIED", $"{screenId}:{action}");
+        if (!online && screenId is "W3-P1-008" or "W3-P1-011" or "W3-P1-012" && action is "manage" or "read" or "retry" or "resolve")
+            throw new P1RuleException("ONLINE_REQUIRED", $"{screenId}:{action}");
+        if (!online && screenId is "W3-P1-009" or "W3-P1-010" && action is "post" or "reverse" or "receipt" or "payment")
+            throw new P1RuleException("OFFLINE_DRAFT_ONLY", $"{screenId}:{action}");
+    }
+
+    private static void ValidateScreenId(string screenId)
+    {
+        if (screenId is not ("W3-P1-008" or "W3-P1-009" or "W3-P1-010" or "W3-P1-011" or "W3-P1-012"))
+            throw new P1RuleException("SCREEN_NOT_DEFINED", screenId);
+    }
+
+    private static bool IsAllowedScreenTransition(string screenId, P1ScreenPhase from, P1ScreenPhase to) =>
+        screenId switch
+        {
+            "W3-P1-008" => (from, to) is (P1ScreenPhase.Loading, P1ScreenPhase.Ready or P1ScreenPhase.Empty or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.Editing) or (P1ScreenPhase.Editing, P1ScreenPhase.Saved or P1ScreenPhase.Conflict)
+                or (P1ScreenPhase.Saved, P1ScreenPhase.Closed),
+            "W3-P1-009" => (from, to) is (P1ScreenPhase.Loading, P1ScreenPhase.Ready or P1ScreenPhase.Empty or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.DraftEditing) or (P1ScreenPhase.DraftEditing, P1ScreenPhase.Checked)
+                or (P1ScreenPhase.Checked, P1ScreenPhase.Approved) or (P1ScreenPhase.Approved, P1ScreenPhase.Posted)
+                or (P1ScreenPhase.Posted, P1ScreenPhase.Reversed),
+            "W3-P1-010" => (from, to) is (P1ScreenPhase.Loading, P1ScreenPhase.Ready or P1ScreenPhase.Empty or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.DraftEditing) or (P1ScreenPhase.DraftEditing, P1ScreenPhase.Approved)
+                or (P1ScreenPhase.Approved, P1ScreenPhase.Posted or P1ScreenPhase.Cancelled),
+            "W3-P1-011" => (from, to) is (P1ScreenPhase.Loading, P1ScreenPhase.Ready or P1ScreenPhase.Empty or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.Detail),
+            "W3-P1-012" => (from, to) is (P1ScreenPhase.Loading, P1ScreenPhase.Online or P1ScreenPhase.Offline)
+                or (P1ScreenPhase.Online or P1ScreenPhase.Offline, P1ScreenPhase.Ready or P1ScreenPhase.Empty or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.Retrying) or (P1ScreenPhase.Retrying, P1ScreenPhase.Resolved or P1ScreenPhase.Error)
+                or (P1ScreenPhase.Ready, P1ScreenPhase.Conflict) or (P1ScreenPhase.Conflict, P1ScreenPhase.Resolved),
+            _ => false
+        };
 
     public P1Company CreateCompany(string id, string code, string name, string actorId = "system")
     {
@@ -271,12 +396,80 @@ public sealed class P1InMemoryService
     public P1Voucher CreateVoucher(string companyId, string? branchId, string id, decimal amount, string paymentMethod, string reference, bool receipt, string actorId = "system")
     {
         RequireCompany(companyId);
+        if (branchId is null) throw new P1RuleException("BRANCH_REQUIRED", id);
+        RequireBranch(companyId, branchId);
         if (amount <= 0) throw new P1RuleException("AMOUNT_INVALID", id);
         if (string.IsNullOrWhiteSpace(paymentMethod)) throw new P1RuleException("PAYMENT_METHOD_INVALID", id);
-        if (_store.Vouchers.Values.Any(x => x.Reference == reference)) throw new P1RuleException("DUPLICATE_REFERENCE", reference);
+        if (string.IsNullOrWhiteSpace(reference)) throw new P1RuleException("REFERENCE_REQUIRED", id);
+        if (_store.Vouchers.Values.Any(x => x.CompanyId == companyId && x.Reference == reference))
+            throw new P1RuleException("DUPLICATE_REFERENCE", reference);
         var voucher = new P1Voucher(id, companyId, branchId, amount, paymentMethod, reference, receipt);
         _store.Vouchers[id] = voucher;
         Audit(receipt ? "CreateReceiptVoucher" : "CreatePaymentVoucher", id, actorId, companyId, branchId, "SUCCESS");
+        return voucher;
+    }
+
+    public P1Voucher CreateVoucherIdempotent(string companyId, string? branchId, string id, decimal amount, string paymentMethod, string reference, bool receipt, string actorId = "system")
+    {
+        var existing = _store.Vouchers.Values.SingleOrDefault(x => x.CompanyId == companyId && x.Reference == reference);
+        if (existing is not null)
+        {
+            if (existing.Receipt != receipt || existing.Amount != amount || !string.Equals(existing.PaymentMethod, paymentMethod, StringComparison.OrdinalIgnoreCase))
+                throw new P1RuleException("IDEMPOTENCY_PAYLOAD_MISMATCH", reference);
+            return existing;
+        }
+        return CreateVoucher(companyId, branchId, id, amount, paymentMethod, reference, receipt, actorId);
+    }
+
+    public P1Voucher UpdateVoucherDraft(string companyId, string voucherId, decimal amount, string paymentMethod, long expectedVersion, string actorId = "system")
+    {
+        var current = RequireVoucher(companyId, voucherId);
+        if (current.Status != P1VoucherState.Draft) throw new P1RuleException("VOUCHER_IMMUTABLE", voucherId);
+        if (current.Version != expectedVersion) throw new P1RuleException("CONCURRENCY_CONFLICT", voucherId);
+        if (amount <= 0) throw new P1RuleException("AMOUNT_INVALID", voucherId);
+        if (string.IsNullOrWhiteSpace(paymentMethod)) throw new P1RuleException("PAYMENT_METHOD_INVALID", voucherId);
+        var updated = current with { Amount = amount, PaymentMethod = paymentMethod, Version = current.Version + 1 };
+        _store.Vouchers[voucherId] = updated;
+        Audit(current.Receipt ? "UpdateReceiptVoucher" : "UpdatePaymentVoucher", voucherId, actorId, companyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    public P1Voucher ApproveVoucher(string companyId, string voucherId, string actorId = "system")
+    {
+        var current = RequireVoucher(companyId, voucherId);
+        if (current.Status != P1VoucherState.Draft) throw new P1RuleException("INVALID_STATE_TRANSITION", voucherId);
+        var updated = current with { Status = P1VoucherState.Approved, Version = current.Version + 1 };
+        _store.Vouchers[voucherId] = updated;
+        Audit(current.Receipt ? "ApproveReceiptVoucher" : "ApprovePaymentVoucher", voucherId, actorId, companyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    public P1Voucher PostVoucher(string companyId, string voucherId, string actorId = "system")
+    {
+        var current = RequireVoucher(companyId, voucherId);
+        if (current.Status != P1VoucherState.Approved) throw new P1RuleException("INVALID_STATE_TRANSITION", voucherId);
+        var updated = current with { Status = P1VoucherState.Posted, Version = current.Version + 1 };
+        _store.Vouchers[voucherId] = updated;
+        Audit(current.Receipt ? "PostReceiptVoucher" : "PostPaymentVoucher", voucherId, actorId, companyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    public P1Voucher CancelVoucher(string companyId, string voucherId, string reason, string actorId = "system")
+    {
+        if (string.IsNullOrWhiteSpace(reason)) throw new P1RuleException("REASON_REQUIRED", voucherId);
+        var current = RequireVoucher(companyId, voucherId);
+        if (current.Status == P1VoucherState.Posted) throw new P1RuleException("POSTED_IMMUTABLE", voucherId);
+        if (current.Status == P1VoucherState.Cancelled) throw new P1RuleException("INVALID_STATE_TRANSITION", voucherId);
+        var updated = current with { Status = P1VoucherState.Cancelled, CancellationReason = reason, Version = current.Version + 1 };
+        _store.Vouchers[voucherId] = updated;
+        Audit(current.Receipt ? "CancelReceiptVoucher" : "CancelPaymentVoucher", voucherId, actorId, companyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    private P1Voucher RequireVoucher(string companyId, string voucherId)
+    {
+        if (!_store.Vouchers.TryGetValue(voucherId, out var voucher) || voucher.CompanyId != companyId)
+            throw new P1RuleException("VOUCHER_NOT_FOUND", voucherId);
         return voucher;
     }
 
@@ -285,11 +478,91 @@ public sealed class P1InMemoryService
     public IReadOnlyList<P1AuditEvent> ReadAuditEvents(string companyId, string? action, string? branchId, int skip = 0, int take = 100)
     {
         if (skip < 0 || take < 0) throw new P1RuleException("INVALID_FILTER", "paging");
-        var query = _store.AuditEvents.Where(x => x.CompanyId == companyId);
+        IEnumerable<P1AuditEvent> query;
+        lock (_auditLock) query = _store.AuditSequence.Where(x => x.CompanyId == companyId).ToArray();
         if (!string.IsNullOrWhiteSpace(action)) query = query.Where(x => x.Action == action);
         if (!string.IsNullOrWhiteSpace(branchId)) query = query.Where(x => x.BranchId == branchId);
-        return query.OrderBy(x => x.At).Skip(skip).Take(take).ToArray();
+        return query.Skip(skip).Take(take).ToArray();
     }
+
+    public bool VerifyAuditHashChain(string? companyId = null)
+    {
+        P1AuditEvent[] events;
+        lock (_auditLock) events = _store.AuditSequence.ToArray();
+        string? previousHash = null;
+        foreach (var auditEvent in events)
+        {
+            if (!string.Equals(auditEvent.PreviousHash, previousHash, StringComparison.Ordinal)) return false;
+            if (!string.Equals(auditEvent.Hash, ComputeAuditHash(auditEvent, previousHash), StringComparison.Ordinal)) return false;
+            previousHash = auditEvent.Hash;
+        }
+        return companyId is null || events.Any(x => x.CompanyId == companyId);
+    }
+
+    public IReadOnlyList<P1AuditEvent> ExportAuditEvents(string companyId, int skip = 0, int take = 100)
+        => ReadAuditEvents(companyId, null, null, skip, take);
+
+    public P1SyncOperation EnqueueSyncOperation(P1SyncOperation operation, string actorId = "sync")
+    {
+        ValidateSyncOperation(operation);
+        var queued = operation with { Status = P1SyncStatus.Queued, ErrorCode = null, Version = 1 };
+        if (!_store.SyncOperations.TryAdd(SyncKey(operation), queued))
+            throw new P1RuleException("DUPLICATE_OPERATION", operation.ClientOperationId);
+        Audit("SyncOperationQueued", operation.ClientOperationId, actorId, operation.CompanyId, operation.BranchId, "SUCCESS");
+        return queued;
+    }
+
+    public P1SyncOperation TransitionSyncOperation(string clientOperationId, P1SyncStatus newStatus, string actorId = "sync")
+        => TransitionSyncOperation(FindSyncOperation(clientOperationId), newStatus, actorId);
+
+    public P1SyncOperation TransitionSyncOperation(string deviceId, string clientOperationId, P1SyncStatus newStatus, string actorId = "sync")
+    {
+        if (!_store.SyncOperations.TryGetValue($"{deviceId}:{clientOperationId}", out var current))
+            throw new P1RuleException("OPERATION_NOT_FOUND", clientOperationId);
+        return TransitionSyncOperation(current, newStatus, actorId);
+    }
+
+    private P1SyncOperation TransitionSyncOperation(P1SyncOperation current, P1SyncStatus newStatus, string actorId)
+    {
+        if (current.Status == newStatus) return current;
+        if (!IsAllowedSyncTransition(current.Status, newStatus))
+            throw new P1RuleException("INVALID_STATE_TRANSITION", current.ClientOperationId);
+        var updated = current with { Status = newStatus, Version = current.Version + 1, ErrorCode = newStatus == P1SyncStatus.Succeeded ? null : current.ErrorCode };
+        _store.SyncOperations[SyncKey(current)] = updated;
+        Audit("SyncOperationTransition", current.ClientOperationId, actorId, current.CompanyId, current.BranchId, "SUCCESS", newStatus.ToString().ToUpperInvariant());
+        return updated;
+    }
+
+    public P1SyncOperation RetrySyncOperation(string clientOperationId, string actorId = "sync")
+    {
+        var current = FindSyncOperation(clientOperationId);
+        if (current.Status != P1SyncStatus.Failed && current.Status != P1SyncStatus.Conflict)
+            throw new P1RuleException("RETRY_NOT_ALLOWED", clientOperationId);
+        var updated = current with
+        {
+            Status = P1SyncStatus.Sending,
+            RetryCount = current.RetryCount + 1,
+            NextRetryAt = DateTimeOffset.UtcNow,
+            ErrorCode = null,
+            Version = current.Version + 1
+        };
+        _store.SyncOperations[SyncKey(current)] = updated;
+        Audit("SyncOperationRetry", clientOperationId, actorId, current.CompanyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    public P1SyncOperation ResolveSyncConflict(string clientOperationId, string resolution, string actorId = "sync")
+    {
+        if (string.IsNullOrWhiteSpace(resolution)) throw new P1RuleException("RESOLUTION_REQUIRED", clientOperationId);
+        var current = FindSyncOperation(clientOperationId);
+        if (current.Status != P1SyncStatus.Conflict) throw new P1RuleException("CONFLICT_NOT_FOUND", clientOperationId);
+        var updated = current with { Status = P1SyncStatus.Resolved, ErrorCode = null, Version = current.Version + 1 };
+        _store.SyncOperations[SyncKey(current)] = updated;
+        Audit("SyncOperationConflictResolved", clientOperationId, actorId, current.CompanyId, current.BranchId, "SUCCESS", resolution);
+        return updated;
+    }
+
+    public P1SyncOperation GetSyncOperation(string clientOperationId) => FindSyncOperation(clientOperationId);
 
     public IReadOnlyList<P1SyncResult> SyncBatch(IEnumerable<P1SyncOperation> operations, string actorId = "sync")
     {
@@ -301,17 +574,54 @@ public sealed class P1InMemoryService
                 results.Add(new P1SyncResult(op.ClientOperationId, "REJECTED", "PAYLOAD_INVALID"));
                 continue;
             }
-            if (_store.SyncOperations.TryGetValue(op.ClientOperationId, out var prior))
+            var key = SyncKey(op);
+            if (_store.SyncOperations.TryGetValue(key, out var prior))
             {
-                results.Add(new P1SyncResult(op.ClientOperationId, prior.PayloadHash == op.PayloadHash ? "DUPLICATE_ACCEPTED" : "CONFLICT", prior.PayloadHash == op.PayloadHash ? null : "CONFLICT"));
+                if (prior.PayloadHash == op.PayloadHash)
+                {
+                    results.Add(new P1SyncResult(op.ClientOperationId, "DUPLICATE_ACCEPTED"));
+                    continue;
+                }
+                var conflicted = prior with { Status = P1SyncStatus.Conflict, ErrorCode = "HASH_MISMATCH", Version = prior.Version + 1 };
+                _store.SyncOperations[key] = conflicted;
+                Audit("SyncOperationConflict", op.ClientOperationId, actorId, prior.CompanyId, prior.BranchId, "CONFLICT", "HASH_MISMATCH");
+                results.Add(new P1SyncResult(op.ClientOperationId, "CONFLICT", "CONFLICT"));
                 continue;
             }
-            _store.SyncOperations[op.ClientOperationId] = op;
-            Audit("SyncP1Operations", op.ClientOperationId, actorId, op.CompanyId, op.BranchId, "SUCCESS");
+            var queued = EnqueueSyncOperation(op, actorId);
+            var sending = TransitionSyncOperation(queued.DeviceId, queued.ClientOperationId, P1SyncStatus.Sending, actorId);
+            _ = TransitionSyncOperation(sending.DeviceId, sending.ClientOperationId, P1SyncStatus.Succeeded, actorId);
             results.Add(new P1SyncResult(op.ClientOperationId, "ACCEPTED"));
         }
         return results;
     }
+
+    private static string SyncKey(P1SyncOperation operation) => $"{operation.DeviceId}:{operation.ClientOperationId}";
+
+    private P1SyncOperation FindSyncOperation(string clientOperationId)
+    {
+        var matches = _store.SyncOperations.Values.Where(x => x.ClientOperationId == clientOperationId).ToArray();
+        if (matches.Length == 0) throw new P1RuleException("OPERATION_NOT_FOUND", clientOperationId);
+        if (matches.Length > 1) throw new P1RuleException("OPERATION_DEVICE_REQUIRED", clientOperationId);
+        return matches[0];
+    }
+
+    private static void ValidateSyncOperation(P1SyncOperation operation)
+    {
+        if (string.IsNullOrWhiteSpace(operation.DeviceId) || string.IsNullOrWhiteSpace(operation.ClientOperationId) || string.IsNullOrWhiteSpace(operation.PayloadHash))
+            throw new P1RuleException("PAYLOAD_INVALID", operation.ClientOperationId);
+        if (string.IsNullOrWhiteSpace(operation.CompanyId)) throw new P1RuleException("SCOPE_DENIED", operation.ClientOperationId);
+    }
+
+    private static bool IsAllowedSyncTransition(P1SyncStatus from, P1SyncStatus to) =>
+        (from, to) switch
+        {
+            (P1SyncStatus.Queued, P1SyncStatus.Sending) => true,
+            (P1SyncStatus.Sending, P1SyncStatus.Succeeded or P1SyncStatus.Failed or P1SyncStatus.Conflict or P1SyncStatus.Rejected) => true,
+            (P1SyncStatus.Failed, P1SyncStatus.Sending) => true,
+            (P1SyncStatus.Conflict, P1SyncStatus.Resolved) => true,
+            _ => false
+        };
 
     private void RequireCompany(string companyId)
     {
@@ -332,8 +642,23 @@ public sealed class P1InMemoryService
         return period;
     }
 
-    private void Audit(string action, string entityId, string actorId, string companyId, string? branchId, string outcome)
+    private void Audit(string action, string entityId, string actorId, string companyId, string? branchId, string outcome, string? reason = null)
     {
-        _store.AuditEvents.Add(new P1AuditEvent(Guid.NewGuid().ToString("N"), action, entityId, actorId, companyId, branchId, Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, outcome));
+        lock (_auditLock)
+        {
+            var previousHash = _store.AuditSequence.LastOrDefault()?.Hash;
+            var auditEvent = new P1AuditEvent(Guid.NewGuid().ToString("N"), action, entityId, actorId, companyId, branchId, Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, outcome, "", previousHash, reason);
+            var hashed = auditEvent with { Hash = ComputeAuditHash(auditEvent, previousHash) };
+            _store.AuditSequence.Add(hashed);
+            _store.AuditEvents.Add(hashed);
+        }
+    }
+
+    private static string ComputeAuditHash(P1AuditEvent auditEvent, string? previousHash)
+    {
+        var canonical = string.Join("|", auditEvent.Id, auditEvent.Action, auditEvent.EntityId, auditEvent.ActorId,
+            auditEvent.CompanyId, auditEvent.BranchId ?? "", auditEvent.CorrelationId, auditEvent.At.ToUniversalTime().ToString("O"),
+            auditEvent.Outcome, auditEvent.Reason ?? "", previousHash ?? "");
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 }
