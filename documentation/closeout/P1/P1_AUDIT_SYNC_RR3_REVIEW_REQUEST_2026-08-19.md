@@ -5,8 +5,10 @@
 ```text
 Repository: https://github.com/shfeekalbhure/TransportERP
 Branch: feature/p1-audit-sync-production-20260819
-Commit: 255c5f70c3f5da0f0ea76d010190c636e9ba0266
+Commit: a018b7c70a66cce480553ce3e42713a03316987e
 ```
+
+**الالتزام الإصلاحي المستهدف في RR4:** `fe9770bcfcffa84f05dca7a38027566cd210f5f1`
 
 ## المرجع الحاكم
 

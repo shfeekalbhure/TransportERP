@@ -3,7 +3,9 @@
 **المشروع:** TransportERP  
 **النطاق:** AuditEvent وSyncOperation وConflictCase وواجهات P1 المرتبطة  
 **الفرع:** `feature/p1-audit-sync-production-20260819`  
-**الالتزام السابق المفحوص:** `05f0b64b8fe3fd9bd7a4bdf62788187dd583aec2`  
+**الالتزام المفحوص في RR3:** `a018b7c70a66cce480553ce3e42713a03316987e`
+
+**الالتزام الإصلاحي المستهدف في RR4:** `fe9770bcfcffa84f05dca7a38027566cd210f5f1`
 **القرار السابق:** `FAIL`
 
 ## الغرض
