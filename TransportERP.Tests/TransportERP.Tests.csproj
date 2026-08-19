@@ -18,4 +18,17 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TransportERP.Application\TransportERP.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\documentation\closeout\P1\W1_DATA_CONTRACT_REGISTER.csv" Link="P1Contracts\W1_DATA_CONTRACT_REGISTER.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\documentation\closeout\P1\W2_ACTION_CONTRACT_REGISTER.csv" Link="P1Contracts\W2_ACTION_CONTRACT_REGISTER.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\documentation\closeout\P1\W3_SCREEN_CONTRACT_REGISTER.csv" Link="P1Contracts\W3_SCREEN_CONTRACT_REGISTER.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\documentation\closeout\P1\P1_ACCEPTANCE_TEST_REGISTER.csv" Link="P1Contracts\P1_ACCEPTANCE_TEST_REGISTER.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\documentation\closeout\P1\P1_SYNC_CONTRACT.md" Link="P1Contracts\P1_SYNC_CONTRACT.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\documentation\closeout\P1\P1_RTL_SCREENS\*.png" LinkBase="P1Screens" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
