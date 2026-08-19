@@ -1,0 +1,25 @@
+HEAD=f66f767972c640f28c01f40c5b23cafcb39adf19
+CLEAN_EXIT=0
+BUILD_EXIT=0
+TEST_EXIT=0
+NUGET_EXIT=0
+STATIC_EXIT=1
+
+--- build summary ---
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+--- test summary ---
+Test Run Successful.
+Total tests: 41
+     Passed: 41
+
+--- nuget summary ---
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+
+The following sources were used:
+   https://api.nuget.org/v3/index.json
+
+The given project `TransportERP.Tests` has no vulnerable packages given the current sources.

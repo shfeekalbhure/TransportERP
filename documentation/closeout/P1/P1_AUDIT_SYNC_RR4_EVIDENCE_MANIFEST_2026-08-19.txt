@@ -1,0 +1,40 @@
+TransportERP — RR4 Evidence Manifest
+Date: 2026-08-19 UTC+3
+Repository: https://github.com/shfeekalbhure/TransportERP
+Branch: feature/p1-audit-sync-production-20260819
+Source commit independently reviewed: 5c5aa2e76c058f1350896bf98125c710a71596a7
+Previous RR3 inspected commit: a018b7c70a66cce480553ce3e42713a03316987e
+Correction code parent commit: fe9770bcfcffa84f05dca7a38027566cd210f5f1
+Database: PostgreSQL 18.6, Host 127.0.0.1, Port 15432, Database poc14_pg_test
+Toolchain: .NET SDK 10.0.400; Microsoft.NETCore.App 10.0.11; Ubuntu 24.04; linux-x64
+
+Traceability rule:
+- All RR4 request, owner-signoff, corrective-action, and independent-review documents identify source commit 5c5aa2e76c058f1350896bf98125c710a71596a7.
+- The RR3 commit a018b7c70a66cce480553ce3e42713a03316987e is historical only and retains the RR3 FAIL record.
+- The owner approval was recorded before the final traceability-only documentation commits; no production code changed after the approved correction baseline.
+
+Independent execution results:
+- Clean exit code: 0.
+- Build exit code: 0; 0 Warning(s), 0 Error(s).
+- Default dotnet test exit code: 0; Test Run Successful; Total 41; Passed 41; Failed 0; Skipped 0.
+- Governance: no PR and no merge executed by the review.
+- Independent review decision: PASS.
+
+SHA-256 raw independent-run evidence:
+- artifacts/rr4/RR4_SOURCE5C_INDEPENDENT_STATUS.log: 2bd8be66f512b0aa6f34f270f75ce00c8df392acf8b72897d8b33c3e1e8f4dc8
+- artifacts/rr4/RR4_SOURCE5C_CLEAN.log: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- artifacts/rr4/RR4_SOURCE5C_BUILD.log: 7eaca2c5c9375380532f978e62490bef9b80b0e688d38f809cdb0d0a9575d20d
+- artifacts/rr4/RR4_SOURCE5C_TEST_DEFAULT.log: bb528d619976fddbbadffcacf5c7c8ee2ed9ed56c12398323d9bc8c448e9a608
+- artifacts/rr4/RR4_SOURCE5C_DOTNET_INFO.log: 8dd7f218fc2781e0adf676fd825da1c8f3b943a562b82aab1f527a4d8bfccbd4
+- artifacts/rr4/RR4_SOURCE5C_SHA256.txt: 2ca2b83f7dce3c1cd306333aaee82f55935132f8c17059b076ef9e375e0ac2cd
+
+SHA-256 final RR4 documents:
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_CORRECTIVE_ACTION_MATRIX_2026-08-19.md: bbd5adc7e9d102f52bb2c5f13b13b8261f5b24e0708b45e514861f4802740721
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_OWNER_SIGNOFF_REQUEST_2026-08-19.md: d44fb53c5c693cf3d10218d5b940a122544824e5322df4700611a768a6d51771
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_REVIEW_REQUEST_2026-08-19.md: 2472a99f0f4732639b172af0a2589f3fa1d1dd492448d54c5b37e6d2365ad007
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_INDEPENDENT_REVIEW_REPORT_2026-08-19.md: dd18304d425e3df260a22099c6639c15d708fa2b883021cbec694c985d9a869e
+
+Verification command:
+sha256sum <file>
+
+This manifest records the independent evidence and decision metadata. It is not a PR or merge operation.

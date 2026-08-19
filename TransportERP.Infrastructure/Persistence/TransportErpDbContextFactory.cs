@@ -7,8 +7,14 @@ public sealed class TransportErpDbContextFactory : IDesignTimeDbContextFactory<T
 {
     public TransportErpDbContext CreateDbContext(string[] args)
     {
+        var connectionString = Environment.GetEnvironmentVariable("TRANSPORTERP_DESIGN_CONNSTR");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "TRANSPORTERP_DESIGN_CONNSTR must be set for EF Core design-time operations.");
+        }
         var options = new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql("Host=localhost;Port=5432;Database=transport_erp_design;Username=transport_erp;Password=design-time-only")
+            .UseNpgsql(connectionString)
             .Options;
         return new TransportErpDbContext(options);
     }

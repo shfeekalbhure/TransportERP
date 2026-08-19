@@ -3,12 +3,14 @@ using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
+[Collection("PostgreSql")]
 public sealed class PostgreSqlPersistenceSmokeTests
 {
     [Fact]
     public async Task Migration_and_receipt_round_trip_work_on_postgresql()
     {
-        var connection = Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
+        var connection = Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
+            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
         if (string.IsNullOrWhiteSpace(connection))
         {
             // Integration test is opt-in so the normal unit-test suite remains database-independent.
@@ -21,9 +23,10 @@ public sealed class PostgreSqlPersistenceSmokeTests
         await using var db = new TransportErpDbContext(options);
         await db.Database.MigrateAsync();
 
+        var currencyCode = await NextCurrencyCodeAsync(db);
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = "P1T", NameAr = "عملة اختبار", MinorUnit = 2, IsBase = true,
+            Id = Guid.NewGuid(), Code = currencyCode, NameAr = "عملة اختبار", MinorUnit = 2, IsBase = true,
             CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, RowVersion = Guid.NewGuid().ToByteArray()
         };
         var company = new Company
@@ -57,5 +60,17 @@ public sealed class PostgreSqlPersistenceSmokeTests
 
         Assert.Equal("DRAFT", voucher.Status);
         Assert.Equal(125m, await db.ReceiptVouchers.Where(x => x.Id == voucher.Id).Select(x => x.Amount).SingleAsync());
+    }
+
+    private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)
+    {
+        for (var attempt = 0; attempt < 16; attempt++)
+        {
+            var code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant();
+            if (!await db.Currencies.AnyAsync(x => x.Code == code))
+                return code;
+        }
+
+        throw new InvalidOperationException("Unable to allocate a unique three-character currency code for the PostgreSQL smoke test.");
     }
 }

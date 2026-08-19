@@ -25,6 +25,29 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<PaymentVoucher> PaymentVouchers => Set<PaymentVoucher>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
+    public DbSet<ConflictCase> ConflictCases => Set<ConflictCase>();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RejectAuditMutation();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RejectAuditMutation();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void RejectAuditMutation()
+    {
+        var illegal = ChangeTracker.Entries<AuditEvent>()
+            .Where(x => x.State is EntityState.Modified or EntityState.Deleted)
+            .Select(x => x.Entity.Id)
+            .ToArray();
+        if (illegal.Length > 0)
+            throw new InvalidOperationException($"AuditEvent is append-only; mutation denied: {string.Join(',', illegal)}");
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,7 +65,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(Role), typeof(Permission),
             typeof(GlobalSetting), typeof(CompanySetting), typeof(BranchSetting), typeof(ChartOfAccount),
             typeof(FiscalPeriod), typeof(FinancialDimension), typeof(JournalEntry), typeof(ReceiptVoucher),
-            typeof(PaymentVoucher), typeof(SyncOperation) })
+            typeof(PaymentVoucher), typeof(SyncOperation), typeof(ConflictCase) })
         {
             var entity = mb.Entity(type);
             entity.Property<byte[]>("RowVersion").HasColumnType("bytea").IsConcurrencyToken();
@@ -54,7 +77,11 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     private static void ConfigureReferenceAndOrganization(ModelBuilder mb)
     {
         var currency = mb.Entity<Currency>();
-        currency.ToTable("currencies");
+        currency.ToTable("currencies", t =>
+        {
+            t.HasCheckConstraint("ck_currencies_minor_unit", "\"MinorUnit\" BETWEEN 0 AND 6");
+            t.HasCheckConstraint("ck_currencies_status", "\"Status\" IN ('ACTIVE','INACTIVE')");
+        });
         currency.HasKey(x => x.Id);
         currency.Property(x => x.Code).HasMaxLength(3).IsRequired();
         currency.Property(x => x.NameAr).HasMaxLength(100).IsRequired();
@@ -62,11 +89,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         currency.Property(x => x.Status).HasMaxLength(20).IsRequired();
         currency.HasIndex(x => x.Code).IsUnique();
         currency.HasIndex(x => x.Status);
-        currency.HasCheckConstraint("ck_currencies_minor_unit", "\"MinorUnit\" BETWEEN 0 AND 6");
-        currency.HasCheckConstraint("ck_currencies_status", "\"Status\" IN ('ACTIVE','INACTIVE')");
 
         var company = mb.Entity<Company>();
-        company.ToTable("companies");
+        company.ToTable("companies", t => t.HasCheckConstraint("ck_companies_status", "\"Status\" IN ('DRAFT','ACTIVE','SUSPENDED','CLOSED')"));
         company.HasKey(x => x.Id);
         company.Property(x => x.Code).HasMaxLength(40).IsRequired();
         company.Property(x => x.LegalNameAr).HasMaxLength(250).IsRequired();
@@ -77,10 +102,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         company.HasIndex(x => x.TaxIdentifier).IsUnique().HasFilter("\"TaxIdentifier\" IS NOT NULL");
         company.HasIndex(x => x.Status);
         company.HasOne(x => x.BaseCurrency).WithMany().HasForeignKey(x => x.BaseCurrencyId).OnDelete(DeleteBehavior.Restrict);
-        company.HasCheckConstraint("ck_companies_status", "\"Status\" IN ('DRAFT','ACTIVE','SUSPENDED','CLOSED')");
 
         var branch = mb.Entity<Branch>();
-        branch.ToTable("branches");
+        branch.ToTable("branches", t => t.HasCheckConstraint("ck_branches_status", "\"Status\" IN ('DRAFT','ACTIVE','INACTIVE')"));
         branch.HasKey(x => x.Id);
         branch.HasAlternateKey(x => new { x.Id, x.CompanyId });
         branch.Property(x => x.Code).HasMaxLength(40).IsRequired();
@@ -93,7 +117,6 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         branch.HasOne(x => x.Company).WithMany(x => x.Branches).HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         branch.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
         branch.HasIndex(x => new { x.CompanyId, x.Status });
-        branch.HasCheckConstraint("ck_branches_status", "\"Status\" IN ('DRAFT','ACTIVE','INACTIVE')");
     }
 
     private static void ConfigureIdentityAndSettings(ModelBuilder mb)
@@ -213,7 +236,11 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         coa.HasQueryFilter(x => x.DeletedAt == null);
 
         var period = mb.Entity<FiscalPeriod>();
-        period.ToTable("fiscal_periods", t => t.HasCheckConstraint("ck_fiscal_periods_status", "\"Status\" IN ('OPEN','SOFT_CLOSED','CLOSED')"));
+        period.ToTable("fiscal_periods", t =>
+        {
+            t.HasCheckConstraint("ck_fiscal_periods_status", "\"Status\" IN ('OPEN','SOFT_CLOSED','CLOSED')");
+            t.HasCheckConstraint("ck_fiscal_periods_range", "\"EndDate\" >= \"StartDate\"");
+        });
         period.HasKey(x => x.Id);
         period.Property(x => x.Code).HasMaxLength(40).IsRequired();
         period.Property(x => x.Status).HasMaxLength(20).IsRequired();
@@ -222,10 +249,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         period.HasIndex(x => new { x.CompanyId, x.Status });
         period.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
         period.HasOne<User>().WithMany().HasForeignKey(x => x.ClosedBy).OnDelete(DeleteBehavior.Restrict);
-        period.HasCheckConstraint("ck_fiscal_periods_range", "\"EndDate\" >= \"StartDate\"");
 
         var dimension = mb.Entity<FinancialDimension>();
-        dimension.ToTable("financial_dimensions");
+        dimension.ToTable("financial_dimensions", t => t.HasCheckConstraint("ck_financial_dimensions_dates", "\"ValidTo\" IS NULL OR \"ValidTo\" >= \"ValidFrom\""));
         dimension.HasKey(x => x.Id);
         dimension.Property(x => x.DimensionCode).HasMaxLength(60).IsRequired();
         dimension.Property(x => x.NameAr).HasMaxLength(200).IsRequired();
@@ -237,10 +263,13 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         dimension.HasIndex(x => new { x.CompanyId, x.ValidFrom, x.ValidTo });
         dimension.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
         dimension.HasOne<FinancialDimension>().WithMany().HasForeignKey(x => x.ParentId).OnDelete(DeleteBehavior.Restrict);
-        dimension.HasCheckConstraint("ck_financial_dimensions_dates", "\"ValidTo\" IS NULL OR \"ValidTo\" >= \"ValidFrom\"");
 
         var journal = mb.Entity<JournalEntry>();
-        journal.ToTable("journal_entries", t => t.HasCheckConstraint("ck_journal_entries_status", "\"Status\" IN ('DRAFT','CHECKED','APPROVED','POSTED','REVERSED')"));
+        journal.ToTable("journal_entries", t =>
+        {
+            t.HasCheckConstraint("ck_journal_entries_status", "\"Status\" IN ('DRAFT','CHECKED','APPROVED','POSTED','REVERSED')");
+            t.HasCheckConstraint("ck_journal_entries_amounts", "\"TotalDebit\" >= 0 AND \"TotalCredit\" >= 0");
+        });
         journal.HasKey(x => x.Id);
         journal.Property(x => x.DocumentNo).HasMaxLength(60).IsRequired();
         journal.Property(x => x.Description).HasMaxLength(500);
@@ -258,10 +287,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         journal.HasOne<FiscalPeriod>().WithMany().HasForeignKey(x => x.FiscalPeriodId).OnDelete(DeleteBehavior.Restrict);
         journal.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
         journal.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.ReversalOfId).OnDelete(DeleteBehavior.Restrict);
-        journal.HasCheckConstraint("ck_journal_entries_amounts", "\"TotalDebit\" >= 0 AND \"TotalCredit\" >= 0");
 
         var line = mb.Entity<JournalEntryLine>();
-        line.ToTable("journal_entry_lines");
+        line.ToTable("journal_entry_lines", t => t.HasCheckConstraint("ck_journal_lines_amounts", "\"Debit\" >= 0 AND \"Credit\" >= 0 AND (\"Debit\" > 0 OR \"Credit\" > 0) AND NOT (\"Debit\" > 0 AND \"Credit\" > 0)"));
         line.HasKey(x => new { x.JournalEntryId, x.LineNo });
         line.Property(x => x.Description).HasMaxLength(500);
         line.Property(x => x.Debit).HasPrecision(19, 4);
@@ -271,7 +299,6 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         line.HasOne<ChartOfAccount>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         line.HasOne<FinancialDimension>().WithMany().HasForeignKey(x => x.FinancialDimensionId).OnDelete(DeleteBehavior.Restrict);
         line.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
-        line.HasCheckConstraint("ck_journal_lines_amounts", "\"Debit\" >= 0 AND \"Credit\" >= 0 AND (\"Debit\" > 0 OR \"Credit\" > 0) AND NOT (\"Debit\" > 0 AND \"Credit\" > 0)");
 
         ConfigureVoucher(mb.Entity<ReceiptVoucher>(), "receipt_vouchers", "PayerName", "CollectedBy", "ck_receipts_status");
         ConfigureVoucher(mb.Entity<PaymentVoucher>(), "payment_vouchers", "PayeeName", "PaidBy", "ck_payments_status");
@@ -279,7 +306,11 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
 
     private static void ConfigureVoucher<TEntity>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity> entity, string table, string partyProperty, string actorProperty, string statusConstraint) where TEntity : P1Entity, IP1Voucher
     {
-        entity.ToTable(table, t => t.HasCheckConstraint(statusConstraint, "\"Status\" IN ('DRAFT','APPROVED','POSTED','CANCELLED')"));
+        entity.ToTable(table, t =>
+        {
+            t.HasCheckConstraint(statusConstraint, "\"Status\" IN ('DRAFT','APPROVED','POSTED','CANCELLED')");
+            t.HasCheckConstraint($"ck_{table}_amount", "\"Amount\" > 0");
+        });
         entity.HasKey(x => x.Id);
         entity.Property<string>(partyProperty).HasMaxLength(250).IsRequired();
         entity.Property(x => x.VoucherNo).HasMaxLength(60).IsRequired();
@@ -297,7 +328,6 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         entity.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
         entity.Property<Guid>(actorProperty).IsRequired();
         entity.HasOne<User>().WithMany().HasForeignKey(actorProperty).OnDelete(DeleteBehavior.Restrict);
-        entity.HasCheckConstraint($"ck_{table}_amount", "\"Amount\" > 0");
     }
 
     private static void ConfigureAuditAndSync(ModelBuilder mb)
@@ -307,6 +337,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         audit.HasKey(x => x.Id);
         audit.Property(x => x.OccurredAt).HasColumnType("timestamptz");
         audit.Property(x => x.Action).HasMaxLength(120).IsRequired();
+        audit.Property(x => x.Outcome).HasMaxLength(40).IsRequired();
         audit.Property(x => x.EntityType).HasMaxLength(120).IsRequired();
         audit.Property(x => x.DeviceId).HasMaxLength(120);
         audit.Property(x => x.BeforeJson).HasColumnType("text");
@@ -324,7 +355,12 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         audit.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
 
         var sync = mb.Entity<SyncOperation>();
-        sync.ToTable("sync_operations", t => t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')"));
+        sync.ToTable("sync_operations", t =>
+        {
+            t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
+            t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
+            t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+        });
         sync.HasKey(x => x.Id);
         sync.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
         sync.Property(x => x.OperationType).HasMaxLength(20).IsRequired();
@@ -342,7 +378,23 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
-        sync.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
-        sync.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+
+        var conflict = mb.Entity<ConflictCase>();
+        conflict.ToTable("conflict_cases", t => t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')"));
+        conflict.HasKey(x => x.Id);
+        conflict.Property(x => x.DeviceSnapshot).HasColumnType("text").IsRequired();
+        conflict.Property(x => x.ServerSnapshot).HasColumnType("text").IsRequired();
+        conflict.Property(x => x.ConflictReason).HasMaxLength(500).IsRequired();
+        conflict.Property(x => x.Resolution).HasMaxLength(1000);
+        conflict.Property(x => x.ResolvedBy).HasMaxLength(120);
+        conflict.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        conflict.HasIndex(x => x.SyncOperationId).IsUnique();
+        conflict.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status, x.CreatedAt });
+        conflict.HasOne(x => x.SyncOperation).WithOne(x => x.ConflictCase)
+            .HasForeignKey<ConflictCase>(x => x.SyncOperationId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<SyncOperation>().WithMany()
+            .HasForeignKey(x => x.ReplacedByOperationId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
     }
 }

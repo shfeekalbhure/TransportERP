@@ -277,6 +277,7 @@ public sealed class AuditEvent
     public Guid? CompanyId { get; set; }
     public Guid? BranchId { get; set; }
     public string Action { get; set; } = string.Empty;
+    public string Outcome { get; set; } = string.Empty;
     public string EntityType { get; set; } = string.Empty;
     public Guid? EntityId { get; set; }
     public Guid CorrelationId { get; set; }
@@ -287,6 +288,23 @@ public sealed class AuditEvent
     public string? Ip { get; set; }
     public string Hash { get; set; } = string.Empty;
     public string? PreviousHash { get; set; }
+}
+
+public sealed class ConflictCase : P1Entity
+{
+    public Guid SyncOperationId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public long? BaseVersion { get; set; }
+    public string DeviceSnapshot { get; set; } = string.Empty;
+    public string ServerSnapshot { get; set; } = string.Empty;
+    public string ConflictReason { get; set; } = string.Empty;
+    public string? Resolution { get; set; }
+    public string? ResolvedBy { get; set; }
+    public DateTimeOffset? ResolvedAt { get; set; }
+    public Guid? ReplacedByOperationId { get; set; }
+    public string Status { get; set; } = "OPEN";
+    public SyncOperation? SyncOperation { get; set; }
 }
 
 public sealed class SyncOperation : P1Entity
@@ -309,5 +327,5 @@ public sealed class SyncOperation : P1Entity
     public int RetryCount { get; set; }
     public DateTimeOffset? NextRetryAt { get; set; }
     public string? ErrorCode { get; set; }
-    public Guid? ConflictCaseId { get; set; }
+    public ConflictCase? ConflictCase { get; set; }
 }

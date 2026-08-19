@@ -1,0 +1,24 @@
+Evidence generated: 2026-08-19
+Database: p1_reapply_test; PostgreSQL listener: 127.0.0.1:15432
+--- version ---
+PostgreSQL 18.6 (Ubuntu 18.6-1.pgdg24.04+2) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+--- required tables ---
+audit_events
+conflict_cases
+sync_operations
+--- append-only trigger ---
+trg_audit_events_append_only|CREATE TRIGGER trg_audit_events_append_only BEFORE DELETE OR UPDATE ON transport_erp.audit_events FOR EACH ROW EXECUTE FUNCTION transport_erp.prevent_audit_event_mutation()
+--- relevant indexes ---
+IX_conflict_cases_BranchId|conflict_cases
+IX_conflict_cases_CompanyId_BranchId_Status_CreatedAt|conflict_cases
+IX_conflict_cases_ReplacedByOperationId|conflict_cases
+IX_conflict_cases_SyncOperationId|conflict_cases
+PK_conflict_cases|conflict_cases
+IX_sync_operations_BranchId|sync_operations
+IX_sync_operations_CompanyId_Status_NextRetryAt|sync_operations
+IX_sync_operations_DeviceId_ClientOperationId|sync_operations
+IX_sync_operations_DeviceId_CreatedAt|sync_operations
+IX_sync_operations_EntityType_EntityId_CreatedAt|sync_operations
+IX_sync_operations_PayloadHash|sync_operations
+IX_sync_operations_UserId|sync_operations
+PK_sync_operations|sync_operations
