@@ -17,6 +17,10 @@ public sealed record P1Voucher(string Id, string CompanyId, string? BranchId, de
 public sealed record P1AuditEvent(string Id, string Action, string EntityId, string ActorId, string CompanyId, string? BranchId, string CorrelationId, DateTimeOffset At, string Outcome);
 public sealed record P1SyncOperation(string DeviceId, string ClientOperationId, string PayloadHash, string Action, string CompanyId, string? BranchId, string BaseVersion);
 public sealed record P1SyncResult(string ClientOperationId, string Status, string? ErrorCode = null);
+public sealed record P1Role(string Id, string Name, long Version = 1);
+public sealed record P1Permission(string Code);
+public sealed record P1Setting(string Key, string Value, long Version = 1);
+public sealed record P1ScopedSetting(string ScopeType, string ScopeId, string Key, string Value, long Version = 1);
 
 public sealed class P1RuleException(string code, string message) : Exception(message)
 {
@@ -34,6 +38,10 @@ public sealed class P1InMemoryStore
     internal ConcurrentDictionary<string, P1JournalEntry> Journals { get; } = new();
     internal ConcurrentDictionary<string, P1Voucher> Vouchers { get; } = new();
     internal ConcurrentDictionary<string, P1SyncOperation> SyncOperations { get; } = new();
+    internal ConcurrentDictionary<string, P1Role> Roles { get; } = new();
+    internal ConcurrentDictionary<string, HashSet<string>> UserRoles { get; } = new();
+    internal ConcurrentDictionary<string, P1Setting> GlobalSettings { get; } = new();
+    internal ConcurrentDictionary<string, P1ScopedSetting> ScopedSettings { get; } = new();
     internal ConcurrentBag<P1AuditEvent> AuditEvents { get; } = new();
 }
 
@@ -72,6 +80,70 @@ public sealed class P1InMemoryService
         _store.Users[id] = user;
         Audit("ManageUsers", id, actorId, companyId, branchId, "SUCCESS");
         return user;
+    }
+
+    public P1User UpdateUser(string companyId, string userId, string userName, bool active, long expectedVersion, string actorId = "system")
+    {
+        if (!_store.Users.TryGetValue(userId, out var current) || current.CompanyId != companyId)
+            throw new P1RuleException("USER_NOT_FOUND", userId);
+        if (current.Version != expectedVersion)
+            throw new P1RuleException("CONCURRENCY_CONFLICT", userId);
+        if (_store.Users.Values.Any(x => x.Id != userId && x.UserName == userName))
+            throw new P1RuleException("USER_DUPLICATE", userName);
+        var updated = current with { UserName = userName, Active = active, Version = current.Version + 1 };
+        _store.Users[userId] = updated;
+        Audit("ManageUsers", userId, actorId, companyId, current.BranchId, "SUCCESS");
+        return updated;
+    }
+
+    public P1Role RegisterRole(string roleId, string name, string actorId = "system")
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new P1RuleException("VALIDATION_ERROR", roleId);
+        if (!_store.Roles.TryAdd(roleId, new P1Role(roleId, name)))
+            throw new P1RuleException("ROLE_DUPLICATE", roleId);
+        Audit("AssignPermissions", roleId, actorId, "platform", null, "SUCCESS");
+        return _store.Roles[roleId];
+    }
+
+    public IReadOnlyCollection<string> AssignRoles(string companyId, string userId, IEnumerable<string> roleIds, string actorId = "system")
+    {
+        if (!_store.Users.TryGetValue(userId, out var user) || user.CompanyId != companyId)
+            throw new P1RuleException("USER_NOT_FOUND", userId);
+        var roles = roleIds.Distinct().ToHashSet();
+        if (roles.Any(x => !_store.Roles.ContainsKey(x)))
+            throw new P1RuleException("ROLE_NOT_FOUND", roles.First(x => !_store.Roles.ContainsKey(x)));
+        _store.UserRoles[userId] = roles;
+        Audit("AssignPermissions", userId, actorId, companyId, user.BranchId, "SUCCESS");
+        return roles.ToArray();
+    }
+
+    public P1Setting SaveGlobalSetting(string key, string value, string actorId = "system")
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+            throw new P1RuleException("SETTING_SCHEMA_INVALID", key);
+        var saved = _store.GlobalSettings.AddOrUpdate(key,
+            _ => new P1Setting(key, value),
+            (_, old) => old with { Value = value, Version = old.Version + 1 });
+        Audit("SaveGlobalSettings", key, actorId, "platform", null, "SUCCESS");
+        return saved;
+    }
+
+    public P1ScopedSetting SaveScopedSetting(string scopeType, string scopeId, string key, string value, string companyId, string actorId = "system")
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+            throw new P1RuleException("SETTING_SCHEMA_INVALID", key);
+        if (scopeType.Equals("branch", StringComparison.OrdinalIgnoreCase))
+            RequireBranch(companyId, scopeId);
+        else if (scopeType.Equals("company", StringComparison.OrdinalIgnoreCase))
+            RequireCompany(scopeId);
+        else
+            throw new P1RuleException("SETTING_SCOPE_INVALID", scopeType);
+        var id = $"{scopeType}:{scopeId}:{key}";
+        var saved = _store.ScopedSettings.AddOrUpdate(id,
+            _ => new P1ScopedSetting(scopeType, scopeId, key, value),
+            (_, old) => old with { Value = value, Version = old.Version + 1 });
+        Audit("SaveScopedSettings", id, actorId, companyId, scopeType.Equals("branch", StringComparison.OrdinalIgnoreCase) ? scopeId : null, "SUCCESS");
+        return saved;
     }
 
     public P1Session Authenticate(string userName, string password, P1Scope scope)
