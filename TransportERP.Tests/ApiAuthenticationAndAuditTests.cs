@@ -12,6 +12,7 @@ using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
+[Collection("PostgreSql")]
 public sealed class ApiAuthenticationAndAuditTests
 {
     private const string Issuer = "TransportERP.Test.Identity";

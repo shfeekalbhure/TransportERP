@@ -5,6 +5,7 @@ using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
+[Collection("PostgreSql")]
 public sealed class SyncOperationPersistenceTests
 {
     [Fact]
@@ -159,7 +160,7 @@ public sealed class SyncOperationPersistenceTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Id = Guid.NewGuid(), Code = await NextCurrencyCodeAsync(db),
             NameAr = "عملة اختبار", MinorUnit = 2, IsBase = true, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -189,6 +190,18 @@ public sealed class SyncOperationPersistenceTests
         await db.SaveChangesAsync();
         return new TestScope(company.Id, branch.Id,
             new SyncSecurityContext(user.Id, $"device-{suffix}-{Guid.NewGuid():N}", company.Id, branch.Id, true, true));
+    }
+
+    private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)
+    {
+        for (var attempt = 0; attempt < 16; attempt++)
+        {
+            var code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant();
+            if (!await db.Currencies.AnyAsync(x => x.Code == code))
+                return code;
+        }
+
+        throw new InvalidOperationException("Unable to allocate a unique three-character currency code for the PostgreSQL sync test.");
     }
 
     private sealed record TestScope(Guid CompanyId, Guid BranchId, SyncSecurityContext Security);
