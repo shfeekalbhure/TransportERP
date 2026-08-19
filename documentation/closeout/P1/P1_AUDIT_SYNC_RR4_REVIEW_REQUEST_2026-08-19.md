@@ -3,13 +3,13 @@
 **المشروع:** TransportERP  
 **المستودع:** `shfeekalbhure/TransportERP`  
 **الفرع:** `feature/p1-audit-sync-production-20260819`  
-**الالتزام المطلوب فحصه:** `87ab53c66eda8055966edaad2f8d9d368b670d5f`
+**الالتزام المطلوب فحصه:** `5c5aa2e76c058f1350896bf98125c710a71596a7`
 **الالتزام السابق وقرار RR3:** `a018b7c70a66cce480553ce3e42713a03316987e` — `FAIL`  
 **قاعدة الدمج:** لا PR ولا دمج قبل قرار مستقل `PASS` واعتماد المالك.
 
 ## التكليف
 
-يُكلّف فريق مراجعة مستقل بإعادة فحص إغلاق CA-RR3-01 وCA-RR3-02 وCA-RR3-03 على الالتزام `87ab53c66eda8055966edaad2f8d9d368b670d5f` دون الاعتماد على الذاكرة أو على نتائج الالتزام السابق. يجب على الفريق مطابقة الملفات والأدلة من Git، وتشغيل الأوامر الموثقة في بيئة PostgreSQL 18.6، وإصدار قرار نهائي واحد فقط: `PASS` أو `FAIL`.
+يُكلّف فريق مراجعة مستقل بإعادة فحص إغلاق CA-RR3-01 وCA-RR3-02 وCA-RR3-03 على الالتزام `5c5aa2e76c058f1350896bf98125c710a71596a7` دون الاعتماد على الذاكرة أو على نتائج الالتزام السابق. يجب على الفريق مطابقة الملفات والأدلة من Git، وتشغيل الأوامر الموثقة في بيئة PostgreSQL 18.6، وإصدار قرار نهائي واحد فقط: `PASS` أو `FAIL`.
 
 ## نطاق الفحص الإلزامي
 
@@ -55,5 +55,5 @@ dotnet test TransportERP.Tests/TransportERP.Tests.csproj -v normal 2>&1 | tee ar
 
 ## مراجع
 
-[1]: https://github.com/shfeekalbhure/TransportERP/commit/87ab53c66eda8055966edaad2f8d9d368b670d5f "TransportERP — الالتزام المستهدف في RR4"
+[1]: https://github.com/shfeekalbhure/TransportERP/commit/5c5aa2e76c058f1350896bf98125c710a71596a7 "TransportERP — الالتزام المستهدف في RR4"
 [2]: https://github.com/shfeekalbhure/TransportERP/commit/a018b7c70a66cce480553ce3e42713a03316987e "TransportERP — الالتزام المفحوص في RR3"
