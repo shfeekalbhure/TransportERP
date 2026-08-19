@@ -67,7 +67,7 @@
 | مالي | `Draft → Checked → Approved → Posted → Settled → Reversed` | تعديل بعد الترحيل دون عكس أو إصدار تغيير؛ ترحيل فترة مغلقة |
 | تذكرة/حجز | `Held → Issued → Boarded → Changed/Refunded/Voided` | إصدار بلا تحقق هوية/مقعد/دفع وفق السياسة |
 | جمارك/منع | `PendingCheck → Hold → Released/Rejected` | ترحيل صنف محظور؛ Release بلا سبب أو صلاحية |
-| مزامنة | `Queued → Sending → Succeeded/Failed/Conflict → Retried/Resolved` | حذف عملية فاشلة دون أثر؛ تطبيق نفس العملية مرتين دون idempotency |
+| مزامنة | `Queued → Sending → Succeeded/Failed/Conflict/Rejected → Resolved`؛ تبقى العملية `FAILED` أثناء إعادة المحاولة مع تحديث `RetryCount` و`NextRetryAt` ثم تعود إلى `SENDING` بعد Backoff | حذف عملية فاشلة دون أثر؛ تطبيق نفس العملية مرتين دون idempotency؛ استخدام `RETRIED` كحالة مستقلة |
 
 ## 5. قواعد القرار المحلية غير المفترضة
 
