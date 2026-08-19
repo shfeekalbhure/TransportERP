@@ -41,7 +41,7 @@ public sealed record EnqueueSyncOperationCommand(
     DateTimeOffset ClientOccurredAt,
     long? BaseVersion = null);
 
-public sealed record TransitionSyncOperationCommand(Guid OperationId, string NewStatus);
+public sealed record TransitionSyncOperationCommand(Guid OperationId, string NewStatus, string? ErrorCode = null);
 
 public sealed record ConflictCaseDraft(
     string DeviceSnapshot,
@@ -156,6 +156,14 @@ public sealed class SyncOperationService(
             throw new SyncRuleException("RETRY_BACKOFF_ACTIVE", operation.ClientOperationId);
 
         operation.Status = newStatus;
+        if (newStatus == "FAILED")
+        {
+            if (string.IsNullOrWhiteSpace(command.ErrorCode))
+                throw new SyncRuleException("ERROR_CODE_REQUIRED", operation.ClientOperationId);
+            operation.ErrorCode = command.ErrorCode.Trim().ToUpperInvariant();
+            if (!IsRetryableErrorCode(operation.ErrorCode))
+                operation.NextRetryAt = null;
+        }
         operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
         operation.RowVersion = Guid.NewGuid().ToByteArray();
         if (newStatus == "SUCCEEDED")
@@ -182,6 +190,21 @@ public sealed class SyncOperationService(
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
         if (operation.Status != "FAILED")
             throw new SyncRuleException("RETRY_NOT_ALLOWED", operation.ClientOperationId);
+
+        if (!IsRetryableErrorCode(operation.ErrorCode))
+        {
+            operation.Status = "REJECTED";
+            operation.NextRetryAt = null;
+            operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
+            operation.RowVersion = Guid.NewGuid().ToByteArray();
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationRetryRejected", "REJECTED", nameof(SyncOperation), operation.Id,
+                security.UserId, operation.CompanyId, operation.BranchId,
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId,
+                Reason: operation.ErrorCode ?? "ERROR_NOT_RETRYABLE"), cancellationToken);
+            return operation;
+        }
 
         if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
         {
@@ -220,7 +243,8 @@ public sealed class SyncOperationService(
         var dueAt = now ?? DateTimeOffset.UtcNow;
         var query = db.SyncOperations.AsNoTracking()
             .Where(x => x.CompanyId == security.CompanyId && x.Status == "FAILED" &&
-                        x.NextRetryAt != null && x.NextRetryAt <= dueAt);
+                        x.NextRetryAt != null && x.NextRetryAt <= dueAt &&
+                        (x.ErrorCode == null || x.ErrorCode == "RATE_LIMITED"));
         if (security.BranchId is not null)
             query = query.Where(x => x.BranchId == security.BranchId);
         return await query.OrderBy(x => x.NextRetryAt).ThenBy(x => x.CreatedAt).Take(take).ToListAsync(cancellationToken);
@@ -369,6 +393,10 @@ public sealed class SyncOperationService(
     private static bool PayloadHashMatches(string payload, string expectedHash)
         => string.Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant(),
             expectedHash.Trim().ToLowerInvariant(), StringComparison.Ordinal);
+
+    private static bool IsRetryableErrorCode(string? errorCode)
+        => string.IsNullOrWhiteSpace(errorCode) ||
+           string.Equals(errorCode.Trim(), "RATE_LIMITED", StringComparison.OrdinalIgnoreCase);
 
     private TimeSpan CalculateBackoff(int retryNumber)
     {

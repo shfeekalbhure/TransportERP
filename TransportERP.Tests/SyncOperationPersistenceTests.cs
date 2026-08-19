@@ -71,7 +71,7 @@ public sealed class SyncOperationPersistenceTests
         operation = await service.TransitionSyncOperationAsync(
             new TransitionSyncOperationCommand(operation.Id, "SENDING"), scope.Security);
         operation = await service.TransitionSyncOperationAsync(
-            new TransitionSyncOperationCommand(operation.Id, "FAILED"), scope.Security);
+            new TransitionSyncOperationCommand(operation.Id, "FAILED", "RATE_LIMITED"), scope.Security);
         operation = await service.RetryOperationAsync(operation.Id, scope.Security);
 
         Assert.Equal("FAILED", operation.Status);
@@ -107,6 +107,31 @@ public sealed class SyncOperationPersistenceTests
 
         await Assert.ThrowsAsync<SyncRuleException>(() => service.ResolveSyncConflictAsync(conflict.Id,
             new ResolveSyncConflictCommand("SECOND_ATTEMPT"), scope.Security));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Retry_rejects_non_retryable_hash_and_permission_errors()
+    {
+        var connection = GetConnection();
+        if (connection is null) return;
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "NRT");
+        var service = CreateService(db);
+        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{\"nonRetryable\":true}"), scope.Security);
+        operation = await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(operation.Id, "SENDING"), scope.Security);
+        operation = await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(operation.Id, "FAILED", "HASH_MISMATCH"), scope.Security);
+
+        var result = await service.RetryOperationAsync(operation.Id, scope.Security);
+
+        Assert.Equal("REJECTED", result.Status);
+        Assert.Null(result.NextRetryAt);
+        Assert.Equal("HASH_MISMATCH", result.ErrorCode);
+        Assert.Contains(await db.AuditEvents.ToListAsync(), x => x.Action == "SyncOperationRetryRejected" && x.EntityId == operation.Id);
     }
 
     private static SyncOperationService CreateService(

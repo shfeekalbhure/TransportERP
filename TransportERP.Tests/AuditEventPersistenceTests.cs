@@ -24,14 +24,78 @@ public sealed class AuditEventPersistenceTests
         await service.AppendAuditEventAsync(new AuditEventDraft(
             "TEST_B", "SUCCESS", "TEST_ENTITY", CompanyId: companyB, BranchId: branchB));
 
-        var chain = await service.VerifyHashChainAsync();
-        Assert.True(chain.IsValid, chain.FailureReason);
+        var chainA = await service.VerifyHashChainAsync(companyA, branchA);
+        var chainB = await service.VerifyHashChainAsync(companyB, branchB);
+        Assert.True(chainA.IsValid, chainA.FailureReason);
+        Assert.True(chainB.IsValid, chainB.FailureReason);
 
         var companyEvents = await service.GetAuditEventsAsync(new AuditEventQuery(
             CompanyId: companyA, Action: "TEST_A", Take: 10));
         Assert.Single(companyEvents);
         Assert.Equal(companyA, companyEvents[0].CompanyId);
         Assert.DoesNotContain(companyEvents, x => x.CompanyId == companyB);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Canonical_hash_chain_isolated_by_company_branch_and_device_stream()
+    {
+        var connection = GetConnection();
+        if (connection is null) return;
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var (company, branch) = await SeedScopeAsync(db, "S");
+        var service = new AuditEventService(db);
+        var deviceA = "audit-device-a";
+        var deviceB = "audit-device-b";
+
+        await service.AppendAuditEventAsync(new AuditEventDraft("STREAM_A1", "SUCCESS", "TEST_ENTITY",
+            CompanyId: company, BranchId: branch, DeviceId: deviceA));
+        await service.AppendAuditEventAsync(new AuditEventDraft("STREAM_B1", "SUCCESS", "TEST_ENTITY",
+            CompanyId: company, BranchId: branch, DeviceId: deviceB));
+        await service.AppendAuditEventAsync(new AuditEventDraft("STREAM_A2", "SUCCESS", "TEST_ENTITY",
+            CompanyId: company, BranchId: branch, DeviceId: deviceA));
+
+        var streamA = await service.VerifyHashChainAsync(company, branch, deviceA);
+        var streamB = await service.VerifyHashChainAsync(company, branch, deviceB);
+
+        Assert.True(streamA.IsValid, streamA.FailureReason);
+        Assert.Equal(2, streamA.EventCount);
+        Assert.Equal(AuditEventService.GetStreamKey(company, branch, deviceA), streamA.StreamKey);
+        Assert.True(streamB.IsValid, streamB.FailureReason);
+        Assert.Equal(1, streamB.EventCount);
+        Assert.Equal(AuditEventService.GetStreamKey(company, branch, deviceB), streamB.StreamKey);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Concurrent_appends_to_one_stream_are_serializable_and_verify()
+    {
+        var connection = GetConnection();
+        if (connection is null) return;
+
+        await using var seedDb = CreateDb(connection);
+        await seedDb.Database.MigrateAsync();
+        var (company, branch) = await SeedScopeAsync(seedDb, "C");
+        var device = $"audit-concurrent-{Guid.NewGuid():N}";
+
+        var tasks = Enumerable.Range(0, 4).Select(async index =>
+        {
+            await using var db = CreateDb(connection);
+            var service = new AuditEventService(db);
+            return await service.AppendAuditEventAsync(new AuditEventDraft(
+                $"CONCURRENT_{index}", "SUCCESS", "TEST_ENTITY", CompanyId: company,
+                BranchId: branch, DeviceId: device, CorrelationId: Guid.NewGuid()));
+        });
+
+        var appended = await Task.WhenAll(tasks);
+        Assert.Equal(4, appended.Length);
+
+        await using var verifyDb = CreateDb(connection);
+        var result = await new AuditEventService(verifyDb).VerifyHashChainAsync(company, branch, device);
+        Assert.True(result.IsValid, result.FailureReason);
+        Assert.Equal(4, result.EventCount);
     }
 
     [Fact]
@@ -43,19 +107,11 @@ public sealed class AuditEventPersistenceTests
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
+        var (company, branch) = await SeedScopeAsync(db, "T");
+        var audit = await new AuditEventService(db).AppendAuditEventAsync(new AuditEventDraft(
+            "TRIGGER_TEST", "SUCCESS", "TEST_ENTITY", CompanyId: company, BranchId: branch,
+            DeviceId: "trigger-device"));
         await using var transaction = await db.Database.BeginTransactionAsync();
-        var audit = new AuditEvent
-        {
-            Id = Guid.NewGuid(),
-            OccurredAt = DateTimeOffset.UtcNow,
-            Action = "TRIGGER_TEST",
-            Outcome = "SUCCESS",
-            EntityType = "TEST_ENTITY",
-            CorrelationId = Guid.NewGuid(),
-            Hash = "trigger-test-hash"
-        };
-        db.AuditEvents.Add(audit);
-        await db.SaveChangesAsync();
 
         await transaction.CreateSavepointAsync("before_update");
         var updateError = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
@@ -84,43 +140,68 @@ public sealed class AuditEventPersistenceTests
         TransportErpDbContext db,
         string suffix)
     {
-        var currency = new Currency
+        for (var attempt = 0; attempt < 8; attempt++)
         {
-            Id = Guid.NewGuid(),
-            Code = $"T{suffix}{Guid.NewGuid():N}"[..3].ToUpperInvariant(),
-            NameAr = "عملة اختبار",
-            MinorUnit = 2,
-            IsBase = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
-        var company = new Company
+            var now = DateTimeOffset.UtcNow;
+            var currency = new Currency
+            {
+                Id = Guid.NewGuid(),
+                Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+                NameAr = "عملة اختبار",
+                MinorUnit = 2,
+                IsBase = true,
+                CreatedAt = now,
+                UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                Code = $"AUD-{suffix}-{Guid.NewGuid():N}"[..18],
+                LegalNameAr = "شركة تدقيق اختبار",
+                BaseCurrencyId = currency.Id,
+                DefaultCalendarId = Guid.NewGuid(),
+                CreatedAt = now,
+                UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            var branch = new Branch
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Code = "MAIN",
+                NameAr = "الفرع الرئيسي",
+                Timezone = "Asia/Aden",
+                CreatedAt = now,
+                UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.Currencies.Add(currency);
+            db.Companies.Add(company);
+            db.Branches.Add(branch);
+            try
+            {
+                await db.SaveChangesAsync();
+                return (company.Id, branch.Id);
+            }
+            catch (Exception ex) when (IsUniqueViolation(ex) && attempt < 7)
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(10 * (attempt + 1));
+            }
+        }
+
+        throw new InvalidOperationException("Unable to seed a unique PostgreSQL test scope after retries.");
+    }
+
+    private static bool IsUniqueViolation(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
         {
-            Id = Guid.NewGuid(),
-            Code = $"AUD-{suffix}-{Guid.NewGuid():N}"[..18],
-            LegalNameAr = "شركة تدقيق اختبار",
-            BaseCurrencyId = currency.Id,
-            DefaultCalendarId = Guid.NewGuid(),
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
-        var branch = new Branch
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            Code = "MAIN",
-            NameAr = "الفرع الرئيسي",
-            Timezone = "Asia/Aden",
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        };
-        db.Currencies.Add(currency);
-        db.Companies.Add(company);
-        db.Branches.Add(branch);
-        await db.SaveChangesAsync();
-        return (company.Id, branch.Id);
+            if (current is PostgresException { SqlState: "23505" })
+                return true;
+        }
+
+        return false;
     }
 }

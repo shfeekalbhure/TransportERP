@@ -1,0 +1,10 @@
+  TransportERP.Application -> /home/ubuntu/repo_review/TransportERP/TransportERP.Application/bin/Debug/net10.0/TransportERP.Application.dll
+  TransportERP.Infrastructure -> /home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/bin/Debug/net10.0/TransportERP.Infrastructure.dll
+  TransportERP.Api -> /home/ubuntu/repo_review/TransportERP/TransportERP.Api/bin/Debug/net10.0/TransportERP.Api.dll
+  TransportERP.Tests -> /home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.19
