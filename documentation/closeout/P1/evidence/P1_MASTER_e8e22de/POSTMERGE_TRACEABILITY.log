@@ -1,0 +1,41 @@
+=== MASTER HEAD ===
+e8e22de26b4faa5040f53582ab2c8934d43216f0
+=== TREE EQUALITY ===
+PASS: merge tree equals approved source tree
+=== TRACEABILITY SHA REFERENCES ===
+[35morigin/master:artifacts/pr33_rr5_final/SUMMARY.log[m[36m:[m[32m1[m[36m:[mHEAD=[1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19
+[35morigin/master:documentation/closeout/P1/P1_AUDIT_SYNC_CORRECTIVE_ACTION_MATRIX_RR2_2026-08-19.md[m[36m:[m[32m4[m[36m:[m**سبب الإصدار:** قرار المراجعة المستقلة `FAIL` على الالتزام `[1;31m8af9af3[m9f25e099e2f4b8ed4526997a907ba7602`  
+[35morigin/master:documentation/closeout/P1/P1_AUDIT_SYNC_RR2_CORRECTIVE_RESPONSE_2026-08-19.md[m[36m:[m[32m4[m[36m:[m**الالتزام الذي فُحص في تقرير FAIL:** `[1;31m8af9af3[m9f25e099e2f4b8ed4526997a907ba7602`  
+[35morigin/master:documentation/closeout/P1/P1_AUDIT_SYNC_RR2_CORRECTIVE_RESPONSE_2026-08-19.md[m[36m:[m[32m10[m[36m:[mقرار `FAIL` كان صحيحًا بالنسبة إلى النسخة المفحوصة: التقرير فحص `master` عند الالتزام `[1;31m8af9af3[m9...`، بينما كانت الإصلاحات السابقة موجودة في مساحة العمل المحلية غير الملتزمة، ولذلك لم تظهر في GitHub أو في الالتزام المفحوص. وعليه لا تُعتبر نتيجة الاختبارات المحلية السابقة دليلًا على النسخة التي راجعها الفريق.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m11[m[36m:[m- **head الحالي لـPR عند إغلاق RR5:** `[1;31mdd2c948[ma0742e5785fadb63d68303689fd6bb6f0`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m12[m[36m:[m- **head تنفيذ اختبارات الأدلة:** `[1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m32[m[36m:[mالسجل الخام `SUMMARY.log` يحتفظ بقيمة head التي كانت موجودة لحظة تنفيذ الأوامر (`[1;31mf66f767[m...`) ولا يجوز إعادة كتابته بأثر رجعي. يربط ملحق traceability هذا السجل بالـhead الحالي `[1;31mdd2c948[m...` عبر diff موثق يثبت أن التغيير اللاحق وثائقي وأدلة فقط.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m43[m[36m:[m| head الحالي لـPR | `[1;31mdd2c948[m...` |
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m44[m[36m:[m| head تنفيذ الأدلة | `[1;31mf66f767[m...` |
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_INDEPENDENT_REVIEW_PACKAGE_2026-08-19.md[m[36m:[m[32m48[m[36m:[mأُغلقت ملاحظة traceability توثيقيًا عبر الفصل الصريح بين head الحالي وhead تنفيذ الأدلة. لا يصبح PR جاهزًا للدمج إلا بعد اعتماد المالك صراحةً لهذه المطابقة، ثم إصدار قرار مستقل نهائي `PASS` على head الحالي `[1;31mdd2c948[m...`. لا يُنفذ الدمج تلقائيًا.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_OWNER_SIGNOFF_REQUEST_2026-08-19.md[m[36m:[m[32m5[m[36m:[mيتعلق هذا الطلب بالملاحظة التوثيقية الوحيدة في RR5 على PR #33. تم الفصل بين head تنفيذ سجلات الأدلة التاريخي `[1;31mf66f767[m...` وhead PR الحالي، وأضيف ملحق يثبت أن الفرق بينهما وثائق وسجلات أدلة فقط ولا يتضمن شيفرة أو مشاريع أو Migrations.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_OWNER_SIGNOFF_REQUEST_2026-08-19.md[m[36m:[m[32m12[m[36m:[m- **head المطلوب اعتماده عند إصدار الطلب:** `[1;31mdd2c948[ma0742e5785fadb63d68303689fd6bb6f0`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_OWNER_SIGNOFF_REQUEST_2026-08-19.md[m[36m:[m[32m13[m[36m:[m- **head تنفيذ الأدلة:** `[1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_PR_BODY.md[m[36m:[m[32m7[m[36m:[m`[1;31mdd2c948[ma0742e5785fadb63d68303689fd6bb6f0`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_PR_BODY.md[m[36m:[m[32m15[m[36m:[m`[1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19`
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_PR_BODY.md[m[36m:[m[32m17[m[36m:[mويثبت ملحق traceability أن الفرق بين `[1;31mf66f767[m...` و`[1;31mdd2c948[m...` يتكون من وثائق وسجلات أدلة فقط، دون ملفات شيفرة أو مشاريع أو Migrations. لا يجوز إعادة كتابة السجلات الخام لتغيير head التاريخي الذي يظهر فيها.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_PR_BODY.md[m[36m:[m[32m21[m[36m:[mأعلنت المراجعة المستقلة `PASS_WITH_NOTES`. أُغلقت الملاحظة التوثيقية بإضافة ملحق traceability يربط مصدر السجلات بالـhead الحالي، لكن `PASS_WITH_NOTES` لا يُعد تفويضًا للدمج. يلزم اعتماد المالك الصريح ثم قرار نهائي مستقل `PASS` أو `FAIL` على head `[1;31mdd2c948[m...`.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_PR_BODY.md[m[36m:[m[32m44[m[36m:[mحالة PR الحالية `OPEN` و`CLEAN`. لا توجد فحوص CI آلية مهيأة. لا يُنفذ الدمج قبل اعتماد المالك الصريح للـhead `[1;31mdd2c948[m...` وصدور قرار مستقل نهائي `PASS` على نفس head.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_TRACEABILITY_ADDENDUM_2026-08-19.md[m[36m:[m[32m11[m[36m:[m| head PR الحالي عند إغلاق RR5 | `[1;31mdd2c948[ma0742e5785fadb63d68303689fd6bb6f0` |
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_TRACEABILITY_ADDENDUM_2026-08-19.md[m[36m:[m[32m12[m[36m:[m| head الذي نُفذت عليه أوامر Clean/Build/Test | `[1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19` |
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_TRACEABILITY_ADDENDUM_2026-08-19.md[m[36m:[m[32m17[m[36m:[mلا يُعاد تعديل `SUMMARY.log` أو أي سجل خام لإخفاء head الذي كان موجودًا لحظة التنفيذ. لذلك يبقى `[1;31mf66f767[m...` ظاهرًا داخل السجل الخام بوصفه مصدر التنفيذ، بينما يثبت هذا الملحق أن `[1;31mdd2c948[m...` هو head PR الحالي وأن الفرق بينهما لا يتضمن ملفات شيفرة أو مشاريع أو Migrations.
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_TRACEABILITY_ADDENDUM_2026-08-19.md[m[36m:[m[32m24[m[36m:[mgit diff --name-status [1;31mf66f767[m972c640f28c01f40c5b23cafcb39adf19..[1;31mdd2c948[ma0742e5785fadb63d68303689fd6bb6f0
+[35morigin/master:documentation/closeout/P1/P1_PR33_RR5_TRACEABILITY_ADDENDUM_2026-08-19.md[m[36m:[m[32m31[m[36m:[mهذه المطابقة تغلق الملاحظة التوثيقية فقط. لا يُصدر قرار دمج نهائي إلا بعد اعتماد المالك الصريح لهذا الملحق والتحقق من ثبات head `[1;31mdd2c948[m...`. بعد ذلك يجب أن يصدر الفريق المستقل قرارًا نهائيًا واحدًا: `PASS` أو `FAIL`، ولا يُستخدم `PASS_WITH_NOTES` كتفويض دمج.
+=== ACTIVE CONTRACT RETRIED ===
+[35morigin/master:documentation/closeout/P1/P1_DOMAIN_OPERATING_MODEL.md[m[36m:[m[32m70[m[36m:[m| مزامنة | `Queued → Sending → Succeeded/Failed/Conflict/Rejected → Resolved`؛ تبقى العملية `FAILED` أثناء إعادة المحاولة مع تحديث `RetryCount` و`NextRetryAt` ثم تعود إلى `SENDING` بعد Backoff | حذف عملية فاشلة دون أثر؛ تطبيق نفس العملية مرتين دون idempotency؛ استخدام `[1;31mRETRIED[m` كحالة مستقلة |
+=== CODE RETRIED ===
+=== ACTIVE CONTRACT HASHES ===
+documentation/closeout/P1/W1_DATA_CONTRACT_REGISTER.csv b65ad5271b38e20634c80920e151f5bcd6ded599db77ae3d5d3168226137d502
+documentation/closeout/P1/W2_ACTION_CONTRACT_REGISTER.csv a5e6bb8e9d9dbe7f5fa792e82a1ed85c543e06354d2a74228d6eaf63c3b26f7e
+documentation/closeout/P1/W3_SCREEN_CONTRACT_REGISTER.csv 1978abad79528d1dd89b377d5f49ed5304bc3c3613b48256183afeb0538718b4
+documentation/closeout/P1/P1_SYNC_CONTRACT.md f537b0ca677d61c0e72ee8c9dbc67d77eec9cdd532377191484e7215069240eb
+documentation/closeout/P1/P1_DOMAIN_OPERATING_MODEL.md afc9e2a28b149c18c372d76cc27a083459e8c75168b90cfa4f46c2d6dcda9eff
+=== MERGE PARENT METADATA ===
+commit=e8e22de26b4faa5040f53582ab2c8934d43216f0
+parent=8af9af39f25e099e2f4b8ed4526997a907ba7602 d39dfaf3596548c4ed0d1f66ec75c5faafc55509
+subject=Merge PR #33: P1 audit and sync production baseline

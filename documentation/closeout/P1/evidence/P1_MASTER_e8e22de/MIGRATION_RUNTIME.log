@@ -1,0 +1,12 @@
+NOTICE:  database "postmerge_migration_20260819" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE
+GRANT
+GRANT
+  Determining projects to restore...
+  Restored /tmp/postmerge_review/master_migration_harness/MasterMigrationHarness.csproj (in 292 ms).
+  1 of 2 projects are up-to-date for restore.
+DOWN_OK
+UP_OK
+REAPPLY_OK
+DROP DATABASE

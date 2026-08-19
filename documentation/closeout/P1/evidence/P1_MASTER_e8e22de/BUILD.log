@@ -1,0 +1,10 @@
+  TransportERP.Application -> /tmp/postmerge_review/master_worktree/TransportERP.Application/bin/Debug/net10.0/TransportERP.Application.dll
+  TransportERP.Infrastructure -> /tmp/postmerge_review/master_worktree/TransportERP.Infrastructure/bin/Debug/net10.0/TransportERP.Infrastructure.dll
+  TransportERP.Api -> /tmp/postmerge_review/master_worktree/TransportERP.Api/bin/Debug/net10.0/TransportERP.Api.dll
+  TransportERP.Tests -> /tmp/postmerge_review/master_worktree/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.04
