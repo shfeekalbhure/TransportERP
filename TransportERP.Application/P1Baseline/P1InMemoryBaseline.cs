@@ -17,7 +17,10 @@ public sealed record P1Voucher(string Id, string CompanyId, string? BranchId, de
 public sealed record P1AuditEvent(string Id, string Action, string EntityId, string ActorId, string CompanyId, string? BranchId, string CorrelationId, DateTimeOffset At, string Outcome);
 public sealed record P1SyncOperation(string DeviceId, string ClientOperationId, string PayloadHash, string Action, string CompanyId, string? BranchId, string BaseVersion);
 public sealed record P1SyncResult(string ClientOperationId, string Status, string? ErrorCode = null);
-public sealed record P1Role(string Id, string Name, long Version = 1);
+public sealed record P1Role(string Id, string Name, IReadOnlySet<string> Permissions, long Version = 1)
+{
+    public P1Role(string id, string name, long version = 1) : this(id, name, new HashSet<string>(), version) { }
+}
 public sealed record P1Permission(string Code);
 public sealed record P1Setting(string Key, string Value, long Version = 1);
 public sealed record P1ScopedSetting(string ScopeType, string ScopeId, string Key, string Value, long Version = 1);
@@ -70,6 +73,21 @@ public sealed class P1InMemoryService
         return branch;
     }
 
+    public P1Branch UpdateBranch(string companyId, string branchId, string code, string name, bool active, long expectedVersion, string actorId = "system")
+    {
+        RequireCompany(companyId);
+        if (!_store.Branches.TryGetValue(branchId, out var current) || current.CompanyId != companyId)
+            throw new P1RuleException("BRANCH_NOT_FOUND", branchId);
+        if (current.Version != expectedVersion)
+            throw new P1RuleException("CONCURRENCY_CONFLICT", branchId);
+        if (_store.Branches.Values.Any(x => x.Id != branchId && x.CompanyId == companyId && x.Code == code))
+            throw new P1RuleException("BRANCH_DUPLICATE", code);
+        var updated = current with { Code = code, Name = name, Active = active, Version = current.Version + 1 };
+        _store.Branches[branchId] = updated;
+        Audit("ManageOrganizations", branchId, actorId, companyId, branchId, "SUCCESS");
+        return updated;
+    }
+
     public P1User CreateUser(string companyId, string? branchId, string id, string userName, string password, string actorId = "system")
     {
         RequireCompany(companyId);
@@ -96,19 +114,21 @@ public sealed class P1InMemoryService
         return updated;
     }
 
-    public P1Role RegisterRole(string roleId, string name, string actorId = "system")
+    public P1Role RegisterRole(string roleId, string name, IEnumerable<string>? permissions = null, string actorId = "system")
     {
         if (string.IsNullOrWhiteSpace(name)) throw new P1RuleException("VALIDATION_ERROR", roleId);
-        if (!_store.Roles.TryAdd(roleId, new P1Role(roleId, name)))
+        if (!_store.Roles.TryAdd(roleId, new P1Role(roleId, name, (permissions ?? Array.Empty<string>()).ToHashSet())))
             throw new P1RuleException("ROLE_DUPLICATE", roleId);
         Audit("AssignPermissions", roleId, actorId, "platform", null, "SUCCESS");
         return _store.Roles[roleId];
     }
 
-    public IReadOnlyCollection<string> AssignRoles(string companyId, string userId, IEnumerable<string> roleIds, string actorId = "system")
+    public IReadOnlyCollection<string> AssignRoles(string companyId, string userId, IEnumerable<string> roleIds, string actorId = "system", long? expectedUserVersion = null)
     {
         if (!_store.Users.TryGetValue(userId, out var user) || user.CompanyId != companyId)
             throw new P1RuleException("USER_NOT_FOUND", userId);
+        if (expectedUserVersion is not null && user.Version != expectedUserVersion.Value)
+            throw new P1RuleException("CONCURRENCY_CONFLICT", userId);
         var roles = roleIds.Distinct().ToHashSet();
         if (roles.Any(x => !_store.Roles.ContainsKey(x)))
             throw new P1RuleException("ROLE_NOT_FOUND", roles.First(x => !_store.Roles.ContainsKey(x)));
@@ -118,9 +138,14 @@ public sealed class P1InMemoryService
     }
 
     public P1Setting SaveGlobalSetting(string key, string value, string actorId = "system")
+        => SaveGlobalSetting(key, value, null, actorId);
+
+    public P1Setting SaveGlobalSetting(string key, string value, long? expectedVersion, string actorId = "system")
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
             throw new P1RuleException("SETTING_SCHEMA_INVALID", key);
+        if (_store.GlobalSettings.TryGetValue(key, out var current) && expectedVersion is not null && current.Version != expectedVersion.Value)
+            throw new P1RuleException("CONCURRENCY_CONFLICT", key);
         var saved = _store.GlobalSettings.AddOrUpdate(key,
             _ => new P1Setting(key, value),
             (_, old) => old with { Value = value, Version = old.Version + 1 });
@@ -129,6 +154,9 @@ public sealed class P1InMemoryService
     }
 
     public P1ScopedSetting SaveScopedSetting(string scopeType, string scopeId, string key, string value, string companyId, string actorId = "system")
+        => SaveScopedSetting(scopeType, scopeId, key, value, companyId, null, actorId);
+
+    public P1ScopedSetting SaveScopedSetting(string scopeType, string scopeId, string key, string value, string companyId, long? expectedVersion, string actorId = "system")
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
             throw new P1RuleException("SETTING_SCHEMA_INVALID", key);
@@ -139,6 +167,8 @@ public sealed class P1InMemoryService
         else
             throw new P1RuleException("SETTING_SCOPE_INVALID", scopeType);
         var id = $"{scopeType}:{scopeId}:{key}";
+        if (_store.ScopedSettings.TryGetValue(id, out var current) && expectedVersion is not null && current.Version != expectedVersion.Value)
+            throw new P1RuleException("CONCURRENCY_CONFLICT", id);
         var saved = _store.ScopedSettings.AddOrUpdate(id,
             _ => new P1ScopedSetting(scopeType, scopeId, key, value),
             (_, old) => old with { Value = value, Version = old.Version + 1 });
@@ -250,7 +280,16 @@ public sealed class P1InMemoryService
         return voucher;
     }
 
-    public IReadOnlyList<P1AuditEvent> ReadAuditEvents(string companyId) => _store.AuditEvents.Where(x => x.CompanyId == companyId).OrderBy(x => x.At).ToArray();
+    public IReadOnlyList<P1AuditEvent> ReadAuditEvents(string companyId) => ReadAuditEvents(companyId, null, null, 0, int.MaxValue);
+
+    public IReadOnlyList<P1AuditEvent> ReadAuditEvents(string companyId, string? action, string? branchId, int skip = 0, int take = 100)
+    {
+        if (skip < 0 || take < 0) throw new P1RuleException("INVALID_FILTER", "paging");
+        var query = _store.AuditEvents.Where(x => x.CompanyId == companyId);
+        if (!string.IsNullOrWhiteSpace(action)) query = query.Where(x => x.Action == action);
+        if (!string.IsNullOrWhiteSpace(branchId)) query = query.Where(x => x.BranchId == branchId);
+        return query.OrderBy(x => x.At).Skip(skip).Take(take).ToArray();
+    }
 
     public IReadOnlyList<P1SyncResult> SyncBatch(IEnumerable<P1SyncOperation> operations, string actorId = "sync")
     {
