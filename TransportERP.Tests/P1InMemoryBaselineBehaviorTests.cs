@@ -82,6 +82,31 @@ public sealed class P1InMemoryBaselineBehaviorTests
     }
 
     [Fact]
+    public void User_update_requires_matching_version_and_role_assignment_requires_existing_role()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var updated = service.UpdateUser(companyId, "U-001", "owner-renamed", true, 1);
+        Assert.Equal(2, updated.Version);
+        Assert.Throws<P1RuleException>(() => service.UpdateUser(companyId, "U-001", "owner-again", true, 1));
+        service.RegisterRole("R-ADMIN", "مدير النظام");
+        Assert.Contains("R-ADMIN", service.AssignRoles(companyId, "U-001", new[] { "R-ADMIN" }));
+        Assert.Throws<P1RuleException>(() => service.AssignRoles(companyId, "U-001", new[] { "R-MISSING" }));
+    }
+
+    [Fact]
+    public void Settings_support_global_and_company_or_branch_scope_and_reject_invalid_scope()
+    {
+        var (service, companyId, branchId, _, _, _) = Seed();
+        var global = service.SaveGlobalSetting("default.currency", "YER");
+        Assert.Equal("YER", global.Value);
+        var company = service.SaveScopedSetting("company", companyId, "timezone", "Asia/Aden", companyId);
+        Assert.Equal(companyId, company.ScopeId);
+        var branch = service.SaveScopedSetting("branch", branchId, "cash.policy", "CASH", companyId);
+        Assert.Equal(branchId, branch.ScopeId);
+        Assert.Throws<P1RuleException>(() => service.SaveScopedSetting("tenant", companyId, "x", "y", companyId));
+    }
+
+    [Fact]
     public void Voucher_rejects_non_positive_amount_and_duplicate_reference()
     {
         var (service, companyId, branchId, _, _, _) = Seed();
