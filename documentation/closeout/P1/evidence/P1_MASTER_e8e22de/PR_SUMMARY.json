@@ -1,0 +1,18 @@
+{
+  "number": 33,
+  "state": "closed",
+  "merged": true,
+  "merged_at": "2026-08-19T20:37:29Z",
+  "merge_commit_sha": "e8e22de26b4faa5040f53582ab2c8934d43216f0",
+  "head": {
+    "ref": null,
+    "sha": null
+  },
+  "base": {
+    "ref": null,
+    "sha": null
+  },
+  "mergeable": null,
+  "mergeable_state": "unknown",
+  "url": "https://api.github.com/repos/shfeekalbhure/TransportERP/pulls/33"
+}
