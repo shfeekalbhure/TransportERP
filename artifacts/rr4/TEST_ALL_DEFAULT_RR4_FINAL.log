@@ -1,0 +1,371 @@
+Build started 08/19/2026 17:34:23.
+     1>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" on node 1 (Restore target(s)).
+     1>_GetAllRestoreProjectPathItems:
+         Determining projects to restore...
+     1>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Application/TransportERP.Application.csproj" (2:4) on node 1 (_GenerateProjectRestoreGraph target(s)).
+     2>AddPrunePackageReferences:
+         Loading prune package data from PrunePackageData folder
+         Failed to load prune package data from PrunePackageData folder, loading from targeting packs instead
+         Looking for targeting packs in /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref
+         Pack directories found: /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11
+     1>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj" (3:5) on node 3 (_GenerateProjectRestoreGraph target(s)).
+     3>AddPrunePackageReferences:
+         Loading prune package data from PrunePackageData folder
+         Failed to load prune package data from PrunePackageData folder, loading from targeting packs instead
+     1>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj" (4:4) on node 2 (_GenerateProjectRestoreGraph target(s)).
+     4>AddPrunePackageReferences:
+         Loading prune package data from PrunePackageData folder
+         Failed to load prune package data from PrunePackageData folder, loading from targeting packs instead
+     3>AddPrunePackageReferences:
+         Looking for targeting packs in /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref
+         Pack directories found: /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11
+     2>AddPrunePackageReferences:
+         Found package overrides file /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11/data/PackageOverrides.txt
+     4>AddPrunePackageReferences:
+         Looking for targeting packs in /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref
+         Pack directories found: /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11
+     3>AddPrunePackageReferences:
+         Found package overrides file /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11/data/PackageOverrides.txt
+     4>AddPrunePackageReferences:
+         Found package overrides file /home/ubuntu/.dotnet/packs/Microsoft.NETCore.App.Ref/10.0.11/data/PackageOverrides.txt
+         Loading prune package data from PrunePackageData folder
+         Failed to load prune package data from PrunePackageData folder, loading from targeting packs instead
+         Looking for targeting packs in /home/ubuntu/.dotnet/packs/Microsoft.AspNetCore.App.Ref
+         Pack directories found: /home/ubuntu/.dotnet/packs/Microsoft.AspNetCore.App.Ref/10.0.11
+         Found package overrides file /home/ubuntu/.dotnet/packs/Microsoft.AspNetCore.App.Ref/10.0.11/data/PackageOverrides.txt
+     2>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Application/TransportERP.Application.csproj" (_GenerateProjectRestoreGraph target(s)).
+     3>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj" (_GenerateProjectRestoreGraph target(s)).
+     4>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj" (_GenerateProjectRestoreGraph target(s)).
+     1>Restore:
+         X.509 certificate chain validation will use the fallback certificate bundle at '/home/ubuntu/.dotnet/sdk/10.0.400/trustedroots/codesignctl.pem'.
+         X.509 certificate chain validation will use the fallback certificate bundle at '/home/ubuntu/.dotnet/sdk/10.0.400/trustedroots/timestampctl.pem'.
+         Assets file has not changed. Skipping assets file writing. Path: /home/ubuntu/repo_review/TransportERP/TransportERP.Api/obj/project.assets.json
+         Assets file has not changed. Skipping assets file writing. Path: /home/ubuntu/repo_review/TransportERP/TransportERP.Application/obj/project.assets.json
+         Assets file has not changed. Skipping assets file writing. Path: /home/ubuntu/repo_review/TransportERP/TransportERP.Tests/obj/project.assets.json
+         Assets file has not changed. Skipping assets file writing. Path: /home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/obj/project.assets.json
+         Restored /home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj (in 48 ms).
+         Restored /home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj (in 48 ms).
+         Restored /home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj (in 48 ms).
+         Restored /home/ubuntu/repo_review/TransportERP/TransportERP.Application/TransportERP.Application.csproj (in 48 ms).
+         
+         NuGet Config files used:
+             /home/ubuntu/.nuget/NuGet/NuGet.Config
+         
+         Feeds used:
+             https://api.nuget.org/v3/index.json
+         All projects are up-to-date for restore.
+     1>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (Restore target(s)).
+   1:7>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" on node 3 (VSTest target(s)).
+     1>BuildProject:
+         Build started, please wait...
+   1:7>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1:7) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1:8) on node 3 (default targets).
+   1:8>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1:8) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj" (3:7) on node 3 (default targets).
+     3>GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+   1:8>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1:8) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Application/TransportERP.Application.csproj" (2:6) on node 2 (default targets).
+     2>GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+     3>CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+     2>CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+     3>_GenerateSourceLinkFile:
+         Source Link file 'obj/Debug/net10.0/TransportERP.Infrastructure.sourcelink.json' is up-to-date.
+     2>_GenerateSourceLinkFile:
+         Source Link file 'obj/Debug/net10.0/TransportERP.Application.sourcelink.json' is up-to-date.
+     3>CoreCompile:
+       Skipping target "CoreCompile" because all output files are up-to-date with respect to the input files.
+     2>CoreCompile:
+       Skipping target "CoreCompile" because all output files are up-to-date with respect to the input files.
+     3>_CopyOutOfDateSourceItemsToOutputDirectory:
+       Skipping target "_CopyOutOfDateSourceItemsToOutputDirectory" because all output files are up-to-date with respect to the input files.
+       GenerateBuildDependencyFile:
+       Skipping target "GenerateBuildDependencyFile" because all output files are up-to-date with respect to the input files.
+       GenerateBuildRuntimeConfigurationFiles:
+       Skipping target "GenerateBuildRuntimeConfigurationFiles" because all output files are up-to-date with respect to the input files.
+     2>GenerateBuildDependencyFile:
+       Skipping target "GenerateBuildDependencyFile" because all output files are up-to-date with respect to the input files.
+     3>CopyFilesToOutputDirectory:
+         TransportERP.Infrastructure -> /home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/bin/Debug/net10.0/TransportERP.Infrastructure.dll
+     2>CopyFilesToOutputDirectory:
+         TransportERP.Application -> /home/ubuntu/repo_review/TransportERP/TransportERP.Application/bin/Debug/net10.0/TransportERP.Application.dll
+     3>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/TransportERP.Infrastructure.csproj" (default targets).
+     2>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Application/TransportERP.Application.csproj" (default targets).
+   1:8>Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (1:8) is building "/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj" (4:6) on node 1 (default targets).
+     4>GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+       CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+       _DiscoverMvcApplicationParts:
+       Skipping target "_DiscoverMvcApplicationParts" because all output files are up-to-date with respect to the input files.
+       _GenerateSourceLinkFile:
+         Source Link file 'obj/Debug/net10.0/TransportERP.Api.sourcelink.json' is up-to-date.
+       CoreCompile:
+       Skipping target "CoreCompile" because all output files are up-to-date with respect to the input files.
+       _CreateAppHost:
+       Skipping target "_CreateAppHost" because all output files are up-to-date with respect to the input files.
+       _ProcessScopedCssFiles:
+       Skipping target "_ProcessScopedCssFiles" because it has no outputs.
+       _ProcessScopedCssFiles:
+       Skipping target "_ProcessScopedCssFiles" because it has no outputs.
+       _BuildCopyStaticWebAssetsPreserveNewest:
+       Skipping target "_BuildCopyStaticWebAssetsPreserveNewest" because it has no outputs.
+       _CopyOutOfDateSourceItemsToOutputDirectory:
+       Skipping target "_CopyOutOfDateSourceItemsToOutputDirectory" because all output files are up-to-date with respect to the input files.
+       GenerateBuildDependencyFile:
+       Skipping target "GenerateBuildDependencyFile" because all output files are up-to-date with respect to the input files.
+       GenerateBuildRuntimeConfigurationFiles:
+       Skipping target "GenerateBuildRuntimeConfigurationFiles" because all output files are up-to-date with respect to the input files.
+       CopyFilesToOutputDirectory:
+         TransportERP.Api -> /home/ubuntu/repo_review/TransportERP/TransportERP.Api/bin/Debug/net10.0/TransportERP.Api.dll
+     4>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Api/TransportERP.Api.csproj" (default targets).
+     1>GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+       CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+       _GenerateSourceLinkFile:
+         Source Link file 'obj/Debug/net10.0/TransportERP.Tests.sourcelink.json' is up-to-date.
+       CoreCompile:
+       Skipping target "CoreCompile" because all output files are up-to-date with respect to the input files.
+       _CopyOutOfDateSourceItemsToOutputDirectory:
+       Building target "_CopyOutOfDateSourceItemsToOutputDirectory" partially, because some output files are out of date with respect to their input files.
+         Copying file from "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/obj/Debug/net10.0/MvcTestingAppManifest.json" to "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/MvcTestingAppManifest.json".
+       GenerateBuildDependencyFile:
+       Skipping target "GenerateBuildDependencyFile" because all output files are up-to-date with respect to the input files.
+       GenerateBuildRuntimeConfigurationFiles:
+       Skipping target "GenerateBuildRuntimeConfigurationFiles" because all output files are up-to-date with respect to the input files.
+       CopyFilesToOutputDirectory:
+         TransportERP.Tests -> /home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Tests.dll
+       _MvcCopyDependencyFiles:
+         Copying file from "/home/ubuntu/repo_review/TransportERP/TransportERP.Api/bin/Debug/net10.0/TransportERP.Api.deps.json" to "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Api.deps.json".
+         Copying file from "/home/ubuntu/repo_review/TransportERP/TransportERP.Application/bin/Debug/net10.0/TransportERP.Application.deps.json" to "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Application.deps.json".
+         Copying file from "/home/ubuntu/repo_review/TransportERP/TransportERP.Infrastructure/bin/Debug/net10.0/TransportERP.Infrastructure.deps.json" to "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Infrastructure.deps.json".
+     1>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (default targets).
+     1>BuildProject:
+         Build completed.
+         
+Test run for /home/ubuntu/repo_review/TransportERP/TransportERP.Tests/bin/Debug/net10.0/TransportERP.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.08]   Discovering: TransportERP.Tests
+[xUnit.net 00:00:00.13]   Discovered:  TransportERP.Tests
+[xUnit.net 00:00:00.16]   Starting:    TransportERP.Tests
+  Passed TransportERP.Tests.P1ContractConformanceTests.Sync_contract_has_required_conflict_and_retry_controls [5 ms]
+  Passed TransportERP.Tests.P1ContractConformanceTests.W2_actions_have_routes_state_and_offline_policy [14 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Journal_client_operation_is_idempotent [23 ms]
+  Passed TransportERP.Tests.P1ContractConformanceTests.Acceptance_register_contains_all_203_specified_cases [7 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Sync_operation_supports_lifecycle_retry_and_conflict_resolution [11 ms]
+  Passed TransportERP.Tests.P1ContractConformanceTests.P1_contracts_do_not_claim_provider_specific_schema_or_migrations [5 ms]
+  Passed TransportERP.Tests.P1ContractConformanceTests.W3_screens_have_contract_links_and_visual_assets [2 ms]
+  Passed TransportERP.Tests.P1ContractConformanceTests.W1_contracts_have_required_data_and_scope_fields [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Voucher_lifecycle_is_draft_approved_posted_and_posted_is_immutable [7 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.User_update_requires_matching_version_and_role_assignment_requires_existing_role [10 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Voucher_rejects_non_positive_amount_and_duplicate_reference [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Organization_role_permissions_and_version_conflicts_are_enforced [2 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Settings_support_global_and_company_or_branch_scope_and_reject_invalid_scope [2 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Posted_journal_is_immutable_until_reversal [6 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.W3_journal_screen_state_enforces_workflow_and_permission [5 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Closing_period_with_draft_journal_is_blocked [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Sync_operation_rejects_invalid_transitions [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Audit_events_are_append_only_and_hash_chain_verifies [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Journal_requires_balanced_lines_and_postable_accounts [< 1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Audit_query_supports_action_branch_and_paging_filters [4 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Settings_require_matching_versions_for_updates [2 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Authenticate_creates_scoped_session_and_audit_event [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Voucher_idempotency_returns_same_draft_and_rejects_changed_payload [1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.W3_sync_screen_state_supports_offline_retry_resolution_and_permission [< 1 ms]
+  Passed TransportERP.Tests.P1InMemoryBaselineBehaviorTests.Sync_accepts_first_operation_repeats_same_hash_and_flags_conflict [1 ms]
+  Passed TransportERP.Tests.VoucherLifecyclePersistenceTests.Payment_can_be_cancelled_from_draft_and_reason_is_retained [787 ms]
+  Passed TransportERP.Tests.VoucherLifecyclePersistenceTests.Receipt_lifecycle_requires_order_and_blocks_posted_cancellation [97 ms]
+  Passed TransportERP.Tests.VoucherLifecyclePersistenceTests.Receipt_creation_is_idempotent_by_external_reference [23 ms]
+  Passed TransportERP.Tests.SyncOperationPersistenceTests.Enqueue_enforces_device_permission_and_company_branch_scope [1 s]
+  Passed TransportERP.Tests.SyncOperationPersistenceTests.Enqueue_is_idempotent_and_rejects_payload_hash_reuse [425 ms]
+  Passed TransportERP.Tests.SyncOperationPersistenceTests.Lifecycle_retry_backoff_conflict_case_and_resolution_are_persisted [353 ms]
+  Passed TransportERP.Tests.SyncOperationPersistenceTests.Retry_rejects_non_retryable_hash_and_permission_errors [109 ms]
+  Passed TransportERP.Tests.PostgreSqlPersistenceSmokeTests.Migration_and_receipt_round_trip_work_on_postgresql [137 ms]
+  Passed TransportERP.Tests.AuditEventPersistenceTests.Concurrent_appends_to_one_stream_are_serializable_and_verify [194 ms]
+  Passed TransportERP.Tests.AuditEventPersistenceTests.Audit_event_append_only_hash_chain_and_company_filter_work [194 ms]
+  Passed TransportERP.Tests.AuditEventPersistenceTests.PostgreSQL_trigger_blocks_update_and_delete_of_audit_event [90 ms]
+  Passed TransportERP.Tests.AuditEventPersistenceTests.Canonical_hash_chain_isolated_by_company_branch_and_device_stream [82 ms]
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[62]
+      User profile is available. Using '/home/ubuntu/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/ubuntu/repo_review/TransportERP/TransportERP.Api
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost/api/v1/audit/events?companyId=59de8d76-efca-4f99-9dc5-5acae462fac2 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: GET /api/v1/audit/events'
+info: Microsoft.AspNetCore.Http.Result.JsonResult[1]
+      Setting HTTP status code 403.
+info: Microsoft.AspNetCore.Http.Result.JsonResult[3]
+      Writing value of type '<>f__AnonymousType0`2' as Json.
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: GET /api/v1/audit/events'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost/api/v1/audit/events?companyId=59de8d76-efca-4f99-9dc5-5acae462fac2 - 403 - application/json;+charset=utf-8 102.1097ms
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost/api/v1/audit/events?companyId=c6199d32-1d31-49ce-9607-56cc9e5a95c8&take=100 - - -
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: GET /api/v1/audit/events'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@8__locals1_draft_CompanyId='?' (DbType = Guid), @8__locals1_draft_BranchId='?' (DbType = Guid), @deviceId='?'], CommandType='Text', CommandTimeout='30']
+      SELECT a."Hash"
+      FROM transport_erp.audit_events AS a
+      WHERE a."CompanyId" = @8__locals1_draft_CompanyId AND a."BranchId" = @8__locals1_draft_BranchId AND a."DeviceId" = @deviceId
+      ORDER BY a."OccurredAt" DESC, a."Id" DESC
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = Guid), @p3='?', @p4='?', @p5='?' (DbType = Guid), @p6='?' (DbType = Guid), @p7='?' (DbType = Guid), @p8='?', @p9='?' (DbType = Guid), @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?', @p15='?', @p16='?'], CommandType='Text', CommandTimeout='30']
+      INSERT INTO transport_erp.audit_events ("Id", "Action", "ActorUserId", "AfterJson", "BeforeJson", "BranchId", "CompanyId", "CorrelationId", "DeviceId", "EntityId", "EntityType", "Hash", "Ip", "OccurredAt", "Outcome", "PreviousHash", "Reason")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16);
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@query_CompanyId='?' (DbType = Guid), @query_BranchId='?' (DbType = Guid), @p0='?' (DbType = Int32), @p='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT a."Id", a."Action", a."ActorUserId", a."AfterJson", a."BeforeJson", a."BranchId", a."CompanyId", a."CorrelationId", a."DeviceId", a."EntityId", a."EntityType", a."Hash", a."Ip", a."OccurredAt", a."Outcome", a."PreviousHash", a."Reason"
+      FROM transport_erp.audit_events AS a
+      WHERE a."CompanyId" = @query_CompanyId AND a."BranchId" = @query_BranchId
+      ORDER BY a."OccurredAt", a."Id"
+      LIMIT @p0 OFFSET @p
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@query_CompanyId='?' (DbType = Guid), @query_BranchId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT count(*)
+      FROM transport_erp.audit_events AS a
+      WHERE a."CompanyId" = @query_CompanyId AND a."BranchId" = @query_BranchId
+info: Microsoft.AspNetCore.Http.Result.OkObjectResult[1]
+      Setting HTTP status code 200.
+info: Microsoft.AspNetCore.Http.Result.OkObjectResult[3]
+      Writing value of type 'PagedAuditEventResponse' as Json.
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: GET /api/v1/audit/events'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost/api/v1/audit/events?companyId=c6199d32-1d31-49ce-9607-56cc9e5a95c8&take=100 - 200 - application/json;+charset=utf-8 275.2017ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[62]
+      User profile is available. Using '/home/ubuntu/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/ubuntu/repo_review/TransportERP/TransportERP.Api
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost/api/v1/sync/operations:batch - application/json;+charset=utf-8 458
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[0]
+      Executing endpoint 'HTTP: POST /api/v1/sync/operations:batch'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@companyId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM transport_erp.companies AS c
+          WHERE c."Id" = @companyId AND c."Status" = 'ACTIVE')
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@branchId='?' (DbType = Guid), @companyId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM transport_erp.branches AS b
+          WHERE b."Id" = @branchId AND b."CompanyId" = @companyId AND b."Status" = 'ACTIVE')
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@security_UserId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM transport_erp.users AS u
+          WHERE u."DeletedAt" IS NULL AND u."Id" = @security_UserId AND u."Status" = 'ACTIVE')
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@command_DeviceId='?', @command_ClientOperationId='?'], CommandType='Text', CommandTimeout='30']
+      SELECT s."Id", s."BaseVersion", s."BranchId", s."ClientOccurredAt", s."ClientOperationId", s."CompanyId", s."CreatedAt", s."DeviceId", s."EntityId", s."EntityType", s."ErrorCode", s."NextRetryAt", s."OperationType", s."PayloadHash", s."PayloadJson", s."ResultVersion", s."RetryCount", s."RowVersion", s."ServerReceivedAt", s."Status", s."UpdatedAt", s."UserId", c."Id", c."BaseVersion", c."BranchId", c."CompanyId", c."ConflictReason", c."CreatedAt", c."DeviceSnapshot", c."ReplacedByOperationId", c."Resolution", c."ResolvedAt", c."ResolvedBy", c."RowVersion", c."ServerSnapshot", c."Status", c."SyncOperationId", c."UpdatedAt"
+      FROM transport_erp.sync_operations AS s
+      LEFT JOIN transport_erp.conflict_cases AS c ON s."Id" = c."SyncOperationId"
+      WHERE s."DeviceId" = @command_DeviceId AND s."ClientOperationId" = @command_ClientOperationId
+      LIMIT 2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = Int64), @p2='?' (DbType = Guid), @p3='?' (DbType = DateTime), @p4='?', @p5='?' (DbType = Guid), @p6='?' (DbType = DateTime), @p7='?', @p8='?' (DbType = Guid), @p9='?', @p10='?', @p11='?' (DbType = DateTime), @p12='?', @p13='?', @p14='?', @p15='?' (DbType = Int64), @p16='?' (DbType = Int32), @p17='?' (DbType = Binary), @p18='?' (DbType = DateTime), @p19='?', @p20='?' (DbType = DateTime), @p21='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO transport_erp.sync_operations ("Id", "BaseVersion", "BranchId", "ClientOccurredAt", "ClientOperationId", "CompanyId", "CreatedAt", "DeviceId", "EntityId", "EntityType", "ErrorCode", "NextRetryAt", "OperationType", "PayloadHash", "PayloadJson", "ResultVersion", "RetryCount", "RowVersion", "ServerReceivedAt", "Status", "UpdatedAt", "UserId")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21);
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@8__locals1_draft_CompanyId='?' (DbType = Guid), @8__locals1_draft_BranchId='?' (DbType = Guid), @deviceId='?'], CommandType='Text', CommandTimeout='30']
+      SELECT a."Hash"
+      FROM transport_erp.audit_events AS a
+      WHERE a."CompanyId" = @8__locals1_draft_CompanyId AND a."BranchId" = @8__locals1_draft_BranchId AND a."DeviceId" = @deviceId
+      ORDER BY a."OccurredAt" DESC, a."Id" DESC
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?', @p2='?' (DbType = Guid), @p3='?', @p4='?', @p5='?' (DbType = Guid), @p6='?' (DbType = Guid), @p7='?' (DbType = Guid), @p8='?', @p9='?' (DbType = Guid), @p10='?', @p11='?', @p12='?', @p13='?' (DbType = DateTime), @p14='?', @p15='?', @p16='?'], CommandType='Text', CommandTimeout='30']
+      INSERT INTO transport_erp.audit_events ("Id", "Action", "ActorUserId", "AfterJson", "BeforeJson", "BranchId", "CompanyId", "CorrelationId", "DeviceId", "EntityId", "EntityType", "Hash", "Ip", "OccurredAt", "Outcome", "PreviousHash", "Reason")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16);
+info: Microsoft.AspNetCore.Http.Result.OkObjectResult[1]
+      Setting HTTP status code 200.
+info: Microsoft.AspNetCore.Http.Result.OkObjectResult[3]
+      Writing value of type 'SyncBatchResponse' as Json.
+info: Microsoft.AspNetCore.Routing.EndpointMiddleware[1]
+      Executed endpoint 'HTTP: POST /api/v1/sync/operations:batch'
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost/api/v1/sync/operations:batch - 200 - application/json;+charset=utf-8 118.3455ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[62]
+      User profile is available. Using '/home/ubuntu/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/ubuntu/repo_review/TransportERP/TransportERP.Api
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 GET http://localhost/api/v1/audit/events - - -
+info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[1]
+      Failed to validate the token.
+      Microsoft.IdentityModel.Tokens.SecurityTokenInvalidIssuerException: IDX10205: Issuer validation failed. Issuer: 'untrusted-issuer'. Did not match: validationParameters.ValidIssuer: 'TransportERP.Test.Identity' or validationParameters.ValidIssuers: 'null' or validationParameters.ConfigurationManager.CurrentConfiguration.Issuer: 'Null'. For more details, see https://aka.ms/IdentityModel/issuer-validation. 
+         at Microsoft.IdentityModel.Tokens.Validators.ValidateIssuerAsync(String issuer, SecurityToken securityToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+         at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateTokenPayloadAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+         at Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.ValidateJWSAsync(JsonWebToken jsonWebToken, TokenValidationParameters validationParameters, BaseConfiguration configuration)
+info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[7]
+      Bearer was not authenticated. Failure message: IDX10205: Issuer validation failed. Issuer: 'untrusted-issuer'. Did not match: validationParameters.ValidIssuer: 'TransportERP.Test.Identity' or validationParameters.ValidIssuers: 'null' or validationParameters.ConfigurationManager.CurrentConfiguration.Issuer: 'Null'. For more details, see https://aka.ms/IdentityModel/issuer-validation. 
+info: Microsoft.AspNetCore.Authorization.DefaultAuthorizationService[2]
+      Authorization failed. These requirements were not met:
+      DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[12]
+      AuthenticationScheme: Bearer was challenged.
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 GET http://localhost/api/v1/audit/events - 401 - - 26.7960ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[62]
+      User profile is available. Using '/home/ubuntu/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/ubuntu/repo_review/TransportERP/TransportERP.Api
+info: Microsoft.AspNetCore.Hosting.Diagnostics[1]
+      Request starting HTTP/1.1 POST http://localhost/api/v1/sync/operations:batch - application/json;+charset=utf-8 70
+info: Microsoft.AspNetCore.Authorization.DefaultAuthorizationService[2]
+      Authorization failed. These requirements were not met:
+      DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+info: Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerHandler[12]
+      AuthenticationScheme: Bearer was challenged.
+info: Microsoft.AspNetCore.Hosting.Diagnostics[2]
+      Request finished HTTP/1.1 POST http://localhost/api/v1/sync/operations:batch - 401 - - 7.7728ms
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+[xUnit.net 00:00:05.25]   Finished:    TransportERP.Tests
+  Passed TransportERP.Tests.ApiAuthenticationAndAuditTests.Audit_read_requires_permission_and_cannot_escape_company_scope [799 ms]
+  Passed TransportERP.Tests.ApiAuthenticationAndAuditTests.Sync_batch_accepts_a_valid_token_and_enforces_claim_scope [325 ms]
+  Passed TransportERP.Tests.ApiAuthenticationAndAuditTests.Invalid_issuer_token_is_rejected_by_jwt_bearer_provider [145 ms]
+  Passed TransportERP.Tests.ApiAuthenticationAndAuditTests.Sync_batch_requires_a_valid_bearer_token [125 ms]
+
+Test Run Successful.
+Total tests: 41
+     Passed: 41
+ Total time: 5.7198 Seconds
+     1>Done Building Project "/home/ubuntu/repo_review/TransportERP/TransportERP.Tests/TransportERP.Tests.csproj" (VSTest target(s)).
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:08.44

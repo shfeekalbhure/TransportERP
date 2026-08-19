@@ -1,0 +1,35 @@
+TransportERP — RR4 Evidence Manifest
+Date: 2026-08-19 UTC+3
+Repository: https://github.com/shfeekalbhure/TransportERP
+Branch: feature/p1-audit-sync-production-20260819
+Tested commit: 684e74581efb8042058cf0d2b787c108c5a05ccb
+Previous RR3 inspected commit: a018b7c70a66cce480553ce3e42713a03316987e
+Correction code parent commit: fe9770bcfcffa84f05dca7a38027566cd210f5f1
+Working tree status at evidence capture: clean before ignored artifacts were generated
+Database: PostgreSQL 18.6, Host 127.0.0.1, Port 15432, Database poc14_pg_test
+Toolchain: .NET SDK 10.0.400; Microsoft.NETCore.App 10.0.11; Ubuntu 24.04; linux-x64
+
+Execution results:
+- Clean: completed successfully.
+- Build: completed successfully; 0 Warning(s), 0 Error(s).
+- Default dotnet test: Test Run Successful; Total tests 41; Passed 41; Failed 0; Skipped 0.
+- Governance: no PR and no merge; independent RR4 PASS is still required.
+
+SHA-256 evidence files:
+- artifacts/rr4/COMMIT_RR4_FINAL.txt: c188483c27915d7cf3ab573992d6d98b1ff9f4dfc1ea947bb40218c1f4f39085
+- artifacts/rr4/STATUS_RR4_FINAL.txt: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- artifacts/rr4/DOTNET_INFO_RR4_FINAL.txt: a4c08efc87d4e5017c805ea9410c09109f972d14c1230ceca97da7153148d729
+- artifacts/rr4/CLEAN_RR4_FINAL.log: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- artifacts/rr4/BUILD_RR4_FINAL.log: fb9bdb48abcee81eeb9545738714ba1d878d58d203b6114385c8d9a652165391
+- artifacts/rr4/TEST_ALL_DEFAULT_RR4_FINAL.log: b7ad648f95d7c1fb4004b44fb70331da0e95c7b5982edafcfe80991b1d895451
+- artifacts/rr4/RESULT_RR4_FINAL.txt: 676f1aef70f4556076f7def44f3239fc97c9dbaa5732ed48e7b2a4fd79d683b8
+
+SHA-256 RR4 documents:
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_CORRECTIVE_ACTION_MATRIX_2026-08-19.md: 6778c8397c9943eaccda5e8ea85220effbc9ba6a59a042e38ad91668205a5bcb
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_OWNER_SIGNOFF_REQUEST_2026-08-19.md: 0b7a1bde1536bbe2fe982b079365bbddcc6279d73c7aa3bec509f2c973b408ad
+- documentation/closeout/P1/P1_AUDIT_SYNC_RR4_REVIEW_REQUEST_2026-08-19.md: bbf5fb9b6df5767f8448e737a4c4ae19d3a7f5163544a3ead11c3a29342f3b34
+
+Verification command:
+sha256sum <file>
+
+The manifest records evidence for RR4 preparation only. It does not constitute an independent review decision or owner sign-off.
