@@ -50,6 +50,18 @@ jobs:
             throw 'DirectorateId remains in P2-C01-A implementation although closed W1 does not authorize it.'
           }
 
+      - name: Persist W1 alignment before build
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add TransportERP.Application/Waybills/WaybillApplicationService.cs TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'fix: align P2-C01-A implementation with closed W1 geo contract'
+            git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
+          }
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -90,14 +102,14 @@ jobs:
       - name: Run complete test suite
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
 
-      - name: Commit normalized code and EF migration
+      - name: Commit EF migration
         if: github.event_name == 'push'
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add TransportERP.Application/Waybills/WaybillApplicationService.cs TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs TransportERP.Infrastructure/Persistence/Migrations
+          git add TransportERP.Infrastructure/Persistence/Migrations
           if (-not (git diff --cached --quiet)) {
-            git commit -m 'db: align W1 geo and generate P2-C01-A migration'
+            git commit -m 'db: generate P2-C01-A waybill foundation migration'
             git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
           }
