@@ -15,6 +15,7 @@ public sealed class OperationalParty : P1Entity
     public Guid? CityId { get; set; }
     public Guid? AreaId { get; set; }
     public string? AddressLine { get; set; }
+    public string? ClientOperationId { get; set; }
     public string Status { get; set; } = "ACTIVE";
 }
 
@@ -24,6 +25,7 @@ public sealed class Waybill : P1Entity
     public Guid BranchId { get; set; }
     public string DraftNo { get; set; } = string.Empty;
     public string? WaybillNo { get; set; }
+    public string CreateOperationId { get; set; } = string.Empty;
     public Guid? ServicePointId { get; set; }
     public Guid? AgentId { get; set; }
     public Guid CreatedBy { get; set; }
@@ -105,7 +107,7 @@ public sealed class NumberSequence : P1Entity
 public sealed class NumberReservation : P1Entity
 {
     public Guid SequenceId { get; set; }
-    public Guid WaybillId { get; set; }
+    public Guid? WaybillId { get; set; }
     public Guid CompanyId { get; set; }
     public Guid? BranchId { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
