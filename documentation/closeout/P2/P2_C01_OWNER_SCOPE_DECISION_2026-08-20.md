@@ -2,7 +2,7 @@
 
 **التاريخ:** 2026-08-20 UTC+3  
 **الحالة:** `SELECTED_FOR_CONTRACTING`  
-**Baseline:** `master@e8e22de26b4faa5040f53582ab2c8934d43216f0`
+**Baseline after W0-2B:** `master@545d9ed8f0859e313c78ef13f6ef6edbdeb3c11c`
 
 ## 1. قرار المالك
 
@@ -35,9 +35,9 @@
 
 تظل هذه المجالات نقاط تكامل وتصميم مستقبلي ولا تدمج في PRs الخاصة بـP2-C01.
 
-## 4. تبعيات P1 المعتمدة
+## 4. تبعيات P1/W0-2B المعتمدة
 
-P2-C01 يرث ولا يعيد بناء: Company, Branch, Currency, Accounting primitives, Audit, Sync/Idempotency, JWT/Scope patterns.
+P2-C01 يرث ولا يعيد بناء: Company, Branch, Currency, Accounting primitives, Audit, Sync/Idempotency, JWT/Scope patterns، والعقود المشتركة المسترجعة في W0-2B مثل OperationContext وGeo Contracts وNumberReservation taxonomy.
 
 ## 5. Offline / Online
 
@@ -46,6 +46,6 @@ P2-C01 يرث ولا يعيد بناء: Company, Branch, Currency, Accounting pr
 - Field Movement/POD: يمكن Queue عند التفويض مع ClientOperationId ثم Server Ack.
 - Financial Close/Reopen: Online only.
 
-## 6. قاعدة الانتقال
+## 6. قاعدة الانتقال الصارمة
 
-لا تبدأ مرحلة التنفيذ الفيزيائي قبل إغلاق W0-2B ثم W0-3 ثم W0-5 حسب مخطط التنفيذ المعتمد.
+لا تبدأ أي مرحلة لاحقة قبل إغلاق المرحلة السابقة بالكامل بالأدلة. ترتيب البوابات الملزم: `W0-2B CLOSED -> W0-3 CLOSED -> W0-5 CLOSED -> P2-C01-A ...`. لا يجوز تنفيذ Physical Schema أو Migration أو Production UI لـP2-C01 أثناء W0-3.
