@@ -21,6 +21,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Align implementation to closed W1 Geo contract
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+
+          $appPath = 'TransportERP.Application/Waybills/WaybillApplicationService.cs'
+          $app = [IO.File]::ReadAllText($appPath)
+          $app = $app.Replace('input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,`r`n            input.Address.CityId', 'input.Address.CountryId, input.Address.GovernorateId,`r`n            input.Address.CityId')
+          $app = $app.Replace('input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,`n            input.Address.CityId', 'input.Address.CountryId, input.Address.GovernorateId,`n            input.Address.CityId')
+          $app = $app.Replace('new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,`r`n                    x.CityId', 'new GeoAddressSnapshot(x.CountryId, x.GovernorateId,`r`n                    x.CityId')
+          $app = $app.Replace('new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,`n                    x.CityId', 'new GeoAddressSnapshot(x.CountryId, x.GovernorateId,`n                    x.CityId')
+          [IO.File]::WriteAllText($appPath, $app, $utf8)
+
+          $persistencePath = 'TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs'
+          $persistence = [IO.File]::ReadAllText($persistencePath)
+          $persistence = $persistence.Replace('p.CountryId, p.GovernorateId, p.DirectorateId, p.CityId, p.AreaId', 'p.CountryId, p.GovernorateId, p.CityId, p.AreaId')
+          $persistence = $persistence.Replace('DirectorateId = x.DirectorateId, ', '')
+          $persistence = $persistence.Replace('DirectorateId = request.Address.DirectorateId,`r`n            CityId', 'CityId')
+          $persistence = $persistence.Replace('DirectorateId = request.Address.DirectorateId,`n            CityId', 'CityId')
+          $persistence = $persistence.Replace('x.CountryId, x.GovernorateId, x.DirectorateId, x.CityId, x.AreaId', 'x.CountryId, x.GovernorateId, x.CityId, x.AreaId')
+          [IO.File]::WriteAllText($persistencePath, $persistence, $utf8)
+
+          $entitiesPath = 'TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs'
+          $entities = [IO.File]::ReadAllText($entitiesPath)
+          $entities = [regex]::Replace($entities, '(?m)^\s*public Guid\? DirectorateId \{ get; set; \}\r?\n', '')
+          [IO.File]::WriteAllText($entitiesPath, $entities, $utf8)
+
+          if (Select-String -Path $appPath,$persistencePath,$entitiesPath -Pattern 'DirectorateId' -Quiet) {
+            throw 'DirectorateId remains in P2-C01-A implementation although closed W1 does not authorize it.'
+          }
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -29,11 +61,17 @@ jobs:
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
-      - name: Restore
+      - name: Restore core tests and dependencies
         run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
 
-      - name: Build solution
-        run: dotnet build TransportERP.slnx --configuration Debug --no-restore
+      - name: Restore Desktop contract surface
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
 
       - name: Generate P2-C01-A migration when missing
         shell: pwsh
@@ -43,20 +81,7 @@ jobs:
           $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
           if (-not $migration) {
             dotnet ef migrations add P2C01AWaybillFoundation --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --output-dir Persistence/Migrations
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add TransportERP.Infrastructure/Persistence/Migrations
-            if (-not (git diff --cached --quiet)) {
-              git commit -m 'db: generate P2-C01-A waybill foundation migration'
-              git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
-            }
           }
-
-      - name: Run complete test suite
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
-
-      - name: Build Desktop contract surface
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug -p:OutputType=Library
 
       - name: Verify migration exists
         shell: pwsh
@@ -64,3 +89,18 @@ jobs:
           $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
           if (-not $migration) { throw 'P2-C01-A migration was not generated.' }
           Write-Host "Migration: $($migration.Name)"
+
+      - name: Run complete test suite
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
+
+      - name: Commit normalized code and EF migration
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add TransportERP.Application/Waybills/WaybillApplicationService.cs TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs TransportERP.Infrastructure/Persistence/Migrations
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'db: align W1 geo and generate P2-C01-A migration'
+            git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
+          }
