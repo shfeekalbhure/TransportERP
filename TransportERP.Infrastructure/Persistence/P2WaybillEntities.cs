@@ -43,6 +43,7 @@ public sealed class WaybillEntity : P2Entity
     public decimal FreightTotal { get; set; }
     public decimal DiscountTotal { get; set; }
     public string Status { get; set; } = "DRAFT";
+    public string CreateClientOperationId { get; set; } = string.Empty;
     public string LastClientOperationId { get; set; } = string.Empty;
     public ICollection<WaybillPartyEntity> Parties { get; set; } = new List<WaybillPartyEntity>();
     public ICollection<WaybillItemEntity> Items { get; set; } = new List<WaybillItemEntity>();
