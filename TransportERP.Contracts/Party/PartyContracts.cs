@@ -1,3 +1,5 @@
+using TransportERP.Contracts.Geo;
+
 namespace TransportERP.Contracts.Party;
 
 public enum PartyRole
@@ -9,19 +11,8 @@ public enum PartyRole
 }
 
 /// <summary>
-/// Immutable address snapshot captured on a business document.
-/// Lookup identities remain optional so imported or field-entered addresses can still be preserved.
-/// </summary>
-public sealed record AddressSnapshot(
-    Guid? CountryId,
-    Guid? GovernorateId,
-    Guid? DirectorateId,
-    Guid? CityId,
-    Guid? AreaId,
-    string? AddressLine);
-
-/// <summary>
 /// Operational party snapshot. An operational party is not automatically an accounting account.
+/// Address data uses the single governed GeoAddressSnapshot contract.
 /// </summary>
 public sealed record OperationalPartySnapshot(
     Guid? PartyId,
@@ -30,7 +21,7 @@ public sealed record OperationalPartySnapshot(
     string Mobile,
     string? IdentityType,
     string? IdentityNo,
-    AddressSnapshot Address)
+    GeoAddressSnapshot Address)
 {
     public void EnsureValid()
     {
@@ -48,6 +39,8 @@ public sealed record OperationalPartySnapshot(
         {
             throw new ArgumentException("Identity type is required when an identity number is supplied.", nameof(IdentityType));
         }
+
+        Address.EnsureUsable();
     }
 }
 
