@@ -26,44 +26,51 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
     private const string SigningKey = "transport-erp-p2-test-signing-key-2026-minimum-32";
 
     [Fact]
-    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Migration_and_waybill_approval_round_trip_are_atomic_and_audited()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2A1", withSequence: true);
 
-        await using var db = CreateP2Db(connection);
-        await db.Database.MigrateAsync();
-        var scope = await SeedScopeAsync(db, "P2A1", withSequence: true);
-        var service = CreateService(db);
         var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
-
-        var draft = await service.CreateDraftAsync(context, new CreateWaybillDraftRequest(
-            scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), scope.CurrencyId,
-            1m, "STANDARD", "NORMAL", $"create-{Guid.NewGuid():N}"));
+        WaybillResponse draft;
+        await using (var db = CreateP2Db(connection))
+            draft = await CreateService(db).CreateDraftAsync(context, new CreateWaybillDraftRequest(
+                scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), scope.CurrencyId,
+                1m, "STANDARD", "NORMAL", $"create-{Guid.NewGuid():N}"));
 
         var address = new GeoAddressSnapshot(null, null, null, null, "عنوان اختبار PostgreSQL");
-        var updated = await service.UpdateDraftAsync(context, draft.Id, new UpdateWaybillDraftRequest(
-            draft.Version, draft.WaybillDateTime, draft.OriginId, draft.DestinationId, draft.CurrencyId,
-            1m, 250m, 25m, "STANDARD", "NORMAL",
-            [
-                new WaybillPartyInput("SENDER", null, "مرسل اختبار", "777100001", null, null, address),
-                new WaybillPartyInput("RECEIVER", null, "مستلم اختبار", "777100002", null, null, address)
-            ],
-            [new WaybillItemInput(null, 1, "GENERAL", "طرود اختبار", 2m, 2, 12m, null, null, null, 500m, null, [], null)],
-            $"update-{Guid.NewGuid():N}"));
+        WaybillResponse updated;
+        await using (var db = CreateP2Db(connection))
+            updated = await CreateService(db).UpdateDraftAsync(context, draft.Id, new UpdateWaybillDraftRequest(
+                draft.Version, draft.WaybillDateTime, draft.OriginId, draft.DestinationId, draft.CurrencyId,
+                1m, 250m, 25m, "STANDARD", "NORMAL",
+                [
+                    new WaybillPartyInput("SENDER", null, "مرسل اختبار", "777100001", null, null, address),
+                    new WaybillPartyInput("RECEIVER", null, "مستلم اختبار", "777100002", null, null, address)
+                ],
+                [new WaybillItemInput(null, 1, "GENERAL", "طرود اختبار", 2m, 2, 12m, null, null, null, 500m, null, [], null)],
+                $"update-{Guid.NewGuid():N}"));
 
-        var submitted = await service.SubmitAsync(context, draft.Id,
-            new SubmitWaybillRequest(updated.Version, $"submit-{Guid.NewGuid():N}"));
+        WaybillResponse submitted;
+        await using (var db = CreateP2Db(connection))
+            submitted = await CreateService(db).SubmitAsync(context, draft.Id,
+                new SubmitWaybillRequest(updated.Version, $"submit-{Guid.NewGuid():N}"));
+
         var approveKey = $"approve-{Guid.NewGuid():N}";
-        var approved = await service.ApproveAsync(context, draft.Id,
-            new ApproveWaybillRequest(submitted.Version, scope.SequenceId!.Value, approveKey));
+        WaybillResponse approved;
+        await using (var db = CreateP2Db(connection))
+            approved = await CreateService(db).ApproveAsync(context, draft.Id,
+                new ApproveWaybillRequest(submitted.Version, scope.SequenceId!.Value, approveKey));
 
-        db.ChangeTracker.Clear();
-        var persisted = await db.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == draft.Id);
-        var reservation = await db.Set<NumberReservationEntity>().AsNoTracking()
+        await using var verifyDb = CreateP2Db(connection);
+        var persisted = await verifyDb.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == draft.Id);
+        var reservation = await verifyDb.Set<NumberReservationEntity>().AsNoTracking()
             .SingleAsync(x => x.WaybillId == draft.Id);
-        var audit = await db.AuditEvents.AsNoTracking()
+        var audit = await verifyDb.AuditEvents.AsNoTracking()
             .SingleAsync(x => x.EntityType == "Waybill" && x.EntityId == draft.Id && x.Action == "WaybillApprove");
 
         Assert.Equal("APPROVED", approved.Status);
@@ -76,52 +83,59 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
     }
 
     [Fact]
-    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Idempotent_create_and_number_reservation_never_duplicate_under_retry()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2A2", withSequence: true);
 
-        await using var db = CreateP2Db(connection);
-        await db.Database.MigrateAsync();
-        var scope = await SeedScopeAsync(db, "P2A2", withSequence: true);
-        var service = CreateService(db);
         var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
         var createKey = $"create-{Guid.NewGuid():N}";
         var request = new CreateWaybillDraftRequest(
             scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), scope.CurrencyId,
             1m, "STANDARD", "NORMAL", createKey);
 
-        var first = await service.CreateDraftAsync(context, request);
-        var replay = await service.CreateDraftAsync(context, request);
+        WaybillResponse first;
+        await using (var db = CreateP2Db(connection))
+            first = await CreateService(db).CreateDraftAsync(context, request);
+        WaybillResponse replay;
+        await using (var db = CreateP2Db(connection))
+            replay = await CreateService(db).CreateDraftAsync(context, request);
 
         Assert.Equal(first.Id, replay.Id);
-        Assert.Equal(1, await db.Set<WaybillEntity>().CountAsync(x =>
+
+        var numberKey = $"number-{Guid.NewGuid():N}";
+        NumberReservationDto r1;
+        await using (var db = CreateP2Db(connection))
+            r1 = await new EfNumberReservationService(db).ReserveAsync(context,
+                new NumberReservationRequest(scope.SequenceId!.Value, numberKey, "TEST"));
+        NumberReservationDto r2;
+        await using (var db = CreateP2Db(connection))
+            r2 = await new EfNumberReservationService(db).ReserveAsync(context,
+                new NumberReservationRequest(scope.SequenceId!.Value, numberKey, "TEST_RETRY"));
+
+        await using var verifyDb = CreateP2Db(connection);
+        Assert.Equal(1, await verifyDb.Set<WaybillEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId && x.CreateClientOperationId == createKey));
-
-        var numbering = new EfNumberReservationService(db);
-        var key = $"number-{Guid.NewGuid():N}";
-        var r1 = await numbering.ReserveAsync(context,
-            new NumberReservationRequest(scope.SequenceId!.Value, key, "TEST"));
-        var r2 = await numbering.ReserveAsync(context,
-            new NumberReservationRequest(scope.SequenceId.Value, key, "TEST_RETRY"));
-
         Assert.Equal(r1.Id, r2.Id);
         Assert.Equal(r1.RenderedNumber, r2.RenderedNumber);
-        Assert.Equal(1, await db.Set<NumberReservationEntity>().CountAsync(x =>
-            x.CompanyId == scope.CompanyId && x.IdempotencyKey == key));
+        Assert.Equal(1, await verifyDb.Set<NumberReservationEntity>().CountAsync(x =>
+            x.CompanyId == scope.CompanyId && x.IdempotencyKey == numberKey));
     }
 
     [Fact]
-    [Trait("Category", "HTTP")]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Waybill_create_API_enforces_permission_and_branch_scope()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2HTTP", withSequence: false);
 
-        await using var db = CreateP2Db(connection);
-        await db.Database.MigrateAsync();
-        var scope = await SeedScopeAsync(db, "P2HTTP", withSequence: false);
         using var factory = CreateFactory(connection);
         using var client = factory.CreateClient();
 
@@ -140,9 +154,23 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         Assert.Equal(scope.BranchId, created.BranchId);
         Assert.Null(created.WaybillNo);
 
-        var wrongBranch = NewCreateRequest(scope) with { BranchId = Guid.NewGuid(), ClientOperationId = $"http-wrong-{Guid.NewGuid():N}" };
+        var wrongBranch = NewCreateRequest(scope) with
+        {
+            BranchId = Guid.NewGuid(),
+            ClientOperationId = $"http-wrong-{Guid.NewGuid():N}"
+        };
         var scoped = await client.PostAsJsonAsync("/api/v1/waybills/drafts", wrongBranch);
         Assert.Equal(HttpStatusCode.Forbidden, scoped.StatusCode);
+    }
+
+    private static string RequireConnection()
+        => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
+            ?? throw new InvalidOperationException("TRANSPORTERP_TEST_CONNSTR is required for P2 PostgreSQL gates.");
+
+    private static async Task EnsureMigratedAsync(string connection)
+    {
+        await using var db = CreateP2Db(connection);
+        await db.Database.MigrateAsync();
     }
 
     private static CreateWaybillDraftRequest NewCreateRequest(TestScope scope)
@@ -192,10 +220,6 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
-
-    private static string? GetConnection()
-        => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
-            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
 
     private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix, bool withSequence)
     {
