@@ -51,7 +51,7 @@ public sealed class TransportErpP2ModelCustomizer(ModelCustomizerDependencies de
             t.HasCheckConstraint("ck_waybills_exchange_rate", "\"ExchangeRate\" > 0");
             t.HasCheckConstraint("ck_waybills_amounts", "\"FreightTotal\" >= 0 AND \"DiscountTotal\" >= 0 AND \"DiscountTotal\" <= \"FreightTotal\"");
             t.HasCheckConstraint("ck_waybills_version", "\"Version\" >= 1");
-            t.HasCheckConstraint("ck_waybills_number_state", "(\"Status\" = 'APPROVED' AND \"WaybillNo\" IS NOT NULL) OR (\"Status\" <> 'APPROVED')");
+            t.HasCheckConstraint("ck_waybills_number_state", "(\"Status\" = 'APPROVED' AND \"WaybillNo\" IS NOT NULL) OR (\"Status\" <> 'APPROVED' AND \"WaybillNo\" IS NULL)");
         });
         waybill.HasKey(x => x.Id);
         waybill.Property(x => x.DraftNo).HasMaxLength(60).IsRequired();
@@ -129,7 +129,12 @@ public sealed class TransportErpP2ModelCustomizer(ModelCustomizerDependencies de
         seq.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         seq.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
         seq.Property(x => x.Version).IsConcurrencyToken();
-        seq.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType }).IsUnique();
+        seq.HasIndex(x => new { x.CompanyId, x.DocumentType })
+            .IsUnique()
+            .HasFilter("\"BranchId\" IS NULL");
+        seq.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType })
+            .IsUnique()
+            .HasFilter("\"BranchId\" IS NOT NULL");
         seq.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         seq.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
 
