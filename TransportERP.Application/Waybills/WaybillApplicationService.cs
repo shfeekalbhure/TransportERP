@@ -10,7 +10,9 @@ namespace TransportERP.Application.Waybills;
 public interface IWaybillRepository
 {
     Task<WaybillAggregate?> GetAsync(Guid companyId, Guid branchId, Guid waybillId, CancellationToken cancellationToken);
-    Task AddAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken);
+    Task<WaybillAggregate?> GetByCreateOperationAsync(Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken);
+    Task<bool> WasLastOperationAsync(Guid companyId, Guid branchId, Guid waybillId, string clientOperationId, CancellationToken cancellationToken);
+    Task<WaybillAggregate> AddOrGetAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken);
     Task SaveAsync(WaybillAggregate aggregate, long expectedVersion, string clientOperationId, CancellationToken cancellationToken);
     Task LinkNumberReservationAsync(Guid companyId, Guid branchId, Guid waybillId, Guid reservationId, CancellationToken cancellationToken);
 }
@@ -71,16 +73,24 @@ public sealed class WaybillApplicationService(
         context.EnsureComplete();
         EnsureBranch(context, request.BranchId);
         RequireClientOperation(request.ClientOperationId);
+        var operationId = request.ClientOperationId.Trim();
 
-        var aggregate = WaybillAggregate.CreateDraft(
+        var replay = await waybills.GetByCreateOperationAsync(context.CompanyId, context.BranchId, operationId, cancellationToken);
+        if (replay is not null)
+            return ToResponse(replay, context.CorrelationId);
+
+        var candidate = WaybillAggregate.CreateDraft(
             Guid.NewGuid(), context.CompanyId, context.BranchId, NewDraftNo(), request.WaybillDateTime,
             request.OriginId, request.DestinationId, request.CurrencyId, request.ExchangeRate,
             request.ServiceType ?? "STANDARD", request.Priority ?? "NORMAL");
 
-        await waybills.AddAsync(aggregate, request.ClientOperationId.Trim(), cancellationToken);
-        await audit.WriteAsync(context, "WaybillDraftCreate", "SUCCESS", "Waybill", aggregate.Id,
-            null, Snapshot(aggregate), null, cancellationToken);
-        return ToResponse(aggregate, context.CorrelationId);
+        var persisted = await waybills.AddOrGetAsync(candidate, operationId, cancellationToken);
+        if (persisted.Id == candidate.Id)
+        {
+            await audit.WriteAsync(context, "WaybillDraftCreate", "SUCCESS", "Waybill", persisted.Id,
+                null, Snapshot(persisted), null, cancellationToken);
+        }
+        return ToResponse(persisted, context.CorrelationId);
     }
 
     public async Task<WaybillResponse> UpdateDraftAsync(
@@ -91,8 +101,10 @@ public sealed class WaybillApplicationService(
     {
         context.EnsureComplete();
         RequireClientOperation(request.ClientOperationId);
+        var operationId = request.ClientOperationId.Trim();
         var aggregate = await RequireWaybill(context, waybillId, cancellationToken);
-        EnsureVersion(aggregate, request.ExpectedVersion);
+        if (await IsReplay(context, aggregate, request.ExpectedVersion, operationId, cancellationToken))
+            return ToResponse(aggregate, context.CorrelationId);
         var before = Snapshot(aggregate);
 
         aggregate.UpdateDraft(
@@ -100,7 +112,7 @@ public sealed class WaybillApplicationService(
             request.ExchangeRate, request.FreightTotal, request.DiscountTotal, request.ServiceType,
             request.Priority, request.Parties.Select(ToDomainParty), request.Items.Select(ToDomainItem));
 
-        await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.ClientOperationId.Trim(), cancellationToken);
+        await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, cancellationToken);
         await audit.WriteAsync(context, "WaybillDraftUpdate", "SUCCESS", "Waybill", aggregate.Id,
             before, Snapshot(aggregate), null, cancellationToken);
         return ToResponse(aggregate, context.CorrelationId);
@@ -130,11 +142,13 @@ public sealed class WaybillApplicationService(
     {
         context.EnsureComplete();
         RequireClientOperation(request.ClientOperationId);
+        var operationId = request.ClientOperationId.Trim();
         var aggregate = await RequireWaybill(context, waybillId, cancellationToken);
-        EnsureVersion(aggregate, request.ExpectedVersion);
+        if (await IsReplay(context, aggregate, request.ExpectedVersion, operationId, cancellationToken))
+            return ToResponse(aggregate, context.CorrelationId);
         var before = Snapshot(aggregate);
         aggregate.SubmitForApproval();
-        await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.ClientOperationId.Trim(), cancellationToken);
+        await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, cancellationToken);
         await audit.WriteAsync(context, "WaybillSubmit", "SUCCESS", "Waybill", aggregate.Id,
             before, Snapshot(aggregate), null, cancellationToken);
         return ToResponse(aggregate, context.CorrelationId);
@@ -149,11 +163,13 @@ public sealed class WaybillApplicationService(
         context.EnsureComplete();
         RequireReason(request.Reason);
         RequireClientOperation(request.ClientOperationId);
+        var operationId = request.ClientOperationId.Trim();
         var aggregate = await RequireWaybill(context, waybillId, cancellationToken);
-        EnsureVersion(aggregate, request.ExpectedVersion);
+        if (await IsReplay(context, aggregate, request.ExpectedVersion, operationId, cancellationToken))
+            return ToResponse(aggregate, context.CorrelationId);
         var before = Snapshot(aggregate);
         aggregate.ReturnForCorrection();
-        await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.ClientOperationId.Trim(), cancellationToken);
+        await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, cancellationToken);
         await audit.WriteAsync(context, "WaybillReturnForCorrection", "SUCCESS", "Waybill", aggregate.Id,
             before, Snapshot(aggregate), request.Reason.Trim(), cancellationToken);
         return ToResponse(aggregate, context.CorrelationId);
@@ -168,11 +184,13 @@ public sealed class WaybillApplicationService(
         context.EnsureComplete();
         RequireReason(request.Reason);
         RequireClientOperation(request.ClientOperationId);
+        var operationId = request.ClientOperationId.Trim();
         var aggregate = await RequireWaybill(context, waybillId, cancellationToken);
-        EnsureVersion(aggregate, request.ExpectedVersion);
+        if (await IsReplay(context, aggregate, request.ExpectedVersion, operationId, cancellationToken))
+            return ToResponse(aggregate, context.CorrelationId);
         var before = Snapshot(aggregate);
         aggregate.Cancel();
-        await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.ClientOperationId.Trim(), cancellationToken);
+        await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, cancellationToken);
         await audit.WriteAsync(context, "WaybillCancel", "SUCCESS", "Waybill", aggregate.Id,
             before, Snapshot(aggregate), request.Reason.Trim(), cancellationToken);
         return ToResponse(aggregate, context.CorrelationId);
@@ -194,7 +212,6 @@ public sealed class WaybillApplicationService(
         {
             var aggregate = await RequireWaybill(context, waybillId, ct);
 
-            // Exact retry of a completed approval returns the same persisted reservation/result.
             if (aggregate.Status == WaybillStatus.Approved)
             {
                 var existing = await numbering.ReserveAsync(context,
@@ -218,7 +235,7 @@ public sealed class WaybillApplicationService(
             {
                 await waybills.LinkNumberReservationAsync(context.CompanyId, context.BranchId, aggregate.Id, reservation.Id, ct);
                 aggregate.ApplyApproval(reservation.RenderedNumber);
-                await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.IdempotencyKey, ct);
+                await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.IdempotencyKey.Trim(), ct);
                 var committed = await numbering.CommitAsync(context,
                     new NumberReservationTransitionRequest(reservation.Id, request.IdempotencyKey, "WAYBILL_APPROVED"), ct);
                 if (committed.State != NumberReservationStates.Committed)
@@ -274,6 +291,20 @@ public sealed class WaybillApplicationService(
         await audit.WriteAsync(context, "OperationalPartyCreate", "SUCCESS", "OperationalParty", created.Id,
             null, JsonSerializer.Serialize(new { created.PartyNo, created.Name, created.Mobile }), null, cancellationToken);
         return ToPartyResponse(created);
+    }
+
+    private async Task<bool> IsReplay(
+        OperationContext context,
+        WaybillAggregate aggregate,
+        long expectedVersion,
+        string clientOperationId,
+        CancellationToken ct)
+    {
+        if (expectedVersion >= 1 && aggregate.Version == expectedVersion)
+            return false;
+        if (await waybills.WasLastOperationAsync(context.CompanyId, context.BranchId, aggregate.Id, clientOperationId, ct))
+            return true;
+        throw new WaybillApplicationException("CONCURRENCY_CONFLICT");
     }
 
     private async Task<WaybillAggregate> RequireWaybill(OperationContext context, Guid id, CancellationToken ct)
