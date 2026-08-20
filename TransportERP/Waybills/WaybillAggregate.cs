@@ -22,6 +22,11 @@ public sealed record WaybillPartyValue(
     string Mobile,
     string? IdentityType,
     string? IdentityNo,
+    Guid? CountryId,
+    Guid? GovernorateId,
+    Guid? DirectorateId,
+    Guid? CityId,
+    Guid? AreaId,
     string? AddressText)
 {
     public void EnsureValid()
@@ -32,6 +37,16 @@ public sealed record WaybillPartyValue(
             throw new WaybillRuleException("PARTY_MOBILE_REQUIRED");
         if (!string.IsNullOrWhiteSpace(IdentityNo) && string.IsNullOrWhiteSpace(IdentityType))
             throw new WaybillRuleException("IDENTITY_TYPE_REQUIRED");
+        if (AreaId.HasValue && !CityId.HasValue)
+            throw new WaybillRuleException("AREA_REQUIRES_CITY");
+        if (CityId.HasValue && !DirectorateId.HasValue)
+            throw new WaybillRuleException("CITY_REQUIRES_DIRECTORATE");
+        if (DirectorateId.HasValue && !GovernorateId.HasValue)
+            throw new WaybillRuleException("DIRECTORATE_REQUIRES_GOVERNORATE");
+        if (GovernorateId.HasValue && !CountryId.HasValue)
+            throw new WaybillRuleException("GOVERNORATE_REQUIRES_COUNTRY");
+        if (!CountryId.HasValue && string.IsNullOrWhiteSpace(AddressText))
+            throw new WaybillRuleException("PARTY_ADDRESS_REQUIRED");
     }
 }
 
@@ -211,6 +226,9 @@ public sealed class WaybillAggregate
             party.EnsureValid();
             _parties.Add(party);
         }
+        if (_parties.Count(x => x.Role == WaybillPartyRole.Sender) > 1 ||
+            _parties.Count(x => x.Role == WaybillPartyRole.Receiver) > 1)
+            throw new WaybillRuleException("PARTY_ROLE_DUPLICATE");
 
         _items.Clear();
         foreach (var item in items.OrderBy(x => x.LineNo))
