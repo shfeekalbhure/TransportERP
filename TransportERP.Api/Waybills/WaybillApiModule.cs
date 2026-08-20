@@ -13,7 +13,7 @@ public static class WaybillApiModule
 {
     public static IServiceCollection AddP2C01AWaybillFoundation(this IServiceCollection services)
     {
-        services.AddScoped<IWaybillRepository, EfWaybillRepository>();
+        services.AddScoped<IWaybillRepository, ConcurrencySafeWaybillRepository>();
         services.AddScoped<IOperationalPartyRepository, EfOperationalPartyRepository>();
         services.AddScoped<INumberReservationService, EfNumberReservationService>();
         services.AddScoped<IWaybillUnitOfWork, EfWaybillUnitOfWork>();
