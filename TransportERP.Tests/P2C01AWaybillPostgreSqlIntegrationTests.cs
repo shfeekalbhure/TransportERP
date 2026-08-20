@@ -12,6 +12,7 @@ using Npgsql;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Geo;
+using TransportERP.Contracts.Numbering;
 using TransportERP.Contracts.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
@@ -101,9 +102,9 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         var numbering = new EfNumberReservationService(db);
         var key = $"number-{Guid.NewGuid():N}";
         var r1 = await numbering.ReserveAsync(context,
-            new Contracts.Numbering.NumberReservationRequest(scope.SequenceId!.Value, key, "TEST"));
+            new NumberReservationRequest(scope.SequenceId!.Value, key, "TEST"));
         var r2 = await numbering.ReserveAsync(context,
-            new Contracts.Numbering.NumberReservationRequest(scope.SequenceId.Value, key, "TEST_RETRY"));
+            new NumberReservationRequest(scope.SequenceId.Value, key, "TEST_RETRY"));
 
         Assert.Equal(r1.Id, r2.Id);
         Assert.Equal(r1.RenderedNumber, r2.RenderedNumber);
