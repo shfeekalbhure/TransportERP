@@ -29,19 +29,16 @@ jobs:
 
           $appPath = 'TransportERP.Application/Waybills/WaybillApplicationService.cs'
           $app = [IO.File]::ReadAllText($appPath)
-          $app = $app.Replace('input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,`r`n            input.Address.CityId', 'input.Address.CountryId, input.Address.GovernorateId,`r`n            input.Address.CityId')
-          $app = $app.Replace('input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,`n            input.Address.CityId', 'input.Address.CountryId, input.Address.GovernorateId,`n            input.Address.CityId')
-          $app = $app.Replace('new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,`r`n                    x.CityId', 'new GeoAddressSnapshot(x.CountryId, x.GovernorateId,`r`n                    x.CityId')
-          $app = $app.Replace('new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,`n                    x.CityId', 'new GeoAddressSnapshot(x.CountryId, x.GovernorateId,`n                    x.CityId')
+          $app = [regex]::Replace($app, 'input\.Address\.CountryId,\s*input\.Address\.GovernorateId,\s*input\.Address\.DirectorateId,\s*input\.Address\.CityId', 'input.Address.CountryId, input.Address.GovernorateId, input.Address.CityId')
+          $app = [regex]::Replace($app, 'new GeoAddressSnapshot\(x\.CountryId,\s*x\.GovernorateId,\s*x\.DirectorateId,\s*x\.CityId', 'new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.CityId')
           [IO.File]::WriteAllText($appPath, $app, $utf8)
 
           $persistencePath = 'TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs'
           $persistence = [IO.File]::ReadAllText($persistencePath)
-          $persistence = $persistence.Replace('p.CountryId, p.GovernorateId, p.DirectorateId, p.CityId, p.AreaId', 'p.CountryId, p.GovernorateId, p.CityId, p.AreaId')
-          $persistence = $persistence.Replace('DirectorateId = x.DirectorateId, ', '')
-          $persistence = $persistence.Replace('DirectorateId = request.Address.DirectorateId,`r`n            CityId', 'CityId')
-          $persistence = $persistence.Replace('DirectorateId = request.Address.DirectorateId,`n            CityId', 'CityId')
-          $persistence = $persistence.Replace('x.CountryId, x.GovernorateId, x.DirectorateId, x.CityId, x.AreaId', 'x.CountryId, x.GovernorateId, x.CityId, x.AreaId')
+          $persistence = [regex]::Replace($persistence, 'p\.CountryId,\s*p\.GovernorateId,\s*p\.DirectorateId,\s*p\.CityId,\s*p\.AreaId', 'p.CountryId, p.GovernorateId, p.CityId, p.AreaId')
+          $persistence = [regex]::Replace($persistence, 'DirectorateId\s*=\s*x\.DirectorateId,\s*', '')
+          $persistence = [regex]::Replace($persistence, 'DirectorateId\s*=\s*request\.Address\.DirectorateId,\s*', '')
+          $persistence = [regex]::Replace($persistence, 'x\.CountryId,\s*x\.GovernorateId,\s*x\.DirectorateId,\s*x\.CityId,\s*x\.AreaId', 'x.CountryId, x.GovernorateId, x.CityId, x.AreaId')
           [IO.File]::WriteAllText($persistencePath, $persistence, $utf8)
 
           $entitiesPath = 'TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs'
