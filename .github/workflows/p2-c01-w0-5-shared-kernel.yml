@@ -7,6 +7,17 @@ on:
   pull_request:
     branches:
       - master
+    paths:
+      - 'TransportERP.Contracts/Core/**'
+      - 'TransportERP.Contracts/Party/**'
+      - 'TransportERP.Contracts/Attachments/**'
+      - 'TransportERP.Contracts/Tracking/**'
+      - 'TransportERP.Contracts/Geo/**'
+      - 'TransportERP.Contracts/Numbering/**'
+      - 'TransportERP.Tests/W05SharedKernelTests.cs'
+      - 'documentation/closeout/P2/P2_C01_W0_5_*'
+      - 'documentation/closeout/P2/validate_p2_c01_w0_5_shared_kernel.py'
+      - '.github/workflows/p2-c01-w0-5-shared-kernel.yml'
   workflow_dispatch:
 
 jobs:
