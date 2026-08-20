@@ -4,7 +4,7 @@
 **حالة الإصدار:** `CLOSED_AFTER_MERGE`  
 **مرجع master:** `e8e22de26b4faa5040f53582ab2c8934d43216f0`  
 **الـhead الذي سبّق الدمج واجتاز RR7:** `d39dfaf3596548c4ed0d1f66ec75c5faafc55509`  
-**PR:** `#33`  
+**PR:** [#33][1]  
 **تاريخ التثبيت:** 2026-08-19 UTC+3
 
 ## 1. غرض baseline
@@ -46,3 +46,10 @@
 ## 6. حدود الانتقال إلى P2
 
 يبدأ P2 من هذا baseline ولا يعيد فتح P1. يجب أن يحدد كل مسار P2 مجالًا تشغيليًا واحدًا أو مجموعة مترابطة معتمدة كتابيًا، ثم يغلق عقود البيانات والأفعال والشاشات والاختبارات قبل تنفيذ الشيفرة. لا يجوز إنشاء جداول أو شاشات تشغيلية لمجال P2 اعتمادًا على الذاكرة أو التخمين.
+
+## References
+
+[1]: https://github.com/shfeekalbhure/TransportERP/pull/33 "TransportERP PR #33"
+[2]: ../../architecture/P1_PHYSICAL_SCHEMA_POSTGRESQL.md "P1 Physical Schema PostgreSQL"
+[3]: P1_RELEASE_SCOPE.md "P1 Release Scope"
+[4]: P1_SYNC_CONTRACT.md "P1 Sync Contract"
