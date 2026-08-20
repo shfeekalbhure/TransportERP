@@ -1,0 +1,407 @@
+using System.Data;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using TransportERP.Application.Waybills;
+using TransportERP.Contracts.Core;
+using TransportERP.Contracts.Geo;
+using TransportERP.Contracts.Numbering;
+using TransportERP.Contracts.Waybills;
+using TransportERP.Domain.Waybills;
+
+namespace TransportERP.Infrastructure.Persistence;
+
+public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepository
+{
+    public async Task<WaybillAggregate?> GetAsync(Guid companyId, Guid branchId, Guid waybillId, CancellationToken cancellationToken)
+    {
+        var entity = await db.Waybills.AsNoTracking()
+            .Include(x => x.Parties)
+            .Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId, cancellationToken);
+        return entity is null ? null : ToAggregate(entity);
+    }
+
+    public async Task<WaybillAggregate?> GetByCreateOperationAsync(Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken)
+    {
+        var entity = await db.Waybills.AsNoTracking()
+            .Include(x => x.Parties)
+            .Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.BranchId == branchId && x.CreateClientOperationId == clientOperationId, cancellationToken);
+        return entity is null ? null : ToAggregate(entity);
+    }
+
+    public Task<bool> WasLastOperationAsync(Guid companyId, Guid branchId, Guid waybillId, string clientOperationId, CancellationToken cancellationToken)
+        => db.Waybills.AsNoTracking().AnyAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId && x.LastClientOperationId == clientOperationId, cancellationToken);
+
+    public async Task AddAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken)
+    {
+        var existing = await db.Waybills.AsNoTracking().AnyAsync(
+            x => x.CompanyId == aggregate.CompanyId && x.BranchId == aggregate.BranchId && x.CreateClientOperationId == clientOperationId,
+            cancellationToken);
+        if (existing)
+            throw new WaybillPersistenceException("DUPLICATE_OPERATION");
+
+        var now = DateTimeOffset.UtcNow;
+        var entity = new WaybillEntity
+        {
+            Id = aggregate.Id,
+            CompanyId = aggregate.CompanyId,
+            BranchId = aggregate.BranchId,
+            DraftNo = aggregate.DraftNo,
+            WaybillNo = aggregate.WaybillNo,
+            WaybillDateTime = aggregate.WaybillDateTime,
+            ServiceType = aggregate.ServiceType,
+            Priority = aggregate.Priority,
+            OriginId = aggregate.OriginId,
+            DestinationId = aggregate.DestinationId,
+            CurrencyId = aggregate.CurrencyId,
+            ExchangeRate = aggregate.ExchangeRate,
+            FreightTotal = aggregate.FreightTotal,
+            DiscountTotal = aggregate.DiscountTotal,
+            Status = ToStorageStatus(aggregate.Status),
+            CreateClientOperationId = clientOperationId,
+            LastClientOperationId = clientOperationId,
+            Version = aggregate.Version,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList(),
+            Items = aggregate.Items.Select(x => ToEntity(aggregate.Id, x)).ToList()
+        };
+        db.Waybills.Add(entity);
+        await SaveWithConcurrencyMapping(cancellationToken);
+    }
+
+    public async Task SaveAsync(WaybillAggregate aggregate, long expectedVersion, string clientOperationId, CancellationToken cancellationToken)
+    {
+        var entity = await db.Waybills
+            .Include(x => x.Parties)
+            .Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == aggregate.Id && x.CompanyId == aggregate.CompanyId && x.BranchId == aggregate.BranchId, cancellationToken)
+            ?? throw new WaybillPersistenceException("NOT_FOUND");
+
+        if (entity.Version != expectedVersion)
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT");
+
+        entity.WaybillNo = aggregate.WaybillNo;
+        entity.WaybillDateTime = aggregate.WaybillDateTime;
+        entity.ServiceType = aggregate.ServiceType;
+        entity.Priority = aggregate.Priority;
+        entity.OriginId = aggregate.OriginId;
+        entity.DestinationId = aggregate.DestinationId;
+        entity.CurrencyId = aggregate.CurrencyId;
+        entity.ExchangeRate = aggregate.ExchangeRate;
+        entity.FreightTotal = aggregate.FreightTotal;
+        entity.DiscountTotal = aggregate.DiscountTotal;
+        entity.Status = ToStorageStatus(aggregate.Status);
+        entity.LastClientOperationId = clientOperationId;
+        entity.Version = aggregate.Version;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.WaybillParties.RemoveRange(entity.Parties);
+        entity.Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList();
+
+        var existingItems = entity.Items.ToDictionary(x => x.Id);
+        var incomingIds = aggregate.Items.Select(x => x.Id).ToHashSet();
+        foreach (var removed in entity.Items.Where(x => !incomingIds.Contains(x.Id)).ToList())
+            db.WaybillItems.Remove(removed);
+        foreach (var item in aggregate.Items)
+        {
+            if (existingItems.TryGetValue(item.Id, out var tracked))
+                Copy(item, tracked);
+            else
+                entity.Items.Add(ToEntity(aggregate.Id, item));
+        }
+
+        await SaveWithConcurrencyMapping(cancellationToken);
+    }
+
+    public async Task LinkNumberReservationAsync(Guid companyId, Guid branchId, Guid waybillId, Guid reservationId, CancellationToken cancellationToken)
+    {
+        var reservation = await db.NumberReservations.SingleOrDefaultAsync(
+            x => x.Id == reservationId && x.CompanyId == companyId && (x.BranchId == null || x.BranchId == branchId), cancellationToken)
+            ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
+        if (reservation.WaybillId.HasValue && reservation.WaybillId != waybillId)
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+        reservation.WaybillId = waybillId;
+        await SaveWithConcurrencyMapping(cancellationToken);
+    }
+
+    private async Task SaveWithConcurrencyMapping(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            throw new WaybillPersistenceException("DUPLICATE_OPERATION", ex);
+        }
+    }
+
+    private static bool IsUniqueViolation(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is PostgresException { SqlState: "23505" }) return true;
+        return false;
+    }
+
+    private static WaybillAggregate ToAggregate(WaybillEntity x)
+        => WaybillAggregate.Rehydrate(
+            x.Id, x.CompanyId, x.BranchId, x.DraftNo, x.WaybillNo, x.WaybillDateTime,
+            x.ServiceType, x.Priority, x.OriginId, x.DestinationId, x.CurrencyId, x.ExchangeRate,
+            x.FreightTotal, x.DiscountTotal, FromStorageStatus(x.Status), x.Version,
+            x.Parties.OrderBy(p => p.Sequence).Select(p => new WaybillPartyValue(
+                Enum.Parse<WaybillPartyRole>(p.Role, true), p.OperationalPartyId, p.NameSnapshot,
+                p.MobileSnapshot, p.IdentityTypeSnapshot, p.IdentityNoSnapshot,
+                p.CountryId, p.GovernorateId, p.DirectorateId, p.CityId, p.AreaId, p.AddressLineSnapshot)),
+            x.Items.OrderBy(i => i.LineNo).Select(i => new WaybillItemValue(
+                i.Id, i.LineNo, i.ItemType, i.Contents, i.Quantity, i.Pieces, i.Weight,
+                i.Length, i.Width, i.Height, i.DeclaredValue, i.OriginCountryId, i.RiskFlagsJson, i.Notes)));
+
+    private static WaybillPartyEntity ToEntity(Guid waybillId, WaybillPartyValue x, int sequence)
+        => new()
+        {
+            Id = Guid.NewGuid(), WaybillId = waybillId, Sequence = sequence,
+            Role = x.Role.ToString().ToUpperInvariant(), OperationalPartyId = x.OperationalPartyId,
+            NameSnapshot = x.Name, MobileSnapshot = x.Mobile, IdentityTypeSnapshot = x.IdentityType,
+            IdentityNoSnapshot = x.IdentityNo, CountryId = x.CountryId, GovernorateId = x.GovernorateId,
+            DirectorateId = x.DirectorateId, CityId = x.CityId, AreaId = x.AreaId, AddressLineSnapshot = x.AddressText
+        };
+
+    private static WaybillItemEntity ToEntity(Guid waybillId, WaybillItemValue x)
+    {
+        var entity = new WaybillItemEntity { Id = x.Id, WaybillId = waybillId };
+        Copy(x, entity);
+        return entity;
+    }
+
+    private static void Copy(WaybillItemValue source, WaybillItemEntity target)
+    {
+        target.LineNo = source.LineNo;
+        target.ItemType = source.ItemType;
+        target.Contents = source.Contents;
+        target.Quantity = source.Quantity;
+        target.Pieces = source.Pieces;
+        target.Weight = source.Weight;
+        target.Length = source.Length;
+        target.Width = source.Width;
+        target.Height = source.Height;
+        target.DeclaredValue = source.DeclaredValue;
+        target.OriginCountryId = source.OriginCountryId;
+        target.RiskFlagsJson = source.RiskFlagsJson;
+        target.Notes = source.Notes;
+    }
+
+    private static string ToStorageStatus(WaybillStatus status) => status switch
+    {
+        WaybillStatus.Draft => "DRAFT",
+        WaybillStatus.ReadyForApproval => "READY_FOR_APPROVAL",
+        WaybillStatus.Approved => "APPROVED",
+        WaybillStatus.Cancelled => "CANCELLED",
+        _ => throw new ArgumentOutOfRangeException(nameof(status))
+    };
+
+    private static WaybillStatus FromStorageStatus(string status) => status switch
+    {
+        "DRAFT" => WaybillStatus.Draft,
+        "READY_FOR_APPROVAL" => WaybillStatus.ReadyForApproval,
+        "APPROVED" => WaybillStatus.Approved,
+        "CANCELLED" => WaybillStatus.Cancelled,
+        _ => throw new WaybillPersistenceException("INVALID_STATE")
+    };
+}
+
+public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOperationalPartyRepository
+{
+    public async Task<(IReadOnlyList<OperationalPartyRecord> Items, long Total)> SearchAsync(
+        Guid companyId, Guid branchId, string? query, int skip, int take, CancellationToken cancellationToken)
+    {
+        IQueryable<OperationalPartyEntity> q = db.OperationalParties.AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.Status == "ACTIVE" && (x.BranchId == null || x.BranchId == branchId));
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var pattern = $"%{query.Trim()}%";
+            q = q.Where(x => EF.Functions.ILike(x.PartyNo, pattern) || EF.Functions.ILike(x.Name, pattern) ||
+                             EF.Functions.ILike(x.Mobile, pattern) || (x.IdentityNo != null && EF.Functions.ILike(x.IdentityNo, pattern)));
+        }
+        var total = await q.LongCountAsync(cancellationToken);
+        var rows = await q.OrderBy(x => x.Name).ThenBy(x => x.PartyNo).Skip(skip).Take(take).ToListAsync(cancellationToken);
+        return (rows.Select(ToRecord).ToList(), total);
+    }
+
+    public async Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken)
+    {
+        var entity = await db.OperationalParties.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.ClientOperationId == clientOperationId, cancellationToken);
+        return entity is null ? null : ToRecord(entity);
+    }
+
+    public async Task<OperationalPartyRecord> CreateAsync(
+        Guid companyId, Guid branchId, string partyNo, OperationalPartyCreateRequest request, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var entity = new OperationalPartyEntity
+        {
+            Id = Guid.NewGuid(), CompanyId = companyId, BranchId = branchId, PartyNo = partyNo,
+            Name = request.Name.Trim(), Mobile = request.Mobile.Trim(), IdentityType = NullIfWhite(request.IdentityType),
+            IdentityNo = NullIfWhite(request.IdentityNo), CountryId = request.Address.CountryId,
+            GovernorateId = request.Address.GovernorateId, DirectorateId = request.Address.DirectorateId,
+            CityId = request.Address.CityId, AreaId = request.Address.AreaId, AddressLine = NullIfWhite(request.Address.AddressLine),
+            Status = "ACTIVE", ClientOperationId = request.ClientOperationId.Trim(), Version = 1, CreatedAt = now, UpdatedAt = now
+        };
+        db.OperationalParties.Add(entity);
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException ex) { throw new WaybillPersistenceException("PARTY_DUPLICATE_WARNING", ex); }
+        return ToRecord(entity);
+    }
+
+    private static OperationalPartyRecord ToRecord(OperationalPartyEntity x)
+        => new(x.Id, x.CompanyId, x.BranchId, x.PartyNo, x.Name, x.Mobile, x.IdentityType, x.IdentityNo,
+            new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId, x.CityId, x.AreaId, x.AddressLine),
+            x.Status, x.Version);
+
+    private static string? NullIfWhite(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+public sealed class EfNumberReservationService(TransportErpDbContext db) : INumberReservationService
+{
+    public async ValueTask<NumberReservationDto> ReserveAsync(
+        OperationContext context, NumberReservationRequest request, CancellationToken cancellationToken = default)
+    {
+        context.EnsureComplete();
+        request.EnsureValid();
+        var key = request.IdempotencyKey.Trim();
+        var existing = await db.NumberReservations.SingleOrDefaultAsync(
+            x => x.CompanyId == context.CompanyId && x.IdempotencyKey == key, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.SequenceId != request.SequenceId)
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+            return ToDto(existing);
+        }
+
+        var sequence = await db.NumberSequences.SingleOrDefaultAsync(
+            x => x.Id == request.SequenceId && x.CompanyId == context.CompanyId &&
+                 (x.BranchId == null || x.BranchId == context.BranchId) && x.Status == "ACTIVE", cancellationToken)
+            ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
+
+        var value = sequence.NextValue;
+        sequence.NextValue++;
+        sequence.Version++;
+        sequence.UpdatedAt = DateTimeOffset.UtcNow;
+        var rendered = $"{sequence.Prefix}{value:D8}";
+        var reservation = new NumberReservationEntity
+        {
+            Id = Guid.NewGuid(), SequenceId = sequence.Id, CompanyId = context.CompanyId,
+            BranchId = sequence.BranchId ?? context.BranchId, IdempotencyKey = key, NumberValue = value,
+            RenderedNumber = rendered, ReservedAt = DateTimeOffset.UtcNow, State = NumberReservationStates.Reserved
+        };
+        db.NumberReservations.Add(reservation);
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException ex) { throw new WaybillPersistenceException("NUMBERING_CONCURRENCY", ex); }
+        catch (DbUpdateException ex) { throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex); }
+        return ToDto(reservation);
+    }
+
+    public async ValueTask<NumberReservationDto> CommitAsync(
+        OperationContext context, NumberReservationTransitionRequest request, CancellationToken cancellationToken = default)
+    {
+        context.EnsureComplete(); request.EnsureValid();
+        var entity = await ScopedReservation(context, request.ReservationId, cancellationToken);
+        if (entity.State == NumberReservationStates.Committed) return ToDto(entity);
+        if (entity.State == NumberReservationStates.Void) throw new WaybillPersistenceException("NUMBER_ALREADY_VOID");
+        if (!entity.WaybillId.HasValue) throw new WaybillPersistenceException("NUMBER_RESERVATION_UNLINKED");
+        entity.State = NumberReservationStates.Committed;
+        entity.CommittedAt = DateTimeOffset.UtcNow;
+        entity.LastTransitionKey = request.IdempotencyKey.Trim();
+        await db.SaveChangesAsync(cancellationToken);
+        return ToDto(entity);
+    }
+
+    public async ValueTask<NumberReservationDto> VoidAsync(
+        OperationContext context, NumberReservationTransitionRequest request, CancellationToken cancellationToken = default)
+    {
+        context.EnsureComplete(); request.EnsureValid();
+        var entity = await ScopedReservation(context, request.ReservationId, cancellationToken);
+        if (entity.State == NumberReservationStates.Void) return ToDto(entity);
+        if (entity.State == NumberReservationStates.Committed) throw new WaybillPersistenceException("COMMITTED_NUMBER_CANNOT_VOID");
+        entity.State = NumberReservationStates.Void;
+        entity.VoidedAt = DateTimeOffset.UtcNow;
+        entity.VoidReason = request.Reason;
+        entity.LastTransitionKey = request.IdempotencyKey.Trim();
+        await db.SaveChangesAsync(cancellationToken);
+        return ToDto(entity);
+    }
+
+    private async Task<NumberReservationEntity> ScopedReservation(OperationContext context, Guid id, CancellationToken ct)
+        => await db.NumberReservations.SingleOrDefaultAsync(
+            x => x.Id == id && x.CompanyId == context.CompanyId && (x.BranchId == null || x.BranchId == context.BranchId), ct)
+            ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
+
+    private static NumberReservationDto ToDto(NumberReservationEntity x)
+        => new(x.Id, x.SequenceId, x.NumberValue, x.RenderedNumber, x.State);
+}
+
+public sealed class EfWaybillUnitOfWork(TransportErpDbContext db) : IWaybillUnitOfWork
+{
+    public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
+    {
+        if (db.Database.CurrentTransaction is not null)
+            return await action(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        try
+        {
+            var result = await action(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+}
+
+public sealed class EfWaybillAuditSink(TransportErpDbContext db, AuditEventService auditService) : IWaybillAuditSink
+{
+    public async Task WriteAsync(
+        OperationContext context, string action, string outcome, string entityType, Guid entityId,
+        string? beforeJson, string? afterJson, string? reason, CancellationToken cancellationToken)
+    {
+        if (db.Database.CurrentTransaction is null)
+        {
+            await auditService.AppendAuditEventAsync(new AuditEventDraft(
+                action, outcome, entityType, entityId, context.UserId, context.CompanyId, context.BranchId,
+                context.CorrelationId, BeforeJson: beforeJson, AfterJson: afterJson, Reason: reason), cancellationToken);
+            return;
+        }
+
+        var previousHash = await db.AuditEvents.AsNoTracking()
+            .Where(x => x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.DeviceId == null)
+            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
+            .Select(x => x.Hash).FirstOrDefaultAsync(cancellationToken);
+        var evt = new AuditEvent
+        {
+            Id = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow, ActorUserId = context.UserId,
+            CompanyId = context.CompanyId, BranchId = context.BranchId, Action = action, Outcome = outcome,
+            EntityType = entityType, EntityId = entityId, CorrelationId = context.CorrelationId,
+            BeforeJson = beforeJson, AfterJson = afterJson, Reason = reason, PreviousHash = previousHash
+        };
+        evt.Hash = AuditEventService.ComputeHash(evt);
+        db.AuditEvents.Add(evt);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed class WaybillPersistenceException : InvalidOperationException
+{
+    public WaybillPersistenceException(string code) : base(code) => Code = code;
+    public WaybillPersistenceException(string code, Exception inner) : base(code, inner) => Code = code;
+    public string Code { get; }
+}
