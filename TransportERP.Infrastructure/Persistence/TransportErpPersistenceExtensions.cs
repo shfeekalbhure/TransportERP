@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace TransportERP.Infrastructure.Persistence;
@@ -16,6 +17,7 @@ public static class TransportErpPersistenceExtensions
             {
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp");
             });
+            options.ReplaceService<IModelCustomizer, TransportErpP2ModelCustomizer>();
         });
         return services;
     }
