@@ -1,0 +1,8 @@
+Permission,Primary_Roles,Scope,Device,Offline,Approval_Level,Sensitive_Data,Audit_Requirement,Notes
+waybill.pricing.manage,WaybillClerk|PricingClerk,Company/Branch,Desktop,OnlineRequired,None,Financial,BeforeAfterPricingAudit,Draft pricing and charge lines only
+waybill.pricing.override,PricingApprover|FinanceApprover,Company/Branch,Desktop,OnlineRequired,Privileged,Financial,BeforeAfterReasonApprovalAudit,Approved waybill pricing or FX amendment only with reason and authority
+manifest.finalize,Dispatcher|ShippingSupervisor,Company/Branch,Desktop,OnlineRequired,OperationalApproval,No,ManifestFinalizationAudit,Required before driver handover
+arrival.finalize,ReceivingSupervisor,Company/ReceivingBranch,Desktop,OnlineRequired,OperationalApproval,DifferenceEvidence,ArrivalFinalizationAudit,All actual lines and required evidence validated first
+trip.close,Dispatcher|OperationsManager,Company/Branch,Desktop,OnlineRequired,OperationalApproval,OperationalTrace,TripClosureReconciliationAudit,All custody quantities must be accounted
+waybill.exception.resolve,ClaimsSupervisor|OperationsManager,Company/Branch,Desktop,OnlineRequired,Manager,Evidence,ResolutionAndConsequenceAudit,Resolution never mutates accepted movement history
+trip.commission.approve,FinanceApprover|OperationsManager,Company/Branch,Desktop,OnlineRequired,FinanceApprover,Financial,AccrualApprovalAudit,Immutable RuleSnapshot required before approval

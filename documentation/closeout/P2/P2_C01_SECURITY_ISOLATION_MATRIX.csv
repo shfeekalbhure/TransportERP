@@ -1,0 +1,42 @@
+Permission,Primary_Roles,Scope,Device,Offline,Approval_Level,Sensitive_Data,Audit_Requirement,Notes
+waybill.view,WaybillClerk|Operations|Finance|Auditor,Company/Branch,Desktop/Mobile,ReadCacheAllowed,None,MaskedIdentity,ReadSensitiveWhenAccessed,No cross-company access
+waybill.create,WaybillClerk|Agent,Company/Branch,Desktop/Mobile,DraftQueueAllowed,None,No,CreateAudit,Draft only offline
+waybill.edit,WaybillClerk,Company/Branch,Desktop,OfflineDraftOnly,None,IdentityIfEntered,BeforeAfterAudit,Approved edits require separate override authority
+waybill.validate,WaybillClerk|Approver,Company/Branch,Desktop,OnlineRequired,None,No,ValidationSnapshot,Blocking and warning codes preserved
+waybill.submit,WaybillClerk,Company/Branch,Desktop,OnlineRequired,None,No,StateTransitionAudit,No number issued
+waybill.approve,WaybillApprover,Company/Branch,Desktop,OnlineRequired,Approver,FinancialSnapshot,ApprovalAndNumberAudit,Server-authoritative atomic numbering
+waybill.approval.return,WaybillApprover,Company/Branch,Desktop,OnlineRequired,Approver,No,ReasonAudit,Returns to draft
+waybill.cancel,OperationsManager|WaybillApprover,Company/Branch,Desktop,OnlineRequired,Manager,FinancialImpact,ReasonAndStateAudit,Issued number never reused
+party.view,WaybillClerk|CustomerService,Company/Branch,Desktop/Mobile,CacheAllowed,None,IdentityMasked,SensitiveReadAudit,Search scoped
+party.create,WaybillClerk|Agent,Company/Branch,Desktop/Mobile,QueueAllowed,None,Identity,CreateAndDuplicateOverrideAudit,No automatic accounting account
+waybill.attachment.add,WaybillClerk|DeliveryClerk|Claims,Company/Branch,Desktop/Mobile,CaptureQueueAllowed,None,PotentiallySensitive,HashAndActorAudit,File policy enforced
+waybill.attachment.view,AuthorizedViewer|Auditor,Company/Branch,Desktop/Mobile,OnlinePreferred,None,IdentityAndPOD,EverySensitiveViewAudit,Separate from add
+waybill.payment.plan,WaybillClerk|Cashier,Company/Branch,Desktop,OnlineRequired,None,Financial,BeforeAfterAudit,Split payer supported
+waybill.collection.create,Cashier|AuthorizedCollector|Driver,Company/Branch,Desktop/Mobile,QueueAllowedServerAccepted,None,Financial,CollectorPayerMethodAmountAudit,Driver collection becomes accountability
+waybill.collection.reverse,Accountant|FinanceApprover,Company/Branch,Desktop,OnlineRequired,FinanceApprover,Financial,ReversalReasonAudit,No deletion of original
+waybill.release,ShippingClerk,Company/Branch,Desktop,OnlineRequired,None,No,QuantityAudit,Serialized quantity check
+waybill.allocate,ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,TripQuantityAudit,Route and released balance enforced
+waybill.unallocate,ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,ReversalReasonAudit,Cannot erase loaded history
+trip.create,Dispatcher,Company/Branch,Desktop,OnlineRequired,None,DriverVehicleRefs,AssignmentAudit,References future Fleet domain
+trip.view,Operations|Dispatcher|Auditor,Company/Branch,Desktop/Mobile,ReadCacheAllowed,None,OperationalTrace,ReadAuditByPolicy,Operational trip tracking only; GPS raw source remains separate
+manifest.create,Dispatcher|ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,ManifestSourceAudit,From allocations
+manifest.load,Loader,Company/Branch,Desktop/Mobile,QueueAllowedServerAccepted,None,No,QuantityDeviceAudit,No over-load
+manifest.handover,Dispatcher|Driver,Company/Branch,Desktop/Mobile,OnlineRequired,DriverAcceptance,DriverIdentity,HandoverAudit,Custody starts on acceptance
+trip.start,Dispatcher|Driver,Company/Branch,Desktop/Mobile,OnlineRequired,None,No,ActualTimeAudit,Manifest must be accepted
+arrival.record,ReceivingClerk|TransitClerk,Company/ReceivingBranch,Desktop/Mobile,QueueAllowedServerAccepted,None,No,LocationTimeAudit,Expected vs actual
+arrival.unload,ReceivingClerk|TransitClerk,Company/ReceivingBranch,Desktop/Mobile,QueueAllowedServerAccepted,None,DamageEvidence,QuantityDifferenceAudit,Partial unload supported
+waybill.reallocate,TransitClerk|ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,FromToTripAudit,Available holding only
+waybill.hold,OperationsManager|Compliance,Company/Branch,Desktop,OnlineRequired,Manager,Reason,HoldActionAudit,Blocks configured actions
+waybill.hold.release,OperationsManager|Compliance,Company/Branch,Desktop,OnlineRequired,Manager,Reason,ReleaseAudit,Historical hold retained
+waybill.redirect,OperationsManager,Company/Branch,Desktop,OnlineRequired,Manager,Address,OldNewRouteReasonAudit,Undelivered quantity only
+waybill.deliver,DeliveryClerk,Company/DeliveryBranch,Desktop/Mobile,CaptureQueueAllowed,Operational,RecipientIdentity,RecipientQuantityLocationAudit,Cannot exceed local availability
+waybill.pod.capture,DeliveryClerk,Company/DeliveryBranch,Desktop/Mobile,CaptureQueueAllowed,None,IdentityPhotoSignature,ProofHashAndAccessAudit,Final accepted after sync ack
+waybill.exception.create,Operations|Claims|ReceivingClerk,Company/Branch,Desktop/Mobile,QueueAllowedServerAccepted,None,Evidence,ExceptionEvidenceAudit,No movement deletion
+trip.commission.calculate,Operations|Accountant,Company/Branch,Desktop,OnlineRequired,None,Financial,RuleSnapshotAudit,Actual manifest basis only
+trip.settle,Accountant|FinanceApprover,Company/Branch,Desktop,OnlineRequired,FinanceApprover,Financial,SettlementJournalAudit,Period must be open
+waybill.financial.close,Accountant|FinanceApprover,Company/Branch,Desktop,OnlineRequired,FinanceApprover,Financial,PreconditionSnapshotAudit,Remaining zero and accountabilities closed
+waybill.financial.reopen,FinanceApprover,Company/Branch,Desktop,OnlineRequired,Privileged,Financial,BeforeAfterReasonAudit,Controlled exception
+waybill.movement.view,Operations|Auditor|CustomerService,Company/Branch,Desktop,OnlineRequired,None,OperationalTrace,ReadAuditByPolicy,Full timeline
+waybill.item.movement.view,Operations|Auditor,Company/Branch,Desktop,OnlineRequired,None,OperationalTrace,ReadAuditByPolicy,Item quantity timeline
+notification.send,CustomerService|SystemService,Company/Branch,Desktop/System,OnlineRequired,None,ContactData,MessageProviderResultAudit,Template must not expose sensitive data
+waybill.print,WaybillClerk|Warehouse,Company/Branch,Desktop,OnlinePreferred,None,No,PrintAudit,Draft watermark before approval
