@@ -19,7 +19,6 @@ public sealed class OperationalPartyEntity : P2Entity
     public string? IdentityNo { get; set; }
     public Guid? CountryId { get; set; }
     public Guid? GovernorateId { get; set; }
-    public Guid? DirectorateId { get; set; }
     public Guid? CityId { get; set; }
     public Guid? AreaId { get; set; }
     public string? AddressLine { get; set; }
@@ -62,7 +61,6 @@ public sealed class WaybillPartyEntity
     public string? IdentityNoSnapshot { get; set; }
     public Guid? CountryId { get; set; }
     public Guid? GovernorateId { get; set; }
-    public Guid? DirectorateId { get; set; }
     public Guid? CityId { get; set; }
     public Guid? AreaId { get; set; }
     public string? AddressLineSnapshot { get; set; }

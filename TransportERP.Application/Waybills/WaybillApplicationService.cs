@@ -318,8 +318,7 @@ public sealed class WaybillApplicationService(
         input.Address.EnsureUsable();
         return new WaybillPartyValue(role, input.OperationalPartyId, input.Name, input.Mobile,
             input.IdentityType, input.IdentityNo,
-            input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,
-            input.Address.CityId, input.Address.AreaId, input.Address.AddressLine);
+            input.Address.CountryId, input.Address.GovernorateId, input.Address.CityId, input.Address.AreaId, input.Address.AddressLine);
     }
 
     private static WaybillItemValue ToDomainItem(WaybillItemInput input)
@@ -336,8 +335,7 @@ public sealed class WaybillApplicationService(
             aggregate.ServiceType, aggregate.Priority, aggregate.Status.ToString().ToUpperInvariant(), aggregate.Version,
             aggregate.Parties.Select(x => new WaybillPartyResponse(
                 x.Role.ToString().ToUpperInvariant(), x.OperationalPartyId, x.Name, x.Mobile, x.IdentityType,
-                MaskIdentity(x.IdentityNo), new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,
-                    x.CityId, x.AreaId, x.AddressText))).ToList(),
+                MaskIdentity(x.IdentityNo), new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.CityId, x.AreaId, x.AddressText))).ToList(),
             aggregate.Items.Select(x => new WaybillItemResponse(
                 x.Id, x.LineNo, x.ItemType, x.Contents, x.Quantity, x.Pieces, x.Weight, x.Length, x.Width, x.Height,
                 x.DeclaredValue, x.OriginCountryId,

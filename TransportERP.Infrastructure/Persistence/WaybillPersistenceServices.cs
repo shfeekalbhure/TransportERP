@@ -162,7 +162,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
             x.Parties.OrderBy(p => p.Sequence).Select(p => new WaybillPartyValue(
                 Enum.Parse<WaybillPartyRole>(p.Role, true), p.OperationalPartyId, p.NameSnapshot,
                 p.MobileSnapshot, p.IdentityTypeSnapshot, p.IdentityNoSnapshot,
-                p.CountryId, p.GovernorateId, p.DirectorateId, p.CityId, p.AreaId, p.AddressLineSnapshot)),
+                p.CountryId, p.GovernorateId, p.CityId, p.AreaId, p.AddressLineSnapshot)),
             x.Items.OrderBy(i => i.LineNo).Select(i => new WaybillItemValue(
                 i.Id, i.LineNo, i.ItemType, i.Contents, i.Quantity, i.Pieces, i.Weight,
                 i.Length, i.Width, i.Height, i.DeclaredValue, i.OriginCountryId, i.RiskFlagsJson, i.Notes)));
@@ -174,7 +174,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
             Role = x.Role.ToString().ToUpperInvariant(), OperationalPartyId = x.OperationalPartyId,
             NameSnapshot = x.Name, MobileSnapshot = x.Mobile, IdentityTypeSnapshot = x.IdentityType,
             IdentityNoSnapshot = x.IdentityNo, CountryId = x.CountryId, GovernorateId = x.GovernorateId,
-            DirectorateId = x.DirectorateId, CityId = x.CityId, AreaId = x.AreaId, AddressLineSnapshot = x.AddressText
+            CityId = x.CityId, AreaId = x.AreaId, AddressLineSnapshot = x.AddressText
         };
 
     private static WaybillItemEntity ToEntity(Guid waybillId, WaybillItemValue x)
@@ -256,8 +256,7 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
             Id = Guid.NewGuid(), CompanyId = companyId, BranchId = branchId, PartyNo = partyNo,
             Name = request.Name.Trim(), Mobile = request.Mobile.Trim(), IdentityType = NullIfWhite(request.IdentityType),
             IdentityNo = NullIfWhite(request.IdentityNo), CountryId = request.Address.CountryId,
-            GovernorateId = request.Address.GovernorateId, DirectorateId = request.Address.DirectorateId,
-            CityId = request.Address.CityId, AreaId = request.Address.AreaId, AddressLine = NullIfWhite(request.Address.AddressLine),
+            GovernorateId = request.Address.GovernorateId, CityId = request.Address.CityId, AreaId = request.Address.AreaId, AddressLine = NullIfWhite(request.Address.AddressLine),
             Status = "ACTIVE", ClientOperationId = request.ClientOperationId.Trim(), Version = 1, CreatedAt = now, UpdatedAt = now
         };
         OperationalParties.Add(entity);
@@ -268,7 +267,7 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
 
     private static OperationalPartyRecord ToRecord(OperationalPartyEntity x)
         => new(x.Id, x.CompanyId, x.BranchId, x.PartyNo, x.Name, x.Mobile, x.IdentityType, x.IdentityNo,
-            new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId, x.CityId, x.AreaId, x.AddressLine),
+            new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.CityId, x.AreaId, x.AddressLine),
             x.Status, x.Version);
 
     private static string? NullIfWhite(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
