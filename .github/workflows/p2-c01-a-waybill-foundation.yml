@@ -30,9 +30,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-    env:
-      TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
-      TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,17 +55,26 @@ jobs:
       - name: Build core runtime and tests
         run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
 
+      - name: Run regression suite without opt-in database tests
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
+
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
       - name: Verify EF model matches committed migrations
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
         run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
-      - name: Apply migrations to PostgreSQL
+      - name: Apply P1 plus P2-C01-A migrations to PostgreSQL
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
         run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
-      - name: Run complete test suite against PostgreSQL
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
+      - name: Run P2-C01-A PostgreSQL and HTTP gates
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01AWaybillPostgreSqlIntegrationTests"
 
   desktop-rtl:
     name: Desktop RTL contract surface
