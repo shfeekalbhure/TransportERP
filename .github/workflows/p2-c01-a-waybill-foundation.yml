@@ -1,0 +1,66 @@
+name: P2 C01 A waybill foundation
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-a-waybill-foundation-20260820
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  waybill-foundation:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
+      - name: Restore
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build solution
+        run: dotnet build TransportERP.slnx --configuration Debug --no-restore
+
+      - name: Generate P2-C01-A migration when missing
+        shell: pwsh
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterp;Username=postgres;Password=postgres
+        run: |
+          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $migration) {
+            dotnet ef migrations add P2C01AWaybillFoundation --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --output-dir Persistence/Migrations
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add TransportERP.Infrastructure/Persistence/Migrations
+            if (-not (git diff --cached --quiet)) {
+              git commit -m 'db: generate P2-C01-A waybill foundation migration'
+              git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
+            }
+          }
+
+      - name: Run complete test suite
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
+
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug -p:OutputType=Library
+
+      - name: Verify migration exists
+        shell: pwsh
+        run: |
+          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $migration) { throw 'P2-C01-A migration was not generated.' }
+          Write-Host "Migration: $($migration.Name)"
