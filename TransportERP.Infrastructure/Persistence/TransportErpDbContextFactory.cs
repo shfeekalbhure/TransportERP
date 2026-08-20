@@ -17,7 +17,7 @@ public sealed class TransportErpDbContextFactory : IDesignTimeDbContextFactory<T
         var options = new DbContextOptionsBuilder<TransportErpDbContext>()
             .UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp"))
-            .ReplaceService<IModelCustomizer, TransportErpP2ModelCustomizer>()
+            .ReplaceService<IModelCustomizer, TransportErpP2CombinedModelCustomizer>()
             .Options;
         return new TransportErpDbContext(options);
     }
