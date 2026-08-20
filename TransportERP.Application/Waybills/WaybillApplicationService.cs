@@ -12,6 +12,7 @@ public interface IWaybillRepository
     Task<WaybillAggregate?> GetAsync(Guid companyId, Guid branchId, Guid waybillId, CancellationToken cancellationToken);
     Task AddAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken);
     Task SaveAsync(WaybillAggregate aggregate, long expectedVersion, string clientOperationId, CancellationToken cancellationToken);
+    Task LinkNumberReservationAsync(Guid companyId, Guid branchId, Guid waybillId, Guid reservationId, CancellationToken cancellationToken);
 }
 
 public sealed record OperationalPartyRecord(
@@ -215,6 +216,7 @@ public sealed class WaybillApplicationService(
 
             try
             {
+                await waybills.LinkNumberReservationAsync(context.CompanyId, context.BranchId, aggregate.Id, reservation.Id, ct);
                 aggregate.ApplyApproval(reservation.RenderedNumber);
                 await waybills.SaveAsync(aggregate, request.ExpectedVersion, request.IdempotencyKey, ct);
                 var committed = await numbering.CommitAsync(context,
@@ -227,8 +229,6 @@ public sealed class WaybillApplicationService(
             }
             catch
             {
-                // The transaction normally rolls back both document and reservation. Void is best-effort
-                // for implementations that persist reservation before the transaction boundary.
                 try
                 {
                     await numbering.VoidAsync(context,
@@ -286,7 +286,9 @@ public sealed class WaybillApplicationService(
             throw new WaybillApplicationException("PARTY_ROLE_INVALID");
         input.Address.EnsureUsable();
         return new WaybillPartyValue(role, input.OperationalPartyId, input.Name, input.Mobile,
-            input.IdentityType, input.IdentityNo, input.Address.AddressLine);
+            input.IdentityType, input.IdentityNo,
+            input.Address.CountryId, input.Address.GovernorateId, input.Address.DirectorateId,
+            input.Address.CityId, input.Address.AreaId, input.Address.AddressLine);
     }
 
     private static WaybillItemValue ToDomainItem(WaybillItemInput input)
@@ -303,7 +305,8 @@ public sealed class WaybillApplicationService(
             aggregate.ServiceType, aggregate.Priority, aggregate.Status.ToString().ToUpperInvariant(), aggregate.Version,
             aggregate.Parties.Select(x => new WaybillPartyResponse(
                 x.Role.ToString().ToUpperInvariant(), x.OperationalPartyId, x.Name, x.Mobile, x.IdentityType,
-                MaskIdentity(x.IdentityNo), new GeoAddressSnapshot(null, null, null, null, null, x.AddressText ?? "غير محدد"))).ToList(),
+                MaskIdentity(x.IdentityNo), new GeoAddressSnapshot(x.CountryId, x.GovernorateId, x.DirectorateId,
+                    x.CityId, x.AreaId, x.AddressText))).ToList(),
             aggregate.Items.Select(x => new WaybillItemResponse(
                 x.Id, x.LineNo, x.ItemType, x.Contents, x.Quantity, x.Pieces, x.Weight, x.Length, x.Width, x.Height,
                 x.DeclaredValue, x.OriginCountryId,
