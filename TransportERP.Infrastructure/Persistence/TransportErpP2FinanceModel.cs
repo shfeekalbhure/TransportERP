@@ -31,7 +31,7 @@ public static class TransportErpP2FinanceModel
         plan.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         plan.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
         plan.Property(x => x.Version).IsConcurrencyToken();
-        plan.HasIndex(x => new { x.WaybillId, x.LineNo }).IsUnique();
+        plan.HasIndex(x => new { x.WaybillId, x.LineNo }).IsUnique().HasFilter("\"Status\" = 'ACTIVE'");
         plan.HasIndex(x => new { x.WaybillId, x.Status });
         plan.HasOne(x => x.Waybill).WithMany(x => x.PaymentPlanLines).HasForeignKey(x => x.WaybillId).OnDelete(DeleteBehavior.Cascade);
         plan.HasOne<OperationalPartyEntity>().WithMany().HasForeignKey(x => x.PartyId).OnDelete(DeleteBehavior.Restrict);
