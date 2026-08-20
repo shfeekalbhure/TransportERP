@@ -24,7 +24,6 @@ public sealed record WaybillPartyValue(
     string? IdentityNo,
     Guid? CountryId,
     Guid? GovernorateId,
-    Guid? DirectorateId,
     Guid? CityId,
     Guid? AreaId,
     string? AddressText)
@@ -39,10 +38,6 @@ public sealed record WaybillPartyValue(
             throw new WaybillRuleException("IDENTITY_TYPE_REQUIRED");
         if (AreaId.HasValue && !CityId.HasValue)
             throw new WaybillRuleException("AREA_REQUIRES_CITY");
-        if (CityId.HasValue && !DirectorateId.HasValue)
-            throw new WaybillRuleException("CITY_REQUIRES_DIRECTORATE");
-        if (DirectorateId.HasValue && !GovernorateId.HasValue)
-            throw new WaybillRuleException("DIRECTORATE_REQUIRES_GOVERNORATE");
         if (GovernorateId.HasValue && !CountryId.HasValue)
             throw new WaybillRuleException("GOVERNORATE_REQUIRES_COUNTRY");
         if (!CountryId.HasValue && string.IsNullOrWhiteSpace(AddressText))
