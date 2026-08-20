@@ -50,7 +50,71 @@ jobs:
             throw 'DirectorateId remains in P2-C01-A implementation although closed W1 does not authorize it.'
           }
 
-      - name: Persist W1 alignment before build
+      - name: Align idempotent create repository contract
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $path = 'TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs'
+          $source = [IO.File]::ReadAllText($path)
+          if ($source -notmatch 'Task<WaybillAggregate> AddOrGetAsync') {
+            $replacement = @'
+    public async Task<WaybillAggregate> AddOrGetAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken)
+    {
+        var operationId = clientOperationId.Trim();
+        var existing = await GetByCreateOperationAsync(aggregate.CompanyId, aggregate.BranchId, operationId, cancellationToken);
+        if (existing is not null)
+            return existing;
+
+        var now = DateTimeOffset.UtcNow;
+        var entity = new WaybillEntity
+        {
+            Id = aggregate.Id,
+            CompanyId = aggregate.CompanyId,
+            BranchId = aggregate.BranchId,
+            DraftNo = aggregate.DraftNo,
+            WaybillNo = aggregate.WaybillNo,
+            WaybillDateTime = aggregate.WaybillDateTime,
+            ServiceType = aggregate.ServiceType,
+            Priority = aggregate.Priority,
+            OriginId = aggregate.OriginId,
+            DestinationId = aggregate.DestinationId,
+            CurrencyId = aggregate.CurrencyId,
+            ExchangeRate = aggregate.ExchangeRate,
+            FreightTotal = aggregate.FreightTotal,
+            DiscountTotal = aggregate.DiscountTotal,
+            Status = ToStorageStatus(aggregate.Status),
+            CreateClientOperationId = operationId,
+            LastClientOperationId = operationId,
+            Version = aggregate.Version,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList(),
+            Items = aggregate.Items.Select(x => ToEntity(aggregate.Id, x)).ToList()
+        };
+
+        Waybills.Add(entity);
+        try
+        {
+            await SaveWithConcurrencyMapping(cancellationToken);
+            return aggregate;
+        }
+        catch (WaybillPersistenceException ex) when (ex.Code == "DUPLICATE_OPERATION")
+        {
+            db.ChangeTracker.Clear();
+            existing = await GetByCreateOperationAsync(aggregate.CompanyId, aggregate.BranchId, operationId, cancellationToken);
+            if (existing is not null)
+                return existing;
+            throw;
+        }
+    }
+'@
+            $pattern = '(?s)    public async Task AddAsync\(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken\).*?^    public async Task SaveAsync'
+            $updated = [regex]::Replace($source, $pattern, $replacement + "`r`n    public async Task SaveAsync", [System.Text.RegularExpressions.RegexOptions]::Multiline)
+            if ($updated -eq $source) { throw 'Could not align AddOrGetAsync repository implementation.' }
+            [IO.File]::WriteAllText($path, $updated, (New-Object System.Text.UTF8Encoding($false)))
+          }
+
+      - name: Persist contract remediations before build
         if: github.event_name == 'push'
         shell: pwsh
         run: |
@@ -58,7 +122,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add TransportERP.Application/Waybills/WaybillApplicationService.cs TransportERP.Infrastructure/Persistence/P2WaybillEntities.cs TransportERP.Infrastructure/Persistence/WaybillPersistenceServices.cs
           if (-not (git diff --cached --quiet)) {
-            git commit -m 'fix: align P2-C01-A implementation with closed W1 geo contract'
+            git commit -m 'fix: align P2-C01-A contracts before build'
             git push origin HEAD:feature/p2-c01-a-waybill-foundation-20260820
           }
 
