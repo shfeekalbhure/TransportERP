@@ -38,13 +38,12 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
     public Task<bool> WasLastOperationAsync(Guid companyId, Guid branchId, Guid waybillId, string clientOperationId, CancellationToken cancellationToken)
         => Waybills.AsNoTracking().AnyAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId && x.LastClientOperationId == clientOperationId, cancellationToken);
 
-    public async Task AddAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken)
+    public async Task<WaybillAggregate> AddOrGetAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken)
     {
-        var existing = await Waybills.AsNoTracking().AnyAsync(
-            x => x.CompanyId == aggregate.CompanyId && x.BranchId == aggregate.BranchId && x.CreateClientOperationId == clientOperationId,
-            cancellationToken);
-        if (existing)
-            throw new WaybillPersistenceException("DUPLICATE_OPERATION");
+        var operationId = clientOperationId.Trim();
+        var existing = await GetByCreateOperationAsync(aggregate.CompanyId, aggregate.BranchId, operationId, cancellationToken);
+        if (existing is not null)
+            return existing;
 
         var now = DateTimeOffset.UtcNow;
         var entity = new WaybillEntity
@@ -64,16 +63,29 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
             FreightTotal = aggregate.FreightTotal,
             DiscountTotal = aggregate.DiscountTotal,
             Status = ToStorageStatus(aggregate.Status),
-            CreateClientOperationId = clientOperationId,
-            LastClientOperationId = clientOperationId,
+            CreateClientOperationId = operationId,
+            LastClientOperationId = operationId,
             Version = aggregate.Version,
             CreatedAt = now,
             UpdatedAt = now,
             Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList(),
             Items = aggregate.Items.Select(x => ToEntity(aggregate.Id, x)).ToList()
         };
+
         Waybills.Add(entity);
-        await SaveWithConcurrencyMapping(cancellationToken);
+        try
+        {
+            await SaveWithConcurrencyMapping(cancellationToken);
+            return aggregate;
+        }
+        catch (WaybillPersistenceException ex) when (ex.Code == "DUPLICATE_OPERATION")
+        {
+            db.ChangeTracker.Clear();
+            existing = await GetByCreateOperationAsync(aggregate.CompanyId, aggregate.BranchId, operationId, cancellationToken);
+            if (existing is not null)
+                return existing;
+            throw;
+        }
     }
 
     public async Task SaveAsync(WaybillAggregate aggregate, long expectedVersion, string clientOperationId, CancellationToken cancellationToken)
