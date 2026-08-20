@@ -179,7 +179,7 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
 
     private static WaybillApplicationService CreateService(TransportErpDbContext db)
         => new(
-            new EfWaybillRepository(db),
+            new ConcurrencySafeWaybillRepository(db),
             new EfOperationalPartyRepository(db),
             new EfNumberReservationService(db),
             new EfWaybillUnitOfWork(db),
