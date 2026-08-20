@@ -18,6 +18,7 @@ waybill.release,ShippingClerk,Company/Branch,Desktop,OnlineRequired,None,No,Quan
 waybill.allocate,ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,TripQuantityAudit,Route and released balance enforced
 waybill.unallocate,ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,ReversalReasonAudit,Cannot erase loaded history
 trip.create,Dispatcher,Company/Branch,Desktop,OnlineRequired,None,DriverVehicleRefs,AssignmentAudit,References future Fleet domain
+trip.view,Operations|Dispatcher|Auditor,Company/Branch,Desktop/Mobile,ReadCacheAllowed,None,OperationalTrace,ReadAuditByPolicy,Operational trip tracking only; GPS raw source remains separate
 manifest.create,Dispatcher|ShippingPlanner,Company/Branch,Desktop,OnlineRequired,None,No,ManifestSourceAudit,From allocations
 manifest.load,Loader,Company/Branch,Desktop/Mobile,QueueAllowedServerAccepted,None,No,QuantityDeviceAudit,No over-load
 manifest.handover,Dispatcher|Driver,Company/Branch,Desktop/Mobile,OnlineRequired,DriverAcceptance,DriverIdentity,HandoverAudit,Custody starts on acceptance
