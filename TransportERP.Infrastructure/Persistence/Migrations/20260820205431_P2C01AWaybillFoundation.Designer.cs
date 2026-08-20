@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TransportERP.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransportErpDbContext))]
-    partial class TransportErpDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260820205431_P2C01AWaybillFoundation")]
+    partial class P2C01AWaybillFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1014,13 +1017,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.HasIndex("CompanyId", "DocumentType")
-                        .IsUnique()
-                        .HasFilter("\"BranchId\" IS NULL");
-
                     b.HasIndex("CompanyId", "BranchId", "DocumentType")
-                        .IsUnique()
-                        .HasFilter("\"BranchId\" IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("number_sequences", "transport_erp", t =>
                         {
@@ -1851,7 +1849,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_waybills_exchange_rate", "\"ExchangeRate\" > 0");
 
-                            t.HasCheckConstraint("ck_waybills_number_state", "(\"Status\" = 'APPROVED' AND \"WaybillNo\" IS NOT NULL) OR (\"Status\" <> 'APPROVED' AND \"WaybillNo\" IS NULL)");
+                            t.HasCheckConstraint("ck_waybills_number_state", "(\"Status\" = 'APPROVED' AND \"WaybillNo\" IS NOT NULL) OR (\"Status\" <> 'APPROVED')");
 
                             t.HasCheckConstraint("ck_waybills_status", "\"Status\" IN ('DRAFT','READY_FOR_APPROVAL','APPROVED','CANCELLED')");
 

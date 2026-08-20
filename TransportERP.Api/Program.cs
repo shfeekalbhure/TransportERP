@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Api.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +13,7 @@ var connectionString = builder.Configuration.GetConnectionString("TransportErp")
     ?? Environment.GetEnvironmentVariable("TRANSPORTERP_CONNECTION_STRING")
     ?? throw new InvalidOperationException("Transport ERP database connection is not configured.");
 
-builder.Services.AddDbContext<TransportErpDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
@@ -22,6 +23,7 @@ builder.Services.AddScoped<SyncOperationService>(services =>
             builder.Configuration.GetValue("Sync:MaxRetryCount", 5),
             TimeSpan.FromSeconds(builder.Configuration.GetValue("Sync:BaseRetrySeconds", 5)),
             TimeSpan.FromMinutes(builder.Configuration.GetValue("Sync:MaxRetryMinutes", 30)))));
+builder.Services.AddP2C01AWaybillFoundation();
 
 var jwtAuthority = builder.Configuration["Auth:Authority"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_AUTHORITY");
 var jwtIssuer = builder.Configuration["Auth:Issuer"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_ISSUER");
@@ -67,6 +69,7 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapP2C01AWaybillFoundation();
 
 app.MapPost("/api/v1/sync/operations:batch", async (
     SyncBatchRequest request,

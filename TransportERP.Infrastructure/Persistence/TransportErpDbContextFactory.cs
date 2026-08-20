@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace TransportERP.Infrastructure.Persistence;
 
@@ -14,7 +15,9 @@ public sealed class TransportErpDbContextFactory : IDesignTimeDbContextFactory<T
                 "TRANSPORTERP_DESIGN_CONNSTR must be set for EF Core design-time operations.");
         }
         var options = new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, npgsql =>
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp"))
+            .ReplaceService<IModelCustomizer, TransportErpP2ModelCustomizer>()
             .Options;
         return new TransportErpDbContext(options);
     }

@@ -1,0 +1,101 @@
+name: P2 C01 A waybill foundation
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-a-waybill-foundation-20260820
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-postgresql:
+    name: Core + PostgreSQL + HTTP
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate closed P2-C01 contracts
+        run: python documentation/closeout/P2/validate_p2_c01_contracts.py
+
+      - name: Restore core tests
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Run regression suite
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL"
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
+      - name: Verify EF model matches committed migrations
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Apply P1 plus P2-C01-A migrations to PostgreSQL
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Run P2-C01-A PostgreSQL and HTTP gates
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category=P2PostgreSQL"
+
+  desktop-rtl:
+    name: Desktop RTL contract surface
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore Desktop
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+      - name: Confirm P2-C01-A screen contracts only
+        shell: pwsh
+        run: |
+          $file = 'TransportERP.Desktop/Waybills/WaybillFoundationForms.cs'
+          if (-not (Test-Path $file)) { throw 'Waybill foundation forms are missing.' }
+          $text = Get-Content $file -Raw
+          foreach ($id in @('SHP-005','SHP-006','SHP-007','SHP-008','SHP-014')) {
+            if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
+          }

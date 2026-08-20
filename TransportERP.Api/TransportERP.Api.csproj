@@ -12,6 +12,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <ProjectReference Include="..\TransportERP.Application\TransportERP.Application.csproj" />
+    <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
     <ProjectReference Include="..\TransportERP.Infrastructure\TransportERP.Infrastructure.csproj" />
   </ItemGroup>
 

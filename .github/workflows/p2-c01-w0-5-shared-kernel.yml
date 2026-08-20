@@ -11,6 +11,7 @@ on:
 
 jobs:
   shared-kernel:
+    if: github.event_name != 'pull_request' || github.head_ref == 'foundation/p2-c01-w0-5-shared-kernel-20260820'
     runs-on: windows-latest
     steps:
       - name: Checkout
