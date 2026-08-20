@@ -36,8 +36,9 @@ public sealed class W05SharedKernelTests
     }
 
     [Fact]
-    public void OperationalPartySnapshot_DoesNotRequireAccountingAccountButRequiresIdentityConsistency()
+    public void OperationalPartySnapshot_UsesGovernedGeoAddressAndDoesNotRequireAccountingAccount()
     {
+        var address = new GeoAddressSnapshot(null, null, null, null, "تعز");
         var party = new OperationalPartySnapshot(
             null,
             "P-001",
@@ -45,7 +46,7 @@ public sealed class W05SharedKernelTests
             "777000000",
             null,
             null,
-            new AddressSnapshot(null, null, null, null, null, "تعز"));
+            address);
         party.EnsureValid();
 
         var invalid = party with { IdentityNo = "12345", IdentityType = null };
@@ -76,26 +77,31 @@ public sealed class W05SharedKernelTests
     }
 
     [Fact]
-    public void GeoAddressSnapshot_EnforcesDeclaredHierarchy()
+    public void GeoAddressSnapshot_AlignsWithClosedW1PartyColumns()
     {
         var country = Guid.NewGuid();
         var governorate = Guid.NewGuid();
-        var directorate = Guid.NewGuid();
         var city = Guid.NewGuid();
         var area = Guid.NewGuid();
-        new GeoAddressSnapshot(country, governorate, directorate, city, area, "شارع 1").EnsureUsable();
+        new GeoAddressSnapshot(country, governorate, city, area, "شارع 1").EnsureUsable();
 
         Assert.Throws<ArgumentException>(() =>
-            new GeoAddressSnapshot(null, null, null, null, area, null).EnsureUsable());
+            new GeoAddressSnapshot(null, null, null, area, null).EnsureUsable());
+        Assert.Throws<ArgumentException>(() =>
+            new GeoAddressSnapshot(null, governorate, city, area, null).EnsureUsable());
     }
 
     [Fact]
-    public void NumberReservationContract_UsesKnownStateAndAuthoritativeIdentity()
+    public void NumberReservationContract_UsesKnownStateAndCompleteLifecycleRequests()
     {
         var dto = new NumberReservationDto(Guid.NewGuid(), Guid.NewGuid(), 1001, "WB-1001", NumberReservationStates.Committed);
         dto.EnsureValid();
         Assert.True(NumberReservationStates.IsKnown(NumberReservationStates.Void));
 
+        var transition = new NumberReservationTransitionRequest(dto.Id, "approve-waybill-1001");
+        transition.EnsureValid();
+
         Assert.Throws<ArgumentException>(() => (dto with { State = "REUSED" }).EnsureValid());
+        Assert.Throws<ArgumentException>(() => new NumberReservationTransitionRequest(Guid.Empty, "op").EnsureValid());
     }
 }
