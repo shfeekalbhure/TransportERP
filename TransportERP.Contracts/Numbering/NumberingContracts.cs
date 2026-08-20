@@ -29,6 +29,23 @@ public sealed record NumberReservationRequest(
     }
 }
 
+/// <summary>
+/// Changes an existing reservation state. Commit/Void retries use the same logical idempotency identity.
+/// </summary>
+public sealed record NumberReservationTransitionRequest(
+    Guid ReservationId,
+    string IdempotencyKey,
+    string? Reason = null)
+{
+    public void EnsureValid()
+    {
+        if (ReservationId == Guid.Empty)
+            throw new ArgumentException("A reservation identity is required.", nameof(ReservationId));
+        if (string.IsNullOrWhiteSpace(IdempotencyKey))
+            throw new ArgumentException("An idempotency key is required.", nameof(IdempotencyKey));
+    }
+}
+
 public sealed record NumberReservationDto(
     Guid Id,
     Guid SequenceId,
@@ -50,6 +67,8 @@ public sealed record NumberReservationDto(
 /// <summary>
 /// Server-authoritative numbering boundary. Implementations must guarantee atomic reservation,
 /// idempotent retry by logical operation, and permanent non-reuse of committed or voided numbers.
+/// The owning application transaction is responsible for coupling CommitAsync to the authoritative
+/// document approval transaction so the official number is not published before the document commit.
 /// Persistence is intentionally outside the shared contract layer.
 /// </summary>
 public interface INumberReservationService
@@ -57,5 +76,15 @@ public interface INumberReservationService
     ValueTask<NumberReservationDto> ReserveAsync(
         OperationContext context,
         NumberReservationRequest request,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<NumberReservationDto> CommitAsync(
+        OperationContext context,
+        NumberReservationTransitionRequest request,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<NumberReservationDto> VoidAsync(
+        OperationContext context,
+        NumberReservationTransitionRequest request,
         CancellationToken cancellationToken = default);
 }
