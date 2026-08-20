@@ -95,7 +95,7 @@ public sealed class NumberSequenceEntity : P2Entity
     public Guid? BranchId { get; set; }
     public string DocumentType { get; set; } = "WAYBILL";
     public string? Prefix { get; set; }
-    public ulong NextValue { get; set; } = 1;
+    public long NextValue { get; set; } = 1;
     public string ResetPolicy { get; set; } = "NONE";
     public string Status { get; set; } = "ACTIVE";
 }
@@ -108,7 +108,7 @@ public sealed class NumberReservationEntity
     public Guid CompanyId { get; set; }
     public Guid? BranchId { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
-    public ulong NumberValue { get; set; }
+    public long NumberValue { get; set; }
     public string RenderedNumber { get; set; } = string.Empty;
     public DateTimeOffset ReservedAt { get; set; }
     public DateTimeOffset? CommittedAt { get; set; }
