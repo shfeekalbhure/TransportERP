@@ -1,5 +1,4 @@
 using System.Data;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TransportERP.Application.Waybills;
@@ -13,9 +12,14 @@ namespace TransportERP.Infrastructure.Persistence;
 
 public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepository
 {
+    private DbSet<WaybillEntity> Waybills => db.Set<WaybillEntity>();
+    private DbSet<WaybillPartyEntity> WaybillParties => db.Set<WaybillPartyEntity>();
+    private DbSet<WaybillItemEntity> WaybillItems => db.Set<WaybillItemEntity>();
+    private DbSet<NumberReservationEntity> NumberReservations => db.Set<NumberReservationEntity>();
+
     public async Task<WaybillAggregate?> GetAsync(Guid companyId, Guid branchId, Guid waybillId, CancellationToken cancellationToken)
     {
-        var entity = await db.Waybills.AsNoTracking()
+        var entity = await Waybills.AsNoTracking()
             .Include(x => x.Parties)
             .Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId, cancellationToken);
@@ -24,7 +28,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
 
     public async Task<WaybillAggregate?> GetByCreateOperationAsync(Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken)
     {
-        var entity = await db.Waybills.AsNoTracking()
+        var entity = await Waybills.AsNoTracking()
             .Include(x => x.Parties)
             .Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.BranchId == branchId && x.CreateClientOperationId == clientOperationId, cancellationToken);
@@ -32,11 +36,11 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
     }
 
     public Task<bool> WasLastOperationAsync(Guid companyId, Guid branchId, Guid waybillId, string clientOperationId, CancellationToken cancellationToken)
-        => db.Waybills.AsNoTracking().AnyAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId && x.LastClientOperationId == clientOperationId, cancellationToken);
+        => Waybills.AsNoTracking().AnyAsync(x => x.Id == waybillId && x.CompanyId == companyId && x.BranchId == branchId && x.LastClientOperationId == clientOperationId, cancellationToken);
 
     public async Task AddAsync(WaybillAggregate aggregate, string clientOperationId, CancellationToken cancellationToken)
     {
-        var existing = await db.Waybills.AsNoTracking().AnyAsync(
+        var existing = await Waybills.AsNoTracking().AnyAsync(
             x => x.CompanyId == aggregate.CompanyId && x.BranchId == aggregate.BranchId && x.CreateClientOperationId == clientOperationId,
             cancellationToken);
         if (existing)
@@ -68,13 +72,13 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
             Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList(),
             Items = aggregate.Items.Select(x => ToEntity(aggregate.Id, x)).ToList()
         };
-        db.Waybills.Add(entity);
+        Waybills.Add(entity);
         await SaveWithConcurrencyMapping(cancellationToken);
     }
 
     public async Task SaveAsync(WaybillAggregate aggregate, long expectedVersion, string clientOperationId, CancellationToken cancellationToken)
     {
-        var entity = await db.Waybills
+        var entity = await Waybills
             .Include(x => x.Parties)
             .Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == aggregate.Id && x.CompanyId == aggregate.CompanyId && x.BranchId == aggregate.BranchId, cancellationToken)
@@ -98,13 +102,13 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
         entity.Version = aggregate.Version;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
-        db.WaybillParties.RemoveRange(entity.Parties);
+        WaybillParties.RemoveRange(entity.Parties);
         entity.Parties = aggregate.Parties.Select((x, i) => ToEntity(aggregate.Id, x, i + 1)).ToList();
 
         var existingItems = entity.Items.ToDictionary(x => x.Id);
         var incomingIds = aggregate.Items.Select(x => x.Id).ToHashSet();
         foreach (var removed in entity.Items.Where(x => !incomingIds.Contains(x.Id)).ToList())
-            db.WaybillItems.Remove(removed);
+            WaybillItems.Remove(removed);
         foreach (var item in aggregate.Items)
         {
             if (existingItems.TryGetValue(item.Id, out var tracked))
@@ -118,7 +122,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
 
     public async Task LinkNumberReservationAsync(Guid companyId, Guid branchId, Guid waybillId, Guid reservationId, CancellationToken cancellationToken)
     {
-        var reservation = await db.NumberReservations.SingleOrDefaultAsync(
+        var reservation = await NumberReservations.SingleOrDefaultAsync(
             x => x.Id == reservationId && x.CompanyId == companyId && (x.BranchId == null || x.BranchId == branchId), cancellationToken)
             ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
         if (reservation.WaybillId.HasValue && reservation.WaybillId != waybillId)
@@ -218,10 +222,12 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
 
 public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOperationalPartyRepository
 {
+    private DbSet<OperationalPartyEntity> OperationalParties => db.Set<OperationalPartyEntity>();
+
     public async Task<(IReadOnlyList<OperationalPartyRecord> Items, long Total)> SearchAsync(
         Guid companyId, Guid branchId, string? query, int skip, int take, CancellationToken cancellationToken)
     {
-        IQueryable<OperationalPartyEntity> q = db.OperationalParties.AsNoTracking()
+        IQueryable<OperationalPartyEntity> q = OperationalParties.AsNoTracking()
             .Where(x => x.CompanyId == companyId && x.Status == "ACTIVE" && (x.BranchId == null || x.BranchId == branchId));
         if (!string.IsNullOrWhiteSpace(query))
         {
@@ -236,7 +242,7 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
 
     public async Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken)
     {
-        var entity = await db.OperationalParties.AsNoTracking()
+        var entity = await OperationalParties.AsNoTracking()
             .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.ClientOperationId == clientOperationId, cancellationToken);
         return entity is null ? null : ToRecord(entity);
     }
@@ -254,7 +260,7 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
             CityId = request.Address.CityId, AreaId = request.Address.AreaId, AddressLine = NullIfWhite(request.Address.AddressLine),
             Status = "ACTIVE", ClientOperationId = request.ClientOperationId.Trim(), Version = 1, CreatedAt = now, UpdatedAt = now
         };
-        db.OperationalParties.Add(entity);
+        OperationalParties.Add(entity);
         try { await db.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException ex) { throw new WaybillPersistenceException("PARTY_DUPLICATE_WARNING", ex); }
         return ToRecord(entity);
@@ -270,13 +276,16 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
 
 public sealed class EfNumberReservationService(TransportErpDbContext db) : INumberReservationService
 {
+    private DbSet<NumberReservationEntity> Reservations => db.Set<NumberReservationEntity>();
+    private DbSet<NumberSequenceEntity> Sequences => db.Set<NumberSequenceEntity>();
+
     public async ValueTask<NumberReservationDto> ReserveAsync(
         OperationContext context, NumberReservationRequest request, CancellationToken cancellationToken = default)
     {
         context.EnsureComplete();
         request.EnsureValid();
         var key = request.IdempotencyKey.Trim();
-        var existing = await db.NumberReservations.SingleOrDefaultAsync(
+        var existing = await Reservations.SingleOrDefaultAsync(
             x => x.CompanyId == context.CompanyId && x.IdempotencyKey == key, cancellationToken);
         if (existing is not null)
         {
@@ -285,12 +294,13 @@ public sealed class EfNumberReservationService(TransportErpDbContext db) : INumb
             return ToDto(existing);
         }
 
-        var sequence = await db.NumberSequences.SingleOrDefaultAsync(
+        var sequence = await Sequences.SingleOrDefaultAsync(
             x => x.Id == request.SequenceId && x.CompanyId == context.CompanyId &&
                  (x.BranchId == null || x.BranchId == context.BranchId) && x.Status == "ACTIVE", cancellationToken)
             ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
 
         var value = sequence.NextValue;
+        if (value < 1) throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
         sequence.NextValue++;
         sequence.Version++;
         sequence.UpdatedAt = DateTimeOffset.UtcNow;
@@ -301,7 +311,7 @@ public sealed class EfNumberReservationService(TransportErpDbContext db) : INumb
             BranchId = sequence.BranchId ?? context.BranchId, IdempotencyKey = key, NumberValue = value,
             RenderedNumber = rendered, ReservedAt = DateTimeOffset.UtcNow, State = NumberReservationStates.Reserved
         };
-        db.NumberReservations.Add(reservation);
+        Reservations.Add(reservation);
         try { await db.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException ex) { throw new WaybillPersistenceException("NUMBERING_CONCURRENCY", ex); }
         catch (DbUpdateException ex) { throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex); }
@@ -339,12 +349,15 @@ public sealed class EfNumberReservationService(TransportErpDbContext db) : INumb
     }
 
     private async Task<NumberReservationEntity> ScopedReservation(OperationContext context, Guid id, CancellationToken ct)
-        => await db.NumberReservations.SingleOrDefaultAsync(
+        => await Reservations.SingleOrDefaultAsync(
             x => x.Id == id && x.CompanyId == context.CompanyId && (x.BranchId == null || x.BranchId == context.BranchId), ct)
             ?? throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
 
     private static NumberReservationDto ToDto(NumberReservationEntity x)
-        => new(x.Id, x.SequenceId, x.NumberValue, x.RenderedNumber, x.State);
+    {
+        if (x.NumberValue < 0) throw new WaybillPersistenceException("NUMBERING_UNAVAILABLE");
+        return new NumberReservationDto(x.Id, x.SequenceId, checked((ulong)x.NumberValue), x.RenderedNumber, x.State);
+    }
 }
 
 public sealed class EfWaybillUnitOfWork(TransportErpDbContext db) : IWaybillUnitOfWork
