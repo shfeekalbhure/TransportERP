@@ -10,12 +10,12 @@ errors: list[str] = []
 
 REQUIRED = {
     "TransportERP.Contracts/Core/MoneyContracts.cs": ["record MoneyAmount", "record FxSnapshot", "ConvertToAccounting"],
-    "TransportERP.Contracts/Party/PartyContracts.cs": ["enum PartyRole", "record OperationalPartySnapshot", "record WaybillPartySnapshot"],
+    "TransportERP.Contracts/Party/PartyContracts.cs": ["enum PartyRole", "record OperationalPartySnapshot", "record WaybillPartySnapshot", "GeoAddressSnapshot Address"],
     "TransportERP.Contracts/Attachments/AttachmentContracts.cs": ["record AttachmentDescriptor", "ContentHash", "StorageRef"],
     "TransportERP.Contracts/Tracking/MovementContracts.cs": ["record MovementEnvelope", "ReversesEventId", "ClientOperationId"],
-    "TransportERP.Contracts/Geo/GeoAddressContracts.cs": ["record GeoAddressSnapshot", "EnsureUsable"],
-    "TransportERP.Contracts/Numbering/NumberingContracts.cs": ["INumberReservationService", "NumberReservationStates", "IdempotencyKey"],
-    "TransportERP.Tests/W05SharedKernelTests.cs": ["class W05SharedKernelTests", "MoneyAndFx", "NumberReservationContract"],
+    "TransportERP.Contracts/Geo/GeoAddressContracts.cs": ["record GeoAddressSnapshot", "EnsureUsable", "Guid? CityId", "Guid? AreaId"],
+    "TransportERP.Contracts/Numbering/NumberingContracts.cs": ["INumberReservationService", "NumberReservationStates", "IdempotencyKey", "CommitAsync", "VoidAsync"],
+    "TransportERP.Tests/W05SharedKernelTests.cs": ["class W05SharedKernelTests", "MoneyAndFx", "NumberReservationContract", "UsesGovernedGeoAddress"],
     "documentation/closeout/P2/P2_C01_W0_5_SHARED_KERNEL_SCOPE_2026-08-20.md": ["P2-C01-A", "MUST NOT"],
     "documentation/closeout/P2/P2_C01_W0_5_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-20.md": ["PASS", "P2-C01-A MUST NOT START"],
 }
@@ -78,6 +78,20 @@ if any("Migration" in Path(path).name for path in changed):
 numbering = (ROOT / "TransportERP.Contracts/Numbering/NumberingContracts.cs").read_text(encoding="utf-8-sig")
 if "Server-authoritative numbering boundary" not in numbering:
     errors.append("NUMBERING_AUTHORITY_GUARD_MISSING")
+if "CommitAsync" not in numbering or "VoidAsync" not in numbering:
+    errors.append("NUMBERING_LIFECYCLE_BOUNDARY_INCOMPLETE")
+if "committed or voided numbers" not in numbering:
+    errors.append("NUMBER_NON_REUSE_GUARD_MISSING")
+
+party = (ROOT / "TransportERP.Contracts/Party/PartyContracts.cs").read_text(encoding="utf-8-sig")
+if "record AddressSnapshot" in party:
+    errors.append("DUPLICATE_ADDRESS_CONTRACT_IN_PARTY")
+if "GeoAddressSnapshot Address" not in party:
+    errors.append("PARTY_NOT_USING_GOVERNED_GEO_ADDRESS")
+
+geo = (ROOT / "TransportERP.Contracts/Geo/GeoAddressContracts.cs").read_text(encoding="utf-8-sig")
+if "DirectorateId" in geo:
+    errors.append("GEO_ADDRESS_NOT_ALIGNED_WITH_CLOSED_W1_PARTY_COLUMNS")
 
 movement = (ROOT / "TransportERP.Contracts/Tracking/MovementContracts.cs").read_text(encoding="utf-8-sig")
 if "cannot reverse itself" not in movement:
