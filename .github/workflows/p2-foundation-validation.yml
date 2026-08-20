@@ -40,19 +40,28 @@ jobs:
       - name: Build core runtime and tests
         run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
 
-      - name: Generate governed P2-C01-A migration when missing
+      - name: Generate governed P2-C01-A migrations when missing
         if: github.event_name == 'pull_request' && github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
         shell: pwsh
         env:
           TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterp;Username=postgres;Password=postgres
         run: |
-          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
-          if (-not $migration) {
+          $foundation = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $foundation) {
             dotnet ef migrations add P2C01AWaybillFoundation --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --output-dir Persistence/Migrations
           }
-          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
-          if (-not $migration) { throw 'P2-C01-A migration was not generated.' }
-          Write-Host "Generated/verified migration: $($migration.Name)"
+
+          $hardening = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundationHardening.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $hardening) {
+            dotnet ef migrations add P2C01AWaybillFoundationHardening --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --output-dir Persistence/Migrations
+          }
+
+          $foundation = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          $hardening = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundationHardening.cs' | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $foundation) { throw 'P2-C01-A foundation migration is missing.' }
+          if (-not $hardening) { throw 'P2-C01-A hardening migration is missing.' }
+          Write-Host "Foundation migration: $($foundation.Name)"
+          Write-Host "Hardening migration: $($hardening.Name)"
 
       - name: Test P1 and P2-C01-A runtime
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
@@ -60,7 +69,7 @@ jobs:
       - name: Compile Desktop recovered contract surface as library
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
 
-      - name: Persist EF-generated P2-C01-A migration to PR branch
+      - name: Persist EF-generated P2-C01-A migrations to PR branch
         if: github.event_name == 'pull_request' && github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
         shell: pwsh
         run: |
@@ -68,6 +77,6 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add TransportERP.Infrastructure/Persistence/Migrations
           if (-not (git diff --cached --quiet)) {
-            git commit -m 'db: generate P2-C01-A waybill foundation migration'
+            git commit -m 'db: generate P2-C01-A migration hardening'
             git push origin HEAD:${{ github.head_ref }}
           }
