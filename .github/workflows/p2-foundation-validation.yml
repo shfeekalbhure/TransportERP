@@ -9,23 +9,65 @@ on:
       - master
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   contracts-and-p1-tests:
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR head for governed P2-C01-A remediation
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
+      - name: Install EF CLI for P2-C01-A
+        if: github.event_name == 'pull_request' && github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
       - name: Restore tests
         run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
 
-      - name: Test P1 and recovered P2 foundation contracts
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+      - name: Restore Desktop contract surface
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Generate governed P2-C01-A migration when missing
+        if: github.event_name == 'pull_request' && github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
+        shell: pwsh
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterp;Username=postgres;Password=postgres
+        run: |
+          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $migration) {
+            dotnet ef migrations add P2C01AWaybillFoundation --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --output-dir Persistence/Migrations
+          }
+          $migration = Get-ChildItem 'TransportERP.Infrastructure/Persistence/Migrations' -Filter '*_P2C01AWaybillFoundation.cs' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.Designer.cs' }
+          if (-not $migration) { throw 'P2-C01-A migration was not generated.' }
+          Write-Host "Generated/verified migration: $($migration.Name)"
+
+      - name: Test P1 and P2-C01-A runtime
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build
 
       - name: Compile Desktop recovered contract surface as library
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug -p:OutputType=Library
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+
+      - name: Persist EF-generated P2-C01-A migration to PR branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add TransportERP.Infrastructure/Persistence/Migrations
+          if (-not (git diff --cached --quiet)) {
+            git commit -m 'db: generate P2-C01-A waybill foundation migration'
+            git push origin HEAD:${{ github.head_ref }}
+          }
