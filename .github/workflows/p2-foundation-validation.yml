@@ -27,5 +27,5 @@ jobs:
       - name: Test P1 and recovered P2 foundation contracts
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
 
-      - name: Build Desktop contract surface
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug
+      - name: Compile Desktop recovered contract surface as library
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug -p:OutputType=Library
