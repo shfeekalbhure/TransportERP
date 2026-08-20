@@ -42,10 +42,14 @@ public sealed class WaybillEntity : P2Entity
     public decimal FreightTotal { get; set; }
     public decimal DiscountTotal { get; set; }
     public string Status { get; set; } = "DRAFT";
+    public string FinancialStatus { get; set; } = "UNPAID";
     public string CreateClientOperationId { get; set; } = string.Empty;
     public string LastClientOperationId { get; set; } = string.Empty;
     public ICollection<WaybillPartyEntity> Parties { get; set; } = new List<WaybillPartyEntity>();
     public ICollection<WaybillItemEntity> Items { get; set; } = new List<WaybillItemEntity>();
+    public ICollection<PaymentPlanLineEntity> PaymentPlanLines { get; set; } = new List<PaymentPlanLineEntity>();
+    public ICollection<CollectionTransactionEntity> Collections { get; set; } = new List<CollectionTransactionEntity>();
+    public ICollection<FinancialLinkEntity> FinancialLinks { get; set; } = new List<FinancialLinkEntity>();
 }
 
 public sealed class WaybillPartyEntity
@@ -115,5 +119,59 @@ public sealed class NumberReservationEntity
     public string State { get; set; } = "RESERVED";
     public string? LastTransitionKey { get; set; }
     public NumberSequenceEntity? Sequence { get; set; }
+    public WaybillEntity? Waybill { get; set; }
+}
+
+public sealed class PaymentPlanLineEntity : P2Entity
+{
+    public Guid WaybillId { get; set; }
+    public int LineNo { get; set; }
+    public string PayerRole { get; set; } = string.Empty;
+    public Guid? PartyId { get; set; }
+    public string PaymentMethodCode { get; set; } = string.Empty;
+    public Guid? AmountCurrencyId { get; set; }
+    public decimal? Amount { get; set; }
+    public decimal? Percent { get; set; }
+    public string DueTrigger { get; set; } = string.Empty;
+    public DateTimeOffset? DueAt { get; set; }
+    public string Status { get; set; } = "ACTIVE";
+    public WaybillEntity? Waybill { get; set; }
+}
+
+public sealed class CollectionTransactionEntity
+{
+    public Guid Id { get; set; }
+    public Guid WaybillId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid BranchId { get; set; }
+    public string PayerRole { get; set; } = string.Empty;
+    public Guid? PartyId { get; set; }
+    public string PaymentMethodCode { get; set; } = string.Empty;
+    public Guid CurrencyId { get; set; }
+    public decimal ExchangeRate { get; set; }
+    public decimal Amount { get; set; }
+    public string CollectedByType { get; set; } = string.Empty;
+    public Guid CollectedById { get; set; }
+    public DateTimeOffset CollectedAt { get; set; }
+    public string ClientOperationId { get; set; } = string.Empty;
+    public string Status { get; set; } = "ACCEPTED";
+    public Guid? AccountingReferenceId { get; set; }
+    public Guid? ReversalOfId { get; set; }
+    public string? ReversalReason { get; set; }
+    public WaybillEntity? Waybill { get; set; }
+    public CollectionTransactionEntity? ReversalOf { get; set; }
+}
+
+public sealed class FinancialLinkEntity
+{
+    public Guid Id { get; set; }
+    public Guid WaybillId { get; set; }
+    public string DocumentType { get; set; } = string.Empty;
+    public Guid DocumentId { get; set; }
+    public decimal Amount { get; set; }
+    public Guid CurrencyId { get; set; }
+    public string LinkType { get; set; } = string.Empty;
+    public string Status { get; set; } = "ACTIVE";
+    public DateTimeOffset CreatedAt { get; set; }
     public WaybillEntity? Waybill { get; set; }
 }
