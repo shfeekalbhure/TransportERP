@@ -227,7 +227,7 @@ jobs:
           foreach ($requiredToken in @(
             'ItemReleaseScreenState','ReleaseItemRequest','TripAllocationPlanningRow','ReleasedRemaining','Route','AllocateItemRequest','UnallocateRequest',
             'RemainingShippingRow','ReadyToLoadRow','LoadPlanningRow','Capacity','CapacityWeight','CapacityVolume','AllocatedWeight','AllocatedVolume','Priority','RiskFlags',
-            'CreateTripRequest','ManifestLoadingRow','LoadManifestLineRequest','ResourceConstraintConfirmed','ManifestScreenState','TotalQuantity','TotalWeight','TotalVolume',
+            'CreateTripRequest','ManifestLoadingRow','LoadManifestLineRequest','_resourceConfirmed.Checked','تمت مراجعة قيد السعة/المخاطر','ManifestScreenState','TotalQuantity','TotalWeight','TotalVolume',
             'PrintDocument','HandoverManifestRequest','DepartureScreenState','StartTripRequest','RiskText')) {
             if ($surfaceText -notmatch [regex]::Escape($requiredToken)) {
               throw "Missing governed W3 Desktop token: $requiredToken"
