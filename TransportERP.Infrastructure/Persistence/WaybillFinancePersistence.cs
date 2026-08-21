@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TransportERP.Application.Waybills;
@@ -29,8 +30,9 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var waybill = await RequireWaybill(context, waybillId, cancellationToken);
+        var operationId = request.ClientOperationId.Trim();
 
-        if (waybill.LastClientOperationId == request.ClientOperationId.Trim())
+        if (waybill.LastClientOperationId == operationId)
         {
             var replay = await ActivePlan(waybillId, cancellationToken);
             await tx.CommitAsync(cancellationToken);
@@ -44,7 +46,10 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             throw new WaybillPersistenceException("INVALID_STATE");
 
         var now = DateTimeOffset.UtcNow;
-        var active = await Plans.Where(x => x.WaybillId == waybillId && x.Status == "ACTIVE").ToListAsync(cancellationToken);
+        var active = await Plans.Where(x => x.WaybillId == waybillId && x.Status == "ACTIVE")
+            .OrderBy(x => x.LineNo).ToListAsync(cancellationToken);
+        var beforeJson = PaymentPlanAuditJson(active);
+
         foreach (var line in active)
         {
             line.Status = "CANCELLED";
@@ -74,13 +79,12 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             });
         }
 
-        var before = waybill.LastClientOperationId;
-        waybill.LastClientOperationId = request.ClientOperationId.Trim();
+        waybill.LastClientOperationId = operationId;
         waybill.Version++;
         waybill.UpdatedAt = now;
         await Save(cancellationToken);
         await audit.WriteAsync(context, "WaybillPaymentPlanSet", "SUCCESS", "Waybill", waybill.Id,
-            before, request.ClientOperationId.Trim(), null, cancellationToken);
+            beforeJson, PaymentPlanInputAuditJson(request.Lines), null, cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
         var lines = await ActivePlan(waybillId, cancellationToken);
@@ -91,9 +95,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         OperationContext context, Guid waybillId, RecordCollectionRequest request, CancellationToken cancellationToken)
     {
         var operationId = request.ClientOperationId.Trim();
-        var replay = await Collections.AsNoTracking().SingleOrDefaultAsync(
-            x => x.CompanyId == context.CompanyId && x.ClientOperationId == operationId,
-            cancellationToken);
+        var replay = await FindScopedOperation(context, operationId, cancellationToken);
         if (replay is not null)
             return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
 
@@ -103,6 +105,10 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             var waybill = await RequireWaybill(context, waybillId, cancellationToken);
             if (waybill.Status != "APPROVED")
                 throw new WaybillPersistenceException("INVALID_STATE");
+
+            if (request.AccountingReferenceId.HasValue)
+                await EnsureAccountingReferenceAsync(
+                    context, request.AccountingDocumentType!, request.AccountingReferenceId.Value, cancellationToken);
 
             var entity = new CollectionTransactionEntity
             {
@@ -126,19 +132,25 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             waybill.UpdatedAt = DateTimeOffset.UtcNow;
             await Save(cancellationToken);
             await audit.WriteAsync(context, "WaybillCollectionRecord", "SUCCESS", "CollectionTransaction", entity.Id,
-                null, $"{entity.Amount}:{entity.CurrencyId}:{entity.ExchangeRate}", null, cancellationToken);
+                null, CollectionAuditJson(entity), null, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return CollectionResponseOf(context, entity);
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
             db.ChangeTracker.Clear();
-            replay = await Collections.AsNoTracking().SingleOrDefaultAsync(
-                x => x.CompanyId == context.CompanyId && x.ClientOperationId == operationId,
-                cancellationToken);
+            replay = await FindScopedOperation(context, operationId, cancellationToken);
             if (replay is not null)
                 return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
             throw new WaybillPersistenceException("DUPLICATE_OPERATION", ex);
+        }
+        catch (Exception ex) when (IsSerializationFailure(ex))
+        {
+            db.ChangeTracker.Clear();
+            replay = await FindScopedOperation(context, operationId, cancellationToken);
+            if (replay is not null)
+                return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
         }
     }
 
@@ -146,9 +158,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         OperationContext context, Guid collectionId, ReverseCollectionRequest request, CancellationToken cancellationToken)
     {
         var operationId = request.ClientOperationId.Trim();
-        var replay = await Collections.AsNoTracking().SingleOrDefaultAsync(
-            x => x.CompanyId == context.CompanyId && x.ClientOperationId == operationId,
-            cancellationToken);
+        var replay = await FindScopedOperation(context, operationId, cancellationToken);
         if (replay is not null)
         {
             if (replay.ReversalOfId != collectionId)
@@ -156,48 +166,83 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             return CollectionResponseOf(context, replay);
         }
 
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var original = await Collections.SingleOrDefaultAsync(x =>
-            x.Id == collectionId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId,
-            cancellationToken) ?? throw new WaybillPersistenceException("NOT_FOUND");
-        if (original.Status != "ACCEPTED" || original.ReversalOfId.HasValue)
-            throw new WaybillPersistenceException("ALREADY_REVERSED");
-        if (await Collections.AnyAsync(x => x.ReversalOfId == original.Id, cancellationToken))
-            throw new WaybillPersistenceException("ALREADY_REVERSED");
-
-        var localDate = original.CollectedAt.UtcDateTime.Date;
-        var closed = await db.FiscalPeriods.AsNoTracking().AnyAsync(x =>
-            x.CompanyId == context.CompanyId && x.Status == "CLOSED" &&
-            x.StartDate.Date <= localDate && x.EndDate.Date >= localDate,
-            cancellationToken);
-        if (closed)
-            throw new WaybillPersistenceException("PERIOD_CLOSED");
-
-        var waybill = await RequireWaybill(context, original.WaybillId, cancellationToken);
-        var reversal = new CollectionTransactionEntity
+        try
         {
-            Id = Guid.NewGuid(), WaybillId = original.WaybillId, CompanyId = original.CompanyId, BranchId = original.BranchId,
-            PayerRole = original.PayerRole, PartyId = original.PartyId, PaymentMethodCode = original.PaymentMethodCode,
-            CurrencyId = original.CurrencyId, ExchangeRate = original.ExchangeRate, Amount = original.Amount,
-            CollectedByType = "USER", CollectedById = context.UserId, CollectedAt = DateTimeOffset.UtcNow,
-            ClientOperationId = operationId, Status = "REVERSED", ReversalOfId = original.Id,
-            ReversalReason = request.Reason.Trim(), AccountingReferenceId = request.AccountingReferenceId
-        };
-        Collections.Add(reversal);
-        if (request.AccountingReferenceId.HasValue)
-            AddFinancialLink(waybill, request.AccountingDocumentType!, request.AccountingReferenceId.Value,
-                original.Amount, original.CurrencyId, "COLLECTION_REVERSAL");
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var original = await Collections.AsNoTracking().SingleOrDefaultAsync(x =>
+                x.Id == collectionId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId,
+                cancellationToken) ?? throw new WaybillPersistenceException("NOT_FOUND");
+            if (original.Status != "ACCEPTED" || original.ReversalOfId.HasValue)
+                throw new WaybillPersistenceException("ALREADY_REVERSED");
+            if (await Collections.AsNoTracking().AnyAsync(x => x.ReversalOfId == original.Id, cancellationToken))
+                throw new WaybillPersistenceException("ALREADY_REVERSED");
 
-        await Save(cancellationToken);
-        await RefreshFinancialStatus(waybill, cancellationToken);
-        waybill.LastClientOperationId = operationId;
-        waybill.Version++;
-        waybill.UpdatedAt = DateTimeOffset.UtcNow;
-        await Save(cancellationToken);
-        await audit.WriteAsync(context, "WaybillCollectionReverse", "SUCCESS", "CollectionTransaction", reversal.Id,
-            $"original:{original.Id}", $"reversal:{reversal.Id}", request.Reason.Trim(), cancellationToken);
-        await tx.CommitAsync(cancellationToken);
-        return CollectionResponseOf(context, reversal);
+            var localDate = original.CollectedAt.UtcDateTime.Date;
+            var closed = await db.FiscalPeriods.AsNoTracking().AnyAsync(x =>
+                x.CompanyId == context.CompanyId && x.Status == "CLOSED" &&
+                x.StartDate.Date <= localDate && x.EndDate.Date >= localDate,
+                cancellationToken);
+            if (closed)
+                throw new WaybillPersistenceException("PERIOD_CLOSED");
+
+            var waybill = await RequireWaybill(context, original.WaybillId, cancellationToken);
+            if (request.AccountingReferenceId.HasValue)
+                await EnsureAccountingReferenceAsync(
+                    context, request.AccountingDocumentType!, request.AccountingReferenceId.Value, cancellationToken);
+
+            var reversal = new CollectionTransactionEntity
+            {
+                Id = Guid.NewGuid(), WaybillId = original.WaybillId, CompanyId = original.CompanyId, BranchId = original.BranchId,
+                PayerRole = original.PayerRole, PartyId = original.PartyId, PaymentMethodCode = original.PaymentMethodCode,
+                CurrencyId = original.CurrencyId, ExchangeRate = original.ExchangeRate, Amount = original.Amount,
+                CollectedByType = "USER", CollectedById = context.UserId, CollectedAt = DateTimeOffset.UtcNow,
+                ClientOperationId = operationId, Status = "REVERSED", ReversalOfId = original.Id,
+                ReversalReason = request.Reason.Trim(), AccountingReferenceId = request.AccountingReferenceId
+            };
+            Collections.Add(reversal);
+            if (request.AccountingReferenceId.HasValue)
+                AddFinancialLink(waybill, request.AccountingDocumentType!, request.AccountingReferenceId.Value,
+                    original.Amount, original.CurrencyId, "COLLECTION_REVERSAL");
+
+            await Save(cancellationToken);
+            await RefreshFinancialStatus(waybill, cancellationToken);
+            waybill.LastClientOperationId = operationId;
+            waybill.Version++;
+            waybill.UpdatedAt = DateTimeOffset.UtcNow;
+            await Save(cancellationToken);
+            await audit.WriteAsync(context, "WaybillCollectionReverse", "SUCCESS", "CollectionTransaction", reversal.Id,
+                CollectionAuditJson(original), CollectionAuditJson(reversal), request.Reason.Trim(), cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+            return CollectionResponseOf(context, reversal);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            replay = await FindScopedOperation(context, operationId, cancellationToken);
+            if (replay is not null)
+            {
+                if (replay.ReversalOfId != collectionId)
+                    throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
+                return CollectionResponseOf(context, replay);
+            }
+            if (await Collections.AsNoTracking().AnyAsync(x =>
+                    x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == collectionId,
+                    cancellationToken))
+                throw new WaybillPersistenceException("ALREADY_REVERSED", ex);
+            throw new WaybillPersistenceException("DUPLICATE_OPERATION", ex);
+        }
+        catch (Exception ex) when (IsSerializationFailure(ex))
+        {
+            db.ChangeTracker.Clear();
+            replay = await FindScopedOperation(context, operationId, cancellationToken);
+            if (replay is not null && replay.ReversalOfId == collectionId)
+                return CollectionResponseOf(context, replay);
+            if (await Collections.AsNoTracking().AnyAsync(x =>
+                    x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == collectionId,
+                    cancellationToken))
+                throw new WaybillPersistenceException("ALREADY_REVERSED", ex);
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
+        }
     }
 
     public async Task<WaybillFinancialStatusResponse> GetFinancialStatusAsync(
@@ -216,6 +261,36 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         => await Waybills.SingleOrDefaultAsync(x =>
             x.Id == waybillId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId, ct)
             ?? throw new WaybillPersistenceException("NOT_FOUND");
+
+    private Task<CollectionTransactionEntity?> FindScopedOperation(
+        OperationContext context, string operationId, CancellationToken ct)
+        => Collections.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ClientOperationId == operationId, ct);
+
+    private async Task EnsureAccountingReferenceAsync(
+        OperationContext context, string documentType, Guid documentId, CancellationToken ct)
+    {
+        if (documentId == Guid.Empty || string.IsNullOrWhiteSpace(documentType))
+            throw new WaybillPersistenceException("ACCOUNTING_REFERENCE_INVALID");
+
+        var type = documentType.Trim().ToUpperInvariant();
+        var exists = type switch
+        {
+            "RECEIPT_VOUCHER" => await db.ReceiptVouchers.AsNoTracking().AnyAsync(x =>
+                x.Id == documentId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
+                (x.Status == "APPROVED" || x.Status == "POSTED"), ct),
+            "PAYMENT_VOUCHER" => await db.PaymentVouchers.AsNoTracking().AnyAsync(x =>
+                x.Id == documentId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
+                (x.Status == "APPROVED" || x.Status == "POSTED"), ct),
+            "JOURNAL_ENTRY" => await db.JournalEntries.AsNoTracking().AnyAsync(x =>
+                x.Id == documentId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
+                (x.Status == "APPROVED" || x.Status == "POSTED" || x.Status == "REVERSED"), ct),
+            _ => false
+        };
+
+        if (!exists)
+            throw new WaybillPersistenceException("ACCOUNTING_REFERENCE_INVALID");
+    }
 
     private async Task RefreshFinancialStatus(WaybillEntity waybill, CancellationToken ct)
     {
@@ -257,10 +332,12 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             new MoneyAmount(waybill.CurrencyId, calc.RemainingEquivalent),
             calc.Status, waybill.Version, context.CorrelationId);
 
-    private CollectionResponse ReplayOrConflict(
+    private static CollectionResponse ReplayOrConflict(
         OperationContext context, CollectionTransactionEntity replay, Guid waybillId, Guid currencyId, decimal amount, decimal rate)
     {
-        if (replay.WaybillId != waybillId || replay.CurrencyId != currencyId || replay.Amount != amount || replay.ExchangeRate != rate)
+        if (replay.CompanyId != context.CompanyId || replay.BranchId != context.BranchId ||
+            replay.WaybillId != waybillId || replay.CurrencyId != currencyId ||
+            replay.Amount != amount || replay.ExchangeRate != rate)
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
         return CollectionResponseOf(context, replay);
     }
@@ -271,6 +348,31 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             Id = Guid.NewGuid(), WaybillId = waybill.Id, DocumentType = documentType.Trim().ToUpperInvariant(),
             DocumentId = documentId, Amount = amount, CurrencyId = currencyId, LinkType = linkType,
             Status = "ACTIVE", CreatedAt = DateTimeOffset.UtcNow
+        });
+
+    private static string PaymentPlanAuditJson(IEnumerable<PaymentPlanLineEntity> lines)
+        => JsonSerializer.Serialize(lines.Select(x => new
+        {
+            x.LineNo, x.PayerRole, x.PartyId, x.PaymentMethodCode,
+            x.AmountCurrencyId, x.Amount, x.Percent, x.DueTrigger, x.DueAt, x.Status
+        }));
+
+    private static string PaymentPlanInputAuditJson(IEnumerable<PaymentPlanLineInput> lines)
+        => JsonSerializer.Serialize(lines.Select(x => new
+        {
+            x.LineNo, PayerRole = x.PayerRole.Trim().ToUpperInvariant(), x.PartyId,
+            PaymentMethodCode = x.PaymentMethodCode.Trim().ToUpperInvariant(),
+            AmountCurrencyId = x.Amount?.CurrencyId, Amount = x.Amount?.Amount, x.Percent,
+            DueTrigger = x.DueTrigger.Trim().ToUpperInvariant(), x.DueAt, Status = "ACTIVE"
+        }));
+
+    private static string CollectionAuditJson(CollectionTransactionEntity x)
+        => JsonSerializer.Serialize(new
+        {
+            x.Id, x.WaybillId, x.CompanyId, x.BranchId, x.PayerRole, x.PartyId,
+            x.PaymentMethodCode, x.CurrencyId, x.ExchangeRate, x.Amount,
+            x.CollectedByType, x.CollectedById, x.CollectedAt, x.ClientOperationId,
+            x.Status, x.AccountingReferenceId, x.ReversalOfId, x.ReversalReason
         });
 
     private async Task Save(CancellationToken ct)
@@ -289,6 +391,13 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
     {
         for (var current = exception; current is not null; current = current.InnerException)
             if (current is PostgresException { SqlState: "23505" }) return true;
+        return false;
+    }
+
+    private static bool IsSerializationFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is PostgresException { SqlState: "40001" }) return true;
         return false;
     }
 }
