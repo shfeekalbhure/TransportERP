@@ -183,12 +183,20 @@ jobs:
       - name: Build Desktop contract surface
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
 
-      - name: Confirm C RTL architecture and phase boundary
+      - name: Confirm C RTL W3 architecture and phase boundary
         shell: pwsh
         run: |
-          $file = 'TransportERP.Desktop/Waybills/ShippingExecutionForms.cs'
-          if (-not (Test-Path $file)) { throw 'P2-C01-C shipping forms are missing.' }
-          $text = Get-Content $file -Raw
+          $forms = 'TransportERP.Desktop/Waybills/ShippingExecutionForms.cs'
+          $models = 'TransportERP.Desktop/Waybills/ShippingExecutionW3Models.cs'
+          $project = 'TransportERP.Desktop/TransportERP.Desktop.csproj'
+          foreach ($path in @($forms,$models,$project)) {
+            if (-not (Test-Path $path)) { throw "Required Desktop W3 file missing: $path" }
+          }
+
+          $text = Get-Content $forms -Raw
+          $modelText = Get-Content $models -Raw
+          $projectText = Get-Content $project -Raw
+          $surfaceText = $text + "`n" + $modelText + "`n" + $projectText
 
           foreach ($id in @('SHP-015','SHP-016','SHP-019','SHP-023','SHP-024','SHP-025','SHP-027','SHP-028','SHP-029','SHP-030')) {
             if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
@@ -202,8 +210,46 @@ jobs:
           if ($text -notmatch 'RightToLeft\s*=\s*RightToLeft\.Yes') { throw 'Arabic RTL is not explicitly enabled.' }
           if ($text -notmatch 'RightToLeftLayout\s*=\s*true') { throw 'RTL layout mirroring is not explicitly enabled.' }
 
-          foreach ($forbiddenToken in @('DbContext','Npgsql','UseNpgsql','ExecuteSql','TransportERP.Infrastructure')) {
-            if ($text -match [regex]::Escape($forbiddenToken)) {
+          foreach ($forbiddenToken in @('DbContext','Npgsql','UseNpgsql','ExecuteSql','TransportERP.Infrastructure','System.Data.SqlClient','Microsoft.Data.SqlClient')) {
+            if ($surfaceText -match [regex]::Escape($forbiddenToken)) {
               throw "Direct Desktop persistence token detected: $forbiddenToken"
             }
+          }
+
+          if ($projectText -match 'TransportERP.Application|TransportERP.Infrastructure') {
+            throw 'Desktop must not reference Application/Infrastructure persistence projects.'
+          }
+
+          if ($surfaceText -match 'IEnumerable<object>') {
+            throw 'Untyped object binding is forbidden for governed P2-C01-C W3 screens.'
+          }
+
+          foreach ($requiredToken in @(
+            'ItemReleaseScreenState','ReleaseItemRequest','TripAllocationPlanningRow','ReleasedRemaining','Route','AllocateItemRequest','UnallocateRequest',
+            'RemainingShippingRow','ReadyToLoadRow','LoadPlanningRow','Capacity','CapacityWeight','CapacityVolume','AllocatedWeight','AllocatedVolume','Priority','RiskFlags',
+            'CreateTripRequest','ManifestLoadingRow','LoadManifestLineRequest','ResourceConstraintConfirmed','ManifestScreenState','TotalQuantity','TotalWeight','TotalVolume',
+            'PrintDocument','HandoverManifestRequest','DepartureScreenState','StartTripRequest','RiskText')) {
+            if ($surfaceText -notmatch [regex]::Escape($requiredToken)) {
+              throw "Missing governed W3 Desktop token: $requiredToken"
+            }
+          }
+
+          if ($modelText -notmatch 'AllocatedWeight:\s*line\.Weight') {
+            throw 'SHP-024 must bind allocated weight from the proportional manifest line.'
+          }
+          if ($modelText -notmatch 'AllocatedVolume:\s*line\.Volume') {
+            throw 'SHP-024 must bind allocated volume from the proportional manifest line.'
+          }
+          if ($modelText -notmatch 'Qty:\s*line\.Quantity') {
+            throw 'SHP-024 quantity must correspond to the allocation/manifest line quantity.'
+          }
+
+          $profiles = @{
+            'SHP-015'='Transaction'; 'SHP-016'='Transaction'; 'SHP-019'='ReportInquiry'; 'SHP-023'='ReportInquiry';
+            'SHP-024'='Transaction'; 'SHP-025'='Transaction'; 'SHP-027'='Transaction'; 'SHP-028'='Transaction';
+            'SHP-029'='ControlApproval'; 'SHP-030'='ControlApproval'
+          }
+          foreach ($pair in $profiles.GetEnumerator()) {
+            $pattern = [regex]::Escape($pair.Key) + '.+' + [regex]::Escape('TransportScreenProfile.' + $pair.Value)
+            if ($text -notmatch $pattern) { throw "Screen profile mismatch for $($pair.Key)" }
           }
