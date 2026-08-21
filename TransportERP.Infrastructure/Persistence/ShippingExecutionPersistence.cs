@@ -38,8 +38,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             cancellationToken);
         if (replay is not null)
         {
-            if (replay.WaybillItemId != itemId || replay.Quantity != request.Quantity ||
-                !SameInstant(replay.ReleasedAt, request.ReleasedAt))
+            if (replay.WaybillItemId != itemId || replay.Quantity != request.Quantity)
                 throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             return await ItemState(context, waybillId, itemId, cancellationToken);
         }
@@ -81,8 +80,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             replay = await Releases.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ClientOperationId == operationId,
                 cancellationToken);
-            if (replay is not null && replay.WaybillItemId == itemId && replay.Quantity == request.Quantity &&
-                SameInstant(replay.ReleasedAt, request.ReleasedAt))
+            if (replay is not null && replay.WaybillItemId == itemId && replay.Quantity == request.Quantity)
                 return await ItemState(context, waybillId, itemId, cancellationToken);
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
         }
