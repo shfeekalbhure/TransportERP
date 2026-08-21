@@ -97,6 +97,7 @@ public sealed record ManifestResponse(
     DateTimeOffset? DriverAcceptedAt,
     string Status,
     long Version,
+    long TripVersion,
     IReadOnlyList<ManifestLineResponse> Lines,
     Guid CorrelationId);
 
