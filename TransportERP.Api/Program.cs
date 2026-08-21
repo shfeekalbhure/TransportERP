@@ -24,6 +24,7 @@ builder.Services.AddScoped<SyncOperationService>(services =>
             TimeSpan.FromSeconds(builder.Configuration.GetValue("Sync:BaseRetrySeconds", 5)),
             TimeSpan.FromMinutes(builder.Configuration.GetValue("Sync:MaxRetryMinutes", 30)))));
 builder.Services.AddP2C01AWaybillFoundation();
+builder.Services.AddP2C01BWaybillFinance();
 
 var jwtAuthority = builder.Configuration["Auth:Authority"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_AUTHORITY");
 var jwtIssuer = builder.Configuration["Auth:Issuer"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_ISSUER");
@@ -70,6 +71,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapP2C01AWaybillFoundation();
+app.MapP2C01BWaybillFinance();
 
 app.MapPost("/api/v1/sync/operations:batch", async (
     SyncBatchRequest request,
