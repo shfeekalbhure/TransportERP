@@ -22,6 +22,7 @@ public static class Wave1ScreenApiModule
             }
         });
 
+        app.MapWave1Geography();
         return app;
     }
 }
