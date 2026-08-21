@@ -40,6 +40,17 @@ public sealed class P2C01CShippingExecutionTests
     }
 
     [Fact]
+    public void Explicit_line_volume_is_authoritative_for_split_allocation()
+    {
+        var part = ShippingExecutionRules.AllocatePhysicalMeasures(
+            itemQuantity: 10m, allocatedQuantity: 4m,
+            lineWeight: 100m, length: 2m, width: 3m, height: 4m, lineVolume: 50m);
+
+        Assert.Equal(40m, part.AllocatedWeight);
+        Assert.Equal(20m, part.AllocatedVolume);
+    }
+
+    [Fact]
     public void Split_allocation_measure_totals_do_not_duplicate_the_original_line()
     {
         var first = ShippingExecutionRules.AllocatePhysicalMeasures(10m, 4m, 100m, 2m, 3m, 4m);

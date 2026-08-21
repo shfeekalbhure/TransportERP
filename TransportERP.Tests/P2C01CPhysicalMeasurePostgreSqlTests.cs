@@ -58,7 +58,7 @@ public sealed class P2C01CPhysicalMeasurePostgreSqlTests
         var item = new WaybillItemEntity
         {
             Id = Guid.NewGuid(), WaybillId = waybill.Id, LineNo = 1, ItemType = "GENERAL", Contents = "Split measures",
-            Quantity = 10m, Pieces = 10, Weight = 100m, Length = 2m, Width = 3m, Height = 4m,
+            Quantity = 10m, Pieces = 10, Weight = 100m, Length = 2m, Width = 3m, Height = 4m, Volume = 50m,
             RiskFlagsJson = "[]"
         };
 
@@ -82,11 +82,11 @@ public sealed class P2C01CPhysicalMeasurePostgreSqlTests
         var second = await CreateTripAllocationManifest(connection, context, item.Id, releaseId, origin, destination, 6m);
 
         Assert.Equal(40m, first.Lines.Single().Weight);
-        Assert.Equal(9.6m, first.Lines.Single().Volume);
+        Assert.Equal(20m, first.Lines.Single().Volume);
         Assert.Equal(60m, second.Lines.Single().Weight);
-        Assert.Equal(14.4m, second.Lines.Single().Volume);
+        Assert.Equal(30m, second.Lines.Single().Volume);
         Assert.Equal(100m, first.Lines.Single().Weight + second.Lines.Single().Weight);
-        Assert.Equal(24m, first.Lines.Single().Volume + second.Lines.Single().Volume);
+        Assert.Equal(50m, first.Lines.Single().Volume + second.Lines.Single().Volume);
     }
 
     private static async Task<ManifestResponse> CreateTripAllocationManifest(

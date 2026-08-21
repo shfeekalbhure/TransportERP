@@ -59,7 +59,8 @@ public sealed record WaybillItemValue(
     decimal? DeclaredValue,
     Guid? OriginCountryId,
     string RiskFlagsJson,
-    string? Notes)
+    string? Notes,
+    decimal? Volume = null)
 {
     public void EnsureValid()
     {
@@ -75,7 +76,7 @@ public sealed record WaybillItemValue(
             throw new WaybillRuleException("ITEM_QUANTITY_INVALID");
         if (Pieces is <= 0)
             throw new WaybillRuleException("ITEM_PIECES_INVALID");
-        foreach (var value in new[] { Weight, Length, Width, Height, DeclaredValue })
+        foreach (var value in new[] { Weight, Length, Width, Height, Volume, DeclaredValue })
         {
             if (value < 0m)
                 throw new WaybillRuleException("ITEM_MEASUREMENT_INVALID");

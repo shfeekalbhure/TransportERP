@@ -25,7 +25,8 @@ public sealed record WaybillItemInput(
     decimal? DeclaredValue,
     Guid? OriginCountryId,
     IReadOnlyList<string>? RiskFlags,
-    string? Notes);
+    string? Notes,
+    decimal? Volume = null);
 
 public sealed record CreateWaybillDraftRequest(
     Guid BranchId,
@@ -89,7 +90,8 @@ public sealed record WaybillItemResponse(
     decimal? DeclaredValue,
     Guid? OriginCountryId,
     IReadOnlyList<string> RiskFlags,
-    string? Notes);
+    string? Notes,
+    decimal? Volume = null);
 
 public sealed record WaybillResponse(
     Guid Id,
