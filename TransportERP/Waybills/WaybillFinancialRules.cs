@@ -57,17 +57,21 @@ public static class WaybillFinancialRules
             if (hasAmount == hasPercent)
                 throw new WaybillFinancialRuleException("PLAN_LINE_MODE_INVALID");
 
-            if (hasAmount)
+            if (line.Amount is decimal amount)
             {
-                if (line.AmountCurrencyId != waybillCurrencyId || line.Amount <= 0m)
+                if (line.AmountCurrencyId != waybillCurrencyId || amount <= 0m)
                     throw new WaybillFinancialRuleException("PLAN_AMOUNT_INVALID");
-                normalized += line.Amount.Value;
+                normalized += amount;
+            }
+            else if (line.Percent is decimal percent)
+            {
+                if (percent <= 0m || percent > 100m)
+                    throw new WaybillFinancialRuleException("PLAN_PERCENT_INVALID");
+                normalized += waybillNetAmount * percent / 100m;
             }
             else
             {
-                if (line.Percent is <= 0m or > 100m)
-                    throw new WaybillFinancialRuleException("PLAN_PERCENT_INVALID");
-                normalized += waybillNetAmount * line.Percent.Value / 100m;
+                throw new WaybillFinancialRuleException("PLAN_LINE_MODE_INVALID");
             }
         }
 
