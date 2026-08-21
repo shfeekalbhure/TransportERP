@@ -231,7 +231,6 @@ public sealed record SyncBatchOperationResult(
 }
 
 public sealed record SyncBatchResponse(
-    string DeviceId,
     string ProtocolVersion,
     IReadOnlyList<SyncBatchOperationResult> Results,
     DateTimeOffset ServerTime,
