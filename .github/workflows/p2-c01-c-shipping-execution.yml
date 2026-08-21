@@ -74,7 +74,7 @@ jobs:
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
-      - name: Generate governed C migration when missing
+      - name: Generate governed C migration or hardening when needed
         env:
           TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
         shell: bash
@@ -89,6 +89,21 @@ jobs:
           migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecution.cs' ! -name '*.Designer.cs' | head -n 1)
           test -n "$migration" || { echo 'P2-C01-C migration is missing.'; exit 1; }
           echo "C migration: $migration"
+
+          if dotnet ef migrations has-pending-model-changes \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj; then
+            echo 'No C hardening migration required.'
+          else
+            if find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecutionHardening.cs' ! -name '*.Designer.cs' | grep -q .; then
+              echo 'Pending model changes remain despite an existing C hardening migration.'
+              exit 1
+            fi
+            dotnet ef migrations add P2C01CShippingExecutionHardening \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --output-dir Persistence/Migrations
+          fi
 
       - name: Verify EF model matches committed/generated migration
         env:
@@ -118,7 +133,7 @@ jobs:
       - name: Run P2-C01-C PostgreSQL and HTTP gates
         env:
           TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests"
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests|FullyQualifiedName~P2C01CConcurrencyPostgreSqlTests"
 
   shipping-desktop-rtl:
     if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
