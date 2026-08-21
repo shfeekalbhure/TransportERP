@@ -1,0 +1,153 @@
+name: P2 C01 C shipping execution
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-c-release-trip-manifest-20260821
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shipping-postgresql:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    name: Shipping + PostgreSQL + HTTP
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout governed C head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate closed P2-C01 contracts
+        run: python documentation/closeout/P2/validate_p2_c01_contracts.py
+
+      - name: Validate C phase boundary
+        shell: bash
+        run: |
+          git fetch origin master --depth=1
+          git diff --name-only origin/master...HEAD > /tmp/c_changed.txt
+          cat /tmp/c_changed.txt
+          if grep -Ev '^documentation/closeout/P2/' /tmp/c_changed.txt | grep -E '/(Arrival|Warehouse|Delivery|Customs|Commission|Settlement|Fleet|GPS|Notification|ExceptionResolution)|(^|/)(Arrival|Warehouse|Delivery|Customs|Commission|Settlement|Fleet|GPS)' ; then
+            echo 'P2-C01-C contains a later-phase file.'
+            exit 1
+          fi
+
+      - name: Restore core tests
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Run non-database regression
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL"
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
+      - name: Generate governed C migration when missing
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        shell: bash
+        run: |
+          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecution.cs' ! -name '*.Designer.cs' | head -n 1)
+          if [ -z "$migration" ]; then
+            dotnet ef migrations add P2C01CShippingExecution \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --output-dir Persistence/Migrations
+          fi
+          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecution.cs' ! -name '*.Designer.cs' | head -n 1)
+          test -n "$migration" || { echo 'P2-C01-C migration is missing.'; exit 1; }
+          echo "C migration: $migration"
+
+      - name: Verify EF model matches committed/generated migration
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Persist EF-generated C migration to branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add TransportERP.Infrastructure/Persistence/Migrations
+          if ! git diff --cached --quiet; then
+            git commit -m 'db: generate P2-C01-C shipping execution migration'
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+
+      - name: Rebuild after migration generation
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Apply P1 A B and C migrations to PostgreSQL 18
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Run P2-C01-C PostgreSQL and HTTP gates
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests"
+
+  shipping-desktop-rtl:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    name: Shipping Desktop RTL
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Desktop
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+
+      - name: Confirm C screen contracts only
+        shell: pwsh
+        run: |
+          $file = 'TransportERP.Desktop/Waybills/ShippingExecutionForms.cs'
+          if (-not (Test-Path $file)) { throw 'P2-C01-C shipping forms are missing.' }
+          $text = Get-Content $file -Raw
+          foreach ($id in @('SHP-015','SHP-016','SHP-019','SHP-023','SHP-024','SHP-025','SHP-027','SHP-028','SHP-029','SHP-030')) {
+            if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
+          }
+          foreach ($forbidden in @('SHP-032','SHP-033','SHP-034','SHP-035','SHP-036','SHP-037','SHP-045','SHP-047')) {
+            if ($text -match [regex]::Escape($forbidden)) { throw "Later-phase screen leaked into C: $forbidden" }
+          }
