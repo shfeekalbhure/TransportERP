@@ -112,6 +112,9 @@ public static class TransportErpP2ShippingModel
         manifest.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         manifest.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
         manifest.Property(x => x.Version).IsConcurrencyToken();
+        // C intentionally governs one manifest lifecycle per Trip. Without this invariant,
+        // finalizing one draft can move the Trip to READY while another draft remains stranded.
+        manifest.HasIndex(x => x.TripId).IsUnique();
         manifest.HasIndex(x => new { x.TripId, x.ManifestNo }).IsUnique();
         manifest.HasIndex(x => new { x.CompanyId, x.BranchId, x.CreateClientOperationId }).IsUnique();
         manifest.HasIndex(x => new { x.TripId, x.Status });
