@@ -47,22 +47,26 @@ public static class ShippingExecutionApiModule
                 context => service.GenerateManifestAsync(context, tripId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}/lines/{lineId:guid}:load", async Task<IResult> (
-            Guid manifestId, Guid lineId, LoadManifestLineRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            Guid manifestId, Guid lineId, LoadManifestLineRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.ManifestLoad,
                 context => service.LoadManifestLineAsync(context, manifestId, lineId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}:finalize", async Task<IResult> (
-            Guid manifestId, FinalizeManifestRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            Guid manifestId, FinalizeManifestRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.ManifestFinalize,
                 context => service.FinalizeManifestAsync(context, manifestId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}:handover", async Task<IResult> (
-            Guid manifestId, HandoverManifestRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            Guid manifestId, HandoverManifestRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.ManifestHandover,
                 context => service.HandoverManifestAsync(context, manifestId, request, ct)));
 
         group.MapPost("/trips/{tripId:guid}:start", async Task<IResult> (
-            Guid tripId, StartTripRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            Guid tripId, StartTripRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.TripStart,
                 context => service.StartTripAsync(context, tripId, request, ct)));
 
@@ -106,7 +110,9 @@ public static class ShippingExecutionApiModule
         "NOT_FOUND" => Results.NotFound(new { ErrorCode = code, CorrelationId = correlationId }),
         "SCOPE_DENIED" => Forbidden(correlationId),
         "CONCURRENCY_CONFLICT" or "IDEMPOTENCY_CONFLICT" or "DUPLICATE_OPERATION" or
-        "DUPLICATE_TRIP_NO" or "INVALID_STATE" or "ALREADY_LOADED" or "HOLD_BLOCKED" or
+        "DUPLICATE_TRIP_NO" or "INVALID_STATE" or "HOLD_BLOCKED" or "ALREADY_LOADED" or
+        "QUANTITY_EXCEEDS_REMAINING" or "QUANTITY_EXCEEDS_RELEASED" or "QUANTITY_EXCEEDS_ALLOCATION" or
+        "ROUTE_INCOMPATIBLE" or "NO_ALLOCATIONS" or "RESOURCE_CONSTRAINT" or "MANIFEST_LINE_INVALID" or
         "MANIFEST_NOT_ACCEPTED" or "DRIVER_MISMATCH" =>
             Results.Json(new { ErrorCode = code, CorrelationId = correlationId }, statusCode: StatusCodes.Status409Conflict),
         _ => Results.BadRequest(new { ErrorCode = code, CorrelationId = correlationId })
