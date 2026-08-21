@@ -53,9 +53,10 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         await using (var db = CreateP2Db(connection))
         {
             first = await CreateService(db).RecordCollectionAsync(context, scope.WaybillId,
-                NewCollection(scope, 25m, $"collect-{Guid.NewGuid():N}"));
+                NewCollection(scope, 25m, $"collect-{Guid.NewGuid():N}", scope.ReceiptVoucherId, "RECEIPT_VOUCHER"));
         }
         Assert.Equal("ACCEPTED", first.Status);
+        Assert.Equal(scope.ReceiptVoucherId, first.AccountingReferenceId);
 
         WaybillFinancialStatusResponse partial;
         await using (var db = CreateP2Db(connection))
@@ -90,12 +91,23 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         await using var verifyDb = CreateP2Db(connection);
         var original = await verifyDb.Set<CollectionTransactionEntity>().AsNoTracking().SingleAsync(x => x.Id == second.Id);
         var finalWaybill = await verifyDb.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == scope.WaybillId);
+        var planAudit = await verifyDb.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "WaybillPaymentPlanSet" && x.EntityId == scope.WaybillId);
+        var collectionAudit = await verifyDb.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "WaybillCollectionRecord" && x.EntityId == first.Id);
+        var reversalAudit = await verifyDb.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "WaybillCollectionReverse" && x.EntityId == reversal.Id);
+
         Assert.Equal("ACCEPTED", original.Status);
         Assert.Equal("PARTIAL", finalWaybill.FinancialStatus);
         Assert.Equal(1, await verifyDb.Set<CollectionTransactionEntity>().CountAsync(x => x.ReversalOfId == second.Id));
-        Assert.True(await verifyDb.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillPaymentPlanSet" && x.EntityId == scope.WaybillId));
-        Assert.True(await verifyDb.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillCollectionRecord" && x.EntityId == first.Id));
-        Assert.True(await verifyDb.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillCollectionReverse" && x.EntityId == reversal.Id));
+        Assert.Equal(1, await verifyDb.Set<FinancialLinkEntity>().CountAsync(x =>
+            x.WaybillId == scope.WaybillId && x.DocumentId == scope.ReceiptVoucherId && x.LinkType == "COLLECTION"));
+        Assert.Contains("PayerRole", planAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("PaymentMethodCode", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("CollectedById", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("ReversalOfId", reversalAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal(context.CorrelationId, collectionAudit.CorrelationId);
     }
 
     [Fact]
@@ -136,6 +148,113 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
 
     [Fact]
     [Trait("Category", "P2PostgreSQL")]
+    public async Task Concurrent_collection_retry_produces_one_accepted_transaction()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BCONC");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var operationId = $"parallel-{Guid.NewGuid():N}";
+        var request = NewCollection(scope, 20m, operationId);
+
+        async Task<CollectionResponse> Execute()
+        {
+            await using var db = CreateP2Db(connection);
+            return await CreateService(db).RecordCollectionAsync(context, scope.WaybillId, request);
+        }
+
+        var results = await Task.WhenAll(Task.Run(Execute), Task.Run(Execute));
+        Assert.Equal(results[0].Id, results[1].Id);
+
+        await using var verifyDb = CreateP2Db(connection);
+        Assert.Equal(1, await verifyDb.Set<CollectionTransactionEntity>().CountAsync(x =>
+            x.CompanyId == scope.CompanyId && x.ClientOperationId == operationId));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Accepted_collection_and_financial_link_are_append_only_and_fake_P1_reference_is_rejected()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BIMM");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        CollectionResponse accepted;
+        await using (var db = CreateP2Db(connection))
+            accepted = await CreateService(db).RecordCollectionAsync(context, scope.WaybillId,
+                NewCollection(scope, 10m, $"immutable-{Guid.NewGuid():N}", scope.ReceiptVoucherId, "RECEIPT_VOUCHER"));
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var row = await db.Set<CollectionTransactionEntity>().SingleAsync(x => x.Id == accepted.Id);
+            row.Amount = 999m;
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+            Assert.Contains("append-only", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var row = await db.Set<CollectionTransactionEntity>().SingleAsync(x => x.Id == accepted.Id);
+            db.Remove(row);
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+            Assert.Contains("append-only", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var link = await db.Set<FinancialLinkEntity>().SingleAsync(x => x.DocumentId == scope.ReceiptVoucherId);
+            db.Remove(link);
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+            Assert.Contains("append-only", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).RecordCollectionAsync(context, scope.WaybillId,
+                    NewCollection(scope, 5m, $"fake-ref-{Guid.NewGuid():N}", Guid.NewGuid(), "RECEIPT_VOUCHER")));
+            Assert.Equal("ACCOUNTING_REFERENCE_INVALID", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Client_operation_id_never_replays_collection_across_branches()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope firstScope;
+        await using (var seedDb = CreateP2Db(connection))
+            firstScope = await SeedApprovedWaybillAsync(seedDb, "BSCOPE");
+
+        FinanceScope secondScope;
+        await using (var db = CreateP2Db(connection))
+            secondScope = await SeedSecondBranchWaybillAsync(db, firstScope, "BSCOPE2");
+
+        var operationId = $"cross-branch-{Guid.NewGuid():N}";
+        var firstContext = new OperationContext(firstScope.UserId, firstScope.CompanyId, firstScope.BranchId, Guid.NewGuid());
+        await using (var db = CreateP2Db(connection))
+            _ = await CreateService(db).RecordCollectionAsync(firstContext, firstScope.WaybillId,
+                NewCollection(firstScope, 15m, operationId));
+
+        var secondContext = new OperationContext(firstScope.UserId, secondScope.CompanyId, secondScope.BranchId, Guid.NewGuid());
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).RecordCollectionAsync(secondContext, secondScope.WaybillId,
+                    NewCollection(secondScope, 15m, operationId)));
+            Assert.Equal("DUPLICATE_OPERATION", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Finance_API_enforces_permission_and_company_branch_scope()
     {
         var connection = RequireConnection();
@@ -169,9 +288,10 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         Assert.Equal(HttpStatusCode.NotFound, scoped.StatusCode);
     }
 
-    private static RecordCollectionRequest NewCollection(FinanceScope scope, decimal amount, string operationId)
+    private static RecordCollectionRequest NewCollection(
+        FinanceScope scope, decimal amount, string operationId, Guid? accountingReferenceId = null, string? accountingDocumentType = null)
         => new("SENDER", null, "CASH", new MoneyAmount(scope.CurrencyId, amount), 2m,
-            "USER", scope.UserId, DateTimeOffset.UtcNow, operationId);
+            "USER", scope.UserId, DateTimeOffset.UtcNow, operationId, accountingReferenceId, accountingDocumentType);
 
     private static WaybillFinanceApplicationService CreateService(TransportErpDbContext db)
         => new(new EfWaybillFinanceStore(db, new EfWaybillAuditSink(db, new AuditEventService(db))));
@@ -190,6 +310,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         => new(new DbContextOptionsBuilder<TransportErpDbContext>()
             .UseNpgsql(connection, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp"))
             .ReplaceService<IModelCustomizer, TransportErpP2CombinedModelCustomizer>()
+            .AddInterceptors(new P2FinanceAppendOnlyInterceptor())
             .Options);
 
     private static WebApplicationFactory<Program> CreateFactory(string connection)
@@ -250,17 +371,14 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
-        var waybill = new WaybillEntity
+        var waybill = NewApprovedWaybill(company.Id, branch.Id, currency.Id, suffix, now);
+        var receipt = new ReceiptVoucher
         {
             Id = Guid.NewGuid(), CompanyId = company.Id, BranchId = branch.Id,
-            DraftNo = $"D-{Guid.NewGuid():N}", WaybillNo = $"WB-B-{Guid.NewGuid():N}"[..24],
-            WaybillDateTime = now, ServiceType = "STANDARD", Priority = "NORMAL",
-            OriginId = Guid.NewGuid(), DestinationId = Guid.NewGuid(), CurrencyId = currency.Id,
-            ExchangeRate = 2m, FreightTotal = 100m, DiscountTotal = 0m,
-            Status = "APPROVED", FinancialStatus = "UNPAID",
-            CreateClientOperationId = $"seed-create-{Guid.NewGuid():N}",
-            LastClientOperationId = $"seed-approve-{Guid.NewGuid():N}",
-            Version = 1, CreatedAt = now, UpdatedAt = now
+            VoucherNo = $"RV-{suffix}-{Guid.NewGuid():N}"[..30], VoucherDate = DateTime.UtcNow.Date,
+            PayerName = "دافع اختبار B", ReferenceType = "WAYBILL", ReferenceId = waybill.Id,
+            PaymentMethodCode = "CASH", Amount = 100m, CurrencyId = currency.Id, Status = "APPROVED",
+            CollectedBy = user.Id, CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };
 
         db.Currencies.Add(currency);
@@ -268,9 +386,42 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         db.Branches.Add(branch);
         db.Users.Add(user);
         db.Set<WaybillEntity>().Add(waybill);
+        db.ReceiptVouchers.Add(receipt);
         await db.SaveChangesAsync();
-        return new FinanceScope(company.Id, branch.Id, user.Id, currency.Id, waybill.Id);
+        return new FinanceScope(company.Id, branch.Id, user.Id, currency.Id, waybill.Id, receipt.Id);
     }
 
-    private sealed record FinanceScope(Guid CompanyId, Guid BranchId, Guid UserId, Guid CurrencyId, Guid WaybillId);
+    private static async Task<FinanceScope> SeedSecondBranchWaybillAsync(
+        TransportErpDbContext db, FinanceScope first, string suffix)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var branch = new Branch
+        {
+            Id = Guid.NewGuid(), CompanyId = first.CompanyId, Code = $"B2-{Guid.NewGuid():N}"[..20], NameAr = "فرع اختبار ثان",
+            Timezone = "Asia/Aden", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        var waybill = NewApprovedWaybill(first.CompanyId, branch.Id, first.CurrencyId, suffix, now);
+        db.Branches.Add(branch);
+        db.Set<WaybillEntity>().Add(waybill);
+        await db.SaveChangesAsync();
+        return new FinanceScope(first.CompanyId, branch.Id, first.UserId, first.CurrencyId, waybill.Id, Guid.Empty);
+    }
+
+    private static WaybillEntity NewApprovedWaybill(Guid companyId, Guid branchId, Guid currencyId, string suffix, DateTimeOffset now)
+        => new()
+        {
+            Id = Guid.NewGuid(), CompanyId = companyId, BranchId = branchId,
+            DraftNo = $"D-{Guid.NewGuid():N}", WaybillNo = $"WB-{suffix}-{Guid.NewGuid():N}"[..30],
+            WaybillDateTime = now, ServiceType = "STANDARD", Priority = "NORMAL",
+            OriginId = Guid.NewGuid(), DestinationId = Guid.NewGuid(), CurrencyId = currencyId,
+            ExchangeRate = 2m, FreightTotal = 100m, DiscountTotal = 0m,
+            Status = "APPROVED", FinancialStatus = "UNPAID",
+            CreateClientOperationId = $"seed-create-{Guid.NewGuid():N}",
+            LastClientOperationId = $"seed-approve-{Guid.NewGuid():N}",
+            Version = 1, CreatedAt = now, UpdatedAt = now
+        };
+
+    private sealed record FinanceScope(
+        Guid CompanyId, Guid BranchId, Guid UserId, Guid CurrencyId, Guid WaybillId, Guid ReceiptVoucherId);
 }
