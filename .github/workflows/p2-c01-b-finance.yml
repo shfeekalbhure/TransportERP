@@ -107,6 +107,9 @@ jobs:
             git push origin HEAD:${{ github.head_ref }}
           fi
 
+      - name: Rebuild after migration generation
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
       - name: Apply P1 A and B migrations to PostgreSQL 18
         env:
           TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
