@@ -77,7 +77,8 @@ public static class ShippingExecutionRules
 
     /// <summary>
     /// W1 WaybillItem physical measures are line-level snapshots. When one line is split across trips,
-    /// each allocation receives the same quantity ratio of the line's total weight and dimensional volume.
+    /// each allocation receives the same quantity ratio of the line's total weight and volume.
+    /// Explicit W1 WaybillItem.Volume is authoritative when supplied; dimensional L×W×H is only a fallback.
     /// Values are rounded to the persistence precision used by ManifestLine (4 decimal places).
     /// </summary>
     public static (decimal AllocatedWeight, decimal AllocatedVolume) AllocatePhysicalMeasures(
@@ -86,7 +87,8 @@ public static class ShippingExecutionRules
         decimal? lineWeight,
         decimal? length,
         decimal? width,
-        decimal? height)
+        decimal? height,
+        decimal? lineVolume = null)
     {
         EnsurePositive(itemQuantity, "ITEM_QUANTITY_INVALID");
         EnsurePositive(allocatedQuantity, "QUANTITY_INVALID");
@@ -97,11 +99,12 @@ public static class ShippingExecutionRules
         var l = length ?? 0m;
         var w = width ?? 0m;
         var h = height ?? 0m;
-        if (weight < 0m || l < 0m || w < 0m || h < 0m)
+        if (weight < 0m || l < 0m || w < 0m || h < 0m || lineVolume < 0m)
             throw new ShippingExecutionRuleException("PHYSICAL_MEASURE_INVALID");
 
         var ratio = allocatedQuantity / itemQuantity;
-        var totalVolume = l == 0m || w == 0m || h == 0m ? 0m : l * w * h;
+        var dimensionalVolume = l == 0m || w == 0m || h == 0m ? 0m : l * w * h;
+        var totalVolume = lineVolume ?? dimensionalVolume;
         return (
             decimal.Round(weight * ratio, 4, MidpointRounding.AwayFromZero),
             decimal.Round(totalVolume * ratio, 4, MidpointRounding.AwayFromZero));
@@ -156,6 +159,31 @@ public static class ShippingExecutionRules
         {
             EnsurePositive(line.Planned, "MANIFEST_LINE_INVALID");
             if (line.Loaded < -Tolerance || Math.Abs(line.Loaded - line.Planned) > Tolerance)
+                throw new ShippingExecutionRuleException("MANIFEST_LINE_INVALID");
+        }
+    }
+
+    /// <summary>
+    /// W2-P2C01-039 requires every finalized manifest line to be backed by one active allocation,
+    /// and every active trip allocation to be represented in the manifest. This prevents both stale
+    /// reversed lines and allocations stranded outside the manifest from reaching READY/DEPARTED.
+    /// </summary>
+    public static void EnsureManifestAllocationCoverage(
+        IReadOnlyList<(Guid AllocationId, Guid WaybillItemId, decimal Quantity)> manifestLines,
+        IReadOnlyList<(Guid AllocationId, Guid WaybillItemId, decimal Quantity)> activeAllocations)
+    {
+        if (manifestLines.Count == 0 || manifestLines.Count != activeAllocations.Count ||
+            manifestLines.Select(x => x.AllocationId).Distinct().Count() != manifestLines.Count ||
+            activeAllocations.Select(x => x.AllocationId).Distinct().Count() != activeAllocations.Count)
+            throw new ShippingExecutionRuleException("MANIFEST_LINE_INVALID");
+
+        var activeById = activeAllocations.ToDictionary(x => x.AllocationId);
+        foreach (var line in manifestLines)
+        {
+            EnsurePositive(line.Quantity, "MANIFEST_LINE_INVALID");
+            if (!activeById.TryGetValue(line.AllocationId, out var active) ||
+                active.WaybillItemId != line.WaybillItemId ||
+                Math.Abs(active.Quantity - line.Quantity) > Tolerance)
                 throw new ShippingExecutionRuleException("MANIFEST_LINE_INVALID");
         }
     }

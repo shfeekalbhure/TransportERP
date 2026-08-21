@@ -100,7 +100,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             cancellationToken);
         if (replay is not null)
         {
-            EnsureTripReplay(replay, request);
+            await EnsureTripReplayAsync(replay, request, cancellationToken);
             return await TripResponseOf(context, replay.Id, cancellationToken);
         }
 
@@ -150,7 +150,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 null, JsonSerializer.Serialize(new
                 {
                     trip.TripNo, trip.VehicleId, trip.DriverId, trip.OriginId, trip.DestinationId,
-                    trip.PlannedDepartAt, Stops = (request.Stops ?? []).Select(x => new { x.StopNo, x.LocationId, x.StopType })
+                    trip.PlannedDepartAt, Stops = (request.Stops ?? []).Select(x => new { x.StopNo, x.LocationId, x.StopType, x.PlannedAt })
                 }), null, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return await TripResponseOf(context, trip.Id, cancellationToken);
@@ -163,7 +163,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 cancellationToken);
             if (replay is not null)
             {
-                EnsureTripReplay(replay, request);
+                await EnsureTripReplayAsync(replay, request, cancellationToken);
                 return await TripResponseOf(context, replay.Id, cancellationToken);
             }
             throw new WaybillPersistenceException("DUPLICATE_TRIP_NO", ex);
@@ -258,7 +258,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             cancellationToken);
         if (replay is not null)
         {
-            if (replay.ReversalOfId != allocationId)
+            if (replay.ReversalOfId != allocationId ||
+                !string.Equals(replay.Reason?.Trim(), request.Reason.Trim(), StringComparison.Ordinal))
                 throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             return AllocationResponseOf(context, replay);
         }
@@ -271,11 +272,16 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 x.Status == ShippingExecutionStatuses.Allocation.Allocated && x.ReversalOfId == null,
                 cancellationToken) ?? throw new WaybillPersistenceException("NOT_FOUND");
 
-            if (await Allocations.AsNoTracking().AnyAsync(x => x.ReversalOfId == original.Id, cancellationToken))
+            if (await Allocations.AsNoTracking().AnyAsync(x =>
+                x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == original.Id,
+                cancellationToken))
                 throw new WaybillPersistenceException("INVALID_STATE");
             if (await Movements.AsNoTracking().AnyAsync(x =>
+                x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
                 x.AllocationId == original.Id && x.EventType == "LOAD", cancellationToken))
                 throw new WaybillPersistenceException("ALREADY_LOADED");
+            if (await ManifestLines.AsNoTracking().AnyAsync(x => x.AllocationId == original.Id, cancellationToken))
+                throw new WaybillPersistenceException("INVALID_STATE");
 
             var reversal = new TripAllocationEntity
             {
@@ -300,7 +306,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             replay = await Allocations.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ClientOperationId == operationId,
                 cancellationToken);
-            if (replay is not null && replay.ReversalOfId == allocationId)
+            if (replay is not null && replay.ReversalOfId == allocationId &&
+                string.Equals(replay.Reason?.Trim(), request.Reason.Trim(), StringComparison.Ordinal))
                 return AllocationResponseOf(context, replay);
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
         }
@@ -322,7 +329,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             cancellationToken);
         if (replay is not null)
         {
-            if (replay.TripId != tripId)
+            if (!ManifestCreateReplayMatches(replay, tripId, request))
                 throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             return await ManifestResponseOf(context, replay.Id, cancellationToken);
         }
@@ -341,7 +348,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 where allocation.TripId == tripId &&
                       allocation.CompanyId == context.CompanyId && allocation.BranchId == context.BranchId &&
                       allocation.Status == ShippingExecutionStatuses.Allocation.Allocated && allocation.ReversalOfId == null &&
-                      !Allocations.Any(r => r.ReversalOfId == allocation.Id) &&
+                      !Allocations.Any(r =>
+                          r.CompanyId == context.CompanyId && r.BranchId == context.BranchId && r.ReversalOfId == allocation.Id) &&
                       !ManifestLines.Any(l => l.AllocationId == allocation.Id)
                 orderby waybill.Id, item.LineNo
                 select new { Allocation = allocation, Item = item, Waybill = waybill }).ToListAsync(cancellationToken);
@@ -378,8 +386,18 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
 
             await Save(cancellationToken);
             await audit.WriteAsync(context, "ManifestGenerate", "SUCCESS", "Manifest", manifest.Id,
-                null, JsonSerializer.Serialize(new { manifest.TripId, manifest.ManifestNo, LineCount = candidates.Count }),
-                null, cancellationToken);
+                null, JsonSerializer.Serialize(new
+                {
+                    manifest.TripId,
+                    manifest.ManifestNo,
+                    LineCount = candidates.Count,
+                    SourceAllocations = candidates.Select(x => new
+                    {
+                        x.Allocation.Id,
+                        x.Allocation.WaybillItemId,
+                        x.Allocation.Quantity
+                    }).OrderBy(x => x.Id).ToArray()
+                }), null, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return await ManifestResponseOf(context, manifest.Id, cancellationToken);
         }
@@ -389,7 +407,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             replay = await Manifests.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.CreateClientOperationId == operationId,
                 cancellationToken);
-            if (replay is not null && replay.TripId == tripId)
+            if (replay is not null && ManifestCreateReplayMatches(replay, tripId, request))
                 return await ManifestResponseOf(context, replay.Id, cancellationToken);
             throw new WaybillPersistenceException("DUPLICATE_OPERATION", ex);
         }
@@ -408,7 +426,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             x.ClientOperationId == operationId && x.EventType == "LOAD", cancellationToken);
         if (replay is not null)
         {
-            if (replay.ManifestId != manifestId || replay.ManifestLineId != lineId || replay.Quantity != request.Quantity)
+            if (!LoadReplayMatches(replay, manifestId, lineId, request))
                 throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             return await ManifestLineResponseOf(lineId, cancellationToken);
         }
@@ -423,10 +441,12 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 ?? throw new WaybillPersistenceException("NOT_FOUND");
             var item = await Items.AsNoTracking().SingleOrDefaultAsync(x => x.Id == line.WaybillItemId, cancellationToken)
                 ?? throw new WaybillPersistenceException("NOT_FOUND");
+            _ = await RequireActiveAllocationForLine(context, manifest, line, cancellationToken);
             await EnsureNoActiveHold(context, line.WaybillId, cancellationToken);
             ShippingExecutionRules.EnsureResourceConstraint(item.RiskFlagsJson, request.ResourceConstraintConfirmed);
 
             var loadedNet = await Movements.AsNoTracking().Where(x =>
+                    x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
                     x.ManifestLineId == line.Id && x.EventType == "LOAD")
                 .SumAsync(x => x.Quantity ?? 0m, cancellationToken);
             ShippingExecutionRules.EnsureLoad(line.Quantity, loadedNet, request.Quantity);
@@ -438,6 +458,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 AllocationId = line.AllocationId, ManifestLineId = line.Id,
                 EventType = "LOAD", Quantity = request.Quantity, TripId = manifest.TripId, ManifestId = manifest.Id,
                 OccurredAt = request.OccurredAt, RecordedAt = DateTimeOffset.UtcNow, RecordedBy = context.UserId,
+                ReasonCode = ResourceConstraintEvidence(request.ResourceConstraintConfirmed),
                 ClientOperationId = operationId
             };
             Movements.Add(movement);
@@ -450,7 +471,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 null, JsonSerializer.Serialize(new
                 {
                     movement.ManifestId, movement.ManifestLineId, movement.AllocationId,
-                    movement.WaybillItemId, movement.Quantity, movement.OccurredAt
+                    movement.WaybillItemId, movement.Quantity, movement.OccurredAt,
+                    request.ResourceConstraintConfirmed
                 }), null, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return ManifestLineResponseOf(line);
@@ -461,7 +483,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             replay = await Movements.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
                 x.ClientOperationId == operationId && x.EventType == "LOAD", cancellationToken);
-            if (replay is not null && replay.ManifestId == manifestId && replay.ManifestLineId == lineId && replay.Quantity == request.Quantity)
+            if (replay is not null && LoadReplayMatches(replay, manifestId, lineId, request))
                 return await ManifestLineResponseOf(lineId, cancellationToken);
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
         }
@@ -482,6 +504,9 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         var manifest = await RequireManifest(context, manifestId, cancellationToken);
         if (manifest.LastClientOperationId == operationId && manifest.Status != ShippingExecutionStatuses.Manifest.Draft)
         {
+            if (manifest.Status != ShippingExecutionStatuses.Manifest.Finalized ||
+                manifest.Version != request.ExpectedVersion + 1)
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             await tx.CommitAsync(cancellationToken);
             return await ManifestResponseOf(context, manifest.Id, cancellationToken);
         }
@@ -494,6 +519,11 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         foreach (var waybillId in lines.Select(x => x.WaybillId).Distinct())
             await EnsureNoActiveHold(context, waybillId, cancellationToken);
         ShippingExecutionRules.EnsureManifestCanFinalize(lines.Select(x => (x.Quantity, x.LoadedQuantity)).ToList());
+
+        var activeAllocations = await ActiveTripAllocations(context, manifest.TripId, cancellationToken);
+        ShippingExecutionRules.EnsureManifestAllocationCoverage(
+            lines.Select(x => (x.AllocationId, x.WaybillItemId, x.Quantity)).ToList(),
+            activeAllocations.Select(x => (x.Id, x.WaybillItemId, x.Quantity)).ToList());
 
         var trip = await RequireTrip(context, manifest.TripId, cancellationToken);
         if (trip.Status != ShippingExecutionStatuses.Trip.Draft)
@@ -510,7 +540,26 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         trip.UpdatedAt = now;
         await Save(cancellationToken);
         await audit.WriteAsync(context, "ManifestFinalize", "SUCCESS", "Manifest", manifest.Id,
-            null, JsonSerializer.Serialize(new { manifest.ManifestNo, LineCount = lines.Count, trip.Status }), null, cancellationToken);
+            null, JsonSerializer.Serialize(new
+            {
+                manifest.ManifestNo,
+                LineCount = lines.Count,
+                FinalTotals = new
+                {
+                    Quantity = lines.Sum(x => x.Quantity),
+                    LoadedQuantity = lines.Sum(x => x.LoadedQuantity),
+                    Weight = lines.Sum(x => x.Weight),
+                    Volume = lines.Sum(x => x.Volume)
+                },
+                SourceAllocations = lines.OrderBy(x => x.AllocationId).Select(x => new
+                {
+                    x.AllocationId,
+                    x.WaybillId,
+                    x.WaybillItemId,
+                    x.Quantity
+                }).ToArray(),
+                trip.Status
+            }), null, cancellationToken);
         await tx.CommitAsync(cancellationToken);
         return await ManifestResponseOf(context, manifest.Id, cancellationToken);
     }
@@ -526,6 +575,11 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         var manifest = await RequireManifest(context, manifestId, cancellationToken);
         if (manifest.LastClientOperationId == operationId && manifest.Status == ShippingExecutionStatuses.Manifest.Accepted)
         {
+            var replayTrip = await RequireTrip(context, manifest.TripId, cancellationToken);
+            if (manifest.Version != request.ExpectedVersion + 1 || replayTrip.DriverId != request.DriverId ||
+                !SameInstant(manifest.HandoverAt, request.AcceptedAt) ||
+                !SameInstant(manifest.DriverAcceptedAt, request.AcceptedAt))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             await tx.CommitAsync(cancellationToken);
             return await ManifestResponseOf(context, manifest.Id, cancellationToken);
         }
@@ -561,6 +615,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         var trip = await RequireTrip(context, tripId, cancellationToken);
         if (trip.LastClientOperationId == operationId && trip.Status == ShippingExecutionStatuses.Trip.Departed)
         {
+            if (trip.Version != request.ExpectedVersion + 1 || !SameInstant(trip.ActualDepartAt, request.ActualDepartAt))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
             await tx.CommitAsync(cancellationToken);
             return await TripResponseOf(context, trip.Id, cancellationToken);
         }
@@ -569,13 +625,26 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         if (trip.Status != ShippingExecutionStatuses.Trip.Ready)
             throw new WaybillPersistenceException("INVALID_STATE");
 
-        var manifests = await Manifests.AsNoTracking().Where(x => x.TripId == tripId).ToListAsync(cancellationToken);
+        var manifests = await Manifests.AsNoTracking().Where(x =>
+            x.TripId == tripId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId).ToListAsync(cancellationToken);
         if (manifests.Count == 0 || manifests.Any(x => x.Status != ShippingExecutionStatuses.Manifest.Accepted))
             throw new WaybillPersistenceException("MANIFEST_NOT_ACCEPTED");
         var manifestIds = manifests.Select(x => x.Id).ToList();
         var lines = await ManifestLines.AsNoTracking().Where(x => manifestIds.Contains(x.ManifestId)).ToListAsync(cancellationToken);
         if (lines.Count == 0 || lines.Any(x => x.LoadedQuantity <= 0m || Math.Abs(x.LoadedQuantity - x.Quantity) > 0.0001m))
             throw new WaybillPersistenceException("MANIFEST_NOT_ACCEPTED");
+
+        var activeAllocations = await ActiveTripAllocations(context, tripId, cancellationToken);
+        try
+        {
+            ShippingExecutionRules.EnsureManifestAllocationCoverage(
+                lines.Select(x => (x.AllocationId, x.WaybillItemId, x.Quantity)).ToList(),
+                activeAllocations.Select(x => (x.Id, x.WaybillItemId, x.Quantity)).ToList());
+        }
+        catch (ShippingExecutionRuleException ex) when (ex.Code == "MANIFEST_LINE_INVALID")
+        {
+            throw new WaybillPersistenceException("MANIFEST_NOT_ACCEPTED", ex);
+        }
 
         trip.Status = ShippingExecutionStatuses.Trip.Departed;
         trip.ActualDepartAt = request.ActualDepartAt;
@@ -632,6 +701,37 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         => await Manifests.SingleOrDefaultAsync(x =>
                x.Id == manifestId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId, ct)
            ?? throw new WaybillPersistenceException("NOT_FOUND");
+
+    private async Task<TripAllocationEntity> RequireActiveAllocationForLine(
+        OperationContext context,
+        ManifestEntity manifest,
+        ManifestLineEntity line,
+        CancellationToken ct)
+    {
+        var allocation = await Allocations.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.Id == line.AllocationId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
+            x.TripId == manifest.TripId && x.WaybillItemId == line.WaybillItemId &&
+            x.Status == ShippingExecutionStatuses.Allocation.Allocated && x.ReversalOfId == null,
+            ct) ?? throw new WaybillPersistenceException("INVALID_STATE");
+
+        if (await Allocations.AsNoTracking().AnyAsync(x =>
+            x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == allocation.Id, ct))
+            throw new WaybillPersistenceException("INVALID_STATE");
+        if (Math.Abs(allocation.Quantity - line.Quantity) > 0.0001m)
+            throw new WaybillPersistenceException("MANIFEST_LINE_INVALID");
+        return allocation;
+    }
+
+    private Task<List<TripAllocationEntity>> ActiveTripAllocations(
+        OperationContext context,
+        Guid tripId,
+        CancellationToken ct)
+        => Allocations.AsNoTracking().Where(x =>
+                x.TripId == tripId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId &&
+                x.Status == ShippingExecutionStatuses.Allocation.Allocated && x.ReversalOfId == null &&
+                !Allocations.Any(r =>
+                    r.CompanyId == context.CompanyId && r.BranchId == context.BranchId && r.ReversalOfId == x.Id))
+            .ToListAsync(ct);
 
     private async Task EnsureNoActiveHold(OperationContext context, Guid waybillId, CancellationToken ct)
     {
@@ -694,14 +794,59 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
     private static AllocationResponse AllocationResponseOf(OperationContext context, TripAllocationEntity x)
         => new(x.Id, x.WaybillItemId, x.ReleaseId, x.TripId, x.Quantity, x.Status, x.ReversalOfId, context.CorrelationId);
 
-    private static void EnsureTripReplay(TripEntity replay, CreateTripRequest request)
+    private async Task EnsureTripReplayAsync(TripEntity replay, CreateTripRequest request, CancellationToken ct)
     {
         if (!string.Equals(replay.TripNo, request.TripNo.Trim(), StringComparison.Ordinal) ||
             replay.VehicleId != request.VehicleId || replay.DriverId != request.DriverId ||
             replay.OriginId != request.OriginId || replay.DestinationId != request.DestinationId ||
-            replay.PlannedDepartAt != request.PlannedDepartAt)
+            !SameInstant(replay.PlannedDepartAt, request.PlannedDepartAt))
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+
+        var persistedStops = await Stops.AsNoTracking().Where(x => x.TripId == replay.Id).OrderBy(x => x.StopNo)
+            .Select(x => new { x.StopNo, x.LocationId, x.StopType, x.PlannedAt }).ToListAsync(ct);
+        var requestedStops = (request.Stops ?? []).OrderBy(x => x.StopNo).ToList();
+        if (persistedStops.Count != requestedStops.Count)
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+
+        for (var i = 0; i < persistedStops.Count; i++)
+        {
+            var persisted = persistedStops[i];
+            var requested = requestedStops[i];
+            if (persisted.StopNo != requested.StopNo || persisted.LocationId != requested.LocationId ||
+                !string.Equals(persisted.StopType, requested.StopType.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+                !SameInstant(persisted.PlannedAt, requested.PlannedAt))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+        }
     }
+
+    private static bool ManifestCreateReplayMatches(ManifestEntity replay, Guid tripId, GenerateManifestRequest request)
+    {
+        if (replay.TripId != tripId)
+            return false;
+        return string.IsNullOrWhiteSpace(request.ManifestNo) ||
+               string.Equals(replay.ManifestNo, request.ManifestNo.Trim(), StringComparison.Ordinal);
+    }
+
+    private static bool LoadReplayMatches(
+        MovementEventEntity replay,
+        Guid manifestId,
+        Guid lineId,
+        LoadManifestLineRequest request)
+        => replay.ManifestId == manifestId && replay.ManifestLineId == lineId && replay.Quantity == request.Quantity &&
+           SameInstant(replay.OccurredAt, request.OccurredAt) &&
+           string.Equals(replay.ReasonCode, ResourceConstraintEvidence(request.ResourceConstraintConfirmed), StringComparison.Ordinal);
+
+    private static string ResourceConstraintEvidence(bool confirmed)
+        => confirmed ? "RESOURCE_CONSTRAINT_CONFIRMED" : "RESOURCE_CONSTRAINT_NOT_CONFIRMED";
+
+    private static bool SameInstant(DateTimeOffset left, DateTimeOffset right)
+        => Math.Abs((left.ToUniversalTime() - right.ToUniversalTime()).Ticks) <= 10;
+
+    private static bool SameInstant(DateTimeOffset? left, DateTimeOffset right)
+        => left.HasValue && SameInstant(left.Value, right);
+
+    private static bool SameInstant(DateTimeOffset? left, DateTimeOffset? right)
+        => left.HasValue == right.HasValue && (!left.HasValue || SameInstant(left.Value, right!.Value));
 
     private async Task Save(CancellationToken ct)
     {
