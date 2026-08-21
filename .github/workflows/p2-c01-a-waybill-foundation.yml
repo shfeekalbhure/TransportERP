@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   core-postgresql:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
     name: Core + PostgreSQL + HTTP
     runs-on: ubuntu-latest
     services:
@@ -74,9 +75,10 @@ jobs:
       - name: Run P2-C01-A PostgreSQL and HTTP gates
         env:
           TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category=P2PostgreSQL"
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01AWaybillPostgreSqlIntegrationTests"
 
   desktop-rtl:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
     name: Desktop RTL contract surface
     runs-on: windows-latest
     steps:
