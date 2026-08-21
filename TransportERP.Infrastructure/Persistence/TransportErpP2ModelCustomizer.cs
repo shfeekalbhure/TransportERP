@@ -97,7 +97,7 @@ public sealed class TransportErpP2ModelCustomizer(ModelCustomizerDependencies de
         {
             t.HasCheckConstraint("ck_waybill_items_quantity", "\"Quantity\" > 0");
             t.HasCheckConstraint("ck_waybill_items_pieces", "\"Pieces\" IS NULL OR \"Pieces\" > 0");
-            t.HasCheckConstraint("ck_waybill_items_measurements", "(\"Weight\" IS NULL OR \"Weight\" >= 0) AND (\"Length\" IS NULL OR \"Length\" >= 0) AND (\"Width\" IS NULL OR \"Width\" >= 0) AND (\"Height\" IS NULL OR \"Height\" >= 0) AND (\"DeclaredValue\" IS NULL OR \"DeclaredValue\" >= 0)");
+            t.HasCheckConstraint("ck_waybill_items_measurements", "(\"Weight\" IS NULL OR \"Weight\" >= 0) AND (\"Length\" IS NULL OR \"Length\" >= 0) AND (\"Width\" IS NULL OR \"Width\" >= 0) AND (\"Height\" IS NULL OR \"Height\" >= 0) AND (\"Volume\" IS NULL OR \"Volume\" >= 0) AND (\"DeclaredValue\" IS NULL OR \"DeclaredValue\" >= 0)");
         });
         item.HasKey(x => x.Id);
         item.Property(x => x.ItemType).HasMaxLength(100).IsRequired();
@@ -107,6 +107,7 @@ public sealed class TransportErpP2ModelCustomizer(ModelCustomizerDependencies de
         item.Property(x => x.Length).HasPrecision(19, 4);
         item.Property(x => x.Width).HasPrecision(19, 4);
         item.Property(x => x.Height).HasPrecision(19, 4);
+        item.Property(x => x.Volume).HasPrecision(19, 4);
         item.Property(x => x.DeclaredValue).HasPrecision(19, 4);
         item.Property(x => x.RiskFlagsJson).HasColumnType("jsonb").IsRequired();
         item.Property(x => x.Notes).HasMaxLength(1000);

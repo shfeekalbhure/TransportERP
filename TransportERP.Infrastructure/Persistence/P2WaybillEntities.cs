@@ -84,6 +84,7 @@ public sealed class WaybillItemEntity
     public decimal? Length { get; set; }
     public decimal? Width { get; set; }
     public decimal? Height { get; set; }
+    public decimal? Volume { get; set; }
     public decimal? DeclaredValue { get; set; }
     public Guid? OriginCountryId { get; set; }
     public string RiskFlagsJson { get; set; } = "[]";

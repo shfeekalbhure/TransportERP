@@ -1,0 +1,255 @@
+name: P2 C01 C shipping execution
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-c-release-trip-manifest-20260821
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shipping-postgresql:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    name: Shipping + PostgreSQL + HTTP
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout governed C head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact C head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected="${{ github.event.pull_request.head.sha }}"
+          else
+            expected="${{ github.sha }}"
+          fi
+          echo "actual=$actual"
+          echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Not running on exact governed head.'; exit 1; }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate closed P2-C01 contracts
+        run: python documentation/closeout/P2/validate_p2_c01_contracts.py
+
+      - name: Validate C phase boundary
+        shell: bash
+        run: |
+          git fetch origin master --depth=1
+          git diff --name-only origin/master...HEAD > /tmp/c_changed.txt
+          cat /tmp/c_changed.txt
+          if grep -Ev '^documentation/closeout/P2/' /tmp/c_changed.txt | grep -E '/(Arrival|Warehouse|Delivery|Customs|Commission|Settlement|Fleet|GPS|Notification|ExceptionResolution)|(^|/)(Arrival|Warehouse|Delivery|Customs|Commission|Settlement|Fleet|GPS)' ; then
+            echo 'P2-C01-C contains a later-phase file.'
+            exit 1
+          fi
+
+      - name: Restore core tests
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Run non-database regression
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL"
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
+      - name: Generate governed C migration or hardening when needed
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        shell: bash
+        run: |
+          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecution.cs' ! -name '*.Designer.cs' | head -n 1)
+          if [ -z "$migration" ]; then
+            dotnet ef migrations add P2C01CShippingExecution \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --output-dir Persistence/Migrations
+          fi
+          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecution.cs' ! -name '*.Designer.cs' | head -n 1)
+          test -n "$migration" || { echo 'P2-C01-C migration is missing.'; exit 1; }
+          echo "C migration: $migration"
+
+          if dotnet ef migrations has-pending-model-changes \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj; then
+            echo 'No C hardening migration required.'
+          else
+            if find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01CShippingExecutionHardening.cs' ! -name '*.Designer.cs' | grep -q .; then
+              echo 'Pending model changes remain despite an existing C hardening migration.'
+              exit 1
+            fi
+            dotnet ef migrations add P2C01CShippingExecutionHardening \
+              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+              --output-dir Persistence/Migrations
+          fi
+
+      - name: Verify EF model matches committed/generated migration
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Persist EF-generated C migration to branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add TransportERP.Infrastructure/Persistence/Migrations
+          if ! git diff --cached --quiet; then
+            git commit -m 'db: generate P2-C01-C shipping execution migration'
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+
+      - name: Rebuild after migration generation
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Apply P1 A B and C migrations to PostgreSQL 18
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Run P2-C01-C PostgreSQL and HTTP gates
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests|FullyQualifiedName~P2C01CConcurrencyPostgreSqlTests|FullyQualifiedName~P2C01CPhysicalMeasurePostgreSqlTests|FullyQualifiedName~P2C01CTeam03PostgreSqlHardeningTests"
+
+  shipping-desktop-rtl:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    name: Shipping Desktop RTL
+    runs-on: windows-latest
+    steps:
+      - name: Checkout governed C head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact C head
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $expected = '${{ github.event.pull_request.head.sha }}'
+          } else {
+            $expected = '${{ github.sha }}'
+          }
+          Write-Host "actual=$actual"
+          Write-Host "expected=$expected"
+          if ($actual -ne $expected) { throw 'Desktop job is not running on exact governed head.' }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Desktop
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+
+      - name: Confirm C RTL W3 architecture and phase boundary
+        shell: pwsh
+        run: |
+          $forms = 'TransportERP.Desktop/Waybills/ShippingExecutionForms.cs'
+          $models = 'TransportERP.Desktop/Waybills/ShippingExecutionW3Models.cs'
+          $project = 'TransportERP.Desktop/TransportERP.Desktop.csproj'
+          foreach ($path in @($forms,$models,$project)) {
+            if (-not (Test-Path $path)) { throw "Required Desktop W3 file missing: $path" }
+          }
+
+          $text = Get-Content $forms -Raw
+          $modelText = Get-Content $models -Raw
+          $projectText = Get-Content $project -Raw
+          $surfaceText = $text + "`n" + $modelText + "`n" + $projectText
+
+          foreach ($id in @('SHP-015','SHP-016','SHP-019','SHP-023','SHP-024','SHP-025','SHP-027','SHP-028','SHP-029','SHP-030')) {
+            if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
+          }
+
+          $screenIds = [regex]::Matches($text, 'SHP-(\d{3})') | ForEach-Object { [int]$_.Groups[1].Value }
+          if ($screenIds | Where-Object { $_ -ge 31 }) {
+            throw 'Later-phase SHP-031+ screen leaked into P2-C01-C.'
+          }
+
+          if ($text -notmatch 'RightToLeft\s*=\s*RightToLeft\.Yes') { throw 'Arabic RTL is not explicitly enabled.' }
+          if ($text -notmatch 'RightToLeftLayout\s*=\s*true') { throw 'RTL layout mirroring is not explicitly enabled.' }
+
+          foreach ($forbiddenToken in @('DbContext','Npgsql','UseNpgsql','ExecuteSql','TransportERP.Infrastructure','System.Data.SqlClient','Microsoft.Data.SqlClient')) {
+            if ($surfaceText -match [regex]::Escape($forbiddenToken)) {
+              throw "Direct Desktop persistence token detected: $forbiddenToken"
+            }
+          }
+
+          if ($projectText -match 'TransportERP.Application|TransportERP.Infrastructure') {
+            throw 'Desktop must not reference Application/Infrastructure persistence projects.'
+          }
+
+          if ($surfaceText -match 'IEnumerable<object>') {
+            throw 'Untyped object binding is forbidden for governed P2-C01-C W3 screens.'
+          }
+
+          foreach ($requiredToken in @(
+            'ItemReleaseScreenState','ReleaseItemRequest','TripAllocationPlanningRow','ReleasedRemaining','Route','AllocateItemRequest','UnallocateRequest',
+            'RemainingShippingRow','ReadyToLoadRow','LoadPlanningRow','Capacity','CapacityWeight','CapacityVolume','AllocatedWeight','AllocatedVolume','Priority','RiskFlags',
+            'CreateTripRequest','ManifestLoadingRow','LoadManifestLineRequest','_resourceConfirmed.Checked','تمت مراجعة قيد السعة/المخاطر','ManifestScreenState','TotalQuantity','TotalWeight','TotalVolume',
+            'PrintDocument','HandoverManifestRequest','DepartureScreenState','StartTripRequest','RiskText')) {
+            if ($surfaceText -notmatch [regex]::Escape($requiredToken)) {
+              throw "Missing governed W3 Desktop token: $requiredToken"
+            }
+          }
+
+          if ($modelText -notmatch 'AllocatedWeight:\s*line\.Weight') {
+            throw 'SHP-024 must bind allocated weight from the proportional manifest line.'
+          }
+          if ($modelText -notmatch 'AllocatedVolume:\s*line\.Volume') {
+            throw 'SHP-024 must bind allocated volume from the proportional manifest line.'
+          }
+          if ($modelText -notmatch 'Qty:\s*line\.Quantity') {
+            throw 'SHP-024 quantity must correspond to the allocation/manifest line quantity.'
+          }
+
+          $profiles = @{
+            'SHP-015'='Transaction'; 'SHP-016'='Transaction'; 'SHP-019'='ReportInquiry'; 'SHP-023'='ReportInquiry';
+            'SHP-024'='Transaction'; 'SHP-025'='Transaction'; 'SHP-027'='Transaction'; 'SHP-028'='Transaction';
+            'SHP-029'='ControlApproval'; 'SHP-030'='ControlApproval'
+          }
+          foreach ($pair in $profiles.GetEnumerator()) {
+            $pattern = [regex]::Escape($pair.Key) + '.+' + [regex]::Escape('TransportScreenProfile.' + $pair.Value)
+            if ($text -notmatch $pattern) { throw "Screen profile mismatch for $($pair.Key)" }
+          }

@@ -18,7 +18,9 @@ public static class TransportErpPersistenceExtensions
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp");
             });
             options.ReplaceService<IModelCustomizer, TransportErpP2CombinedModelCustomizer>();
-            options.AddInterceptors(new P2FinanceAppendOnlyInterceptor());
+            options.AddInterceptors(
+                new P2FinanceAppendOnlyInterceptor(),
+                new P2ShippingAppendOnlyInterceptor());
         });
         return services;
     }

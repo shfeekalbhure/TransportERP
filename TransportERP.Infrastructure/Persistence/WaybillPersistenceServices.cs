@@ -177,7 +177,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
                 p.CountryId, p.GovernorateId, p.CityId, p.AreaId, p.AddressLineSnapshot)),
             x.Items.OrderBy(i => i.LineNo).Select(i => new WaybillItemValue(
                 i.Id, i.LineNo, i.ItemType, i.Contents, i.Quantity, i.Pieces, i.Weight,
-                i.Length, i.Width, i.Height, i.DeclaredValue, i.OriginCountryId, i.RiskFlagsJson, i.Notes)));
+                i.Length, i.Width, i.Height, i.DeclaredValue, i.OriginCountryId, i.RiskFlagsJson, i.Notes, i.Volume)));
 
     private static WaybillPartyEntity ToEntity(Guid waybillId, WaybillPartyValue x, int sequence)
         => new()
@@ -207,6 +207,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
         target.Length = source.Length;
         target.Width = source.Width;
         target.Height = source.Height;
+        target.Volume = source.Volume;
         target.DeclaredValue = source.DeclaredValue;
         target.OriginCountryId = source.OriginCountryId;
         target.RiskFlagsJson = source.RiskFlagsJson;

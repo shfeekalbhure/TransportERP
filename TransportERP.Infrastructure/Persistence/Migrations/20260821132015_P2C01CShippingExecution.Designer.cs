@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TransportERP.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransportErpDbContext))]
-    partial class TransportErpDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821132015_P2C01CShippingExecution")]
+    partial class P2C01CShippingExecution
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1158,9 +1161,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("TripId")
-                        .IsUnique();
 
                     b.HasIndex("TripId", "ManifestNo")
                         .IsUnique();
@@ -2698,10 +2698,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<decimal?>("Volume")
-                        .HasPrecision(19, 4)
-                        .HasColumnType("numeric(19,4)");
-
                     b.Property<Guid>("WaybillId")
                         .HasColumnType("uuid");
 
@@ -2722,7 +2718,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.ToTable("waybill_items", "transport_erp", t =>
                         {
-                            t.HasCheckConstraint("ck_waybill_items_measurements", "(\"Weight\" IS NULL OR \"Weight\" >= 0) AND (\"Length\" IS NULL OR \"Length\" >= 0) AND (\"Width\" IS NULL OR \"Width\" >= 0) AND (\"Height\" IS NULL OR \"Height\" >= 0) AND (\"Volume\" IS NULL OR \"Volume\" >= 0) AND (\"DeclaredValue\" IS NULL OR \"DeclaredValue\" >= 0)");
+                            t.HasCheckConstraint("ck_waybill_items_measurements", "(\"Weight\" IS NULL OR \"Weight\" >= 0) AND (\"Length\" IS NULL OR \"Length\" >= 0) AND (\"Width\" IS NULL OR \"Width\" >= 0) AND (\"Height\" IS NULL OR \"Height\" >= 0) AND (\"DeclaredValue\" IS NULL OR \"DeclaredValue\" >= 0)");
 
                             t.HasCheckConstraint("ck_waybill_items_pieces", "\"Pieces\" IS NULL OR \"Pieces\" > 0");
 

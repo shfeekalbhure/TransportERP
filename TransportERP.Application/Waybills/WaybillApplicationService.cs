@@ -325,7 +325,7 @@ public sealed class WaybillApplicationService(
         => new(input.Id.GetValueOrDefault(Guid.NewGuid()), input.LineNo, input.ItemType, input.Contents,
             input.Quantity, input.Pieces, input.Weight, input.Length, input.Width, input.Height,
             input.DeclaredValue, input.OriginCountryId,
-            JsonSerializer.Serialize(input.RiskFlags ?? Array.Empty<string>()), input.Notes);
+            JsonSerializer.Serialize(input.RiskFlags ?? Array.Empty<string>()), input.Notes, input.Volume);
 
     public static WaybillResponse ToResponse(WaybillAggregate aggregate, Guid correlationId)
         => new(
@@ -339,7 +339,7 @@ public sealed class WaybillApplicationService(
             aggregate.Items.Select(x => new WaybillItemResponse(
                 x.Id, x.LineNo, x.ItemType, x.Contents, x.Quantity, x.Pieces, x.Weight, x.Length, x.Width, x.Height,
                 x.DeclaredValue, x.OriginCountryId,
-                JsonSerializer.Deserialize<string[]>(x.RiskFlagsJson) ?? Array.Empty<string>(), x.Notes)).ToList(),
+                JsonSerializer.Deserialize<string[]>(x.RiskFlagsJson) ?? Array.Empty<string>(), x.Notes, x.Volume)).ToList(),
             correlationId);
 
     private static OperationalPartyResponse ToPartyResponse(OperationalPartyRecord party)
