@@ -22,6 +22,15 @@ public static class TransportErpPersistenceExtensions
                 new P2FinanceAppendOnlyInterceptor(),
                 new P2ShippingAppendOnlyInterceptor());
         });
+
+        services.AddDbContext<Wave1GeoDbContext>(options =>
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(Wave1GeoDbContext).Assembly.FullName);
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1Geo", "transport_erp");
+            }));
+        services.AddScoped<Wave1GeoService>();
+
         return services;
     }
 }
