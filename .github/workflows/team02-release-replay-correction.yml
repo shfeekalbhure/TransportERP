@@ -1,0 +1,39 @@
+name: TEAM-02 release replay correction
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-c-release-trip-manifest-20260821
+
+permissions:
+  contents: write
+
+jobs:
+  apply-team02-release-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feature/p2-c01-c-release-trip-manifest-20260821
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply TEAM-02 correction
+        run: python tools/team02_release_replay_fix.py
+      - name: Restore and targeted regression
+        run: |
+          dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+          dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+      - name: Commit correction and remove bootstrap
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -- .github/workflows/team02-release-replay-correction.yml tools/team02_release_replay_fix.py
+          git add -- TransportERP.Infrastructure/Persistence/ShippingExecutionPersistence.cs
+          git diff --cached --check
+          git commit -m 'team02: align release replay with W2 contract'
+          git push origin HEAD:feature/p2-c01-c-release-trip-manifest-20260821
