@@ -38,6 +38,19 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref || github.ref_name }}
 
+      - name: Verify exact C head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected="${{ github.event.pull_request.head.sha }}"
+          else
+            expected="${{ github.sha }}"
+          fi
+          echo "actual=$actual"
+          echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Not running on exact governed head.'; exit 1; }
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -133,15 +146,31 @@ jobs:
       - name: Run P2-C01-C PostgreSQL and HTTP gates
         env:
           TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests|FullyQualifiedName~P2C01CConcurrencyPostgreSqlTests"
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests|FullyQualifiedName~P2C01CConcurrencyPostgreSqlTests|FullyQualifiedName~P2C01CPhysicalMeasurePostgreSqlTests|FullyQualifiedName~P2C01CTeam03PostgreSqlHardeningTests"
 
   shipping-desktop-rtl:
     if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
     name: Shipping Desktop RTL
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout governed C head
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact C head
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $expected = '${{ github.event.pull_request.head.sha }}'
+          } else {
+            $expected = '${{ github.sha }}'
+          }
+          Write-Host "actual=$actual"
+          Write-Host "expected=$expected"
+          if ($actual -ne $expected) { throw 'Desktop job is not running on exact governed head.' }
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
@@ -154,15 +183,27 @@ jobs:
       - name: Build Desktop contract surface
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
 
-      - name: Confirm C screen contracts only
+      - name: Confirm C RTL architecture and phase boundary
         shell: pwsh
         run: |
           $file = 'TransportERP.Desktop/Waybills/ShippingExecutionForms.cs'
           if (-not (Test-Path $file)) { throw 'P2-C01-C shipping forms are missing.' }
           $text = Get-Content $file -Raw
+
           foreach ($id in @('SHP-015','SHP-016','SHP-019','SHP-023','SHP-024','SHP-025','SHP-027','SHP-028','SHP-029','SHP-030')) {
             if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
           }
-          foreach ($forbidden in @('SHP-032','SHP-033','SHP-034','SHP-035','SHP-036','SHP-037','SHP-045','SHP-047')) {
-            if ($text -match [regex]::Escape($forbidden)) { throw "Later-phase screen leaked into C: $forbidden" }
+
+          $screenIds = [regex]::Matches($text, 'SHP-(\d{3})') | ForEach-Object { [int]$_.Groups[1].Value }
+          if ($screenIds | Where-Object { $_ -ge 31 }) {
+            throw 'Later-phase SHP-031+ screen leaked into P2-C01-C.'
+          }
+
+          if ($text -notmatch 'RightToLeft\s*=\s*RightToLeft\.Yes') { throw 'Arabic RTL is not explicitly enabled.' }
+          if ($text -notmatch 'RightToLeftLayout\s*=\s*true') { throw 'RTL layout mirroring is not explicitly enabled.' }
+
+          foreach ($forbiddenToken in @('DbContext','Npgsql','UseNpgsql','ExecuteSql','TransportERP.Infrastructure')) {
+            if ($text -match [regex]::Escape($forbiddenToken)) {
+              throw "Direct Desktop persistence token detected: $forbiddenToken"
+            }
           }
