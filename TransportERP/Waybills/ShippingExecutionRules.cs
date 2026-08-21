@@ -75,6 +75,38 @@ public static class ShippingExecutionRules
             throw new ShippingExecutionRuleException("QUANTITY_EXCEEDS_ALLOCATION");
     }
 
+    /// <summary>
+    /// W1 WaybillItem physical measures are line-level snapshots. When one line is split across trips,
+    /// each allocation receives the same quantity ratio of the line's total weight and dimensional volume.
+    /// Values are rounded to the persistence precision used by ManifestLine (4 decimal places).
+    /// </summary>
+    public static (decimal AllocatedWeight, decimal AllocatedVolume) AllocatePhysicalMeasures(
+        decimal itemQuantity,
+        decimal allocatedQuantity,
+        decimal? lineWeight,
+        decimal? length,
+        decimal? width,
+        decimal? height)
+    {
+        EnsurePositive(itemQuantity, "ITEM_QUANTITY_INVALID");
+        EnsurePositive(allocatedQuantity, "QUANTITY_INVALID");
+        if (allocatedQuantity - itemQuantity > Tolerance)
+            throw new ShippingExecutionRuleException("QUANTITY_EXCEEDS_ITEM");
+
+        var weight = lineWeight ?? 0m;
+        var l = length ?? 0m;
+        var w = width ?? 0m;
+        var h = height ?? 0m;
+        if (weight < 0m || l < 0m || w < 0m || h < 0m)
+            throw new ShippingExecutionRuleException("PHYSICAL_MEASURE_INVALID");
+
+        var ratio = allocatedQuantity / itemQuantity;
+        var totalVolume = l == 0m || w == 0m || h == 0m ? 0m : l * w * h;
+        return (
+            decimal.Round(weight * ratio, 4, MidpointRounding.AwayFromZero),
+            decimal.Round(totalVolume * ratio, 4, MidpointRounding.AwayFromZero));
+    }
+
     public static void EnsureRouteCompatible(
         Guid waybillOriginId,
         Guid waybillDestinationId,
