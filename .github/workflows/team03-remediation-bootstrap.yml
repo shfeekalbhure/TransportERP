@@ -14,7 +14,9 @@ permissions:
 
 jobs:
   apply-team03:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event_name == 'push') &&
+      !contains(github.event.head_commit.message, 'team03: apply persistence hardening')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current C branch
@@ -45,13 +47,12 @@ jobs:
           dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
           dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
 
-      - name: Commit bounded remediation and remove bootstrap files
+      - name: Commit bounded persistence remediation only
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm -- .github/workflows/team03-remediation-bootstrap.yml tools/team03_remediate.py tools/team03_store_parts.txt
-          git add -- TransportERP.Infrastructure/Persistence/ShippingExecutionPersistence.cs .github/workflows/p2-c01-c-shipping-execution.yml
+          git add -- TransportERP.Infrastructure/Persistence/ShippingExecutionPersistence.cs
           git diff --cached --check
           git diff --cached --stat
           git commit -m 'team03: apply persistence hardening'
