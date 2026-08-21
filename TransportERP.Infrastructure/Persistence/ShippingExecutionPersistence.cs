@@ -350,8 +350,9 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 throw new WaybillPersistenceException("NO_ALLOCATIONS");
 
             var now = DateTimeOffset.UtcNow;
+            var autoManifestNo = $"MF-{trip.TripNo}-{Guid.NewGuid():N}";
             var manifestNo = string.IsNullOrWhiteSpace(request.ManifestNo)
-                ? $"MF-{trip.TripNo}-{Guid.NewGuid():N}"[..Math.Min(100, $"MF-{trip.TripNo}-{Guid.NewGuid():N}".Length)]
+                ? autoManifestNo[..Math.Min(100, autoManifestNo.Length)]
                 : request.ManifestNo.Trim();
             var manifest = new ManifestEntity
             {
@@ -420,7 +421,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 throw new WaybillPersistenceException("INVALID_STATE");
             var line = await ManifestLines.SingleOrDefaultAsync(x => x.Id == lineId && x.ManifestId == manifestId, cancellationToken)
                 ?? throw new WaybillPersistenceException("NOT_FOUND");
-            var item = await Items.AsNoTracking().SingleAsync(x => x.Id == line.WaybillItemId, cancellationToken);
+            var item = await Items.AsNoTracking().SingleOrDefaultAsync(x => x.Id == line.WaybillItemId, cancellationToken)
+                ?? throw new WaybillPersistenceException("NOT_FOUND");
             await EnsureNoActiveHold(context, line.WaybillId, cancellationToken);
             ShippingExecutionRules.EnsureResourceConstraint(item.RiskFlagsJson, request.ResourceConstraintConfirmed);
 
@@ -621,13 +623,13 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         return (waybill, item);
     }
 
-    private Task<TripEntity> RequireTrip(OperationContext context, Guid tripId, CancellationToken ct)
-        => Trips.SingleOrDefaultAsync(x =>
+    private async Task<TripEntity> RequireTrip(OperationContext context, Guid tripId, CancellationToken ct)
+        => await Trips.SingleOrDefaultAsync(x =>
                x.Id == tripId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId, ct)
            ?? throw new WaybillPersistenceException("NOT_FOUND");
 
-    private Task<ManifestEntity> RequireManifest(OperationContext context, Guid manifestId, CancellationToken ct)
-        => Manifests.SingleOrDefaultAsync(x =>
+    private async Task<ManifestEntity> RequireManifest(OperationContext context, Guid manifestId, CancellationToken ct)
+        => await Manifests.SingleOrDefaultAsync(x =>
                x.Id == manifestId && x.CompanyId == context.CompanyId && x.BranchId == context.BranchId, ct)
            ?? throw new WaybillPersistenceException("NOT_FOUND");
 
@@ -672,11 +674,12 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
     private async Task<ManifestResponse> ManifestResponseOf(OperationContext context, Guid manifestId, CancellationToken ct)
     {
         var manifest = await Manifests.AsNoTracking().SingleAsync(x => x.Id == manifestId, ct);
+        var tripVersion = await Trips.AsNoTracking().Where(x => x.Id == manifest.TripId).Select(x => x.Version).SingleAsync(ct);
         var lines = await ManifestLines.AsNoTracking().Where(x => x.ManifestId == manifestId).OrderBy(x => x.Id)
             .Select(x => new ManifestLineResponse(x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId,
                 x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus)).ToListAsync(ct);
         return new ManifestResponse(manifest.Id, manifest.TripId, manifest.ManifestNo, manifest.CreatedAt,
-            manifest.HandoverAt, manifest.DriverAcceptedAt, manifest.Status, manifest.Version, lines, context.CorrelationId);
+            manifest.HandoverAt, manifest.DriverAcceptedAt, manifest.Status, manifest.Version, tripVersion, lines, context.CorrelationId);
     }
 
     private Task<ManifestLineResponse> ManifestLineResponseOf(Guid lineId, CancellationToken ct)
