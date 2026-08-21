@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("TransportErp")
 
 builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
+builder.Services.AddScoped<Wave1DetailedTrialBalanceService>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),
@@ -73,6 +74,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapWave1ScreenCatalog();
+app.MapWave1DetailedTrialBalance();
 app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
