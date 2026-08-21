@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/p2-c01-c-release-trip-manifest-20260821
+  pull_request:
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
@@ -11,7 +14,7 @@ permissions:
 
 jobs:
   apply-team03:
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'team03: apply persistence hardening')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current C branch
