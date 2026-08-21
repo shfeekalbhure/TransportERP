@@ -2,6 +2,7 @@ using System.Security.Claims;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
+using TransportERP.Domain.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Api.Waybills;
