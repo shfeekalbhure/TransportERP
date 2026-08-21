@@ -29,6 +29,27 @@ public sealed class P2C01CShippingExecutionTests
     }
 
     [Fact]
+    public void Split_allocation_scales_line_weight_and_volume_by_quantity_ratio()
+    {
+        var half = ShippingExecutionRules.AllocatePhysicalMeasures(
+            itemQuantity: 10m, allocatedQuantity: 5m,
+            lineWeight: 100m, length: 2m, width: 3m, height: 4m);
+
+        Assert.Equal(50m, half.AllocatedWeight);
+        Assert.Equal(12m, half.AllocatedVolume);
+    }
+
+    [Fact]
+    public void Split_allocation_measure_totals_do_not_duplicate_the_original_line()
+    {
+        var first = ShippingExecutionRules.AllocatePhysicalMeasures(10m, 4m, 100m, 2m, 3m, 4m);
+        var second = ShippingExecutionRules.AllocatePhysicalMeasures(10m, 6m, 100m, 2m, 3m, 4m);
+
+        Assert.Equal(100m, first.AllocatedWeight + second.AllocatedWeight);
+        Assert.Equal(24m, first.AllocatedVolume + second.AllocatedVolume);
+    }
+
+    [Fact]
     public void Route_requires_origin_before_destination()
     {
         var origin = Guid.NewGuid();
