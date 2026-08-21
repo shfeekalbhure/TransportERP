@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 namespace TransportERP.Infrastructure.Persistence;
 
 /// <summary>
-/// Composes the closed P2-C01-A model with the additive P2-C01-B finance model.
+/// Composes the closed P2-C01-A foundation, P2-C01-B finance model, and the additive
+/// P2-C01-C release/trip/manifest execution model.
 /// </summary>
 public sealed class TransportErpP2CombinedModelCustomizer(ModelCustomizerDependencies dependencies)
     : ModelCustomizer(dependencies)
@@ -15,5 +16,6 @@ public sealed class TransportErpP2CombinedModelCustomizer(ModelCustomizerDepende
     {
         _foundation.Customize(modelBuilder, context);
         TransportErpP2FinanceModel.Configure(modelBuilder);
+        TransportErpP2ShippingModel.Configure(modelBuilder);
     }
 }
