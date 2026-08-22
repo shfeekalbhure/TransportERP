@@ -228,7 +228,7 @@ public static class Wave1FinancialReportsApiModule
 
     private static (int Skip, int Take) Paging(int page, int pageSize)
     {
-        if (page < 1 || pageSize is < 1 or > 500) throw new ArgumentException("INVALID_PAGING");
+        if (page < 1 || pageSize is < 1 or > 200) throw new ArgumentException("INVALID_PAGING");
         return ((page - 1) * pageSize, pageSize);
     }
 
