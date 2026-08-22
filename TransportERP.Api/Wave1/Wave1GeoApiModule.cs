@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using TransportERP.Contracts.Geo;
 using TransportERP.Infrastructure.Persistence;
@@ -20,7 +21,7 @@ public static class Wave1GeoApiModule
     private static void MapCountries(IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/v1/general/countries").RequireAuthorization("Authenticated");
-        g.MapGet("", (PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Countries, "GEN003.View", q, h, s, ct));
+        g.MapGet("", ([AsParameters] PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Countries, "GEN003.View", q, h, s, ct));
         g.MapGet("/{id:guid}", (Guid id, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadOne(Wave1GeoResource.Countries, "GEN003.View", id, h, s, ct));
         g.MapPost("", (CreateCountryRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Create(Wave1GeoResource.Countries, "GEN003.Create", r, h, s, ct));
         g.MapPut("/{id:guid}", (Guid id, UpdateCountryRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Update(Wave1GeoResource.Countries, "GEN003.Edit", id, r, h, s, ct));
@@ -30,7 +31,7 @@ public static class Wave1GeoApiModule
     private static void MapGovernorates(IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/v1/general/governorates").RequireAuthorization("Authenticated");
-        g.MapGet("", (PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Governorates, "GEN004.View", q, h, s, ct));
+        g.MapGet("", ([AsParameters] PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Governorates, "GEN004.View", q, h, s, ct));
         g.MapGet("/{id:guid}", (Guid id, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadOne(Wave1GeoResource.Governorates, "GEN004.View", id, h, s, ct));
         g.MapPost("", (CreateGovernorateRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Create(Wave1GeoResource.Governorates, "GEN004.Create", r, h, s, ct));
         g.MapPut("/{id:guid}", (Guid id, UpdateGovernorateRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Update(Wave1GeoResource.Governorates, "GEN004.Edit", id, r, h, s, ct));
@@ -40,7 +41,7 @@ public static class Wave1GeoApiModule
     private static void MapDirectorates(IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/v1/general/directorates").RequireAuthorization("Authenticated");
-        g.MapGet("", (PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Directorates, "GEN005.View", q, h, s, ct));
+        g.MapGet("", ([AsParameters] PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Directorates, "GEN005.View", q, h, s, ct));
         g.MapGet("/{id:guid}", (Guid id, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadOne(Wave1GeoResource.Directorates, "GEN005.View", id, h, s, ct));
         g.MapPost("", (CreateDirectorateRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Create(Wave1GeoResource.Directorates, "GEN005.Create", r, h, s, ct));
         g.MapPut("/{id:guid}", (Guid id, UpdateDirectorateRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Update(Wave1GeoResource.Directorates, "GEN005.Edit", id, r, h, s, ct));
@@ -50,7 +51,7 @@ public static class Wave1GeoApiModule
     private static void MapCities(IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/v1/general/cities").RequireAuthorization("Authenticated");
-        g.MapGet("", (PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Cities, "GEN006.View", q, h, s, ct));
+        g.MapGet("", ([AsParameters] PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Cities, "GEN006.View", q, h, s, ct));
         g.MapGet("/{id:guid}", (Guid id, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadOne(Wave1GeoResource.Cities, "GEN006.View", id, h, s, ct));
         g.MapPost("", (CreateCityRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Create(Wave1GeoResource.Cities, "GEN006.Create", r, h, s, ct));
         g.MapPut("/{id:guid}", (Guid id, UpdateCityRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Update(Wave1GeoResource.Cities, "GEN006.Edit", id, r, h, s, ct));
@@ -60,7 +61,7 @@ public static class Wave1GeoApiModule
     private static void MapAreas(IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/v1/general/areas").RequireAuthorization("Authenticated");
-        g.MapGet("", (PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Areas, "GEN007.View", q, h, s, ct));
+        g.MapGet("", ([AsParameters] PagedQueryRequest q, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadList(Wave1GeoResource.Areas, "GEN007.View", q, h, s, ct));
         g.MapGet("/{id:guid}", (Guid id, HttpContext h, Wave1GeoService s, CancellationToken ct) => ReadOne(Wave1GeoResource.Areas, "GEN007.View", id, h, s, ct));
         g.MapPost("", (CreateAreaRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Create(Wave1GeoResource.Areas, "GEN007.Create", r, h, s, ct));
         g.MapPut("/{id:guid}", (Guid id, UpdateAreaRequest r, HttpContext h, Wave1GeoService s, CancellationToken ct) => Update(Wave1GeoResource.Areas, "GEN007.Edit", id, r, h, s, ct));
