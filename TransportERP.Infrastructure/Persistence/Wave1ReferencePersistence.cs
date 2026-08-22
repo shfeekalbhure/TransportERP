@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage;
 using TransportERP.Contracts.Core;
@@ -161,8 +162,8 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
         ValidatePage(skip, take);
         var q = db.Languages.AsNoTracking().OrderBy(x => x.Code);
         var total = await q.CountAsync(ct);
-        var items = await q.Skip(skip).Take(take).Select(x => ToDto(x)).ToListAsync(ct);
-        return new(items, total, skip, take);
+        var raw = await q.Skip(skip).Take(take).ToListAsync(ct);
+        return new(raw.Select(ToDto).ToList(), total, skip, take);
     }
 
     public Task<LanguageDto> CreateLanguageAsync(OperationContext context, CreateLanguageRequest request, CancellationToken ct = default)
@@ -194,9 +195,12 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             var code = NormalizeCode(request.Code, 20);
             if (await db.Languages.AnyAsync(x => x.Id != id && x.Code == code, ct)) throw new ArgumentException("DUPLICATE_CODE");
             var before = JsonSerializer.Serialize(ToDto(entity));
-            entity.Code = code; entity.ArabicName = Required(request.ArabicName, 120);
-            entity.EnglishName = Optional(request.EnglishName, 120); entity.IsRtl = request.IsRtl;
-            entity.Version++; entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.Code = code;
+            entity.ArabicName = Required(request.ArabicName, 120);
+            entity.EnglishName = Optional(request.EnglishName, 120);
+            entity.IsRtl = request.IsRtl;
+            entity.Version++;
+            entity.UpdatedAt = DateTimeOffset.UtcNow;
             await AppendAuditAsync(context, "Language.Update", "Language", entity.Id, before, JsonSerializer.Serialize(ToDto(entity)), null, ct);
             await db.SaveChangesAsync(ct);
             return ToDto(entity);
@@ -211,7 +215,9 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             if (entity is null) return null;
             if (entity.Version != request.ExpectedVersion) throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
             var before = JsonSerializer.Serialize(ToDto(entity));
-            entity.IsActive = false; entity.Version++; entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.IsActive = false;
+            entity.Version++;
+            entity.UpdatedAt = DateTimeOffset.UtcNow;
             await AppendAuditAsync(context, "Language.Disable", "Language", entity.Id, before, JsonSerializer.Serialize(ToDto(entity)), request.Reason, ct);
             await db.SaveChangesAsync(ct);
             return ToDto(entity);
@@ -221,7 +227,8 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
         => ExecuteRequiredAsync(async () =>
         {
             context.EnsureComplete();
-            if (!await db.Languages.AnyAsync(x => x.Id == languageId && x.IsActive, ct)) throw new ArgumentException("LANGUAGE_NOT_FOUND_OR_INACTIVE");
+            if (!await db.Languages.AnyAsync(x => x.Id == languageId && x.IsActive, ct))
+                throw new ArgumentException("LANGUAGE_NOT_FOUND_OR_INACTIVE");
             var key = Required(request.ResourceKey, 240);
             var text = Required(request.Text, int.MaxValue);
             var entity = await db.Translations.SingleOrDefaultAsync(x => x.LanguageId == languageId && x.ResourceKey == key, ct);
@@ -229,14 +236,22 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             string? before = null;
             if (entity is null)
             {
-                entity = new Wave1TranslationEntity { Id = Guid.NewGuid(), LanguageId = languageId, ResourceKey = key, Text = text, IsActive = true, Version = 1, CreatedAt = now, UpdatedAt = now };
+                entity = new Wave1TranslationEntity
+                {
+                    Id = Guid.NewGuid(), LanguageId = languageId, ResourceKey = key, Text = text,
+                    IsActive = true, Version = 1, CreatedAt = now, UpdatedAt = now
+                };
                 db.Translations.Add(entity);
             }
             else
             {
-                if (!request.ExpectedVersion.HasValue || entity.Version != request.ExpectedVersion.Value) throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
+                if (!request.ExpectedVersion.HasValue || entity.Version != request.ExpectedVersion.Value)
+                    throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
                 before = JsonSerializer.Serialize(ToDto(entity));
-                entity.Text = text; entity.IsActive = true; entity.Version++; entity.UpdatedAt = now;
+                entity.Text = text;
+                entity.IsActive = true;
+                entity.Version++;
+                entity.UpdatedAt = now;
             }
             await AppendAuditAsync(context, "Translation.Upsert", "Translation", entity.Id, before, JsonSerializer.Serialize(ToDto(entity)), null, ct);
             await db.SaveChangesAsync(ct);
@@ -248,16 +263,18 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
         ValidatePage(skip, take);
         var q = db.AccountClassifications.AsNoTracking().Where(x => x.CompanyId == companyId).OrderBy(x => x.Code);
         var total = await q.CountAsync(ct);
-        var items = await q.Skip(skip).Take(take).Select(x => ToDto(x)).ToListAsync(ct);
-        return new(items, total, skip, take);
+        var raw = await q.Skip(skip).Take(take).ToListAsync(ct);
+        return new(raw.Select(ToDto).ToList(), total, skip, take);
     }
 
     public Task<AccountClassificationDto> CreateClassificationAsync(OperationContext context, CreateAccountClassificationRequest request, CancellationToken ct = default)
         => ExecuteRequiredAsync(async () =>
         {
             context.EnsureComplete();
-            var code = NormalizeCode(request.Code, 60); var type = NormalizeAccountType(request.AccountType);
-            if (await db.AccountClassifications.AnyAsync(x => x.CompanyId == context.CompanyId && x.Code == code, ct)) throw new ArgumentException("DUPLICATE_CODE");
+            var code = NormalizeCode(request.Code, 60);
+            var type = NormalizeAccountType(request.AccountType);
+            if (await db.AccountClassifications.AnyAsync(x => x.CompanyId == context.CompanyId && x.Code == code, ct))
+                throw new ArgumentException("DUPLICATE_CODE");
             var now = DateTimeOffset.UtcNow;
             var entity = new Wave1AccountClassificationEntity
             {
@@ -267,7 +284,8 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             };
             db.AccountClassifications.Add(entity);
             await AppendAuditAsync(context, "AccountClassification.Create", "AccountClassification", entity.Id, null, JsonSerializer.Serialize(ToDto(entity)), null, ct);
-            await db.SaveChangesAsync(ct); return ToDto(entity);
+            await db.SaveChangesAsync(ct);
+            return ToDto(entity);
         }, ct);
 
     public Task<AccountClassificationDto?> UpdateClassificationAsync(OperationContext context, Guid id, UpdateAccountClassificationRequest request, CancellationToken ct = default)
@@ -278,12 +296,18 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             if (entity is null) return null;
             if (entity.Version != request.ExpectedVersion) throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
             var code = NormalizeCode(request.Code, 60);
-            if (await db.AccountClassifications.AnyAsync(x => x.Id != id && x.CompanyId == context.CompanyId && x.Code == code, ct)) throw new ArgumentException("DUPLICATE_CODE");
+            if (await db.AccountClassifications.AnyAsync(x => x.Id != id && x.CompanyId == context.CompanyId && x.Code == code, ct))
+                throw new ArgumentException("DUPLICATE_CODE");
             var before = JsonSerializer.Serialize(ToDto(entity));
-            entity.Code = code; entity.ArabicName = Required(request.ArabicName, 200); entity.EnglishName = Optional(request.EnglishName, 200);
-            entity.AccountType = NormalizeAccountType(request.AccountType); entity.Version++; entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.Code = code;
+            entity.ArabicName = Required(request.ArabicName, 200);
+            entity.EnglishName = Optional(request.EnglishName, 200);
+            entity.AccountType = NormalizeAccountType(request.AccountType);
+            entity.Version++;
+            entity.UpdatedAt = DateTimeOffset.UtcNow;
             await AppendAuditAsync(context, "AccountClassification.Update", "AccountClassification", entity.Id, before, JsonSerializer.Serialize(ToDto(entity)), null, ct);
-            await db.SaveChangesAsync(ct); return ToDto(entity);
+            await db.SaveChangesAsync(ct);
+            return ToDto(entity);
         }, ct);
 
     public Task<AccountClassificationDto?> DisableClassificationAsync(OperationContext context, Guid id, DisableReferenceRequest request, CancellationToken ct = default)
@@ -295,48 +319,96 @@ public sealed class Wave1ReferenceService(Wave1ReferenceDbContext db)
             if (entity is null) return null;
             if (entity.Version != request.ExpectedVersion) throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
             var before = JsonSerializer.Serialize(ToDto(entity));
-            entity.IsActive = false; entity.Version++; entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.IsActive = false;
+            entity.Version++;
+            entity.UpdatedAt = DateTimeOffset.UtcNow;
             await AppendAuditAsync(context, "AccountClassification.Disable", "AccountClassification", entity.Id, before, JsonSerializer.Serialize(ToDto(entity)), request.Reason, ct);
-            await db.SaveChangesAsync(ct); return ToDto(entity);
+            await db.SaveChangesAsync(ct);
+            return ToDto(entity);
         }, ct);
 
     private async Task<T?> ExecuteAsync<T>(Func<Task<T?>> action, CancellationToken ct)
     {
         await using var tx = await BeginTransactionIfSupportedAsync(ct);
-        try { var value = await action(); if (tx is not null) await tx.CommitAsync(ct); return value; }
-        catch { if (tx is not null) await tx.RollbackAsync(ct); throw; }
+        try
+        {
+            var value = await action();
+            if (tx is not null) await tx.CommitAsync(ct);
+            return value;
+        }
+        catch
+        {
+            if (tx is not null) await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 
     private async Task<T> ExecuteRequiredAsync<T>(Func<Task<T>> action, CancellationToken ct)
     {
         await using var tx = await BeginTransactionIfSupportedAsync(ct);
-        try { var value = await action(); if (tx is not null) await tx.CommitAsync(ct); return value; }
-        catch { if (tx is not null) await tx.RollbackAsync(ct); throw; }
+        try
+        {
+            var value = await action();
+            if (tx is not null) await tx.CommitAsync(ct);
+            return value;
+        }
+        catch
+        {
+            if (tx is not null) await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 
-    private Task<IDbContextTransaction?> BeginTransactionIfSupportedAsync(CancellationToken ct)
-        => db.Database.IsRelational() ? db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct).ContinueWith<IDbContextTransaction?>(x => x.Result, ct) : Task.FromResult<IDbContextTransaction?>(null);
+    private async Task<IDbContextTransaction?> BeginTransactionIfSupportedAsync(CancellationToken ct)
+    {
+        if (!db.Database.IsRelational()) return null;
+        return await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+    }
 
     private async Task AppendAuditAsync(OperationContext context, string action, string entityType, Guid entityId, string? before, string? after, string? reason, CancellationToken ct)
     {
         var previousHash = await db.AuditEvents.AsNoTracking()
             .Where(x => x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.DeviceId == null)
-            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id).Select(x => x.Hash).FirstOrDefaultAsync(ct);
+            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
+            .Select(x => x.Hash).FirstOrDefaultAsync(ct);
         var evt = new AuditEvent
         {
             Id = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow, ActorUserId = context.UserId,
             CompanyId = context.CompanyId, BranchId = context.BranchId, Action = action, Outcome = "SUCCESS",
             EntityType = entityType, EntityId = entityId, CorrelationId = context.CorrelationId,
-            BeforeJson = before, AfterJson = after, Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(), PreviousHash = previousHash
+            BeforeJson = before, AfterJson = after,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(), PreviousHash = previousHash
         };
-        evt.Hash = AuditEventService.ComputeHash(evt); db.AuditEvents.Add(evt);
+        evt.Hash = AuditEventService.ComputeHash(evt);
+        db.AuditEvents.Add(evt);
     }
 
-    private static void ValidatePage(int skip, int take) { if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take)); }
+    private static void ValidatePage(int skip, int take)
+    {
+        if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take));
+    }
+
     private static string NormalizeCode(string value, int max) => Required(value, max).ToUpperInvariant();
-    private static string Required(string value, int max) { if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("VALUE_REQUIRED"); var x = value.Trim(); if (x.Length > max) throw new ArgumentException("VALUE_TOO_LONG"); return x; }
-    private static string? Optional(string? value, int max) { if (string.IsNullOrWhiteSpace(value)) return null; var x = value.Trim(); if (x.Length > max) throw new ArgumentException("VALUE_TOO_LONG"); return x; }
-    private static string NormalizeAccountType(string value) { var x = Required(value, 20).ToUpperInvariant(); if (!AccountTypes.Contains(x)) throw new ArgumentException("INVALID_ACCOUNT_TYPE"); return x; }
+    private static string Required(string value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("VALUE_REQUIRED");
+        var x = value.Trim();
+        if (x.Length > max) throw new ArgumentException("VALUE_TOO_LONG");
+        return x;
+    }
+    private static string? Optional(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var x = value.Trim();
+        if (x.Length > max) throw new ArgumentException("VALUE_TOO_LONG");
+        return x;
+    }
+    private static string NormalizeAccountType(string value)
+    {
+        var x = Required(value, 20).ToUpperInvariant();
+        if (!AccountTypes.Contains(x)) throw new ArgumentException("INVALID_ACCOUNT_TYPE");
+        return x;
+    }
     private static LanguageDto ToDto(Wave1LanguageEntity x) => new(x.Id, x.Code, x.ArabicName, x.EnglishName, x.IsRtl, x.IsActive, x.Version);
     private static TranslationDto ToDto(Wave1TranslationEntity x) => new(x.Id, x.LanguageId, x.ResourceKey, x.Text, x.IsActive, x.Version);
     private static AccountClassificationDto ToDto(Wave1AccountClassificationEntity x) => new(x.Id, x.CompanyId, x.Code, x.ArabicName, x.EnglishName, x.AccountType, x.IsActive, x.Version);
@@ -349,30 +421,135 @@ public sealed class Wave1ReferenceAndOpenItems : Migration
     protected override void Up(MigrationBuilder m)
     {
         m.EnsureSchema("transport_erp");
-        m.CreateTable("languages", "transport_erp", columns: t => new
-        {
-            Id=t.Column<Guid>(), Code=t.Column<string>(maxLength:20), ArabicName=t.Column<string>(maxLength:120), EnglishName=t.Column<string>(maxLength:120, nullable:true), IsRtl=t.Column<bool>(), IsActive=t.Column<bool>(), Version=t.Column<long>(), CreatedAt=t.Column<DateTimeOffset>(), UpdatedAt=t.Column<DateTimeOffset>()
-        }, constraints: t => t.PrimaryKey("PK_languages", x => x.Id));
-        m.CreateIndex("IX_languages_Code", "transport_erp", "languages", "Code", unique:true);
-        m.CreateTable("translations", "transport_erp", columns: t => new
-        {
-            Id=t.Column<Guid>(), LanguageId=t.Column<Guid>(), ResourceKey=t.Column<string>(maxLength:240), Text=t.Column<string>(type:"text"), IsActive=t.Column<bool>(), Version=t.Column<long>(), CreatedAt=t.Column<DateTimeOffset>(), UpdatedAt=t.Column<DateTimeOffset>()
-        }, constraints: t => { t.PrimaryKey("PK_translations", x => x.Id); t.ForeignKey("FK_translations_languages_LanguageId", x => x.LanguageId, "transport_erp", "languages", "Id", onDelete:ReferentialAction.Restrict); });
-        m.CreateIndex("IX_translations_LanguageId_ResourceKey", "transport_erp", "translations", new[]{"LanguageId","ResourceKey"}, unique:true);
-        m.CreateTable("account_classifications", "transport_erp", columns: t => new
-        {
-            Id=t.Column<Guid>(), CompanyId=t.Column<Guid>(), Code=t.Column<string>(maxLength:60), ArabicName=t.Column<string>(maxLength:200), EnglishName=t.Column<string>(maxLength:200, nullable:true), AccountType=t.Column<string>(maxLength:20), IsActive=t.Column<bool>(), Version=t.Column<long>(), CreatedAt=t.Column<DateTimeOffset>(), UpdatedAt=t.Column<DateTimeOffset>()
-        }, constraints: t => t.PrimaryKey("PK_account_classifications", x => x.Id));
-        m.CreateIndex("IX_account_classifications_CompanyId_Code", "transport_erp", "account_classifications", new[]{"CompanyId","Code"}, unique:true);
-        m.CreateTable("accounting_open_items", "transport_erp", columns: t => new
-        {
-            Id=t.Column<Guid>(), CompanyId=t.Column<Guid>(), BranchId=t.Column<Guid>(), PartyId=t.Column<Guid>(), PartyCode=t.Column<string>(maxLength:80), PartyName=t.Column<string>(maxLength:250), Side=t.Column<string>(maxLength:20), SourceType=t.Column<string>(maxLength:80), SourceId=t.Column<Guid>(), DocumentNo=t.Column<string>(maxLength:80), DocumentDate=t.Column<DateTime>(), DueDate=t.Column<DateTime>(), CurrencyId=t.Column<Guid>(), OriginalAmount=t.Column<decimal>(type:"numeric(19,4)"), SettledAmount=t.Column<decimal>(type:"numeric(19,4)"), Status=t.Column<string>(maxLength:20), Version=t.Column<long>(), CreatedAt=t.Column<DateTimeOffset>(), UpdatedAt=t.Column<DateTimeOffset>()
-        }, constraints: t => t.PrimaryKey("PK_accounting_open_items", x => x.Id));
-        m.CreateIndex("IX_accounting_open_items_Source", "transport_erp", "accounting_open_items", new[]{"CompanyId","SourceType","SourceId","Side"}, unique:true);
-        m.CreateIndex("IX_accounting_open_items_Aging", "transport_erp", "accounting_open_items", new[]{"CompanyId","BranchId","Side","Status","DueDate"});
+
+        m.CreateTable(
+            name: "languages",
+            schema: "transport_erp",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                Code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                ArabicName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                EnglishName = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
+                IsRtl = table.Column<bool>(type: "boolean", nullable: false),
+                IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                Version = table.Column<long>(type: "bigint", nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+            },
+            constraints: table => table.PrimaryKey("PK_languages", x => x.Id));
+
+        m.CreateIndex(
+            name: "IX_languages_Code",
+            schema: "transport_erp",
+            table: "languages",
+            column: "Code",
+            unique: true);
+
+        m.CreateTable(
+            name: "translations",
+            schema: "transport_erp",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                LanguageId = table.Column<Guid>(type: "uuid", nullable: false),
+                ResourceKey = table.Column<string>(type: "character varying(240)", maxLength: 240, nullable: false),
+                Text = table.Column<string>(type: "text", nullable: false),
+                IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                Version = table.Column<long>(type: "bigint", nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_translations", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_translations_languages_LanguageId",
+                    column: x => x.LanguageId,
+                    principalSchema: "transport_erp",
+                    principalTable: "languages",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
+            });
+
+        m.CreateIndex(
+            name: "IX_translations_LanguageId_ResourceKey",
+            schema: "transport_erp",
+            table: "translations",
+            columns: new[] { "LanguageId", "ResourceKey" },
+            unique: true);
+
+        m.CreateTable(
+            name: "account_classifications",
+            schema: "transport_erp",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
+                Code = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
+                ArabicName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                EnglishName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                AccountType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                Version = table.Column<long>(type: "bigint", nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+            },
+            constraints: table => table.PrimaryKey("PK_account_classifications", x => x.Id));
+
+        m.CreateIndex(
+            name: "IX_account_classifications_CompanyId_Code",
+            schema: "transport_erp",
+            table: "account_classifications",
+            columns: new[] { "CompanyId", "Code" },
+            unique: true);
+
+        m.CreateTable(
+            name: "accounting_open_items",
+            schema: "transport_erp",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                CompanyId = table.Column<Guid>(type: "uuid", nullable: false),
+                BranchId = table.Column<Guid>(type: "uuid", nullable: false),
+                PartyId = table.Column<Guid>(type: "uuid", nullable: false),
+                PartyCode = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
+                PartyName = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: false),
+                Side = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                SourceType = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
+                SourceId = table.Column<Guid>(type: "uuid", nullable: false),
+                DocumentNo = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
+                DocumentDate = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
+                DueDate = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
+                CurrencyId = table.Column<Guid>(type: "uuid", nullable: false),
+                OriginalAmount = table.Column<decimal>(type: "numeric(19,4)", nullable: false),
+                SettledAmount = table.Column<decimal>(type: "numeric(19,4)", nullable: false),
+                Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                Version = table.Column<long>(type: "bigint", nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+                UpdatedAt = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+            },
+            constraints: table => table.PrimaryKey("PK_accounting_open_items", x => x.Id));
+
+        m.CreateIndex(
+            name: "IX_accounting_open_items_Source",
+            schema: "transport_erp",
+            table: "accounting_open_items",
+            columns: new[] { "CompanyId", "SourceType", "SourceId", "Side" },
+            unique: true);
+
+        m.CreateIndex(
+            name: "IX_accounting_open_items_Aging",
+            schema: "transport_erp",
+            table: "accounting_open_items",
+            columns: new[] { "CompanyId", "BranchId", "Side", "Status", "DueDate" });
     }
+
     protected override void Down(MigrationBuilder m)
     {
-        m.DropTable("accounting_open_items", "transport_erp"); m.DropTable("account_classifications", "transport_erp"); m.DropTable("translations", "transport_erp"); m.DropTable("languages", "transport_erp");
+        m.DropTable(name: "accounting_open_items", schema: "transport_erp");
+        m.DropTable(name: "account_classifications", schema: "transport_erp");
+        m.DropTable(name: "translations", schema: "transport_erp");
+        m.DropTable(name: "languages", schema: "transport_erp");
     }
 }
