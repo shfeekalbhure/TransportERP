@@ -83,12 +83,12 @@ public sealed class Wave1NumberingTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ProtectedActionAsync(
             context,
             sequence.Id,
-            new ProtectedNumberSequenceActionRequest(2, currentSequence.Version, "محاولة رجوع ممنوعة")));
+            new ProtectedNumberSequenceActionRequest(1, currentSequence.Version, "محاولة رجوع ممنوعة")));
 
         var advanced = await service.ProtectedActionAsync(
             context,
             sequence.Id,
-            new ProtectedNumberSequenceActionRequest(10, currentSequence.Version, "تقديم آمن للتسلسل"));
+            new ProtectedNumberSequenceActionRequest(9, currentSequence.Version, "تقديم آمن للتسلسل"));
         Assert.NotNull(advanced);
         Assert.Equal(10, advanced!.NextValue);
 
