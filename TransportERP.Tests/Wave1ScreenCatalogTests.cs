@@ -30,6 +30,22 @@ public sealed class Wave1ScreenCatalogTests
         Assert.True(screen.IsRtl);
     }
 
+    [Theory]
+    [InlineData("FIN-028", "ACC074")]
+    [InlineData("FIN-029", "ACC075")]
+    [InlineData("FIN-042", "ACC049")]
+    [InlineData("FIN-043", "ACC050")]
+    [InlineData("FIN-055", "ACC058")]
+    public void Report_permissions_match_exact_current_w2_binding(string screenId, string permissionPrefix)
+    {
+        var screen = Wave1ScreenCatalog.GetRequired(screenId);
+        Assert.All(screen.Actions, x => Assert.StartsWith(permissionPrefix + ".", x.Permission, StringComparison.Ordinal));
+        Assert.Contains(screen.Actions, x => x.Action == "ApplyFilters" && x.Permission == permissionPrefix + ".View");
+        Assert.Contains(screen.Actions, x => x.Action == "DrillDown" && x.Permission == permissionPrefix + ".DrillDown");
+        Assert.Contains(screen.Actions, x => x.Action == "Export" && x.Permission == permissionPrefix + ".Export");
+        Assert.Contains(screen.Actions, x => x.Action == "Print" && x.Permission == permissionPrefix + ".Print");
+    }
+
     [Fact]
     public void Toolbar_contract_never_exposes_close_action()
     {
