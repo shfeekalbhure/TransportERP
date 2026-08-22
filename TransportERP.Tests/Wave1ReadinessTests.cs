@@ -23,13 +23,20 @@ public sealed class Wave1ReadinessTests
     [Theory]
     [InlineData("GEN-003", "W1_PHYSICAL_PROMOTION")]
     [InlineData("GEN-013", "W1_W3_FIELD_SEMANTICS")]
-    [InlineData("GEN-014", "CONTRACT_CODE_PARITY")]
-    [InlineData("ACC-036", "W1_PHYSICAL_FIELD_MAPPING")]
-    [InlineData("ACC-050", "CASH_FLOW_SOURCE_RECONCILIATION")]
+    [InlineData("ACC-036", "W1_W2_ENTITY_DTO_RECONCILIATION")]
+    [InlineData("ACC-050", "OTS_W1_005_CASH_FLOW_CLASSIFICATION")]
     public void Known_blockers_are_explicit(string screenId, string gate)
     {
         var entry = Wave1ReadinessCatalog.GetRequired(screenId);
         Assert.Equal(Wave1ReadinessState.Hold, entry.State);
         Assert.Equal(gate, entry.Gate);
+    }
+
+    [Fact]
+    public void GEN014_is_implemented_but_still_requires_exact_sha_independent_review()
+    {
+        var entry = Wave1ReadinessCatalog.GetRequired("GEN-014");
+        Assert.Equal(Wave1ReadinessState.ImplementedReviewRequired, entry.State);
+        Assert.Equal("EXACT_SHA_INDEPENDENT_REVIEW", entry.Gate);
     }
 }
