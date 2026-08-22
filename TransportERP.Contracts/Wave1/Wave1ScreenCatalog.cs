@@ -60,8 +60,8 @@ public static class Wave1ScreenCatalog
             new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
             CrudBindings("ACC036", "/api/v1/accounting/account-classifications")),
 
-        Report("FIN-028", "أعمار الذمم المدينة", "ACC058", "/api/v1/accounting/reports/customer-aging"),
-        Report("FIN-029", "أعمار الذمم الدائنة", "ACC059", "/api/v1/accounting/reports/supplier-aging"),
+        Report("FIN-028", "أعمار الذمم المدينة", "ACC074", "/api/v1/accounting/reports/customer-aging"),
+        Report("FIN-029", "أعمار الذمم الدائنة", "ACC075", "/api/v1/accounting/reports/supplier-aging"),
         Report("FIN-042", "الميزانية العمومية", "ACC049", "/api/v1/accounting/reports/balance-sheet"),
         Report("FIN-043", "التدفقات النقدية", "ACC050", "/api/v1/accounting/reports/cash-flow"),
         Report("FIN-055", "ميزان المراجعة التفصيلي", "ACC058", "/api/v1/accounting/reports/detailed-trial-balance")
