@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TransportERP.Contracts.Core;
+using TransportERP.Contracts.Geo;
 using TransportERP.Contracts.Wave1;
 using TransportERP.Infrastructure.Persistence;
 
@@ -8,16 +9,39 @@ namespace TransportERP.Tests;
 public sealed class Wave1RemainingImplementationTests
 {
     [Fact]
-    public async Task Language_and_account_classification_masters_are_concurrency_safe_and_audited()
+    public async Task Language_master_matches_current_GEN014_contract_and_is_concurrency_safe_and_audited()
     {
         await using var db = CreateReferenceDb();
         var service = new Wave1ReferenceService(db);
         var ctx = Context();
 
-        var language = await service.CreateLanguageAsync(ctx, new CreateLanguageRequest("ar", "العربية", "Arabic", true));
-        Assert.Equal("AR", language.Code);
-        var translation = await service.UpsertTranslationAsync(ctx, language.Id, new UpsertTranslationRequest("Common.Save", "حفظ"));
-        Assert.Equal("حفظ", translation.Text);
+        var language = await service.CreateLanguageAsync(ctx, new CreateLanguageRequest("ar", "ar-YE", "rtl"));
+        Assert.Equal("ar", language.Code);
+        Assert.Equal("ar-YE", language.CultureCode);
+        Assert.Equal("RTL", language.Direction);
+        Assert.Equal("Active", language.Status);
+        Assert.Equal(1, language.Version);
+
+        var byId = await service.GetLanguageAsync(language.Id);
+        Assert.NotNull(byId);
+        Assert.Equal(language, byId);
+
+        var list = await service.ListLanguagesAsync(new LanguageQueryRequest(SearchText: "ar", Direction: "RTL", Page: 1, PageSize: 500));
+        Assert.Single(list.Items);
+        Assert.Equal(200, list.PageSize); // authoritative server cap
+
+        await Assert.ThrowsAsync<Wave1ReferenceRuleException>(() => service.CreateLanguageAsync(ctx, new CreateLanguageRequest("ar2", "ar-YE", "RTL")));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => service.UpdateLanguageAsync(ctx, language.Id, new UpdateLanguageRequest("ar", "ar-SA", "RTL", 99)));
+
+        var updated = await service.UpdateLanguageAsync(ctx, language.Id, new UpdateLanguageRequest("ar", "ar-SA", "RTL", language.Version));
+        Assert.NotNull(updated);
+        Assert.Equal(2, updated!.Version);
+        Assert.Equal("ar-SA", updated.CultureCode);
+
+        var disabled = await service.DisableLanguageAsync(ctx, language.Id, new DisableRequest(updated.Version, "retired locale"));
+        Assert.NotNull(disabled);
+        Assert.Equal("Stopped", disabled!.Status);
+        Assert.Equal(3, disabled.Version);
 
         var classification = await service.CreateClassificationAsync(ctx,
             new CreateAccountClassificationRequest("CASH", "نقدية", "Cash", "asset"));
@@ -27,7 +51,7 @@ public sealed class Wave1RemainingImplementationTests
             ctx, classification.Id,
             new UpdateAccountClassificationRequest("CASH", "نقدية", "Cash", "ASSET", classification.Version + 10)));
 
-        Assert.Equal(3, await db.AuditEvents.CountAsync());
+        Assert.Equal(4, await db.AuditEvents.CountAsync());
         Assert.All(await db.AuditEvents.OrderBy(x => x.OccurredAt).ToListAsync(), x => Assert.False(string.IsNullOrWhiteSpace(x.Hash)));
     }
 
