@@ -17,39 +17,59 @@ Legacy targets such as `SET-001`, `SET-002`, `SET-011`, `FIN-028`, and `FIN-055`
 
 | Screen | Current state | Proven basis | Remaining gate |
 |---|---|---|---|
-| GEN-003 | HOLD | W2/W3 specification exists, but W1 physical persistence does not authorize ISO2/ISO3/DialingCode. | `W1_PHYSICAL_PROMOTION`. Keep runtime/DDL withheld unless a current governing W1 physical promotion is issued. |
-| GEN-004 | IMPLEMENTED / REVIEW REQUIRED | Governorate implementation is present under the current geography hierarchy. | Exact-SHA runtime, negative/security and independent review evidence. |
-| GEN-005 | IMPLEMENTED / REVIEW REQUIRED | Directorate implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
-| GEN-006 | IMPLEMENTED / REVIEW REQUIRED | City implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
-| GEN-007 | IMPLEMENTED / REVIEW REQUIRED | Area implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
-| GEN-013 | HOLD | W1 NumberSequence persists CompanyId/BranchId/FiscalYearId/DocumentType/NextValue/ResetRule/format/IsActive/Version. | `W1_W3_FIELD_SEMANTICS`: Code/ArabicName/EnglishName/Notes are not proven persistent; Scope binding is unresolved; LastNumber must not be inferred from NextValue. Runtime and DI service exposure are withheld. |
-| GEN-014 | IMPLEMENTED / REVIEW REQUIRED | Current W1/W2 contract is implemented as Id/Code/CultureCode/Direction/IsActive/Version with List/Get/Create/Update/Disable only; translation/display-name persistence was removed. | Exact-final-SHA CI and independent review. |
-| ACC-036 | HOLD | Current W1 defines separate AccountGroup and AccountType entities; W2 route/DTO type names exist. | `W1_W2_ENTITY_DTO_RECONCILIATION`: exact field-level DTO schema/entity discrimination and physical implementation contract are NOT PROVEN. |
-| ACC-074 | HOLD | W1 source chain requires Customer/OpenItem/PaymentAllocation with authoritative joins. | `OPEN_ITEM_SOURCE_RECONCILIATION`: exact physical mapping and customer/source-document joins remain NOT PROVEN. |
-| ACC-075 | HOLD | W1 source chain requires Supplier/OpenItem/PaymentAllocation with authoritative joins. | Same `OPEN_ITEM_SOURCE_RECONCILIATION` gate as ACC-074. |
-| ACC-049 | HOLD | Balance sheet source-of-truth is posted JournalEntry/JournalLine/Account/AccountType. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA posted/reversal/branch/currency/drill-down/export evidence. |
-| ACC-050 | HOLD | W2 Query/Export/Print/DrillDown surfaces exist. | `OTS_W1_005_CASH_FLOW_CLASSIFICATION`: candidate/heuristic classification does not authorize implementation-ready closure. |
-| ACC-058 | HOLD | Detailed trial balance source-of-truth is posted JournalEntry/JournalLine/Account and W2 Query/DrillDown/Export/Print is exact. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA period/currency/reversal/scope/drill-down/export/print evidence. Runtime remains withheld while the gate is open. |
+| GEN-003 | HOLD | SRC-055 closes full logical/W2/W3 specification design only and explicitly grants no DDL/code/runtime authority. | `W1_PHYSICAL_PROMOTION` for ISO2/ISO3/DialingCode; runtime/DDL withheld. |
+| GEN-004 | IMPLEMENTED / REVIEW REQUIRED | Governorate implementation is present under the current geography hierarchy. | Exact-final-SHA independent review. |
+| GEN-005 | IMPLEMENTED / REVIEW REQUIRED | Directorate implementation is present. | Exact-final-SHA independent review. |
+| GEN-006 | IMPLEMENTED / REVIEW REQUIRED | City implementation is present. | Exact-final-SHA independent review. |
+| GEN-007 | IMPLEMENTED / REVIEW REQUIRED | Area implementation is present. | Exact-final-SHA independent review. |
+| GEN-013 | HOLD | Owner/business numbering semantics are partially resolved. | `W1_W3_FIELD_SEMANTICS`: NextValue→LastNumber supersession/migration and physical scope/FK/approval/concurrency evidence remain open; runtime and DI exposure withheld. |
+| GEN-014 | IMPLEMENTED / REVIEW REQUIRED | Current W1/W2 contract is Id/Code/CultureCode/Direction/IsActive/Version with exact List/Get/Create/Update/Disable runtime. | Exact-final-SHA independent review. |
+| ACC-036 | HOLD | W1 requires separate AccountGroup and AccountType. | `W1_W2_ENTITY_DTO_RECONCILIATION`: exact field-level DTO/entity discrimination and authorized physical implementation contract are NOT PROVEN. |
+| ACC-074 | HOLD | W1/W2 require authoritative OpenItem/PaymentAllocation and customer/source-document joins. | `OPEN_ITEM_SOURCE_RECONCILIATION` remains NOT PROVEN. |
+| ACC-075 | HOLD | W1/W2 require authoritative OpenItem/PaymentAllocation and supplier/source-document joins. | `OPEN_ITEM_SOURCE_RECONCILIATION` remains NOT PROVEN. |
+| ACC-049 | IMPLEMENTED / REVIEW REQUIRED | Dedicated runtime uses posted JournalEntry/JournalLine/Account data. Tests prove original+reversal semantics, branch/currency isolation, drill-down, export/print and cap=200. | Exact-final-SHA CI then independent review. |
+| ACC-050 | HOLD | Current implementation source still contains ReferenceType heuristic classification. | `OTS_W1_005_CASH_FLOW_CLASSIFICATION`; candidate/heuristic classification cannot authorize runtime. |
+| ACC-058 | IMPLEMENTED / REVIEW REQUIRED | Dedicated runtime uses posted JournalEntry/JournalLine/Account data. Tests prove opening/period/closing, original+reversal semantics, branch/currency isolation, drill-down, export/print and cap=200. | Exact-final-SHA CI then independent review. |
 
-## Runtime containment verified on this branch
+## Runtime containment / exposure
 
-1. `MapWave1ScreenCatalog` registers only non-HOLD WAVE-1 runtime surfaces.
+1. `MapWave1ScreenCatalog` exposes only non-HOLD runtime identities.
 2. GEN-003 is withheld inside geography registration.
-3. GEN-013 numbering routes are not registered and its DI service registration is removed while the HOLD remains.
-4. ACC-036 and WAVE-1 financial report routes are not registered; financial report DI service registration is removed while those HOLDs remain.
-5. Migration `20260822172500_Wave1HeldArtifactsCleanup` drops the non-governing `account_classifications` and `accounting_open_items` tables and refuses rollback recreation without new governing authority.
-6. Held WAVE-1 report modules `ACC-049`, `ACC-050`, `ACC-074`, `ACC-075`, and `ACC-058` enforce the authoritative server paging cap `PageSize <= 200`; this source correction does not promote any held report to READY.
+3. GEN-013 numbering routes and DI service are withheld.
+4. ACC-036 / ACC-050 / ACC-074 / ACC-075 routes and their held shared report DI service remain withheld.
+5. ACC-049 is exposed through the dedicated `Wave1BalanceSheetService` and exact W2 API module only.
+6. ACC-058 is exposed through the dedicated `Wave1DetailedTrialBalanceService` and exact W2 API module only.
+7. ACC-049/058 exact action bindings remain Query/View, DrillDown/DrillDown, Export/Export, Print/Print over POST routes defined by W2.
+8. All WAVE-1 report paging validators use authoritative `PageSize <= 200`.
+9. Cleanup migration `20260822172500_Wave1HeldArtifactsCleanup` continues to remove non-governing `account_classifications` and `accounting_open_items` physical tables without inventing replacement authority.
 
-## Structural corrections already applied
+## Accounting E2E reconciliation evidence
 
-1. WAVE-1 catalog uses the 13 Current Approved IDs, not composite target IDs.
-2. Report permission identities are exact: ACC074 / ACC075 / ACC049 / ACC050 / ACC058.
-3. UI aliases are not represented as duplicate W2 endpoint bindings.
-4. W3 visual definitions are bound to current V1.26/V1.3 and scoped approved decisions; historical/benchmark material is not promoted by name or date.
-5. `Wave1ReadinessCatalog` prevents silent READY claims while evidence-backed HOLD gates remain.
+For ACC-049 and ACC-058 the new exact tests establish:
+
+- source-of-truth is `Status == POSTED` journal entries/lines;
+- draft entries are ignored;
+- branch scope is isolated;
+- currency scope is isolated;
+- reversal is represented as a separate posted entry with `ReversalOfId` and inverse lines: the original remains in drill-down and the accounting effect nets correctly;
+- drill-down returns both original and reversal when in scope;
+- export and print payload generation is exercised;
+- server/service paging cap is 200;
+- `Wave1ReadinessCatalog` promotes only ACC-049/058 from HOLD to `IMPLEMENTED / REVIEW REQUIRED`; remaining authority gaps stay HOLD.
+
+## Remaining governing blockers
+
+1. `GEN-003 — W1_PHYSICAL_PROMOTION`
+2. `GEN-013 — W1_W3_FIELD_SEMANTICS`
+3. `ACC-036 — W1_W2_ENTITY_DTO_RECONCILIATION`
+4. `ACC-074 — OPEN_ITEM_SOURCE_RECONCILIATION`
+5. `ACC-075 — OPEN_ITEM_SOURCE_RECONCILIATION`
+6. `ACC-050 — OTS_W1_005_CASH_FLOW_CLASSIFICATION`
+
+These six blockers require governing authority/reconciliation that is not present in the Current source set. They must remain OPEN/HOLD/NOT PROVEN; no runtime promotion by inference is allowed.
 
 ## Hard gates
 
 `CI GREEN != SCREEN READY`.
 
-PR #58 must remain **Draft / NOT READY / DO NOT MERGE** while any `Wave1ReadinessCatalog` HOLD remains. READY/Merge requires blockers=0, required CI green on one exact final SHA, all review threads resolved, documentation snapshot updated, and an independent reviewer PASS on that same exact SHA.
+PR #58 remains **Draft / NOT READY / DO NOT MERGE** while any HOLD remains. Independent Review does not start until blockers=0. READY/Merge requires blockers=0, required CI green on one exact final SHA, all review threads resolved, documentation/traceability current, and independent reviewer PASS on that same exact SHA.
