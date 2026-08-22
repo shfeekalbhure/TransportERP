@@ -20,7 +20,12 @@ public static class Wave1ScreenCatalog
 {
     private static readonly IReadOnlyList<Wave1ScreenDefinition> Screens = new[]
     {
-        Master("GEN-003", "الدول", "GEN003", "/api/v1/general/countries"),
+        new Wave1ScreenDefinition(
+            "GEN-003", "الدول", "MasterData", "Standard", true,
+            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
+            CrudBindings("GEN003", "/api/v1/general/countries")
+                .Concat(new[] { new Wave1ActionBinding("Print", "GEN003.Print", "POST", "/api/v1/general/countries/print") })
+                .ToArray()),
         Master("GEN-004", "المناطق الإدارية/المحافظات", "GEN004", "/api/v1/general/governorates"),
         Master("GEN-005", "المديريات", "GEN005", "/api/v1/general/directorates"),
         Master("GEN-006", "المدن", "GEN006", "/api/v1/general/cities"),
@@ -64,16 +69,7 @@ public static class Wave1ScreenCatalog
             ["FIN-055"] = new[] { "ACC-058" }
         };
 
-    /// <summary>
-    /// The authoritative WAVE-1 implementation slice after P0 authority rebase.
-    /// These are Current Approved screen identities, not composite recovery/catalog targets.
-    /// </summary>
     public static IReadOnlyList<Wave1ScreenDefinition> All => Screens;
-
-    /// <summary>
-    /// Legacy R2/catalog target to Current Approved identity mappings. These aliases are
-    /// navigation/recovery mappings only and are never included in <see cref="All"/>.
-    /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> LegacyCatalogMappings => LegacyMappings;
 
     public static Wave1ScreenDefinition GetRequired(string screenId)
@@ -113,6 +109,7 @@ public static class Wave1ScreenCatalog
         => new[]
         {
             new Wave1ActionBinding("View", $"{permissionPrefix}.View", "GET", routeBase),
+            new Wave1ActionBinding("ViewDetails", $"{permissionPrefix}.View", "GET", $"{routeBase}/{{id}}"),
             new Wave1ActionBinding("New", $"{permissionPrefix}.Create", "POST", routeBase),
             new Wave1ActionBinding("Save", $"{permissionPrefix}.Create", "POST", routeBase),
             new Wave1ActionBinding("Edit", $"{permissionPrefix}.Edit", "PUT", $"{routeBase}/{{id}}"),
