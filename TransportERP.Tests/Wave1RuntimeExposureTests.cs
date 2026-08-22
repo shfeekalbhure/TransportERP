@@ -37,7 +37,7 @@ public sealed class Wave1RuntimeExposureTests
     public void Review_required_wave1_routes_remain_exposed_after_hold_containment()
     {
         using var factory = CreateFactory();
-        var routes = GetRoutes(factory);
+        var routes = GetRoutes(factory).Select(Normalize).ToArray();
 
         var requiredRoutes = new[]
         {
@@ -51,7 +51,7 @@ public sealed class Wave1RuntimeExposureTests
         };
 
         foreach (var required in requiredRoutes)
-            Assert.Contains(routes, route => string.Equals(route, required, StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(Normalize(required), routes, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -90,4 +90,7 @@ public sealed class Wave1RuntimeExposureTests
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(route => route, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+
+    private static string Normalize(string route)
+        => route.Length > 1 ? route.TrimEnd('/') : route;
 }
