@@ -34,9 +34,9 @@ public static class Wave1DetailedTrialBalanceApiModule
             if (!HasPermission(httpContext.User, "ACC058.Export")) return Forbidden("PERMISSION_DENIED", httpContext);
             if (!TryResolveScope(httpContext.User, request.BranchId, out var companyId, out var branchId)) return Forbidden("SCOPE_DENIED", httpContext);
             var report = await service.QueryAsync(companyId, branchId, request, cancellationToken);
-            var sb = new StringBuilder("AccountCode,AccountName,CurrencyId,Opening,Debit,Credit,Closing\n");
+            var sb = new StringBuilder("AccountCode,AccountName,OpeningDebit,OpeningCredit,PeriodDebit,PeriodCredit,ClosingDebit,ClosingCredit\n");
             foreach (var x in report.Items)
-                sb.AppendLine(string.Join(',', Csv(x.AccountCode), Csv(x.AccountNameAr), x.CurrencyId, N(x.OpeningBalance), N(x.PeriodDebit), N(x.PeriodCredit), N(x.ClosingBalance)));
+                sb.AppendLine(string.Join(',', Csv(x.AccountCode), Csv(x.AccountNameAr), N(x.OpeningDebit), N(x.OpeningCredit), N(x.PeriodDebit), N(x.PeriodCredit), N(x.ClosingDebit), N(x.ClosingCredit)));
             return Results.Ok(new ReportExportResponse("detailed-trial-balance.csv", "text/csv; charset=utf-8", sb.ToString()));
         });
 
@@ -45,8 +45,8 @@ public static class Wave1DetailedTrialBalanceApiModule
             if (!HasPermission(httpContext.User, "ACC058.Print")) return Forbidden("PERMISSION_DENIED", httpContext);
             if (!TryResolveScope(httpContext.User, request.BranchId, out var companyId, out var branchId)) return Forbidden("SCOPE_DENIED", httpContext);
             var report = await service.QueryAsync(companyId, branchId, request, cancellationToken);
-            var rows = string.Concat(report.Items.Select(x => $"<tr><td>{Html(x.AccountCode)}</td><td>{Html(x.AccountNameAr)}</td><td>{N(x.OpeningBalance)}</td><td>{N(x.PeriodDebit)}</td><td>{N(x.PeriodCredit)}</td><td>{N(x.ClosingBalance)}</td></tr>"));
-            var html = $"<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\"><title>ميزان المراجعة التفصيلي</title></head><body><h1>ميزان المراجعة التفصيلي</h1><table><thead><tr><th>الحساب</th><th>الاسم</th><th>افتتاحي</th><th>مدين</th><th>دائن</th><th>ختامي</th></tr></thead><tbody>{rows}</tbody></table></body></html>";
+            var rows = string.Concat(report.Items.Select(x => $"<tr><td>{Html(x.AccountCode)}</td><td>{Html(x.AccountNameAr)}</td><td>{N(x.OpeningDebit)}</td><td>{N(x.OpeningCredit)}</td><td>{N(x.PeriodDebit)}</td><td>{N(x.PeriodCredit)}</td><td>{N(x.ClosingDebit)}</td><td>{N(x.ClosingCredit)}</td></tr>"));
+            var html = $"<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\"><title>ميزان المراجعة التفصيلي</title></head><body><h1>ميزان المراجعة التفصيلي</h1><table><thead><tr><th>الحساب</th><th>الاسم</th><th>افتتاحي مدين</th><th>افتتاحي دائن</th><th>حركة مدين</th><th>حركة دائن</th><th>ختامي مدين</th><th>ختامي دائن</th></tr></thead><tbody>{rows}</tbody></table></body></html>";
             return Results.Ok(new ReportPrintResponse("ميزان المراجعة التفصيلي", "text/html; charset=utf-8", html));
         });
 
