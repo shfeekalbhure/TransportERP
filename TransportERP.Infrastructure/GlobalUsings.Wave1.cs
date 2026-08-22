@@ -1,1 +1,1 @@
-global using Microsoft.EntityFrameworkCore.Infrastructure;
+global using TransportERP.Contracts.Geo;
