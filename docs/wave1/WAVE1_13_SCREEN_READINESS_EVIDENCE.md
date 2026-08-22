@@ -29,7 +29,7 @@ Legacy targets such as `SET-001`, `SET-002`, `SET-011`, `FIN-028`, and `FIN-055`
 | ACC-075 | HOLD | W1 source chain requires Supplier/OpenItem/PaymentAllocation with authoritative joins. | Same `OPEN_ITEM_SOURCE_RECONCILIATION` gate as ACC-074. |
 | ACC-049 | HOLD | Balance sheet source-of-truth is posted JournalEntry/JournalLine/Account/AccountType. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA posted/reversal/branch/currency/drill-down/export evidence. |
 | ACC-050 | HOLD | W2 Query/Export/Print/DrillDown surfaces exist. | `OTS_W1_005_CASH_FLOW_CLASSIFICATION`: candidate/heuristic classification does not authorize implementation-ready closure. |
-| ACC-058 | HOLD | Detailed trial balance source-of-truth is posted JournalEntry/JournalLine/Account and W2 Query/DrillDown/Export/Print is exact. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA period/currency/reversal/scope/drill-down/export/print evidence. Report PageSize validation is aligned to the authoritative cap of 200, but runtime remains withheld while the gate is open. |
+| ACC-058 | HOLD | Detailed trial balance source-of-truth is posted JournalEntry/JournalLine/Account and W2 Query/DrillDown/Export/Print is exact. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA period/currency/reversal/scope/drill-down/export/print evidence. Runtime remains withheld while the gate is open. |
 
 ## Runtime containment verified on this branch
 
@@ -38,7 +38,7 @@ Legacy targets such as `SET-001`, `SET-002`, `SET-011`, `FIN-028`, and `FIN-055`
 3. GEN-013 numbering routes are not registered and its DI service registration is removed while the HOLD remains.
 4. ACC-036 and WAVE-1 financial report routes are not registered; financial report DI service registration is removed while those HOLDs remain.
 5. Migration `20260822172500_Wave1HeldArtifactsCleanup` drops the non-governing `account_classifications` and `accounting_open_items` tables and refuses rollback recreation without new governing authority.
-6. ACC-058 report paging validation uses the authoritative server cap `PageSize <= 200`; this correction does not promote ACC-058 from HOLD.
+6. Held WAVE-1 report modules `ACC-049`, `ACC-050`, `ACC-074`, `ACC-075`, and `ACC-058` enforce the authoritative server paging cap `PageSize <= 200`; this source correction does not promote any held report to READY.
 
 ## Structural corrections already applied
 
