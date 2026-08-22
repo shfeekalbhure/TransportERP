@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
@@ -51,6 +52,22 @@ public sealed class Wave1RuntimeExposureTests
 
         foreach (var required in requiredRoutes)
             Assert.Contains(routes, route => string.Equals(route, required, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Held_reference_services_and_entities_are_not_part_of_the_runtime_container_or_model()
+    {
+        using var factory = CreateFactory();
+        using var scope = factory.Services.CreateScope();
+
+        Assert.Null(scope.ServiceProvider.GetService<Wave1ReferenceService>());
+        Assert.Null(scope.ServiceProvider.GetService<Wave1FinancialReportService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1LanguageService>());
+
+        var db = scope.ServiceProvider.GetRequiredService<Wave1ReferenceDbContext>();
+        Assert.Null(db.Model.FindEntityType(typeof(Wave1AccountClassificationEntity)));
+        Assert.Null(db.Model.FindEntityType(typeof(Wave1AccountingOpenItemEntity)));
+        Assert.NotNull(db.Model.FindEntityType(typeof(Wave1LanguageEntity)));
     }
 
     private static WebApplicationFactory<Program> CreateFactory()

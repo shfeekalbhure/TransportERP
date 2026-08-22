@@ -13,21 +13,21 @@ public static class Wave1ReferenceApiModule
     {
         var languages = app.MapGroup("/api/v1/general/languages").RequireAuthorization("Authenticated");
 
-        languages.MapGet("", async ([AsParameters] LanguageQueryRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
+        languages.MapGet("", async ([AsParameters] LanguageQueryRequest request, HttpContext h, Wave1LanguageService service, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN014.View")) return Forbidden(h);
             try { return Results.Ok(await service.ListLanguagesAsync(request, ct)); }
             catch (Wave1ReferenceRuleException ex) { return Rule(ex, h); }
         });
 
-        languages.MapGet("/{id:guid}", async (Guid id, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
+        languages.MapGet("/{id:guid}", async (Guid id, HttpContext h, Wave1LanguageService service, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN014.View")) return Forbidden(h);
             var row = await service.GetLanguageAsync(id, ct);
             return row is null ? NotFound(h) : Results.Ok(row);
         });
 
-        languages.MapPost("", async (CreateLanguageRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
+        languages.MapPost("", async (CreateLanguageRequest request, HttpContext h, Wave1LanguageService service, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN014.Create")) return Forbidden(h);
             if (!TryContext(h, out var context)) return ScopeDenied(h);
@@ -35,7 +35,7 @@ public static class Wave1ReferenceApiModule
             catch (Wave1ReferenceRuleException ex) { return Rule(ex, h); }
         });
 
-        languages.MapPut("/{id:guid}", async (Guid id, UpdateLanguageRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
+        languages.MapPut("/{id:guid}", async (Guid id, UpdateLanguageRequest request, HttpContext h, Wave1LanguageService service, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN014.Edit")) return Forbidden(h);
             if (!TryContext(h, out var context)) return ScopeDenied(h);
@@ -48,7 +48,7 @@ public static class Wave1ReferenceApiModule
             catch (Wave1ReferenceRuleException ex) { return Rule(ex, h); }
         });
 
-        languages.MapPost("/{id:guid}/disable", async (Guid id, DisableRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
+        languages.MapPost("/{id:guid}/disable", async (Guid id, DisableRequest request, HttpContext h, Wave1LanguageService service, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN014.Disable")) return Forbidden(h);
             if (!TryContext(h, out var context)) return ScopeDenied(h);

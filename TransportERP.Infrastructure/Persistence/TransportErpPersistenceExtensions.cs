@@ -31,17 +31,23 @@ public static class TransportErpPersistenceExtensions
             }));
 
         services.AddDbContext<Wave1ReferenceDbContext>(options =>
+        {
             options.UseNpgsql(connectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(Wave1ReferenceDbContext).Assembly.FullName);
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1Reference", "transport_erp");
-            }));
+            });
+            options.ReplaceService<IModelCustomizer, Wave1ReferenceRuntimeModelCustomizer>();
+        });
 
         services.AddScoped<Wave1GeoService>();
-        services.AddScoped<Wave1ReferenceService>();
+        services.AddScoped<Wave1LanguageService>();
         services.AddScoped<Wave1BalanceSheetService>();
         services.AddScoped<Wave1DetailedTrialBalanceService>();
 
+        // Wave1ReferenceService is deliberately NOT registered: it contains historical/held
+        // ACC-036 behavior. Wave1FinancialReportService is also not registered because
+        // ACC-050/074/075 remain governing HOLDs.
         return services;
     }
 }
