@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Api.Wave1;
 using TransportERP.Api.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
@@ -71,6 +72,7 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapWave1ScreenCatalog();
 app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
