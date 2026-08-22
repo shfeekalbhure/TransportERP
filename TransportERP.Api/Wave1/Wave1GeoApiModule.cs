@@ -10,7 +10,6 @@ public static class Wave1GeoApiModule
 {
     public static IEndpointRouteBuilder MapWave1Geography(this IEndpointRouteBuilder app)
     {
-        MapCountries(app);
         MapGovernorates(app);
         MapDirectorates(app);
         MapCities(app);
