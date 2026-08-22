@@ -24,6 +24,8 @@ public static class Wave1ScreenApiModule
 
         app.MapWave1Geography();
         app.MapWave1Numbering();
+        app.MapWave1ReferenceMasters();
+        app.MapWave1FinancialReports();
         return app;
     }
 }
