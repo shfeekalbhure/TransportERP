@@ -61,47 +61,7 @@ public static class Wave1ReferenceApiModule
             catch (Wave1ReferenceRuleException ex) { return Rule(ex, h); }
         });
 
-        // ACC-036 remains HOLD until its field-level implementation contract is closed.
-        var classifications = app.MapGroup("/api/v1/accounting/account-classifications").RequireAuthorization("Authenticated");
-        classifications.MapGet("", async (int? skip, int? take, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
-        {
-            if (!HasPermission(h.User, "ACC036.View")) return Forbidden(h);
-            if (!TryContext(h, out var context)) return ScopeDenied(h);
-            try { return Results.Ok(await service.ListClassificationsAsync(context.CompanyId, skip ?? 0, take ?? 100, ct)); }
-            catch (ArgumentOutOfRangeException ex) { return Bad(ex.Message, h); }
-        });
-        classifications.MapPost("", async (CreateAccountClassificationRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
-        {
-            if (!HasPermission(h.User, "ACC036.Create")) return Forbidden(h);
-            if (!TryContext(h, out var context)) return ScopeDenied(h);
-            try { return Results.Ok(await service.CreateClassificationAsync(context, request, ct)); }
-            catch (ArgumentException ex) { return Unprocessable(ex.Message, h); }
-        });
-        classifications.MapPut("/{id:guid}", async (Guid id, UpdateAccountClassificationRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
-        {
-            if (!HasPermission(h.User, "ACC036.Edit")) return Forbidden(h);
-            if (!TryContext(h, out var context)) return ScopeDenied(h);
-            try
-            {
-                var row = await service.UpdateClassificationAsync(context, id, request, ct);
-                return row is null ? NotFound(h) : Results.Ok(row);
-            }
-            catch (DbUpdateConcurrencyException) { return ConcurrencyConflict(h); }
-            catch (ArgumentException ex) { return Unprocessable(ex.Message, h); }
-        });
-        classifications.MapPost("/{id:guid}/disable", async (Guid id, DisableReferenceRequest request, HttpContext h, Wave1ReferenceService service, CancellationToken ct) =>
-        {
-            if (!HasPermission(h.User, "ACC036.Disable")) return Forbidden(h);
-            if (!TryContext(h, out var context)) return ScopeDenied(h);
-            try
-            {
-                var row = await service.DisableClassificationAsync(context, id, request, ct);
-                return row is null ? NotFound(h) : Results.Ok(row);
-            }
-            catch (DbUpdateConcurrencyException) { return ConcurrencyConflict(h); }
-            catch (ArgumentException ex) { return Unprocessable(ex.Message, h); }
-        });
-
+        // ACC-036 is intentionally not registered while its exact entity/DTO field contract is HOLD.
         return app;
     }
 
@@ -129,6 +89,4 @@ public static class Wave1ReferenceApiModule
     private static IResult ScopeDenied(HttpContext h) => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = Correlation(h) }, statusCode: 403);
     private static IResult NotFound(HttpContext h) => Results.NotFound(new { ErrorCode = "NOT_FOUND", CorrelationId = Correlation(h) });
     private static IResult ConcurrencyConflict(HttpContext h) => Results.Conflict(new { ErrorCode = "CONCURRENCY_CONFLICT", CorrelationId = Correlation(h) });
-    private static IResult Bad(string message, HttpContext h) => Results.BadRequest(new { ErrorCode = "INVALID_FILTER", Message = message, CorrelationId = Correlation(h) });
-    private static IResult Unprocessable(string message, HttpContext h) => Results.UnprocessableEntity(new { ErrorCode = message, CorrelationId = Correlation(h) });
 }
