@@ -30,6 +30,7 @@ public static class TransportErpPersistenceExtensions
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1Geo", "transport_erp");
             }));
         services.AddScoped<Wave1GeoService>();
+        services.AddScoped<Wave1NumberingService>();
 
         return services;
     }
