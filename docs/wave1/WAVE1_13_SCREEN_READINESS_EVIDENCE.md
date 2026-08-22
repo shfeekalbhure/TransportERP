@@ -3,7 +3,9 @@
 **Branch:** `wave1-screen-readiness-20260822`  
 **Rule:** No guessing. A screen is not READY merely because code compiles or CI is green. Any unclosed authority, W1/W2/W3, accounting, visual, or exact-SHA evidence gap remains an explicit gate.
 
-## Authority baseline
+## Current authority freeze
+
+Current authority is **Current Approved References V1.26 + Unified Design V1.3 + P0 Authority Decision Record 2026-08-22**. The governing identity baseline is **57 Current Approved identities**; the 51 master catalog targets remain mapping/recovery/navigation targets and do not replace the 57 identities.
 
 WAVE-1 is governed by these 13 Current Approved identities:
 
@@ -15,30 +17,39 @@ Legacy targets such as `SET-001`, `SET-002`, `SET-011`, `FIN-028`, and `FIN-055`
 
 | Screen | Current state | Proven basis | Remaining gate |
 |---|---|---|---|
-| GEN-003 | HOLD | SRC-055 closes the full logical/W2/W3 specification and exact actions including Print. | Current W1 physical contract does not yet carry ISO2/ISO3/DialingCode. Do not promote candidate DB columns without controlled W1 physical approval. |
-| GEN-004 | IMPLEMENTED / REVIEW REQUIRED | SRC-056 closes Governorate as an independent MasterData/Standard screen; current geography hierarchy is Country→Governorate→Directorate→City→Area. | Exact-SHA runtime + independent review. |
-| GEN-005 | IMPLEMENTED / REVIEW REQUIRED | SRC-056 closes Directorate independently. | Exact-SHA runtime + independent review. |
-| GEN-006 | IMPLEMENTED / REVIEW REQUIRED | SRC-056 closes City independently. | Exact-SHA runtime + independent review. |
-| GEN-007 | IMPLEMENTED / REVIEW REQUIRED | SRC-056 closes Area independently. | Exact-SHA runtime + independent review. |
-| GEN-013 | HOLD | Current W2 lifecycle is View/Edit/Reserve/Commit/Cancel/Override. | Current W1 does not persist Code/ArabicName/EnglishName/Notes; Scope needs explicit binding; LastNumber must not be silently equated with NextValue. |
-| GEN-014 | HOLD | Current W1 physical fields are Id/Code/CultureCode/Direction/IsActive/Version and current W2 exposes List/Get/Create/Update/Disable only. | Existing branch implementation still uses ArabicName/EnglishName/IsRtl plus translation storage; Contract↔Code↔migration parity must be corrected before READY. |
-| ACC-036 | HOLD | Current W1 physical contract defines separate AccountGroup and AccountType entities; W2 exact endpoints are List/Get/Create/Update/Disable. | Existing branch merges both into one AccountClassification entity. Exact DTO field schema / entity discrimination must be proven before safe rewrite. |
-| ACC-074 | HOLD | W1 defines Customer/OpenItem/PaymentAllocation source chain and OpenItem physical schema. | Branch OpenItem schema differs materially from W1 physical fields and has no proven posting/allocation producer reconciliation. |
-| ACC-075 | HOLD | W1 defines Supplier/OpenItem/PaymentAllocation source chain and OpenItem physical schema. | Same OpenItem physical/source reconciliation gate as ACC-074. |
-| ACC-049 | HOLD | W1 source-of-truth is JournalEntry/JournalLine/Account/AccountType and reporting must be posted-only. | Exact-SHA end-to-end accounting reconciliation, period/currency/reversal and drill-down evidence. |
-| ACC-050 | BLOCKED | W2 routes/actions exist. | `OTS-W1-005 Cash Flow classification` remains gate-bound before ACC-050. Heuristic source classification cannot earn READY. |
-| ACC-058 | HOLD | W1 source-of-truth is JournalEntry/JournalLine/Account and W2 Query/DrillDown/Export/Print is exact. | Exact-SHA posted-only accounting reconciliation and drill-down/export/print evidence. |
+| GEN-003 | HOLD | W2/W3 specification exists, but W1 physical persistence does not authorize ISO2/ISO3/DialingCode. | `W1_PHYSICAL_PROMOTION`. Keep runtime/DDL withheld unless a current governing W1 physical promotion is issued. |
+| GEN-004 | IMPLEMENTED / REVIEW REQUIRED | Governorate implementation is present under the current geography hierarchy. | Exact-SHA runtime, negative/security and independent review evidence. |
+| GEN-005 | IMPLEMENTED / REVIEW REQUIRED | Directorate implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
+| GEN-006 | IMPLEMENTED / REVIEW REQUIRED | City implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
+| GEN-007 | IMPLEMENTED / REVIEW REQUIRED | Area implementation is present. | Exact-SHA runtime, negative/security and independent review evidence. |
+| GEN-013 | HOLD | W1 NumberSequence persists CompanyId/BranchId/FiscalYearId/DocumentType/NextValue/ResetRule/format/IsActive/Version. | `W1_W3_FIELD_SEMANTICS`: Code/ArabicName/EnglishName/Notes are not proven persistent; Scope binding is unresolved; LastNumber must not be inferred from NextValue. Runtime and DI service exposure are withheld. |
+| GEN-014 | IMPLEMENTED / REVIEW REQUIRED | Current W1/W2 contract is implemented as Id/Code/CultureCode/Direction/IsActive/Version with List/Get/Create/Update/Disable only; translation/display-name persistence was removed. | Exact-final-SHA CI and independent review. |
+| ACC-036 | HOLD | Current W1 defines separate AccountGroup and AccountType entities; W2 route/DTO type names exist. | `W1_W2_ENTITY_DTO_RECONCILIATION`: exact field-level DTO schema/entity discrimination and physical implementation contract are NOT PROVEN. |
+| ACC-074 | HOLD | W1 source chain requires Customer/OpenItem/PaymentAllocation with authoritative joins. | `OPEN_ITEM_SOURCE_RECONCILIATION`: exact physical mapping and customer/source-document joins remain NOT PROVEN. |
+| ACC-075 | HOLD | W1 source chain requires Supplier/OpenItem/PaymentAllocation with authoritative joins. | Same `OPEN_ITEM_SOURCE_RECONCILIATION` gate as ACC-074. |
+| ACC-049 | HOLD | Balance sheet source-of-truth is posted JournalEntry/JournalLine/Account/AccountType. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA posted/reversal/branch/currency/drill-down/export evidence. |
+| ACC-050 | HOLD | W2 Query/Export/Print/DrillDown surfaces exist. | `OTS_W1_005_CASH_FLOW_CLASSIFICATION`: candidate/heuristic classification does not authorize implementation-ready closure. |
+| ACC-058 | HOLD | Detailed trial balance source-of-truth is posted JournalEntry/JournalLine/Account and W2 Query/DrillDown/Export/Print is exact. | `ACCOUNTING_E2E_RECONCILIATION`: exact-SHA period/currency/reversal/scope/drill-down/export/print evidence. Report PageSize validation is aligned to the authoritative cap of 200, but runtime remains withheld while the gate is open. |
 
-## Verified structural corrections already applied on this branch
+## Runtime containment verified on this branch
 
-1. WAVE-1 catalog uses the 13 Current Approved IDs, not ten composite target IDs.
+1. `MapWave1ScreenCatalog` registers only non-HOLD WAVE-1 runtime surfaces.
+2. GEN-003 is withheld inside geography registration.
+3. GEN-013 numbering routes are not registered and its DI service registration is removed while the HOLD remains.
+4. ACC-036 and WAVE-1 financial report routes are not registered; financial report DI service registration is removed while those HOLDs remain.
+5. Migration `20260822172500_Wave1HeldArtifactsCleanup` drops the non-governing `account_classifications` and `accounting_open_items` tables and refuses rollback recreation without new governing authority.
+6. ACC-058 report paging validation uses the authoritative server cap `PageSize <= 200`; this correction does not promote ACC-058 from HOLD.
+
+## Structural corrections already applied
+
+1. WAVE-1 catalog uses the 13 Current Approved IDs, not composite target IDs.
 2. Report permission identities are exact: ACC074 / ACC075 / ACC049 / ACC050 / ACC058.
-3. UI aliases are no longer represented as duplicate W2 endpoint bindings in `Wave1ScreenCatalog`.
-4. W3 visual definitions are bound to current V1.25/V1.3 and scoped owner decisions; GEN-003/013/014 no longer inherit unissued fields from the prior generic shell.
+3. UI aliases are not represented as duplicate W2 endpoint bindings.
+4. W3 visual definitions are bound to current V1.26/V1.3 and scoped approved decisions; historical/benchmark material is not promoted by name or date.
 5. `Wave1ReadinessCatalog` prevents silent READY claims while evidence-backed HOLD gates remain.
 
-## Hard rule
+## Hard gates
 
 `CI GREEN != SCREEN READY`.
 
-Merge is prohibited while `Wave1ReadinessCatalog.HasMergeBlockers == true` or until an independent reviewer verifies every required closure on the same exact head SHA.
+PR #58 must remain **Draft / NOT READY / DO NOT MERGE** while any `Wave1ReadinessCatalog` HOLD remains. READY/Merge requires blockers=0, required CI green on one exact final SHA, all review threads resolved, documentation snapshot updated, and an independent reviewer PASS on that same exact SHA.
