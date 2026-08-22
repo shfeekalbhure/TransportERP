@@ -245,7 +245,7 @@ public sealed class Wave1FinancialReportService(
     }
 
     private static int Age(DateTime asOf, DateTime due) => (asOf - due.Date).Days;
-    private static void ValidatePage(int skip, int take) { if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take)); }
+    private static void ValidatePage(int skip, int take) { if (skip < 0 || take is < 1 or > 200) throw new ArgumentOutOfRangeException(nameof(take)); }
     private static string ClassifyActivity(string? referenceType)
     {
         var x = (referenceType ?? string.Empty).Trim().ToUpperInvariant();
