@@ -244,7 +244,7 @@ public sealed class Wave1FinancialReportService(
         return new AgingDrillDownResponse(rows, total, request.Skip, request.Take);
     }
 
-    private static int Age(DateTime asOf, DateTime due) => Math.Max(0, (asOf - due.Date).Days);
+    private static int Age(DateTime asOf, DateTime due) => (asOf - due.Date).Days;
     private static void ValidatePage(int skip, int take) { if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take)); }
     private static string ClassifyActivity(string? referenceType)
     {
