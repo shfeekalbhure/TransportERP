@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using TransportERP.Contracts.Wave1;
 
@@ -136,6 +138,21 @@ public sealed class Wave1DetailedTrialBalanceService(TransportErpDbContext db)
         return new DetailedTrialBalanceDrillDownResponse(page, total, request.Skip, request.Take);
     }
 
+    public static ReportExportResponse Export(DetailedTrialBalanceResponse report)
+    {
+        var sb = new StringBuilder("AccountCode,AccountName,OpeningDebit,OpeningCredit,PeriodDebit,PeriodCredit,ClosingDebit,ClosingCredit\n");
+        foreach (var x in report.Items)
+            sb.AppendLine(string.Join(',', Csv(x.AccountCode), Csv(x.AccountNameAr), Number(x.OpeningDebit), Number(x.OpeningCredit), Number(x.PeriodDebit), Number(x.PeriodCredit), Number(x.ClosingDebit), Number(x.ClosingCredit)));
+        return new ReportExportResponse("detailed-trial-balance.csv", "text/csv; charset=utf-8", sb.ToString());
+    }
+
+    public static ReportPrintResponse Print(DetailedTrialBalanceResponse report)
+    {
+        var rows = string.Concat(report.Items.Select(x => $"<tr><td>{Html(x.AccountCode)}</td><td>{Html(x.AccountNameAr)}</td><td>{Number(x.OpeningDebit)}</td><td>{Number(x.OpeningCredit)}</td><td>{Number(x.PeriodDebit)}</td><td>{Number(x.PeriodCredit)}</td><td>{Number(x.ClosingDebit)}</td><td>{Number(x.ClosingCredit)}</td></tr>"));
+        var html = $"<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\"><title>ميزان المراجعة التفصيلي</title></head><body><h1>ميزان المراجعة التفصيلي</h1><table><thead><tr><th>الحساب</th><th>الاسم</th><th>افتتاحي مدين</th><th>افتتاحي دائن</th><th>حركة مدين</th><th>حركة دائن</th><th>ختامي مدين</th><th>ختامي دائن</th></tr></thead><tbody>{rows}</tbody></table></body></html>";
+        return new ReportPrintResponse("ميزان المراجعة التفصيلي", "text/html; charset=utf-8", html);
+    }
+
     private static DetailedTrialBalanceRow BuildRow(
         Guid accountId,
         IReadOnlyDictionary<Guid, Aggregate> opening,
@@ -169,6 +186,10 @@ public sealed class Wave1DetailedTrialBalanceService(TransportErpDbContext db)
         if (skip < 0 || take is < 1 or > 200)
             throw new ArgumentOutOfRangeException(nameof(take), "Skip must be non-negative and Take must be between 1 and 200.");
     }
+
+    private static string Number(decimal value) => value.ToString("0.####", CultureInfo.InvariantCulture);
+    private static string Csv(string? value) => $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+    private static string Html(string? value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
 
     private sealed record Aggregate(Guid AccountId, string Code, string NameAr, decimal Debit, decimal Credit);
 }

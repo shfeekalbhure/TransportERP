@@ -27,7 +27,10 @@ public static class Wave1ScreenApiModule
         app.MapWave1Geography();
         // GEN-013 numbering is HOLD and intentionally not registered.
         app.MapWave1ReferenceMasters();
-        // ACC-036 and all WAVE-1 financial report routes are HOLD and intentionally not registered.
+        // ACC-036 / ACC-050 / ACC-074 / ACC-075 remain HOLD and are intentionally not registered.
+        // ACC-049 / ACC-058 are exposed only through dedicated report services after exact contract/E2E reconciliation.
+        app.MapWave1BalanceSheet();
+        app.MapWave1DetailedTrialBalance();
         return app;
     }
 }

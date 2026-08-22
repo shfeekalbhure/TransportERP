@@ -39,6 +39,8 @@ public static class TransportErpPersistenceExtensions
 
         services.AddScoped<Wave1GeoService>();
         services.AddScoped<Wave1ReferenceService>();
+        services.AddScoped<Wave1BalanceSheetService>();
+        services.AddScoped<Wave1DetailedTrialBalanceService>();
 
         return services;
     }
