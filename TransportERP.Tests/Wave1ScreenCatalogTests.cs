@@ -45,11 +45,43 @@ public sealed class Wave1ScreenCatalogTests
     public void Report_permissions_match_exact_current_w2_binding(string screenId, string permissionPrefix)
     {
         var screen = Wave1ScreenCatalog.GetRequired(screenId);
+        Assert.Equal(4, screen.Actions.Count);
         Assert.All(screen.Actions, x => Assert.StartsWith(permissionPrefix + ".", x.Permission, StringComparison.Ordinal));
-        Assert.Contains(screen.Actions, x => x.Action == "ApplyFilters" && x.Permission == permissionPrefix + ".View");
+        Assert.Contains(screen.Actions, x => x.Action == "Query" && x.Permission == permissionPrefix + ".View");
         Assert.Contains(screen.Actions, x => x.Action == "DrillDown" && x.Permission == permissionPrefix + ".DrillDown");
         Assert.Contains(screen.Actions, x => x.Action == "Export" && x.Permission == permissionPrefix + ".Export");
         Assert.Contains(screen.Actions, x => x.Action == "Print" && x.Permission == permissionPrefix + ".Print");
+    }
+
+    [Theory]
+    [InlineData("GEN-003", 6)]
+    [InlineData("GEN-004", 5)]
+    [InlineData("GEN-005", 5)]
+    [InlineData("GEN-006", 5)]
+    [InlineData("GEN-007", 5)]
+    [InlineData("GEN-014", 5)]
+    [InlineData("ACC-036", 5)]
+    public void Master_screen_action_count_matches_exact_current_w2(string screenId, int expected)
+        => Assert.Equal(expected, Wave1ScreenCatalog.GetRequired(screenId).Actions.Count);
+
+    [Fact]
+    public void Every_screen_has_one_binding_per_http_method_and_route()
+    {
+        foreach (var screen in Wave1ScreenCatalog.All)
+        {
+            var keys = screen.Actions
+                .Select(x => $"{x.HttpMethod.ToUpperInvariant()} {x.Route}")
+                .ToArray();
+            Assert.Equal(keys.Length, keys.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+    }
+
+    [Fact]
+    public void Catalog_does_not_expose_ui_aliases_as_w2_actions()
+    {
+        var aliases = new[] { "New", "Save", "Search", "Refresh", "ApplyFilters", "Activate/Disable" };
+        foreach (var action in Wave1ScreenCatalog.All.SelectMany(x => x.Actions))
+            Assert.DoesNotContain(action.Action, aliases, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -83,9 +115,8 @@ public sealed class Wave1ScreenCatalogTests
         Assert.Contains("Commit", actions);
         Assert.Contains("Cancel", actions);
         Assert.Contains("Override", actions);
-        Assert.DoesNotContain("New", actions);
-        Assert.DoesNotContain("Save", actions);
-        Assert.DoesNotContain("Activate/Disable", actions);
+        Assert.DoesNotContain("Create", actions);
+        Assert.DoesNotContain("Disable", actions);
     }
 
     [Theory]
@@ -97,13 +128,12 @@ public sealed class Wave1ScreenCatalogTests
     public void Report_screens_are_read_only_inquiry_surfaces(string screenId)
     {
         var actions = Wave1ScreenCatalog.GetRequired(screenId).Actions.Select(x => x.Action).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        Assert.Equal(5, actions.Count);
-        Assert.Contains("ApplyFilters", actions);
-        Assert.Contains("Refresh", actions);
+        Assert.Equal(4, actions.Count);
+        Assert.Contains("Query", actions);
         Assert.Contains("DrillDown", actions);
         Assert.Contains("Export", actions);
         Assert.Contains("Print", actions);
-        Assert.DoesNotContain("New", actions);
+        Assert.DoesNotContain("Create", actions);
         Assert.DoesNotContain("Edit", actions);
     }
 
