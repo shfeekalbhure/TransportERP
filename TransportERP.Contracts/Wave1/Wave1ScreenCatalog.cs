@@ -23,7 +23,7 @@ public static class Wave1ScreenCatalog
         new Wave1ScreenDefinition(
             "GEN-003", "الدول", "MasterData", "Standard", true,
             new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings("GEN003", "/api/v1/general/countries")
+            MasterBindings("GEN003", "/api/v1/general/countries")
                 .Concat(new[] { new Wave1ActionBinding("Print", "GEN003.Print", "POST", "/api/v1/general/countries/print") })
                 .ToArray()),
         Master("GEN-004", "المناطق الإدارية/المحافظات", "GEN004", "/api/v1/general/governorates"),
@@ -85,7 +85,7 @@ public static class Wave1ScreenCatalog
         => new(
             screenId, name, "MasterData", "Standard", true,
             new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings(permissionPrefix, routeBase));
+            MasterBindings(permissionPrefix, routeBase));
 
     private static Wave1ScreenDefinition Report(
         string screenId,
@@ -98,23 +98,19 @@ public static class Wave1ScreenCatalog
             new[] { "معايير التقرير", "النتائج", "الملخص والتفاصيل" },
             new[]
             {
-                new Wave1ActionBinding("ApplyFilters", $"{permissionPrefix}.View", "POST", $"{routeBase}/query"),
-                new Wave1ActionBinding("Refresh", $"{permissionPrefix}.View", "POST", $"{routeBase}/query"),
+                new Wave1ActionBinding("Query", $"{permissionPrefix}.View", "POST", $"{routeBase}/query"),
                 new Wave1ActionBinding("DrillDown", $"{permissionPrefix}.DrillDown", "POST", $"{routeBase}/drill-down"),
                 new Wave1ActionBinding("Export", $"{permissionPrefix}.Export", "POST", $"{routeBase}/export"),
                 new Wave1ActionBinding("Print", $"{permissionPrefix}.Print", "POST", $"{routeBase}/print")
             });
 
-    private static Wave1ActionBinding[] CrudBindings(string permissionPrefix, string routeBase)
+    private static Wave1ActionBinding[] MasterBindings(string permissionPrefix, string routeBase)
         => new[]
         {
             new Wave1ActionBinding("View", $"{permissionPrefix}.View", "GET", routeBase),
             new Wave1ActionBinding("ViewDetails", $"{permissionPrefix}.View", "GET", $"{routeBase}/{{id}}"),
-            new Wave1ActionBinding("New", $"{permissionPrefix}.Create", "POST", routeBase),
-            new Wave1ActionBinding("Save", $"{permissionPrefix}.Create", "POST", routeBase),
+            new Wave1ActionBinding("Create", $"{permissionPrefix}.Create", "POST", routeBase),
             new Wave1ActionBinding("Edit", $"{permissionPrefix}.Edit", "PUT", $"{routeBase}/{{id}}"),
-            new Wave1ActionBinding("Activate/Disable", $"{permissionPrefix}.Disable", "POST", $"{routeBase}/{{id}}/disable"),
-            new Wave1ActionBinding("Search", $"{permissionPrefix}.View", "GET", routeBase),
-            new Wave1ActionBinding("Refresh", $"{permissionPrefix}.View", "GET", routeBase)
+            new Wave1ActionBinding("Disable", $"{permissionPrefix}.Disable", "POST", $"{routeBase}/{{id}}/disable")
         };
 }
