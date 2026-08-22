@@ -6,21 +6,14 @@ namespace TransportERP.Infrastructure.Persistence;
 
 public static class TransportErpPersistenceExtensions
 {
-    public static IServiceCollection AddTransportErpPostgreSql(
-        this IServiceCollection services,
-        string connectionString)
+    public static IServiceCollection AddTransportErpPostgreSql(this IServiceCollection services, string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.AddDbContext<TransportErpDbContext>(options =>
         {
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp");
-            });
+            options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp"));
             options.ReplaceService<IModelCustomizer, TransportErpP2CombinedModelCustomizer>();
-            options.AddInterceptors(
-                new P2FinanceAppendOnlyInterceptor(),
-                new P2ShippingAppendOnlyInterceptor());
+            options.AddInterceptors(new P2FinanceAppendOnlyInterceptor(), new P2ShippingAppendOnlyInterceptor());
         });
 
         services.AddDbContext<Wave1GeoDbContext>(options =>
@@ -40,14 +33,41 @@ public static class TransportErpPersistenceExtensions
             options.ReplaceService<IModelCustomizer, Wave1ReferenceRuntimeModelCustomizer>();
         });
 
+        services.AddDbContext<Wave1CountryAuthorityDbContext>(options =>
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(Wave1CountryAuthorityDbContext).Assembly.FullName);
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1CountryAuthority", "transport_erp");
+            }));
+
+        services.AddDbContext<Wave1NumberingAuthorityDbContext>(options =>
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(Wave1NumberingAuthorityDbContext).Assembly.FullName);
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1NumberingAuthority", "transport_erp");
+            }));
+
+        services.AddDbContext<Wave1AccountingAuthorityDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(Wave1AccountingAuthorityDbContext).Assembly.FullName);
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory_Wave1AccountingAuthority", "transport_erp");
+            });
+            options.ReplaceService<IModelCustomizer, Wave1AccountingAuthorityModelCustomizer>();
+        });
+
         services.AddScoped<Wave1GeoService>();
         services.AddScoped<Wave1LanguageService>();
+        services.AddScoped<Wave1CountryAuthorityService>();
+        services.AddScoped<Wave1NumberingAuthorityService>();
+        services.AddScoped<Wave1AccountClassificationAuthorityService>();
+        services.AddScoped<Wave1AgingAuthorityService>();
+        services.AddScoped<Wave1CashFlowAuthorityService>();
         services.AddScoped<Wave1BalanceSheetService>();
         services.AddScoped<Wave1DetailedTrialBalanceService>();
 
-        // Wave1ReferenceService is deliberately NOT registered: it contains historical/held
-        // ACC-036 behavior. Wave1FinancialReportService is also not registered because
-        // ACC-050/074/075 remain governing HOLDs.
+        // Historical mixed services remain deliberately unregistered. Their code is retained for lineage only.
         return services;
     }
 }

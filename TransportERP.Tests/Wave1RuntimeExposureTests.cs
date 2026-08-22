@@ -13,61 +13,54 @@ public sealed class Wave1RuntimeExposureTests
     private const string SigningKey = "transport-erp-wave1-route-probe-signing-key-2026";
 
     [Fact]
-    public void Governing_hold_routes_are_absent_from_the_runtime_endpoint_table()
-    {
-        using var factory = CreateFactory();
-        var routes = GetRoutes(factory);
-
-        var blockedPrefixes = new[]
-        {
-            "/api/v1/general/countries",
-            "/api/v1/general/number-sequences",
-            "/api/v1/general/number-reservations",
-            "/api/v1/accounting/account-classifications",
-            "/api/v1/accounting/reports/customer-aging",
-            "/api/v1/accounting/reports/supplier-aging",
-            "/api/v1/accounting/reports/cash-flow"
-        };
-
-        foreach (var prefix in blockedPrefixes)
-            Assert.DoesNotContain(routes, route => route.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public void Review_required_wave1_routes_remain_exposed_after_hold_containment()
+    public void All_thirteen_owner_authorized_wave1_surfaces_are_registered()
     {
         using var factory = CreateFactory();
         var routes = GetRoutes(factory).Select(Normalize).ToArray();
-
-        var requiredRoutes = new[]
+        var required = new[]
         {
-            "/api/v1/general/governorates",
-            "/api/v1/general/directorates",
-            "/api/v1/general/cities",
-            "/api/v1/general/areas",
-            "/api/v1/general/languages",
-            "/api/v1/accounting/reports/balance-sheet/query",
+            "/api/v1/general/countries", "/api/v1/general/countries/print",
+            "/api/v1/general/governorates", "/api/v1/general/directorates", "/api/v1/general/cities", "/api/v1/general/areas",
+            "/api/v1/general/number-sequences", "/api/v1/general/number-reservations/{reservationId:guid}/commit",
+            "/api/v1/general/languages", "/api/v1/accounting/account-classifications",
+            "/api/v1/accounting/reports/customer-aging/query", "/api/v1/accounting/reports/supplier-aging/query",
+            "/api/v1/accounting/reports/balance-sheet/query", "/api/v1/accounting/reports/cash-flow/query",
             "/api/v1/accounting/reports/detailed-trial-balance/query"
         };
-
-        foreach (var required in requiredRoutes)
-            Assert.Contains(Normalize(required), routes, StringComparer.OrdinalIgnoreCase);
+        foreach (var route in required) Assert.Contains(Normalize(route), routes, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Held_reference_services_and_entities_are_not_part_of_the_runtime_container_or_model()
+    public void Authorized_services_are_registered_while_historical_mixed_services_remain_unregistered()
     {
-        using var factory = CreateFactory();
-        using var scope = factory.Services.CreateScope();
-
+        using var factory = CreateFactory(); using var scope = factory.Services.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1CountryAuthorityService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1NumberingAuthorityService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1AccountClassificationAuthorityService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1AgingAuthorityService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1CashFlowAuthorityService>());
+        Assert.NotNull(scope.ServiceProvider.GetService<Wave1LanguageService>());
         Assert.Null(scope.ServiceProvider.GetService<Wave1ReferenceService>());
         Assert.Null(scope.ServiceProvider.GetService<Wave1FinancialReportService>());
-        Assert.NotNull(scope.ServiceProvider.GetService<Wave1LanguageService>());
+        Assert.Null(scope.ServiceProvider.GetService<Wave1NumberingService>());
+    }
 
-        var db = scope.ServiceProvider.GetRequiredService<Wave1ReferenceDbContext>();
-        Assert.Null(db.Model.FindEntityType(typeof(Wave1AccountClassificationEntity)));
-        Assert.Null(db.Model.FindEntityType(typeof(Wave1AccountingOpenItemEntity)));
-        Assert.NotNull(db.Model.FindEntityType(typeof(Wave1LanguageEntity)));
+    [Fact]
+    public void Active_models_use_governing_entities_not_legacy_denormalized_hold_entities()
+    {
+        using var factory = CreateFactory(); using var scope = factory.Services.CreateScope();
+        var reference = scope.ServiceProvider.GetRequiredService<Wave1ReferenceDbContext>();
+        Assert.Null(reference.Model.FindEntityType(typeof(Wave1AccountClassificationEntity)));
+        Assert.Null(reference.Model.FindEntityType(typeof(Wave1AccountingOpenItemEntity)));
+        Assert.NotNull(reference.Model.FindEntityType(typeof(Wave1LanguageEntity)));
+
+        var accounting = scope.ServiceProvider.GetRequiredService<Wave1AccountingAuthorityDbContext>();
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(Wave1AccountGroupRecord)));
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(Wave1AccountTypeRecord)));
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(Wave1OpenItemRecord)));
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(Wave1PaymentAllocationRecord)));
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(Wave1CashFlowAccountMappingRecord)));
+        Assert.NotNull(accounting.Model.FindEntityType(typeof(AuditEvent)));
     }
 
     private static WebApplicationFactory<Program> CreateFactory()
@@ -80,17 +73,8 @@ public sealed class Wave1RuntimeExposureTests
         });
 
     private static string[] GetRoutes(WebApplicationFactory<Program> factory)
-        => factory.Services
-            .GetServices<EndpointDataSource>()
-            .SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>()
-            .Select(endpoint => endpoint.RoutePattern.RawText)
-            .Where(route => !string.IsNullOrWhiteSpace(route))
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(route => route, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static string Normalize(string route)
-        => route.Length > 1 ? route.TrimEnd('/') : route;
+        => factory.Services.GetServices<EndpointDataSource>().SelectMany(x => x.Endpoints).OfType<RouteEndpoint>()
+            .Select(x => x.RoutePattern.RawText).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
+    private static string Normalize(string route) => route.Length > 1 ? route.TrimEnd('/') : route;
 }
