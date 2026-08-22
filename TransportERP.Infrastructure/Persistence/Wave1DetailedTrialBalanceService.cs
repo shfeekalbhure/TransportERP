@@ -166,8 +166,8 @@ public sealed class Wave1DetailedTrialBalanceService(TransportErpDbContext db)
     {
         if (to.Date < from.Date)
             throw new ArgumentException("To date must be on or after From date.");
-        if (skip < 0 || take is < 1 or > 500)
-            throw new ArgumentOutOfRangeException(nameof(take), "Skip must be non-negative and Take must be between 1 and 500.");
+        if (skip < 0 || take is < 1 or > 200)
+            throw new ArgumentOutOfRangeException(nameof(take), "Skip must be non-negative and Take must be between 1 and 200.");
     }
 
     private sealed record Aggregate(Guid AccountId, string Code, string NameAr, decimal Debit, decimal Credit);
