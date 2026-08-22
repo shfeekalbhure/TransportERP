@@ -34,34 +34,57 @@ public sealed record Wave1VisualDefinition(
 
 public static class Wave1VisualCatalog
 {
-    private const string Rule = "TransportERP-native RTL W3 baseline derived from Current Approved References V1.25, Unified Design V1.3, scoped W3 and exact current W2.";
+    private const string Rule = "TransportERP-native Arabic RTL W3 definition bound only to Current Approved V1.25/V1.3 and scoped owner decisions SRC-055/SRC-056/SRC-057; no unissued field is inferred.";
 
     private static readonly IReadOnlyDictionary<string, Wave1VisualDefinition> Definitions =
         new Dictionary<string, Wave1VisualDefinition>(StringComparer.OrdinalIgnoreCase)
         {
-            ["GEN-003"] = GeoMaster("GEN-003", null, true),
-            ["GEN-004"] = GeoMaster("GEN-004", "الدولة", false, "Countries"),
-            ["GEN-005"] = GeoMaster("GEN-005", "المحافظة", false, "Governorates"),
-            ["GEN-006"] = GeoMaster("GEN-006", "المديرية", false, "Directorates"),
-            ["GEN-007"] = GeoMaster("GEN-007", "المدينة", false, "Cities"),
+            ["GEN-003"] = new(
+                "GEN-003", "MasterData",
+                new[]
+                {
+                    F("Code", "الرمز", Wave1VisualFieldKind.Text, true),
+                    F("ArabicName", "الاسم العربي", Wave1VisualFieldKind.Text, true),
+                    F("EnglishName", "الاسم الإنجليزي", Wave1VisualFieldKind.Text),
+                    F("NationalityName", "اسم الجنسية", Wave1VisualFieldKind.Text),
+                    F("Notes", "ملاحظات", Wave1VisualFieldKind.Multiline),
+                    F("ISO2", "ISO2", Wave1VisualFieldKind.Text, true),
+                    F("ISO3", "ISO3", Wave1VisualFieldKind.Text),
+                    F("DialingCode", "مفتاح الاتصال", Wave1VisualFieldKind.Text),
+                    F("Status", "الحالة", Wave1VisualFieldKind.Lookup, readOnly:true, lookup:"Active|Stopped"),
+                    F("Version", "الإصدار", Wave1VisualFieldKind.Number, readOnly:true)
+                },
+                new[]
+                {
+                    C("Code", "الرمز", 90), C("ArabicName", "الاسم العربي", 170), C("EnglishName", "الاسم الإنجليزي", 150),
+                    C("ISO2", "ISO2", 65), C("ISO3", "ISO3", 65), C("DialingCode", "مفتاح الاتصال", 95),
+                    C("Status", "الحالة", 85)
+                }, Array.Empty<string>(), Rule),
+
+            ["GEN-004"] = GeoMaster("GEN-004", "الدولة", "Countries"),
+            ["GEN-005"] = GeoMaster("GEN-005", "المحافظة", "Governorates"),
+            ["GEN-006"] = GeoMaster("GEN-006", "المديرية", "Directorates"),
+            ["GEN-007"] = GeoMaster("GEN-007", "المدينة", "Cities"),
 
             ["GEN-013"] = new(
                 "GEN-013", "Settings",
                 new[]
                 {
+                    F("Code", "الرمز", Wave1VisualFieldKind.Text, true),
+                    F("ArabicName", "الاسم العربي", Wave1VisualFieldKind.Text, true),
+                    F("EnglishName", "الاسم الإنجليزي", Wave1VisualFieldKind.Text),
+                    F("Status", "الحالة", Wave1VisualFieldKind.Lookup, readOnly:true, lookup:"Active|Stopped"),
+                    F("Notes", "ملاحظات", Wave1VisualFieldKind.Multiline),
+                    F("Scope", "النطاق", Wave1VisualFieldKind.Lookup, true, lookup:"NumberingScopes"),
                     F("DocumentType", "نوع المستند", Wave1VisualFieldKind.Lookup, true, lookup:"DocumentTypes"),
                     F("Prefix", "البادئة", Wave1VisualFieldKind.Text),
-                    F("ResetPolicy", "سياسة إعادة الترقيم", Wave1VisualFieldKind.Lookup, true, lookup:"ResetPolicies"),
-                    F("Status", "الحالة", Wave1VisualFieldKind.Lookup, true, lookup:"ACTIVE|INACTIVE"),
-                    F("NextValue", "الرقم التالي", Wave1VisualFieldKind.Number, readOnly:true),
-                    F("Version", "الإصدار", Wave1VisualFieldKind.Number, readOnly:true),
-                    F("IdempotencyKey", "مفتاح عدم التكرار", Wave1VisualFieldKind.Text),
-                    F("Reason", "السبب", Wave1VisualFieldKind.Multiline)
+                    F("LastNumber", "آخر رقم", Wave1VisualFieldKind.Number, readOnly:true),
+                    F("ResetPolicy", "سياسة إعادة الترقيم", Wave1VisualFieldKind.Lookup, true, lookup:"ResetPolicies")
                 },
                 new[]
                 {
-                    C("DocumentType", "نوع المستند", 150), C("Prefix", "البادئة", 90), C("ResetPolicy", "سياسة الإعادة", 130),
-                    C("NextValue", "التالي", 90), C("Status", "الحالة", 90), C("Version", "الإصدار", 70)
+                    C("Code", "الرمز", 90), C("DocumentType", "نوع المستند", 150), C("Scope", "النطاق", 110),
+                    C("Prefix", "البادئة", 90), C("LastNumber", "آخر رقم", 95), C("ResetPolicy", "سياسة الإعادة", 130), C("Status", "الحالة", 85)
                 }, new[] { "ActiveSequences", "Reserved", "Committed", "Cancelled" }, Rule),
 
             ["GEN-014"] = new(
@@ -69,18 +92,16 @@ public static class Wave1VisualCatalog
                 new[]
                 {
                     F("Code", "رمز اللغة", Wave1VisualFieldKind.Text, true),
-                    F("ArabicName", "الاسم العربي", Wave1VisualFieldKind.Text, true),
-                    F("EnglishName", "الاسم الإنجليزي", Wave1VisualFieldKind.Text),
-                    F("IsRtl", "من اليمين إلى اليسار", Wave1VisualFieldKind.Boolean),
-                    F("ResourceKey", "مفتاح الترجمة", Wave1VisualFieldKind.Text),
-                    F("TranslationText", "النص المترجم", Wave1VisualFieldKind.Multiline),
+                    F("CultureCode", "رمز الثقافة", Wave1VisualFieldKind.Text, true),
+                    F("Direction", "اتجاه الكتابة", Wave1VisualFieldKind.Lookup, true, lookup:"RTL|LTR"),
+                    F("Status", "الحالة", Wave1VisualFieldKind.Lookup, readOnly:true, lookup:"Active|Stopped"),
                     F("Version", "الإصدار", Wave1VisualFieldKind.Number, readOnly:true)
                 },
                 new[]
                 {
-                    C("Code", "الرمز", 80), C("ArabicName", "الاسم العربي", 160), C("EnglishName", "الاسم الإنجليزي", 160),
-                    C("IsRtl", "RTL", 60), C("TranslationCount", "عدد الترجمات", 100), C("IsActive", "الحالة", 80), C("Version", "الإصدار", 70)
-                }, new[] { "Languages", "Translations" }, Rule),
+                    C("Code", "الرمز", 90), C("CultureCode", "رمز الثقافة", 120), C("Direction", "الاتجاه", 90),
+                    C("Status", "الحالة", 85), C("Version", "الإصدار", 70)
+                }, Array.Empty<string>(), Rule),
 
             ["ACC-036"] = new(
                 "ACC-036", "MasterData",
@@ -159,31 +180,23 @@ public static class Wave1VisualCatalog
             ? value
             : throw new KeyNotFoundException($"No authoritative WAVE-1 visual definition for '{screenId}'.");
 
-    private static Wave1VisualDefinition GeoMaster(
-        string screenId,
-        string? parentLabel,
-        bool country,
-        string? lookup = null)
+    private static Wave1VisualDefinition GeoMaster(string screenId, string parentLabel, string lookup)
     {
-        var fields = new List<Wave1VisualField>();
-        if (parentLabel is not null)
-            fields.Add(F("ParentId", parentLabel, Wave1VisualFieldKind.Lookup, true, lookup: lookup));
-        fields.Add(F("Code", "الرمز", Wave1VisualFieldKind.Text, true));
-        fields.Add(F("ArabicName", "الاسم العربي", Wave1VisualFieldKind.Text, true));
-        fields.Add(F("EnglishName", "الاسم الإنجليزي", Wave1VisualFieldKind.Text));
-        if (country)
-            fields.Add(F("NationalityName", "اسم الجنسية", Wave1VisualFieldKind.Text));
-        fields.Add(F("IsActive", "نشط", Wave1VisualFieldKind.Boolean, readOnly:true));
-        fields.Add(F("Version", "الإصدار", Wave1VisualFieldKind.Number, readOnly:true));
-
-        var columns = new List<Wave1VisualColumn>
+        var fields = new[]
         {
-            C("Code", "الرمز", 90), C("ArabicName", "الاسم العربي", 180), C("EnglishName", "الاسم الإنجليزي", 160)
+            F("ParentId", parentLabel, Wave1VisualFieldKind.Lookup, true, lookup:lookup),
+            F("Code", "الرمز", Wave1VisualFieldKind.Text, true),
+            F("ArabicName", "الاسم العربي", Wave1VisualFieldKind.Text, true),
+            F("EnglishName", "الاسم الإنجليزي", Wave1VisualFieldKind.Text),
+            F("Status", "الحالة", Wave1VisualFieldKind.Lookup, readOnly:true, lookup:"Active|Stopped"),
+            F("Version", "الإصدار", Wave1VisualFieldKind.Number, readOnly:true)
         };
-        if (parentLabel is not null)
-            columns.Add(C("ParentName", parentLabel, 160));
-        columns.Add(C("IsActive", "الحالة", 80));
-        columns.Add(C("Version", "الإصدار", 70));
+
+        var columns = new[]
+        {
+            C("Code", "الرمز", 90), C("ArabicName", "الاسم العربي", 180), C("EnglishName", "الاسم الإنجليزي", 160),
+            C("ParentName", parentLabel, 160), C("Status", "الحالة", 85), C("Version", "الإصدار", 70)
+        };
         return new(screenId, "MasterData", fields, columns, Array.Empty<string>(), Rule);
     }
 
