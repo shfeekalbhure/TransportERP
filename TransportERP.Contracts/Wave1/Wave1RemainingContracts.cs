@@ -2,42 +2,44 @@ namespace TransportERP.Contracts.Wave1;
 
 public sealed record Wave1ReferencePage<T>(IReadOnlyList<T> Items, int Total, int Skip, int Take);
 
+// GEN-014 current governing contract: SRC-048/SRC-049/SRC-057.
+public sealed record LanguageQueryRequest(
+    string? SearchText = null,
+    string? Status = null,
+    string? Direction = null,
+    int Page = 1,
+    int PageSize = 100,
+    string? SortBy = null,
+    string? SortDirection = null);
+
 public sealed record LanguageDto(
     Guid Id,
     string Code,
-    string ArabicName,
-    string? EnglishName,
-    bool IsRtl,
-    bool IsActive,
-    long Version);
+    string CultureCode,
+    string Direction,
+    string Status,
+    int Version);
+
+public sealed record LanguageListItemDto(
+    Guid Id,
+    string Code,
+    string CultureCode,
+    string Direction,
+    string Status,
+    int Version);
 
 public sealed record CreateLanguageRequest(
     string Code,
-    string ArabicName,
-    string? EnglishName,
-    bool IsRtl = false);
+    string CultureCode,
+    string Direction);
 
 public sealed record UpdateLanguageRequest(
     string Code,
-    string ArabicName,
-    string? EnglishName,
-    bool IsRtl,
-    long ExpectedVersion);
+    string CultureCode,
+    string Direction,
+    int ExpectedVersion);
 
 public sealed record DisableReferenceRequest(long ExpectedVersion, string Reason);
-
-public sealed record TranslationDto(
-    Guid Id,
-    Guid LanguageId,
-    string ResourceKey,
-    string Text,
-    bool IsActive,
-    long Version);
-
-public sealed record UpsertTranslationRequest(
-    string ResourceKey,
-    string Text,
-    long? ExpectedVersion = null);
 
 public sealed record AccountClassificationDto(
     Guid Id,
