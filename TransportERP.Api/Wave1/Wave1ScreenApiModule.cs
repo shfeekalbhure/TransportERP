@@ -22,10 +22,12 @@ public static class Wave1ScreenApiModule
             }
         });
 
+        // Runtime registration is restricted to identities that are not in HOLD.
+        // GEN-003 is withheld inside MapWave1Geography; GEN-004..007 remain reviewable.
         app.MapWave1Geography();
-        app.MapWave1Numbering();
+        // GEN-013 numbering is HOLD and intentionally not registered.
         app.MapWave1ReferenceMasters();
-        app.MapWave1FinancialReports();
+        // ACC-036 and all WAVE-1 financial report routes are HOLD and intentionally not registered.
         return app;
     }
 }
