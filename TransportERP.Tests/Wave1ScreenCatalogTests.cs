@@ -5,23 +5,29 @@ namespace TransportERP.Tests;
 public sealed class Wave1ScreenCatalogTests
 {
     [Fact]
-    public void Catalog_contains_exactly_ten_unique_wave1_screens()
+    public void Catalog_contains_exactly_thirteen_unique_current_approved_wave1_screens()
     {
-        Assert.Equal(10, Wave1ScreenCatalog.All.Count);
-        Assert.Equal(10, Wave1ScreenCatalog.All.Select(x => x.ScreenId).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(13, Wave1ScreenCatalog.All.Count);
+        Assert.Equal(13, Wave1ScreenCatalog.All.Select(x => x.ScreenId).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(
+            Wave1ScreenCatalog.All.Select(x => x.ScreenId).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            Wave1VisualCatalog.All.Select(x => x.ScreenId).OrderBy(x => x, StringComparer.Ordinal).ToArray());
     }
 
     [Theory]
-    [InlineData("SET-001", "MasterData", "Standard")]
-    [InlineData("SET-002", "MasterData", "Standard")]
-    [InlineData("SET-011", "Settings", "NumberingControlled")]
-    [InlineData("SET-013", "MasterData", "Standard")]
-    [InlineData("FIN-003", "MasterData", "Standard")]
-    [InlineData("FIN-028", "ReportInquiry", "Aging")]
-    [InlineData("FIN-029", "ReportInquiry", "Aging")]
-    [InlineData("FIN-042", "ReportInquiry", "Report")]
-    [InlineData("FIN-043", "ReportInquiry", "Report")]
-    [InlineData("FIN-055", "ReportInquiry", "Report")]
+    [InlineData("GEN-003", "MasterData", "Standard")]
+    [InlineData("GEN-004", "MasterData", "Standard")]
+    [InlineData("GEN-005", "MasterData", "Standard")]
+    [InlineData("GEN-006", "MasterData", "Standard")]
+    [InlineData("GEN-007", "MasterData", "Standard")]
+    [InlineData("GEN-013", "Settings", "NumberingControlled")]
+    [InlineData("GEN-014", "MasterData", "Standard")]
+    [InlineData("ACC-036", "MasterData", "Standard")]
+    [InlineData("ACC-074", "ReportInquiry", "Aging")]
+    [InlineData("ACC-075", "ReportInquiry", "Aging")]
+    [InlineData("ACC-049", "ReportInquiry", "Report")]
+    [InlineData("ACC-050", "ReportInquiry", "Report")]
+    [InlineData("ACC-058", "ReportInquiry", "Report")]
     public void Profile_and_variant_are_governing(string screenId, string profile, string variant)
     {
         var screen = Wave1ScreenCatalog.GetRequired(screenId);
@@ -31,11 +37,11 @@ public sealed class Wave1ScreenCatalogTests
     }
 
     [Theory]
-    [InlineData("FIN-028", "ACC074")]
-    [InlineData("FIN-029", "ACC075")]
-    [InlineData("FIN-042", "ACC049")]
-    [InlineData("FIN-043", "ACC050")]
-    [InlineData("FIN-055", "ACC058")]
+    [InlineData("ACC-074", "ACC074")]
+    [InlineData("ACC-075", "ACC075")]
+    [InlineData("ACC-049", "ACC049")]
+    [InlineData("ACC-050", "ACC050")]
+    [InlineData("ACC-058", "ACC058")]
     public void Report_permissions_match_exact_current_w2_binding(string screenId, string permissionPrefix)
     {
         var screen = Wave1ScreenCatalog.GetRequired(screenId);
@@ -47,17 +53,32 @@ public sealed class Wave1ScreenCatalogTests
     }
 
     [Fact]
-    public void Toolbar_contract_never_exposes_close_action()
+    public void Legacy_catalog_targets_are_mapping_only_and_never_authoritative_screens()
     {
-        Assert.DoesNotContain(
-            Wave1ScreenCatalog.All.SelectMany(x => x.Actions),
-            x => string.Equals(x.Action, "Close", StringComparison.OrdinalIgnoreCase));
+        var authoritative = Wave1ScreenCatalog.All.Select(x => x.ScreenId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var alias in Wave1ScreenCatalog.LegacyCatalogMappings.Keys)
+            Assert.DoesNotContain(alias, authoritative);
+
+        Assert.Equal(new[] { "GEN-003", "GEN-004" }, Wave1ScreenCatalog.ResolveLegacyCatalogTarget("SET-001"));
+        Assert.Equal(new[] { "GEN-005", "GEN-006", "GEN-007" }, Wave1ScreenCatalog.ResolveLegacyCatalogTarget("SET-002"));
+        Assert.Equal(new[] { "GEN-013" }, Wave1ScreenCatalog.ResolveLegacyCatalogTarget("SET-011"));
+        Assert.Equal(new[] { "ACC-058" }, Wave1ScreenCatalog.ResolveLegacyCatalogTarget("FIN-055"));
+    }
+
+    [Fact]
+    public void Geography_current_identities_do_not_share_cross_screen_permissions()
+    {
+        Assert.All(Wave1ScreenCatalog.GetRequired("GEN-003").Actions, x => Assert.StartsWith("GEN003.", x.Permission));
+        Assert.All(Wave1ScreenCatalog.GetRequired("GEN-004").Actions, x => Assert.StartsWith("GEN004.", x.Permission));
+        Assert.All(Wave1ScreenCatalog.GetRequired("GEN-005").Actions, x => Assert.StartsWith("GEN005.", x.Permission));
+        Assert.All(Wave1ScreenCatalog.GetRequired("GEN-006").Actions, x => Assert.StartsWith("GEN006.", x.Permission));
+        Assert.All(Wave1ScreenCatalog.GetRequired("GEN-007").Actions, x => Assert.StartsWith("GEN007.", x.Permission));
     }
 
     [Fact]
     public void Numbering_uses_governing_lifecycle_not_generic_crud()
     {
-        var actions = Wave1ScreenCatalog.GetRequired("SET-011").Actions.Select(x => x.Action).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var actions = Wave1ScreenCatalog.GetRequired("GEN-013").Actions.Select(x => x.Action).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("Reserve", actions);
         Assert.Contains("Commit", actions);
         Assert.Contains("Cancel", actions);
@@ -68,11 +89,11 @@ public sealed class Wave1ScreenCatalogTests
     }
 
     [Theory]
-    [InlineData("FIN-028")]
-    [InlineData("FIN-029")]
-    [InlineData("FIN-042")]
-    [InlineData("FIN-043")]
-    [InlineData("FIN-055")]
+    [InlineData("ACC-074")]
+    [InlineData("ACC-075")]
+    [InlineData("ACC-049")]
+    [InlineData("ACC-050")]
+    [InlineData("ACC-058")]
     public void Report_screens_are_read_only_inquiry_surfaces(string screenId)
     {
         var actions = Wave1ScreenCatalog.GetRequired(screenId).Actions.Select(x => x.Action).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -98,6 +119,10 @@ public sealed class Wave1ScreenCatalogTests
     }
 
     [Fact]
-    public void Unknown_screen_is_rejected()
-        => Assert.Throws<KeyNotFoundException>(() => Wave1ScreenCatalog.GetRequired("UNKNOWN"));
+    public void Unknown_or_legacy_screen_is_rejected_by_authoritative_lookup()
+    {
+        Assert.Throws<KeyNotFoundException>(() => Wave1ScreenCatalog.GetRequired("UNKNOWN"));
+        Assert.Throws<KeyNotFoundException>(() => Wave1ScreenCatalog.GetRequired("SET-001"));
+        Assert.Throws<KeyNotFoundException>(() => Wave1VisualCatalog.GetRequired("FIN-055"));
+    }
 }
