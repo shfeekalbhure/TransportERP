@@ -20,25 +20,14 @@ public static class Wave1ScreenCatalog
 {
     private static readonly IReadOnlyList<Wave1ScreenDefinition> Screens = new[]
     {
-        new Wave1ScreenDefinition(
-            "SET-001", "الدول والمناطق الإدارية", "MasterData", "Standard", true,
-            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings("GEN003", "/api/v1/general/countries")
-                .Concat(CrudBindings("GEN004", "/api/v1/general/governorates"))
-                .DistinctBy(x => (x.Action, x.Permission, x.Route))
-                .ToArray()),
+        Master("GEN-003", "الدول", "GEN003", "/api/v1/general/countries"),
+        Master("GEN-004", "المناطق الإدارية/المحافظات", "GEN004", "/api/v1/general/governorates"),
+        Master("GEN-005", "المديريات", "GEN005", "/api/v1/general/directorates"),
+        Master("GEN-006", "المدن", "GEN006", "/api/v1/general/cities"),
+        Master("GEN-007", "الأحياء/المناطق", "GEN007", "/api/v1/general/areas"),
 
         new Wave1ScreenDefinition(
-            "SET-002", "المدن والمديريات/الأحياء", "MasterData", "Standard", true,
-            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings("GEN005", "/api/v1/general/directorates")
-                .Concat(CrudBindings("GEN006", "/api/v1/general/cities"))
-                .Concat(CrudBindings("GEN007", "/api/v1/general/areas"))
-                .DistinctBy(x => (x.Action, x.Permission, x.Route))
-                .ToArray()),
-
-        new Wave1ScreenDefinition(
-            "SET-011", "الترقيم والتسلسلات", "Settings", "NumberingControlled", true,
+            "GEN-013", "الترقيم العام", "Settings", "NumberingControlled", true,
             new[] { "سياسات الترقيم", "نطاقات الترقيم", "الاستثناءات والاعتماد", "سجل التخصيص" },
             new[]
             {
@@ -50,32 +39,66 @@ public static class Wave1ScreenCatalog
                 new Wave1ActionBinding("Override", "GEN013.Override", "POST", "/api/v1/general/number-sequences/{id}/protected-action")
             }),
 
-        new Wave1ScreenDefinition(
-            "SET-013", "اللغات والترجمة", "MasterData", "Standard", true,
-            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings("GEN014", "/api/v1/general/languages")),
+        Master("GEN-014", "اللغات", "GEN014", "/api/v1/general/languages"),
+        Master("ACC-036", "مجموعات/أنواع الحسابات", "ACC036", "/api/v1/accounting/account-classifications"),
 
-        new Wave1ScreenDefinition(
-            "FIN-003", "مجموعات/أنواع الحسابات", "MasterData", "Standard", true,
-            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
-            CrudBindings("ACC036", "/api/v1/accounting/account-classifications")),
-
-        Report("FIN-028", "أعمار الذمم المدينة", "ACC074", "/api/v1/accounting/reports/customer-aging"),
-        Report("FIN-029", "أعمار الذمم الدائنة", "ACC075", "/api/v1/accounting/reports/supplier-aging"),
-        Report("FIN-042", "الميزانية العمومية", "ACC049", "/api/v1/accounting/reports/balance-sheet"),
-        Report("FIN-043", "التدفقات النقدية", "ACC050", "/api/v1/accounting/reports/cash-flow"),
-        Report("FIN-055", "ميزان المراجعة التفصيلي", "ACC058", "/api/v1/accounting/reports/detailed-trial-balance")
+        Report("ACC-074", "أعمار الديون للعملاء", "ACC074", "/api/v1/accounting/reports/customer-aging", "Aging"),
+        Report("ACC-075", "أعمار الالتزامات للموردين", "ACC075", "/api/v1/accounting/reports/supplier-aging", "Aging"),
+        Report("ACC-049", "الميزانية العمومية", "ACC049", "/api/v1/accounting/reports/balance-sheet", "Report"),
+        Report("ACC-050", "التدفقات النقدية", "ACC050", "/api/v1/accounting/reports/cash-flow", "Report"),
+        Report("ACC-058", "ميزان المراجعة التفصيلي", "ACC058", "/api/v1/accounting/reports/detailed-trial-balance", "Report")
     };
 
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> LegacyMappings =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["SET-001"] = new[] { "GEN-003", "GEN-004" },
+            ["SET-002"] = new[] { "GEN-005", "GEN-006", "GEN-007" },
+            ["SET-011"] = new[] { "GEN-013" },
+            ["SET-013"] = new[] { "GEN-014" },
+            ["FIN-003"] = new[] { "ACC-036" },
+            ["FIN-028"] = new[] { "ACC-074" },
+            ["FIN-029"] = new[] { "ACC-075" },
+            ["FIN-042"] = new[] { "ACC-049" },
+            ["FIN-043"] = new[] { "ACC-050" },
+            ["FIN-055"] = new[] { "ACC-058" }
+        };
+
+    /// <summary>
+    /// The authoritative WAVE-1 implementation slice after P0 authority rebase.
+    /// These are Current Approved screen identities, not composite recovery/catalog targets.
+    /// </summary>
     public static IReadOnlyList<Wave1ScreenDefinition> All => Screens;
+
+    /// <summary>
+    /// Legacy R2/catalog target to Current Approved identity mappings. These aliases are
+    /// navigation/recovery mappings only and are never included in <see cref="All"/>.
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> LegacyCatalogMappings => LegacyMappings;
 
     public static Wave1ScreenDefinition GetRequired(string screenId)
         => Screens.FirstOrDefault(x => string.Equals(x.ScreenId, screenId, StringComparison.OrdinalIgnoreCase))
-           ?? throw new KeyNotFoundException($"Unknown WAVE-1 screen '{screenId}'.");
+           ?? throw new KeyNotFoundException($"Unknown authoritative WAVE-1 screen '{screenId}'.");
 
-    private static Wave1ScreenDefinition Report(string screenId, string name, string permissionPrefix, string routeBase)
+    public static IReadOnlyList<string> ResolveLegacyCatalogTarget(string legacyScreenId)
+        => LegacyMappings.TryGetValue(legacyScreenId, out var ids)
+            ? ids
+            : throw new KeyNotFoundException($"Unknown legacy WAVE-1 catalog target '{legacyScreenId}'.");
+
+    private static Wave1ScreenDefinition Master(string screenId, string name, string permissionPrefix, string routeBase)
         => new(
-            screenId, name, "ReportInquiry", screenId is "FIN-028" or "FIN-029" ? "Aging" : "Report", true,
+            screenId, name, "MasterData", "Standard", true,
+            new[] { "البيانات الرئيسية", "الاستخدام والربط", "التدقيق" },
+            CrudBindings(permissionPrefix, routeBase));
+
+    private static Wave1ScreenDefinition Report(
+        string screenId,
+        string name,
+        string permissionPrefix,
+        string routeBase,
+        string variant)
+        => new(
+            screenId, name, "ReportInquiry", variant, true,
             new[] { "معايير التقرير", "النتائج", "الملخص والتفاصيل" },
             new[]
             {
