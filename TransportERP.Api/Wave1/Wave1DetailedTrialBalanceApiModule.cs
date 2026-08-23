@@ -40,7 +40,7 @@ public static class Wave1DetailedTrialBalanceApiModule
             catch (ArgumentException ex) { return Bad(ex, httpContext); }
         });
 
-        group.MapPost("/export", async (ACC058ExportRequest request, HttpContext httpContext, Wave1DetailedTrialBalanceService service, CancellationToken cancellationToken) =>
+        group.MapPost("/export", async (ACC058ExportRequest request, HttpContext httpContext, Wave1DetailedTrialBalanceService service, Wave1DeliveryAuditWriter audit, CancellationToken cancellationToken) =>
         {
             if (!HasPermission(httpContext.User, "ACC058.Export")) return Forbidden("PERMISSION_DENIED", httpContext);
             if (!TryResolveScope(httpContext.User, request.BranchId, out var companyId, out var branchId)) return Forbidden("SCOPE_DENIED", httpContext);
@@ -50,6 +50,8 @@ public static class Wave1DetailedTrialBalanceApiModule
                 var report = await service.QueryAsync(companyId, branchId,
                     new DetailedTrialBalanceQueryRequest(request.From, request.To, branchId, request.CurrencyId, request.AccountId, request.FinancialDimensionId, paging.Skip, paging.Take), cancellationToken);
                 var export = Wave1DetailedTrialBalanceService.Export(report);
+                var correlation = GetCorrelationId(httpContext);
+                await audit.AppendSuccessAsync("ACC-058", "Export", request, AuditContext(httpContext, companyId, branchId, correlation), cancellationToken);
                 return Results.Ok(new ExportJobOrFileResponse(export.FileName, export.ContentType, export.Content));
             }
             catch (ArgumentException ex) { return Bad(ex, httpContext); }
@@ -97,6 +99,12 @@ public static class Wave1DetailedTrialBalanceApiModule
         branchId = requestedBranchId;
         return true;
     }
+
+    private static Wave1DeliveryAuditContext AuditContext(HttpContext context, Guid companyId, Guid? branchId, Guid correlation)
+        => new(TryActor(context.User), companyId, branchId, correlation, context.User.FindFirstValue("device_id"), context.Connection.RemoteIpAddress?.ToString());
+
+    private static Guid? TryActor(ClaimsPrincipal principal)
+        => Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var id) ? id : null;
 
     private static bool HasPermission(ClaimsPrincipal principal, string permission)
         => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role && string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
