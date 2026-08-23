@@ -91,7 +91,7 @@ public sealed class Wave1AgingAuthorityService(Wave1AccountingAuthorityDbContext
         var computed = new List<ComputedItem>();
         foreach (var item in openItems)
         {
-            var source = await ResolveSourceDocumentAsync(item.SourceDocumentType, item.SourceDocumentId, ct);
+            var source = await ResolveSourceDocumentAsync(companyId, branchId, item.SourceDocumentType, item.SourceDocumentId, ct);
             if (source.Date.Date > asOf.Date) continue;
             var outstanding = item.OriginalAmount - applied.GetValueOrDefault(item.Id);
             if (outstanding <= 0) continue;
@@ -131,28 +131,35 @@ public sealed class Wave1AgingAuthorityService(Wave1AccountingAuthorityDbContext
         return (computed, aggregates);
     }
 
-    private async Task<SourceDocument> ResolveSourceDocumentAsync(string type, Guid id, CancellationToken ct)
+    private async Task<SourceDocument> ResolveSourceDocumentAsync(Guid companyId, Guid? branchId, string type, Guid id, CancellationToken ct)
     {
         switch (type.Trim().ToUpperInvariant())
         {
             case "RECEIPT_VOUCHER":
             {
-                var x = await accounting.ReceiptVouchers.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.VoucherNo, x.VoucherDate }).SingleOrDefaultAsync(ct);
+                var x = await accounting.ReceiptVouchers.AsNoTracking()
+                    .Where(x => x.Id == id && x.CompanyId == companyId && (!branchId.HasValue || x.BranchId == branchId.Value))
+                    .Select(x => new { x.VoucherNo, x.VoucherDate }).SingleOrDefaultAsync(ct);
                 return x is null ? throw new InvalidOperationException("SOURCE_DOCUMENT_NOT_FOUND") : new(x.VoucherNo, x.VoucherDate);
             }
             case "PAYMENT_VOUCHER":
             {
-                var x = await accounting.PaymentVouchers.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.VoucherNo, x.VoucherDate }).SingleOrDefaultAsync(ct);
+                var x = await accounting.PaymentVouchers.AsNoTracking()
+                    .Where(x => x.Id == id && x.CompanyId == companyId && (!branchId.HasValue || x.BranchId == branchId.Value))
+                    .Select(x => new { x.VoucherNo, x.VoucherDate }).SingleOrDefaultAsync(ct);
                 return x is null ? throw new InvalidOperationException("SOURCE_DOCUMENT_NOT_FOUND") : new(x.VoucherNo, x.VoucherDate);
             }
             case "JOURNAL_ENTRY":
             {
-                var x = await accounting.JournalEntries.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.DocumentNo, x.EntryDate }).SingleOrDefaultAsync(ct);
+                var x = await accounting.JournalEntries.AsNoTracking()
+                    .Where(x => x.Id == id && x.CompanyId == companyId && (!branchId.HasValue || x.BranchId == branchId.Value))
+                    .Select(x => new { x.DocumentNo, x.EntryDate }).SingleOrDefaultAsync(ct);
                 return x is null ? throw new InvalidOperationException("SOURCE_DOCUMENT_NOT_FOUND") : new(x.DocumentNo, x.EntryDate);
             }
             case "WAYBILL":
             {
-                var x = await accounting.Set<WaybillEntity>().AsNoTracking().Where(x => x.Id == id)
+                var x = await accounting.Set<WaybillEntity>().AsNoTracking()
+                    .Where(x => x.Id == id && x.CompanyId == companyId && (!branchId.HasValue || x.BranchId == branchId.Value))
                     .Select(x => new { x.DraftNo, x.WaybillNo, x.WaybillDateTime }).SingleOrDefaultAsync(ct);
                 return x is null ? throw new InvalidOperationException("SOURCE_DOCUMENT_NOT_FOUND") : new(x.WaybillNo ?? x.DraftNo, x.WaybillDateTime.UtcDateTime);
             }
