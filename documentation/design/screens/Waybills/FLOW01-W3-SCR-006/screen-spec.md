@@ -2,27 +2,23 @@
 
 **Alias:** `WHS-003`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `FIELD_GRID`  
-**OwnerTeam:** `TEAM-D03`  
+**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**OwnerTeam:** `TEAM-D06`  
 **Batch:** `BATCH-01`
 
 ## Authority
 - Canonical identity: `CHG-20260818-FLOW01-W3-ID-002`.
 - W1: `CurrentCustodyOwner`, `CustodyHandoff`, `PackageHandlingEvent`.
 - W2: `F01.CustodyHandoff.Confirm`, `F01.HubHandling.Get`.
+- Permissions: `f01.custody.handoff.confirm`, `f01.hub.handling.view`.
 - Typed definition: `FLOW01-W3-SCR-006_TYPED_SCREENDEFINITION.md`.
 - Design test input: `TAE-F01-005` (issued; runtime PASS not claimed).
+- FIELD_GRID authority: `documentation/design/decisions/2026-08-24_BATCH-01_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`.
 
 ## ANALYSIS — TEAM-D01 PASS
 Purpose: confirm a custody handoff for one or more packages and display immutable handling history inside authorized scope.
 
-### Capabilities
-| Capability | Action | Permission | State rule |
-|---|---|---|---|
-| تأكيد انتقال الحيازة | `F01.CustodyHandoff.Confirm` | `f01.custody.handoff.confirm` | source/target + receipt confirmation |
-| عرض تعامل الطرد | `F01.HubHandling.Get` | `f01.hub.handling.view` | scoped read |
-
-### Fields
+Fields:
 - `packageRefs` — الطرود — LookupMulti / UUID Collection — required — one current owner.
 - `sourceCustodyRef` — الحيازة المصدر — Reference/read-only — server resolved.
 - `targetCustodyRef` — الحيازة المستهدفة — Lookup/Reference — required — allowed scope.
@@ -31,31 +27,50 @@ Purpose: confirm a custody handoff for one or more packages and display immutabl
 - `handlingHistory` — سجل التعامل — ReadGrid/Collection — immutable display.
 
 ## LAYOUT — TEAM-D02 PASS
-Current shared Transaction profile governs historical sizing shorthand:
+Shared `Transaction / HeaderLines` authority:
 - Header/MainData = `Content`.
 - Tabs/Workspace = `Fill`.
-- Handoff/History grid workspace = `Fill`.
-- Actions/Audit = shared CoreUI regions.
-- No LocalException; RTL/DPI/shared styling remain CoreUI-owned.
+- history/handoff grid workspace = `Fill`.
+- actions/audit/shared presenters = CoreUI.
+- tabs: `Handoff | Handling History | Audit`.
+- no LocalException or local sizing/style.
 
-Functional tabs retained: `Handoff | Handling History | Audit`.
+## FIELD_GRID — TEAM-D03 PASS
+`GridProfile=TransactionLines/Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true` as issued, `SelectionPolicy=SingleRow`. The history grid is immutable/read-only.
 
-## FIELD_GRID — TEAM-D03 IN PROGRESS
-Typed columns:
-`packageRef, sourceCustody, targetCustody, confirmedAt, receiver, reason, eventState`.
+| # | Key | Arabic Header | UI Type | Edit | Width policy |
+|---:|---|---|---|---|---|
+| 1 | `packageRef` | الطرد | Reference | ReadOnly | content/reference |
+| 2 | `sourceCustody` | الحيازة المصدر | Reference | ReadOnly | content/reference |
+| 3 | `targetCustody` | الحيازة المستهدفة | Reference | ReadOnly | content/reference |
+| 4 | `confirmedAt` | وقت التأكيد | Instant | ReadOnly | content datetime |
+| 5 | `receiver` | المستلم | Reference | ReadOnly | content/reference |
+| 6 | `reason` | السبب | String | ReadOnly | primary Fill |
+| 7 | `eventState` | حالة الحدث | Enum | ReadOnly | content state |
 
-Known rules:
-- `AutoGenerateColumns=false`.
-- paging is issued.
-- history is immutable.
-- custody source is server-resolved; client must not assert current owner.
+Input interaction remains in the issued header fields (`packageRefs`, `targetCustodyRef`, `receiptConfirmedBy`, `handoffReason`); the history grid does not become an edit surface.
 
-Required TEAM-D03 closure: explicit labels/types/read-only-edit rules/order/CoreUI width policy/selection policy and reference-editor presentation. Exact provider identifiers remain gated unless issued.
+## UX — TEAM-D04 PASS
+- source custody is displayed from the server and never asserted or recalculated by the client.
+- confirm is available only with issued permission/state, selected subjects/target, distinct receipt confirmation and nonempty reason.
+- while confirming, shared loading state prevents duplicate submit/conflicting mutation.
+- client does not change visible current custody until the successful server response is returned.
+- validation uses shared presenter; permission/scope denial leaks no hidden custody/package data.
+- handling history remains immutable; refresh reloads server-authoritative history.
+- no offline handoff/queue is exposed.
 
-## Non-inventions
-No local custody transition formula, API/DTO/permission, DDL, offline handoff, or hidden package relationship is created.
+## VISUAL — TEAM-D05 PASS
+- CoreUI Transaction visual tokens only: RTL, DPI, central typography/spacing, lookup/signature field states, shared grid/history rendering, validation/loading/error/audit.
+- no local colors, heights, fonts, widths or handoff-specific toolbar clone.
+
+## Acceptance criteria
+1. one current custody owner remains server authority.
+2. separate receiver confirmation is required by the issued contract.
+3. source custody is read-only/server resolved.
+4. history grid has seven explicit read-only columns and paging.
+5. no silent local custody transfer, API/DTO/Permission/DDL/offline invention.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`.
-- Current: `FIELD_GRID`.
-- Next after PASS: `TEAM-D04 / UX`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
+- Current: `INDEPENDENT_REVIEW`.
+- Reviewer: `TEAM-D06`.
