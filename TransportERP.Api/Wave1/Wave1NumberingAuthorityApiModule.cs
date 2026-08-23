@@ -34,7 +34,7 @@ public static class Wave1NumberingAuthorityApiModule
             catch (InvalidOperationException ex) { return Conflict(ex.Message, h); }
             catch (ArgumentException ex) { return Rule(ex.Message, h); }
         });
-        sequences.MapPost("/{id:guid}/protected-action", async (Guid id, ProtectedNumberSequenceActionRequest r, HttpContext h, Wave1NumberingAuthorityService s, CancellationToken ct) =>
+        sequences.MapPost("/{id:guid}/protected-action", async (Guid id, NumberingProtectedActionRequest r, HttpContext h, Wave1NumberingAuthorityService s, CancellationToken ct) =>
         {
             if (!HasPermission(h.User, "GEN013.Override")) return Forbidden(h);
             if (!TryContext(h, out var context)) return ScopeDenied(h);
