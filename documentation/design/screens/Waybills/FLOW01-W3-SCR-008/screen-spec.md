@@ -2,8 +2,8 @@
 
 **Alias:** `TRIP-002`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-01`
 
 ## Authority
@@ -62,11 +62,16 @@ Rules:
 - stale version uses shared conflict + Reload/Refresh, never silent overwrite.
 - after successful load, returned manifest state/resource replaces local values and pre-load editors become read-only when required.
 - no local dispatch/posting/accounting side effect is implied.
-- writes remain online-authoritative only.
+- all issued FLOW01 actions are online-only; no offline load/queue is exposed.
 
 ## VISUAL — TEAM-D05 PASS
 - shared Transaction CoreUI only: toolbar, tabs, line grid, semantic Required/ReadOnly/Error/Focus states, capacity status presentation, validation/loading/error/audit, RTL and DPI.
 - no local capacity colors/formulas, raw styling, fixed pixel sizes or custom grid rendering.
+
+## Independent review — TEAM-D06 PASS
+- Review artifact: `documentation/design/batches/BATCH-01_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Open design findings: `0`.
+- Runtime test `TAE-F01-007`: issued, not run.
 
 ## Acceptance criteria
 1. manifest actions remain permission/state bound exactly as issued.
@@ -76,6 +81,5 @@ Rules:
 5. no invented API/DTO/Permission/DDL/posting/offline behavior.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
-- Current: `INDEPENDENT_REVIEW`.
-- Reviewer: `TEAM-D06`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.
+- Final: `DESIGN_APPROVED`.
