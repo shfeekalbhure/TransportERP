@@ -66,6 +66,7 @@ public static class TransportErpPersistenceExtensions
         services.AddScoped<Wave1CashFlowAuthorityService>();
         services.AddScoped<Wave1BalanceSheetService>();
         services.AddScoped<Wave1DetailedTrialBalanceService>();
+        services.AddScoped<Wave1DeliveryAuditWriter>();
 
         // Historical mixed services remain deliberately unregistered. Their code is retained for lineage only.
         return services;
