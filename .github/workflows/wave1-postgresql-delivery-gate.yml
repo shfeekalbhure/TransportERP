@@ -1,0 +1,60 @@
+name: WAVE1 PostgreSQL delivery gate
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wave1-postgresql-upgrade:
+    if: github.event_name != 'pull_request' || github.head_ref == 'wave1-screen-readiness-20260822'
+    name: WAVE1 PostgreSQL 18 governed upgrade
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore tests
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Execute governed WAVE1 migration order on PostgreSQL 18
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: >-
+          dotnet test TransportERP.Tests/TransportERP.Tests.csproj
+          --configuration Debug
+          --no-build
+          --filter "FullyQualifiedName~Wave1PostgreSqlMigrationOrderTests"
+
+      - name: Record exact reviewed head
+        shell: bash
+        run: |
+          echo "WAVE1_POSTGRESQL_GATE_SHA=$(git rev-parse HEAD)"
+          git rev-parse HEAD
