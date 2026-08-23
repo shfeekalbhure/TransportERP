@@ -2,8 +2,8 @@
 
 **Alias:** `WHS-003`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-01`
 
 ## Authority
@@ -63,6 +63,11 @@ Input interaction remains in the issued header fields (`packageRefs`, `targetCus
 - CoreUI Transaction visual tokens only: RTL, DPI, central typography/spacing, lookup/signature field states, shared grid/history rendering, validation/loading/error/audit.
 - no local colors, heights, fonts, widths or handoff-specific toolbar clone.
 
+## Independent review — TEAM-D06 PASS
+- Review artifact: `documentation/design/batches/BATCH-01_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Open design findings: `0`.
+- Runtime test `TAE-F01-005`: issued, not run.
+
 ## Acceptance criteria
 1. one current custody owner remains server authority.
 2. separate receiver confirmation is required by the issued contract.
@@ -71,6 +76,5 @@ Input interaction remains in the issued header fields (`packageRefs`, `targetCus
 5. no silent local custody transfer, API/DTO/Permission/DDL/offline invention.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
-- Current: `INDEPENDENT_REVIEW`.
-- Reviewer: `TEAM-D06`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.
+- Final: `DESIGN_APPROVED`.
