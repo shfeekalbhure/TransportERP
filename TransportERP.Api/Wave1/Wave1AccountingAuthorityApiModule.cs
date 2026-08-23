@@ -55,7 +55,7 @@ public static class Wave1AccountingAuthorityApiModule
         var g = app.MapGroup("/api/v1/accounting/reports/customer-aging").RequireAuthorization("Authenticated");
         g.MapPost("/query", (ACC074QueryRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC074.View", r.BranchId, (c,b) => s.QueryCustomerAsync(c,b,r,ct)));
         g.MapPost("/drill-down", (ACC074DrillDownRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC074.DrillDown", r.BranchId, (c,b) => s.DrillCustomerAsync(c,b,r,ct)));
-        g.MapPost("/export", (ACC074ExportRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC074.Export", r.BranchId, (c,b) => s.ExportCustomerAsync(c,b,r,ct)));
+        g.MapPost("/export", (ACC074ExportRequest r, HttpContext h, Wave1AgingAuthorityService s, Wave1DeliveryAuditWriter a, CancellationToken ct) => Report(h, "ACC074.Export", r.BranchId, (c,b) => s.ExportCustomerAsync(c,b,r,ct), a, "ACC-074", r, ct));
         g.MapPost("/print", (ACC074PrintRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC074.Print", r.BranchId, (c,b) => s.PrintCustomerAsync(c,b,r,ct)));
     }
 
@@ -64,7 +64,7 @@ public static class Wave1AccountingAuthorityApiModule
         var g = app.MapGroup("/api/v1/accounting/reports/supplier-aging").RequireAuthorization("Authenticated");
         g.MapPost("/query", (ACC075QueryRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC075.View", r.BranchId, (c,b) => s.QuerySupplierAsync(c,b,r,ct)));
         g.MapPost("/drill-down", (ACC075DrillDownRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC075.DrillDown", r.BranchId, (c,b) => s.DrillSupplierAsync(c,b,r,ct)));
-        g.MapPost("/export", (ACC075ExportRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC075.Export", r.BranchId, (c,b) => s.ExportSupplierAsync(c,b,r,ct)));
+        g.MapPost("/export", (ACC075ExportRequest r, HttpContext h, Wave1AgingAuthorityService s, Wave1DeliveryAuditWriter a, CancellationToken ct) => Report(h, "ACC075.Export", r.BranchId, (c,b) => s.ExportSupplierAsync(c,b,r,ct), a, "ACC-075", r, ct));
         g.MapPost("/print", (ACC075PrintRequest r, HttpContext h, Wave1AgingAuthorityService s, CancellationToken ct) => Report(h, "ACC075.Print", r.BranchId, (c,b) => s.PrintSupplierAsync(c,b,r,ct)));
     }
 
@@ -73,15 +73,33 @@ public static class Wave1AccountingAuthorityApiModule
         var g = app.MapGroup("/api/v1/accounting/reports/cash-flow").RequireAuthorization("Authenticated");
         g.MapPost("/query", (ACC050QueryRequest r, HttpContext h, Wave1CashFlowAuthorityService s, CancellationToken ct) => Report(h, "ACC050.View", r.BranchId, (c,b) => s.QueryAsync(c,b,r,ct)));
         g.MapPost("/drill-down", (ACC050DrillDownRequest r, HttpContext h, Wave1CashFlowAuthorityService s, CancellationToken ct) => Report(h, "ACC050.DrillDown", r.BranchId, (c,b) => s.DrillAsync(c,b,r,ct)));
-        g.MapPost("/export", (ACC050ExportRequest r, HttpContext h, Wave1CashFlowAuthorityService s, CancellationToken ct) => Report(h, "ACC050.Export", r.BranchId, (c,b) => s.ExportAsync(c,b,r,ct)));
+        g.MapPost("/export", (ACC050ExportRequest r, HttpContext h, Wave1CashFlowAuthorityService s, Wave1DeliveryAuditWriter a, CancellationToken ct) => Report(h, "ACC050.Export", r.BranchId, (c,b) => s.ExportAsync(c,b,r,ct), a, "ACC-050", r, ct));
         g.MapPost("/print", (ACC050PrintRequest r, HttpContext h, Wave1CashFlowAuthorityService s, CancellationToken ct) => Report(h, "ACC050.Print", r.BranchId, (c,b) => s.PrintAsync(c,b,r,ct)));
     }
 
-    private static async Task<IResult> Report<T>(HttpContext h, string permission, Guid? requestedBranch, Func<Guid, Guid?, Task<T>> action)
+    private static async Task<IResult> Report<T>(
+        HttpContext h,
+        string permission,
+        Guid? requestedBranch,
+        Func<Guid, Guid?, Task<T>> action,
+        Wave1DeliveryAuditWriter? audit = null,
+        string? screenId = null,
+        object? filters = null,
+        CancellationToken ct = default)
     {
         if (!Has(h, permission)) return Denied(h);
         if (!ReportContext(h, requestedBranch, out var companyId, out var branchId)) return ScopeDenied(h);
-        try { return Results.Ok(await action(companyId, branchId)); }
+        try
+        {
+            var result = await action(companyId, branchId);
+            if (audit is not null)
+            {
+                var correlation = Correlation(h);
+                await audit.AppendSuccessAsync(screenId ?? throw new InvalidOperationException("AUDIT_SCREEN_REQUIRED"), "Export", filters ?? new { },
+                    DeliveryContext(h, companyId, branchId, correlation), ct);
+            }
+            return Results.Ok(result);
+        }
         catch (Exception ex) when (ex is ArgumentException or ArgumentOutOfRangeException or InvalidOperationException) { return Bad(ex.Message, h); }
     }
 
@@ -99,6 +117,8 @@ public static class Wave1AccountingAuthorityApiModule
         if (requestedBranch.HasValue && requestedBranch.Value != claimBranch.Value) return false;
         companyId = company.Value; branchId = requestedBranch ?? claimBranch.Value; return true;
     }
+    private static Wave1DeliveryAuditContext DeliveryContext(HttpContext h, Guid companyId, Guid? branchId, Guid correlation)
+        => new(GuidClaim(h.User, ClaimTypes.NameIdentifier) ?? GuidClaim(h.User, "sub"), companyId, branchId, correlation, h.User.FindFirstValue("device_id"), h.Connection.RemoteIpAddress?.ToString());
     private static Guid? GuidClaim(ClaimsPrincipal p, string type) => Guid.TryParse(p.FindFirstValue(type), out var v) ? v : null;
     private static bool Has(HttpContext h, string permission) => h.User.Claims.Any(x => (x.Type == "permission" || x.Type == ClaimTypes.Role) && string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
     private static Guid Correlation(HttpContext h) => Guid.TryParse(h.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var v) ? v : Guid.NewGuid();
