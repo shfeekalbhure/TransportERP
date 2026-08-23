@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations.Builders;
 
 namespace TransportERP.Infrastructure.Persistence;
@@ -12,11 +13,17 @@ internal static class Wave1MigrationBuilderCompatibilityExtensions
         Func<ColumnsBuilder, TColumns> columns,
         Action<CreateTableBuilder<TColumns>> constraints)
     {
-        var table = migrationBuilder.CreateTable(
+        var operationCount = migrationBuilder.Operations.Count;
+        migrationBuilder.CreateTable(
             name: name,
             columns: columns,
             schema: schema,
             constraints: constraints);
+
+        var tableOperation = migrationBuilder.Operations
+            .Skip(operationCount)
+            .OfType<CreateTableOperation>()
+            .Single();
 
         // Earlier WAVE-1 hand-written migrations used the compact positional
         // ForeignKey(name, column, schema, table, column) form. EF Core's actual
@@ -24,7 +31,7 @@ internal static class Wave1MigrationBuilderCompatibilityExtensions
         // principalSchema), which produces malformed PostgreSQL such as
         // REFERENCES "Id".transport_erp (companies). Normalize only that exact
         // legacy signature; correctly constructed foreign keys are untouched.
-        foreach (var foreignKey in table.Operation.ForeignKeys)
+        foreach (var foreignKey in tableOperation.ForeignKeys)
         {
             if (!string.Equals(foreignKey.PrincipalTable, schema, StringComparison.Ordinal) ||
                 !string.Equals(foreignKey.PrincipalSchema, "Id", StringComparison.Ordinal) ||
