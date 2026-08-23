@@ -22,20 +22,47 @@ public sealed class Wave1OwnerDecisionClosureTests
     }
 
     [Fact]
-    public async Task GEN013_derives_LastNumber_without_reusing_historical_reservations_and_persists_metadata()
+    public async Task GEN013_requires_approved_binding_preserves_unknown_legacy_name_and_audits_approval_trace()
     {
         await using var db = new Wave1NumberingAuthorityDbContext(new DbContextOptionsBuilder<Wave1NumberingAuthorityDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString("N")).Options);
-        var company = Guid.NewGuid(); var branch = Guid.NewGuid(); var sequenceId = Guid.NewGuid();
+        var company = Guid.NewGuid(); var branch = Guid.NewGuid(); var sequenceId = Guid.NewGuid(); var approver = Guid.NewGuid();
         db.Sequences.Add(new Wave1NumberSequenceRecord { Id=sequenceId, CompanyId=company, BranchId=branch, DocumentType="WAYBILL", Prefix="WB-", NextValue=10, ResetPolicy="NONE", Status="ACTIVE", Version=1 });
         db.Reservations.Add(new Wave1NumberReservationRecord { Id=Guid.NewGuid(), SequenceId=sequenceId, CompanyId=company, BranchId=branch, IdempotencyKey="old", NumberValue=12, RenderedNumber="WB-00000012", ReservedAt=DateTimeOffset.UtcNow, State="VOID" });
         await db.SaveChangesAsync();
         var service = new Wave1NumberingAuthorityService(db); var ctx = new OperationContext(Guid.NewGuid(), company, branch, Guid.NewGuid());
-        Assert.Equal(12, Assert.Single(await service.ListAsync(ctx)).LastNumber);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ProtectedActionAsync(ctx, sequenceId, new ProtectedNumberSequenceActionRequest(11,1,"too low")));
-        var changed = await service.ProtectedActionAsync(ctx, sequenceId, new ProtectedNumberSequenceActionRequest(15,1,"approved adjustment"));
+        var legacy = Assert.Single(await service.ListAsync(ctx));
+        Assert.Equal(12, legacy.LastNumber);
+        Assert.Null(legacy.ArabicName);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ProtectedActionAsync(ctx, sequenceId,
+            new NumberingProtectedActionRequest(15, 1, "approval required", Guid.Empty)));
+
+        var approvalId = Guid.NewGuid();
+        db.ApprovalRequests.Add(new Wave1ApprovalRequestRecord
+        {
+            Id=approvalId, TargetType=Wave1NumberingApprovalContract.TargetType, TargetId=sequenceId,
+            RequestedAction=Wave1NumberingApprovalContract.RequestedAction, Status=Wave1NumberingApprovalContract.ApprovedStatus,
+            Reason="approved numbering override", RequestedBy=Guid.NewGuid(), RequestedAt=DateTimeOffset.UtcNow,
+            TargetExpectedVersion=1, CompanyId=company, BranchId=branch, Version=2, UpdatedAt=DateTimeOffset.UtcNow
+        });
+        db.ApprovalActions.Add(new Wave1ApprovalActionRecord
+        {
+            Id=Guid.NewGuid(), ApprovalRequestId=approvalId, Decision=Wave1NumberingApprovalContract.ApproveDecision,
+            DecidedBy=approver, DecidedAt=DateTimeOffset.UtcNow, Reason="approved"
+        });
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ProtectedActionAsync(ctx, sequenceId,
+            new NumberingProtectedActionRequest(11,1,"too low",approvalId)));
+        var changed = await service.ProtectedActionAsync(ctx, sequenceId,
+            new NumberingProtectedActionRequest(15,1,"approved adjustment",approvalId));
         Assert.Equal(15, changed!.LastNumber);
+        var protectedAudit = await db.AuditEvents.SingleAsync(x => x.Action == "NumberSequence.ProtectedAction");
+        Assert.Contains(approvalId.ToString(), protectedAudit.AfterJson, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(approver.ToString(), protectedAudit.AfterJson, StringComparison.OrdinalIgnoreCase);
+
         var updated = await service.UpdateAsync(ctx, sequenceId, new UpdateNumberSequenceRequest("WB-","NONE","ACTIVE",changed.Version,"metadata","WB","ترقيم البوالص","Waybill numbering","ملاحظات",Guid.NewGuid()));
-        Assert.Equal("WB", updated!.Code); Assert.Equal("ملاحظات", updated.Notes); Assert.Contains("FISCAL_YEAR", updated.Scope);
+        Assert.Equal("WB", updated!.Code); Assert.Equal("ترقيم البوالص", updated.ArabicName); Assert.Equal("ملاحظات", updated.Notes); Assert.Contains("FISCAL_YEAR", updated.Scope);
         var reservation = await service.ReserveAsync(ctx, sequenceId, new NumberReservationCommandRequest("new-16"));
         Assert.Equal((ulong)16, reservation.NumberValue);
     }
@@ -70,6 +97,20 @@ public sealed class Wave1OwnerDecisionClosureTests
     }
 
     [Fact]
+    public async Task ACC074_source_document_resolution_fails_closed_on_foreign_company_or_branch()
+    {
+        await using var authority=CreateAuthorityDb(); await using var accounting=CreateAccountingDb();
+        var company=Guid.NewGuid(); var branch=Guid.NewGuid(); var currency=Guid.NewGuid(); var customer=Guid.NewGuid(); var foreignJe=Guid.NewGuid();
+        authority.Customers.Add(new Wave1CustomerRecord{Id=customer,CompanyId=company,Code="C-X",ArabicName="عميل",ControlAccountId=Guid.NewGuid(),IsActive=true,Version=1});
+        authority.OpenItems.Add(new Wave1OpenItemRecord{Id=Guid.NewGuid(),CompanyId=company,BranchId=branch,PartyType="CUSTOMER",CustomerId=customer,SourceDocumentType="JOURNAL_ENTRY",SourceDocumentId=foreignJe,JournalEntryId=foreignJe,JournalLineNo=1,CurrencyId=currency,OriginalAmount=10m,DueDate=new DateTime(2026,8,1),Status="OPEN",Version=1});
+        accounting.JournalEntries.Add(new JournalEntry{Id=foreignJe,CompanyId=Guid.NewGuid(),BranchId=Guid.NewGuid(),DocumentNo="FOREIGN",FiscalPeriodId=Guid.NewGuid(),EntryDate=new DateTime(2026,8,1),Status="POSTED",SourceType="TEST",TotalDebit=10,TotalCredit=10,CurrencyId=currency,ExchangeRate=1});
+        await authority.SaveChangesAsync(); await accounting.SaveChangesAsync();
+        var service=new Wave1AgingAuthorityService(authority,accounting);
+        var ex=await Assert.ThrowsAsync<InvalidOperationException>(() => service.QueryCustomerAsync(company,branch,new ACC074QueryRequest(new DateTime(2026,8,20),branch,currency,customer,Page:1,PageSize:200)));
+        Assert.Equal("SOURCE_DOCUMENT_NOT_FOUND", ex.Message);
+    }
+
+    [Fact]
     public async Task ACC050_uses_account_mapping_and_controlled_override_not_reference_type_keywords()
     {
         await using var authority=CreateAuthorityDb(); await using var accounting=CreateAccountingDb();
@@ -85,6 +126,19 @@ public sealed class Wave1OwnerDecisionClosureTests
         var page=await service.QueryAsync(company,branch,new ACC050QueryRequest(new DateTime(2026,8,1),new DateTime(2026,8,31),branch,currency,Page:1,PageSize:200));
         Assert.Equal("FINANCING",Assert.Single(page.Items,x=>x.DocumentNo=="RV-1").Activity);
         Assert.Equal("UNCLASSIFIED",Assert.Single(page.Items,x=>x.DocumentNo=="PV-1").Activity);
+    }
+
+    [Fact]
+    public async Task Delivery_audit_writer_records_screen_filters_scope_actor_and_correlation()
+    {
+        await using var db=CreateAccountingDb();
+        var actor=Guid.NewGuid(); var company=Guid.NewGuid(); var branch=Guid.NewGuid(); var correlation=Guid.NewGuid();
+        var writer=new Wave1DeliveryAuditWriter(db);
+        await writer.AppendSuccessAsync("ACC-050","Export",new { From="2026-08-01", To="2026-08-31" },new Wave1DeliveryAuditContext(actor,company,branch,correlation,"D-1","127.0.0.1"));
+        var evt=Assert.Single(db.AuditEvents);
+        Assert.Equal("ACC-050.Export",evt.Action); Assert.Equal(actor,evt.ActorUserId); Assert.Equal(company,evt.CompanyId); Assert.Equal(branch,evt.BranchId); Assert.Equal(correlation,evt.CorrelationId);
+        Assert.Contains("2026-08-01",evt.AfterJson); Assert.Contains("ACC-050",evt.AfterJson);
+        Assert.Equal(AuditEventService.ComputeHash(evt),evt.Hash);
     }
 
     private static Wave1AccountingAuthorityDbContext CreateAuthorityDb()
