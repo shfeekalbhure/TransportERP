@@ -365,7 +365,7 @@ public sealed class Wave1NumberingMetadata : Migration
         }, constraints: t =>
         {
             t.PrimaryKey("PK_number_sequence_metadata", x => x.SequenceId);
-            t.ForeignKey("FK_number_sequence_metadata_number_sequences_SequenceId", x => x.SequenceId, "transport_erp", "number_sequences", "Id", onDelete: ReferentialAction.Cascade);
+            t.ForeignKey("FK_number_sequence_metadata_number_sequences_SequenceId", x => x.SequenceId, "number_sequences", "Id", "transport_erp", onDelete: ReferentialAction.Cascade);
         });
         m.CreateIndex(name: "IX_number_sequence_metadata_CompanyId_Code", schema: "transport_erp", table: "number_sequence_metadata", columns: new[] { "CompanyId", "Code" }, unique: true);
         // Legacy DocumentType is a technical sequence identifier and can seed Code. ArabicName remains unknown until governed reconciliation/touch; it is never guessed.
@@ -413,7 +413,7 @@ public sealed class Wave1NumberingApprovalBinding : Migration
         }, constraints: t =>
         {
             t.PrimaryKey("PK_approval_actions", x => x.Id);
-            t.ForeignKey("FK_approval_actions_approval_requests", x => x.ApprovalRequestId, "transport_erp", "approval_requests", "Id", onDelete: ReferentialAction.Restrict);
+            t.ForeignKey("FK_approval_actions_approval_requests", x => x.ApprovalRequestId, "approval_requests", "Id", "transport_erp", onDelete: ReferentialAction.Restrict);
             t.CheckConstraint("ck_approval_actions_decision", "\"Decision\" IN ('APPROVE','REJECT','RETURN','CANCEL')");
         });
         m.CreateIndex(name: "IX_approval_actions_Request_Time", schema: "transport_erp", table: "approval_actions", columns: new[] { "ApprovalRequestId", "DecidedAt" });
