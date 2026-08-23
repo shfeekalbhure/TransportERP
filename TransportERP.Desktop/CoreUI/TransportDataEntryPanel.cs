@@ -14,6 +14,7 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
         ColumnCount = 2;
     }
 
+    [System.ComponentModel.DefaultValue(2)]
     public new int ColumnCount
     {
         get => _columnCount;
@@ -24,6 +25,8 @@ public sealed class TransportDataEntryPanel : TableLayoutPanel
             base.ColumnCount = value;
         }
     }
+
+    private bool ShouldSerializeColumnCount() => ColumnCount != 2;
 
     public void AddField(Control field, int fieldSpan = 1)
     {
