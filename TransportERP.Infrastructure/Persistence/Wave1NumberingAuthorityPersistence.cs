@@ -30,7 +30,7 @@ public sealed class Wave1NumberSequenceMetadataRecord
     public Guid SequenceId { get; set; }
     public Guid CompanyId { get; set; }
     public string Code { get; set; } = string.Empty;
-    public string ArabicName { get; set; } = string.Empty;
+    public string? ArabicName { get; set; }
     public string? EnglishName { get; set; }
     public string? Notes { get; set; }
     public Guid? FiscalYearId { get; set; }
@@ -56,11 +56,48 @@ public sealed class Wave1NumberReservationRecord
     public string? LastTransitionKey { get; set; }
 }
 
+public sealed class Wave1ApprovalRequestRecord
+{
+    public Guid Id { get; set; }
+    public string TargetType { get; set; } = string.Empty;
+    public Guid TargetId { get; set; }
+    public string RequestedAction { get; set; } = string.Empty;
+    public string Status { get; set; } = "PENDING";
+    public string? Reason { get; set; }
+    public Guid RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public long TargetExpectedVersion { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public long Version { get; set; } = 1;
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+public sealed class Wave1ApprovalActionRecord
+{
+    public Guid Id { get; set; }
+    public Guid ApprovalRequestId { get; set; }
+    public string Decision { get; set; } = string.Empty;
+    public Guid DecidedBy { get; set; }
+    public DateTimeOffset DecidedAt { get; set; }
+    public string? Reason { get; set; }
+}
+
+public static class Wave1NumberingApprovalContract
+{
+    public const string TargetType = "NumberSequence";
+    public const string RequestedAction = "Override/Reset";
+    public const string ApprovedStatus = "APPROVED";
+    public const string ApproveDecision = "APPROVE";
+}
+
 public sealed class Wave1NumberingAuthorityDbContext(DbContextOptions<Wave1NumberingAuthorityDbContext> options) : DbContext(options)
 {
     public DbSet<Wave1NumberSequenceRecord> Sequences => Set<Wave1NumberSequenceRecord>();
     public DbSet<Wave1NumberSequenceMetadataRecord> Metadata => Set<Wave1NumberSequenceMetadataRecord>();
     public DbSet<Wave1NumberReservationRecord> Reservations => Set<Wave1NumberReservationRecord>();
+    public DbSet<Wave1ApprovalRequestRecord> ApprovalRequests => Set<Wave1ApprovalRequestRecord>();
+    public DbSet<Wave1ApprovalActionRecord> ApprovalActions => Set<Wave1ApprovalActionRecord>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -74,7 +111,7 @@ public sealed class Wave1NumberingAuthorityDbContext(DbContextOptions<Wave1Numbe
 
         var meta = mb.Entity<Wave1NumberSequenceMetadataRecord>();
         meta.ToTable("number_sequence_metadata"); meta.HasKey(x => x.SequenceId);
-        meta.Property(x => x.Code).HasMaxLength(60).IsRequired(); meta.Property(x => x.ArabicName).HasMaxLength(200).IsRequired();
+        meta.Property(x => x.Code).HasMaxLength(60).IsRequired(); meta.Property(x => x.ArabicName).HasMaxLength(200);
         meta.Property(x => x.EnglishName).HasMaxLength(200); meta.Property(x => x.Notes).HasMaxLength(1000);
         meta.Property(x => x.CreatedAt).HasColumnType("timestamptz"); meta.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
         meta.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
@@ -86,6 +123,21 @@ public sealed class Wave1NumberingAuthorityDbContext(DbContextOptions<Wave1Numbe
         r.Property(x => x.ReservedAt).HasColumnType("timestamptz"); r.Property(x => x.CommittedAt).HasColumnType("timestamptz"); r.Property(x => x.VoidedAt).HasColumnType("timestamptz");
         r.HasIndex(x => new { x.SequenceId, x.NumberValue }).IsUnique(); r.HasIndex(x => new { x.CompanyId, x.IdempotencyKey }).IsUnique();
         r.HasOne<Wave1NumberSequenceRecord>().WithMany().HasForeignKey(x => x.SequenceId).OnDelete(DeleteBehavior.Restrict);
+
+        var approval = mb.Entity<Wave1ApprovalRequestRecord>();
+        approval.ToTable("approval_requests"); approval.HasKey(x => x.Id);
+        approval.Property(x => x.TargetType).HasMaxLength(120).IsRequired(); approval.Property(x => x.RequestedAction).HasMaxLength(120).IsRequired();
+        approval.Property(x => x.Status).HasMaxLength(20).IsRequired(); approval.Property(x => x.Reason).HasMaxLength(1000);
+        approval.Property(x => x.RequestedAt).HasColumnType("timestamptz"); approval.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
+        approval.Property(x => x.Version).IsConcurrencyToken();
+        approval.HasIndex(x => new { x.CompanyId, x.TargetType, x.TargetId, x.Status });
+
+        var approvalAction = mb.Entity<Wave1ApprovalActionRecord>();
+        approvalAction.ToTable("approval_actions"); approvalAction.HasKey(x => x.Id);
+        approvalAction.Property(x => x.Decision).HasMaxLength(20).IsRequired(); approvalAction.Property(x => x.Reason).HasMaxLength(1000);
+        approvalAction.Property(x => x.DecidedAt).HasColumnType("timestamptz");
+        approvalAction.HasIndex(x => new { x.ApprovalRequestId, x.DecidedAt });
+        approvalAction.HasOne<Wave1ApprovalRequestRecord>().WithMany().HasForeignKey(x => x.ApprovalRequestId).OnDelete(DeleteBehavior.Restrict);
 
         var a = mb.Entity<AuditEvent>(); a.ToTable("audit_events"); a.HasKey(x => x.Id);
         a.Property(x => x.OccurredAt).HasColumnType("timestamptz"); a.Property(x => x.Action).HasMaxLength(120).IsRequired();
@@ -171,23 +223,59 @@ public sealed class Wave1NumberingAuthorityService(Wave1NumberingAuthorityDbCont
     public Task<NumberReservationDto> CancelAsync(OperationContext context, Guid reservationId, NumberReservationTransitionCommandRequest request, CancellationToken ct = default)
         => Transition(context, reservationId, request, NumberReservationStates.Void, ct);
 
-    public Task<NumberSequenceDto?> ProtectedActionAsync(OperationContext context, Guid id, ProtectedNumberSequenceActionRequest request, CancellationToken ct = default)
+    public Task<NumberSequenceDto?> ProtectedActionAsync(OperationContext context, Guid id, NumberingProtectedActionRequest request, CancellationToken ct = default)
         => ExecuteAsync(async () =>
         {
             context.EnsureComplete();
             if (request.LastNumber < 0) throw new ArgumentException("INVALID_LAST_NUMBER");
             if (string.IsNullOrWhiteSpace(request.Reason)) throw new ArgumentException("REASON_REQUIRED");
+            if (request.ApprovalRequestId == Guid.Empty) throw new InvalidOperationException("APPROVAL_STATE_INVALID");
+
             var sequence = await Scoped(context).SingleOrDefaultAsync(x => x.Id == id, ct);
             if (sequence is null) return null;
             if (sequence.Version != request.ExpectedVersion) throw new DbUpdateConcurrencyException("CONCURRENCY_CONFLICT");
+            if (!string.Equals(sequence.Status, "ACTIVE", StringComparison.Ordinal)) throw new InvalidOperationException("NUMBERING_STATE_INVALID");
+
+            var approval = await db.ApprovalRequests.AsNoTracking().SingleOrDefaultAsync(x =>
+                x.Id == request.ApprovalRequestId &&
+                x.CompanyId == context.CompanyId &&
+                x.TargetType == Wave1NumberingApprovalContract.TargetType &&
+                x.TargetId == id &&
+                x.RequestedAction == Wave1NumberingApprovalContract.RequestedAction, ct);
+            if (approval is null ||
+                !string.Equals(approval.Status, Wave1NumberingApprovalContract.ApprovedStatus, StringComparison.Ordinal) ||
+                approval.TargetExpectedVersion != request.ExpectedVersion ||
+                (sequence.BranchId.HasValue ? approval.BranchId != sequence.BranchId : approval.BranchId.HasValue))
+                throw new InvalidOperationException("APPROVAL_STATE_INVALID");
+
+            var approvedAction = await db.ApprovalActions.AsNoTracking()
+                .Where(x => x.ApprovalRequestId == approval.Id && x.Decision == Wave1NumberingApprovalContract.ApproveDecision)
+                .OrderByDescending(x => x.DecidedAt).ThenByDescending(x => x.Id)
+                .FirstOrDefaultAsync(ct);
+            if (approvedAction is null) throw new InvalidOperationException("APPROVAL_STATE_INVALID");
+
             var allocated = await db.Reservations.AsNoTracking().Where(x => x.SequenceId == id).Select(x => (long?)x.NumberValue).MaxAsync(ct) ?? 0;
             var currentLast = Math.Max(sequence.NextValue - 1, allocated);
             if (request.LastNumber < currentLast) throw new InvalidOperationException("NUMBER_REUSE_FORBIDDEN");
+
             var before = JsonSerializer.Serialize(await BuildDto(sequence, null, ct));
             sequence.NextValue = checked(request.LastNumber + 1); sequence.Version++; sequence.UpdatedAt = DateTimeOffset.UtcNow;
-            await AppendAudit(context, "NumberSequence.ProtectedAction", id, before, null, request.Reason.Trim(), ct);
+            var after = await BuildDto(sequence, null, ct);
+            await AppendAudit(context, "NumberSequence.ProtectedAction", id, before, JsonSerializer.Serialize(new
+            {
+                Result = after,
+                Approval = new
+                {
+                    ApprovalRequestId = approval.Id,
+                    ApprovalRequestVersion = approval.Version,
+                    approval.RequestedAction,
+                    ApprovedBy = approvedAction.DecidedBy,
+                    ApprovedAt = approvedAction.DecidedAt,
+                    Decision = approvedAction.Decision
+                }
+            }), request.Reason.Trim(), ct);
             await db.SaveChangesAsync(ct);
-            return await BuildDto(sequence, null, ct);
+            return after;
         }, ct);
 
     private Task<NumberReservationDto> Transition(OperationContext context, Guid id, NumberReservationTransitionCommandRequest request, string target, CancellationToken ct)
@@ -220,7 +308,7 @@ public sealed class Wave1NumberingAuthorityService(Wave1NumberingAuthorityDbCont
         => new(x.Id, x.CompanyId, x.BranchId, x.DocumentType, x.Prefix, x.NextValue, x.ResetPolicy, x.Status, x.Version)
         {
             Code = m?.Code ?? x.DocumentType,
-            ArabicName = m?.ArabicName ?? x.DocumentType,
+            ArabicName = m?.ArabicName,
             EnglishName = m?.EnglishName,
             Notes = m?.Notes,
             FiscalYearId = m?.FiscalYearId,
@@ -270,7 +358,7 @@ public sealed class Wave1NumberingMetadata : Migration
         {
             SequenceId = t.Column<Guid>(type: "uuid", nullable: false), CompanyId = t.Column<Guid>(type: "uuid", nullable: false),
             Code = t.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
-            ArabicName = t.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+            ArabicName = t.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
             EnglishName = t.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
             Notes = t.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
             FiscalYearId = t.Column<Guid>(type: "uuid", nullable: true), CreatedAt = t.Column<DateTimeOffset>(type: "timestamptz", nullable: false), UpdatedAt = t.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
@@ -280,7 +368,60 @@ public sealed class Wave1NumberingMetadata : Migration
             t.ForeignKey("FK_number_sequence_metadata_number_sequences_SequenceId", x => x.SequenceId, "transport_erp", "number_sequences", "Id", onDelete: ReferentialAction.Cascade);
         });
         m.CreateIndex(name: "IX_number_sequence_metadata_CompanyId_Code", schema: "transport_erp", table: "number_sequence_metadata", columns: new[] { "CompanyId", "Code" }, unique: true);
-        m.Sql("INSERT INTO transport_erp.number_sequence_metadata (\"SequenceId\",\"CompanyId\",\"Code\",\"ArabicName\",\"EnglishName\",\"Notes\",\"FiscalYearId\",\"CreatedAt\",\"UpdatedAt\") SELECT \"Id\",\"CompanyId\",\"DocumentType\",\"DocumentType\",NULL,NULL,NULL,COALESCE(\"CreatedAt\",NOW()),COALESCE(\"UpdatedAt\",NOW()) FROM transport_erp.number_sequences ON CONFLICT (\"SequenceId\") DO NOTHING;");
+        // Legacy DocumentType is a technical sequence identifier and can seed Code. ArabicName remains unknown until governed reconciliation/touch; it is never guessed.
+        m.Sql("INSERT INTO transport_erp.number_sequence_metadata (\"SequenceId\",\"CompanyId\",\"Code\",\"ArabicName\",\"EnglishName\",\"Notes\",\"FiscalYearId\",\"CreatedAt\",\"UpdatedAt\") SELECT \"Id\",\"CompanyId\",\"DocumentType\",NULL,NULL,NULL,NULL,COALESCE(\"CreatedAt\",NOW()),COALESCE(\"UpdatedAt\",NOW()) FROM transport_erp.number_sequences ON CONFLICT (\"SequenceId\") DO NOTHING;");
     }
     protected override void Down(MigrationBuilder m) => m.DropTable(name: "number_sequence_metadata", schema: "transport_erp");
+}
+
+[DbContext(typeof(Wave1NumberingAuthorityDbContext))]
+[Migration("20260823002100_Wave1NumberingApprovalBinding")]
+public sealed class Wave1NumberingApprovalBinding : Migration
+{
+    protected override void Up(MigrationBuilder m)
+    {
+        m.CreateTable(name: "approval_requests", schema: "transport_erp", columns: t => new
+        {
+            Id = t.Column<Guid>(type: "uuid", nullable: false),
+            TargetType = t.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+            TargetId = t.Column<Guid>(type: "uuid", nullable: false),
+            RequestedAction = t.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+            Status = t.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+            Reason = t.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+            RequestedBy = t.Column<Guid>(type: "uuid", nullable: false),
+            RequestedAt = t.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+            TargetExpectedVersion = t.Column<long>(type: "bigint", nullable: false),
+            CompanyId = t.Column<Guid>(type: "uuid", nullable: false),
+            BranchId = t.Column<Guid>(type: "uuid", nullable: true),
+            Version = t.Column<long>(type: "bigint", nullable: false, defaultValue: 1L),
+            UpdatedAt = t.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+        }, constraints: t =>
+        {
+            t.PrimaryKey("PK_approval_requests", x => x.Id);
+            t.CheckConstraint("ck_approval_requests_status", "\"Status\" IN ('PENDING','APPROVED','REJECTED','RETURNED','CANCELLED')");
+        });
+        m.CreateIndex(name: "IX_approval_requests_Target", schema: "transport_erp", table: "approval_requests", columns: new[] { "CompanyId", "TargetType", "TargetId", "Status" });
+
+        m.CreateTable(name: "approval_actions", schema: "transport_erp", columns: t => new
+        {
+            Id = t.Column<Guid>(type: "uuid", nullable: false),
+            ApprovalRequestId = t.Column<Guid>(type: "uuid", nullable: false),
+            Decision = t.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+            DecidedBy = t.Column<Guid>(type: "uuid", nullable: false),
+            DecidedAt = t.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
+            Reason = t.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true)
+        }, constraints: t =>
+        {
+            t.PrimaryKey("PK_approval_actions", x => x.Id);
+            t.ForeignKey("FK_approval_actions_approval_requests", x => x.ApprovalRequestId, "transport_erp", "approval_requests", "Id", onDelete: ReferentialAction.Restrict);
+            t.CheckConstraint("ck_approval_actions_decision", "\"Decision\" IN ('APPROVE','REJECT','RETURN','CANCEL')");
+        });
+        m.CreateIndex(name: "IX_approval_actions_Request_Time", schema: "transport_erp", table: "approval_actions", columns: new[] { "ApprovalRequestId", "DecidedAt" });
+    }
+
+    protected override void Down(MigrationBuilder m)
+    {
+        m.DropTable(name: "approval_actions", schema: "transport_erp");
+        m.DropTable(name: "approval_requests", schema: "transport_erp");
+    }
 }
