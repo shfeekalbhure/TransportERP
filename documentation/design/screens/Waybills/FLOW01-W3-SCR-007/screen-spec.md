@@ -2,65 +2,77 @@
 
 **Alias:** `TRIP-001`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `FIELD_GRID`  
-**OwnerTeam:** `TEAM-D03`  
+**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**OwnerTeam:** `TEAM-D06`  
 **Batch:** `BATCH-01`
 
 ## Authority
 - Canonical identity: `CHG-20260818-FLOW01-W3-ID-002`.
 - W1: `FreightTrip`.
 - W2: `F01.FreightTrip.Create`, `F01.FreightTrip.UpdateDraft`, `F01.FreightTrip.Transition`, `F01.FreightTrip.Get/Search`.
+- Permissions: `f01.trip.create`, `f01.trip.edit`, `f01.trip.transition`, `f01.trip.view`.
 - Typed definition: `FLOW01-W3-SCR-007_TYPED_SCREENDEFINITION.md`.
 - Design test input: `TAE-F01-006` (issued; runtime PASS not claimed).
+- FIELD_GRID authority: `documentation/design/decisions/2026-08-24_BATCH-01_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`.
 
 ## ANALYSIS — TEAM-D01 PASS
 Purpose: create/edit a freight trip Draft, expose scoped trip data, and request only legal lifecycle transitions through the issued transition capability.
 
-### Capabilities
-| Capability | Action | Permission | State rule |
-|---|---|---|---|
-| إنشاء | `F01.FreightTrip.Create` | `f01.trip.create` | new Draft |
-| تعديل | `F01.FreightTrip.UpdateDraft` | `f01.trip.edit` | Draft + expectedVersion |
-| انتقال حالة | `F01.FreightTrip.Transition` | `f01.trip.transition` | legal lifecycle edge only |
-| عرض/بحث | `F01.FreightTrip.Get/Search` | `f01.trip.view` | scoped read |
-
-### Fields
+Fields:
 - `tripId` — رقم الرحلة — UUID/read-only — server assigned.
-- `vehicleRef` — المركبة — Lookup/Reference — required — Draft only — scope valid.
-- `driverRef` — السائق — Lookup/Reference — conditional — Draft only — scope valid.
+- `vehicleRef` — المركبة — Lookup/Reference — required — Draft only.
+- `driverRef` — السائق — Lookup/Reference — conditional — Draft only.
 - `originRef` — المصدر — Lookup/Reference — required — Draft only.
 - `destinationRef` — الوجهة — Lookup/Reference — required — Draft only.
-- `scheduledAt` — الموعد — DateTime/Instant — Draft only — date validation.
-- `tripState` — الحالة — Enum/read-only — server state.
-- `targetState` — الانتقال المطلوب — Enum lookup — conditional — legal edge only.
-- `expectedVersion` — Integer hidden/read-only token — required on update/transition.
+- `scheduledAt` — الموعد — DateTime/Instant — Draft only.
+- `tripState` — الحالة — Enum/read-only/server state.
+- `targetState` — الانتقال المطلوب — Enum lookup — conditional; legal edge only.
+- `expectedVersion` — hidden Integer/read-only token — update/transition.
 
 ## LAYOUT — TEAM-D02 PASS
-Current shared Transaction profile governs:
+Shared `Transaction / HeaderLines` authority:
 - Header/MainData = `Content`.
 - Tabs/Workspace = `Fill`.
 - TripAllocationGrid = `Fill`.
-- Actions/Audit/shared presenters = CoreUI.
-- No LocalException; RTL/DPI/shared sizing remain central.
+- shared actions/audit/presenters = CoreUI.
+- tabs: `General | Load | Route | Audit`.
+- no LocalException; central RTL/DPI/sizing only.
 
-Functional tabs retained: `General | Load | Route | Audit`.
+## FIELD_GRID — TEAM-D03 PASS
+`GridProfile=TransactionLines/Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true`, `SelectionPolicy=SingleRow`. This screen has no allocation-edit capability, so the allocation grid is read-only display.
 
-## FIELD_GRID — TEAM-D03 IN PROGRESS
-Typed columns:
-`allocationRef, shipmentRef, quantityOrPackage, loadState, capacityContribution`.
+| # | Key | Arabic Header | UI Type | Edit | Width policy |
+|---:|---|---|---|---|---|
+| 1 | `allocationRef` | مرجع التخصيص | Reference | ReadOnly | content/reference |
+| 2 | `shipmentRef` | البوليصة | Reference | ReadOnly | content/reference |
+| 3 | `quantityOrPackage` | الكمية/الطرد | String display | ReadOnly | primary Fill |
+| 4 | `loadState` | حالة التحميل | Enum | ReadOnly | content state |
+| 5 | `capacityContribution` | مساهمة السعة | Decimal | ReadOnly | content numeric |
 
-Known rules:
-- `AutoGenerateColumns=false`.
-- server paging is issued.
-- state transition remains permission + legal-edge bound.
-- capacity/business calculations are not recreated in the client.
+Exact provider/sort identifiers remain `TBD-GATED`; no allocation mutation is invented inside the trip screen.
 
-Required TEAM-D03 closure: explicit column labels/types/read-only-edit rules/order/CoreUI width policy/selection/editor presentation and lookup UI contracts without inventing providers.
+## UX — TEAM-D04 PASS
+- Draft fields are editable only under the issued edit permission/state.
+- transition action is enabled only under `f01.trip.transition` and current server state; the client does not derive or persist a lifecycle graph.
+- target-state choices must be limited to server/contract-authorized legal edges; no unsupported transition is shown as executable.
+- `expectedVersion` is required for protected update/transition; conflict uses shared Reload/Refresh and never overwrites silently.
+- loading state prevents duplicate submit and conflicting mutations.
+- capacity contribution/allocation state are display-only server results; no local capacity formula.
+- lookups are shared server-side/debounced/Id-bound/scope-authoritative; provider identifiers may remain gated.
+- all writes remain online-authoritative.
 
-## Non-inventions
-No lifecycle graph, capacity formula, route formula, API/DTO/permission, DDL, or offline transition authority is created.
+## VISUAL — TEAM-D05 PASS
+- shared Transaction CoreUI tokens only: central typography, spacing, state colors, toolbar, grids, tabs, RTL, DPI, validation/loading/error/audit.
+- no local route/capacity graphics, fixed sizes, raw colors or custom lifecycle styling.
+
+## Acceptance criteria
+1. create/edit/transition/view are permission/state bound exactly as issued.
+2. client does not invent legal transition edges or capacity formulas.
+3. explicit five-column read-only allocation grid with server paging.
+4. Draft-only editability and concurrency token are preserved.
+5. no invented API/DTO/Permission/DDL/offline behavior.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`.
-- Current: `FIELD_GRID`.
-- Next after PASS: `TEAM-D04 / UX`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
+- Current: `INDEPENDENT_REVIEW`.
+- Reviewer: `TEAM-D06`.
