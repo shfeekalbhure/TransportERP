@@ -36,7 +36,7 @@ Shared `Transaction / HeaderLines` authority:
 - no LocalException or local sizing/style.
 
 ## FIELD_GRID — TEAM-D03 PASS
-`GridProfile=TransactionLines/Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true` as issued, `SelectionPolicy=SingleRow`. The history grid is immutable/read-only.
+`GridProfile=Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true` as issued, `SelectionPolicy=SingleRow`. The history grid is immutable/read-only.
 
 | # | Key | Arabic Header | UI Type | Edit | Width policy |
 |---:|---|---|---|---|---|
@@ -57,7 +57,7 @@ Input interaction remains in the issued header fields (`packageRefs`, `targetCus
 - client does not change visible current custody until the successful server response is returned.
 - validation uses shared presenter; permission/scope denial leaks no hidden custody/package data.
 - handling history remains immutable; refresh reloads server-authoritative history.
-- no offline handoff/queue is exposed.
+- all issued FLOW01 actions are online-only; no offline handoff/queue is exposed.
 
 ## VISUAL — TEAM-D05 PASS
 - CoreUI Transaction visual tokens only: RTL, DPI, central typography/spacing, lookup/signature field states, shared grid/history rendering, validation/loading/error/audit.
