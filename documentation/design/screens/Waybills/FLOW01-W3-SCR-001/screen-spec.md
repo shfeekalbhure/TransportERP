@@ -1,358 +1,316 @@
 # FLOW01-W3-SCR-001 — إدخال البوليصة — Canonical Screen Specification
 
-## Mandatory pre-read / evidence readiness
-- Queue row read from `documentation/design/04_SCREEN_WORK_QUEUE.csv`: `YES`.
-- Orchestrator protocol and workflow read: `YES`.
-- Current governing FLOW01 kurrasa/current-design authority read and reconciled: `YES`.
-- `SRC-053 / OWNER-FLOW01-W2-W3-TECHNICAL-ISSUANCE-001`: read; governing for issued W2/W3 facts only.
-- W1 logical boundary, W2 exact contract/security binding, typed W3 ScreenDefinition, acceptance specification and atomic trace: read.
-- Current repository waybill implementation: read as implementation/lineage evidence only.
-- Current approved CoreUI/Profile authority read: `Transaction_Profile_Specification_V1.1`, `ScreenDefinition_Templates_V1.1`, `CoreUI_Controls_Catalog_V1.2`, `CoreUI_Properties_Specification_V1.4`, `Shared_API_Error_Paging_Lookup_Contracts_TransportERP_V1.3`.
-- Legacy R2/V4 `SHP-005/006/007/008`: reconciled as non-governing lineage; nothing is imported merely because it exists there.
-- Layout authority decision read and applied: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`.
-- FIELD_GRID owner authority decision read and applied: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`.
+**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**ScreenProfile:** `Transaction`  
+**Variant:** `HeaderLines`  
+**Canonical alias:** `SHP-001`  
+**Domain:** `Waybills / FLOW01`  
+**OwnerTeam:** `TEAM-D06`  
+**Date:** `2026-08-24`
 
-Stage readiness:
-- TEAM-D01 / ANALYSIS: `COMPLETED`.
-- TEAM-D02 / LAYOUT: `COMPLETED`.
-- TEAM-D03 / FIELD_GRID: `COMPLETED`.
-- TEAM-D04 / UX: `READY`.
+> This is the one canonical screen record. Stage evidence files are attachments/references, not competing final copies. Repository-lineage `SHP-005` is non-governing and is retained only for traceability.
 
-## Identity
+## 1. Authority and evidence readiness
+Read/reconciled before design claims:
+- current live queue;
+- current FLOW01 W1/W2/W3 authority and exact screen identity/trace;
+- `FLOW01_W2_EXACT_CONTRACT_AND_SECURITY_BINDING_2026-08-22.md`;
+- `FLOW01-W3-SCR-001_TYPED_SCREENDEFINITION.md`;
+- `FLOW01_ACCEPTANCE_TEST_SPECIFICATIONS_2026-08-22.md` (`TAE-F01-001`, issued but not run);
+- `FLOW01_ATOMIC_TRACEABILITY_AND_E2E_SPEC_2026-08-22.md`;
+- `Transaction_Profile_Specification_V1.1`;
+- `CoreUI_Properties_Specification_V1.4`;
+- `CoreUI_Controls_Catalog_V1.2`;
+- `Shared_API_Error_Paging_Lookup_Contracts_TransportERP_V1.3`;
+- `CoreUI_Architecture_Tests_Specification_V1.2`;
+- project-owner layout decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`;
+- project-owner FIELD_GRID design authority: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`;
+- stage evidence: `ux-stage-evidence.md`, `visual-stage-evidence.md`.
+
+Completed stages:
+- `TEAM-D01 / ANALYSIS = PASS`
+- `TEAM-D02 / LAYOUT = PASS`
+- `TEAM-D03 / FIELD_GRID = PASS`
+- `TEAM-D04 / UX = PASS`
+- `TEAM-D05 / VISUAL = PASS`
+- `TEAM-D06 / INDEPENDENT_REVIEW = IN PROGRESS`
+
+## 2. Identity and business boundary
 - ScreenCode: `FLOW01-W3-SCR-001`
-- Current FLOW01 alias: `SHP-001`
+- Alias: `SHP-001`
 - ArabicName: `إدخال البوليصة`
 - English role: `Shipment Entry`
-- Domain: `Waybills / FLOW01`
-- ScreenProfile: `Transaction`
-- Variant: `HeaderLines`
-- Capabilities: `F01.Shipment.Create`, `F01.Shipment.UpdateDraft`, `F01.Shipment.Confirm`, `F01.Shipment.Get`, `F01.Shipment.Search`.
-- CurrentDesignState: `UX`
-- CompletedStages: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`
-- OwnerTeam: `TEAM-D04`
+- Profile/Variant: `Transaction / HeaderLines`
+- Business purpose: create a Shipment as Draft, edit Draft under optimistic concurrency, confirm Draft → Confirmed, and read/search within server-authorized company/branch scope.
 
-## Authority chain
-1. `CHG-20260818-FLOW01-W3-ID-002` — canonical identity: `FLOW01-W3-SCR-001 / SHP-001 / إدخال البوليصة / Transaction / HeaderLines`.
-2. `FLOW01-REQ-CONTRACT-001` — approved business requirement; no direct code authority.
-3. `W1-FLOW01-LOGICAL-DOMAIN-001` — logical boundary only; no DDL/physical field authority.
-4. `OWNER-FLOW01-P1-BUSINESS-DECISIONS-001` — issued business decisions for FLOW01 boundaries.
-5. `FLOW01_W2_EXACT_CONTRACT_AND_SECURITY_BINDING_2026-08-22.md` — exact actions/routes/DTO/permissions/scope.
-6. `FLOW01-W3-SCR-001_TYPED_SCREENDEFINITION.md` — typed screen definition.
-7. `FLOW01_ACCEPTANCE_TEST_SPECIFICATIONS_2026-08-22.md` — `TAE-F01-001`, issued but not run.
-8. `FLOW01_ATOMIC_TRACEABILITY_AND_E2E_SPEC_2026-08-22.md` — atomic trace.
-9. Current approved CoreUI/Profile contracts listed in the pre-read section.
-10. Project-owner layout decision dated 2026-08-24.
-11. Project-owner FIELD_GRID design authority decision dated 2026-08-24.
-
-## Legacy / repository reconciliation
-The repository-lineage form uses `SHP-005` and presents `SHP-005/006/007/008` as tabs. Current FLOW01 authority treats that lineage as non-governing. It is not used to define this screen.
-
-The governing surface is `FLOW01-W3-SCR-001`, with issued tabs:
-`General | Items | Packages | Legs | Audit`.
-
-## Purpose and actors
-- Business purpose: create a Shipment as Draft, edit Draft under optimistic concurrency, confirm Draft → Confirmed, and read/search shipments inside server-authorized scope.
-- Business role names are not invented; UI authority is represented by the issued permission codes only.
-- Server scope is authoritative; client-supplied company/branch values are not authorization authority.
-
-Issued permissions:
-- `f01.shipment.create`
-- `f01.shipment.edit`
-- `f01.shipment.confirm`
-- `f01.shipment.view`
-
-## W1 logical boundary
+Logical boundary:
 - `Shipment`
 - `ShipmentItem`
 - `ShipmentPackage`
 - `ShipmentLeg`
 
-Issued lifecycle vocabulary: `Draft / Confirmed / Active / Completed / Cancelled`.
+Lifecycle vocabulary visible to this screen:
+`Draft / Confirmed / Active / Completed / Cancelled`.
 
-This screen writes Draft and confirms Draft → Confirmed only. `Confirmed` creates a commercial commitment/reference only; it does not post a journal, recognize revenue, or create commission.
+This screen creates/edits Draft and confirms Draft → Confirmed only. No command is invented for Active, Completed, or Cancelled. Confirmed creates a commercial commitment/reference only; no posting, journal creation, revenue recognition, or commission is implied.
 
-## Layout contract — TEAM-D02 PASS
-- Shell: governed `Transaction / HeaderLines`.
-- Header/MainData: `Content`.
-- Tabs/Workspace: `Fill`.
-- Relevant Lines/Grid inside workspace: `Fill`.
-- Summary/Action/Audit: inherited shared CoreUI/Profile regions only.
-- RTL/DPI/resize: inherited CoreUI behavior; no local exception.
-- LocalException: `NONE`.
-
-```text
-Transaction / HeaderLines
-┌──────────────────────────────────────────────────────────┐
-│ Shared CoreUI command / shell regions                    │
-├──────────────────────────────────────────────────────────┤
-│ Header / MainData — Content                              │
-│ status | customer | origin | destination                 │
-├──────────────────────────────────────────────────────────┤
-│ Tabs / Workspace — Fill                                  │
-│ General | Items | Packages | Legs | Audit                │
-│                                                          │
-│ Relevant line grid owns Fill inside its tab              │
-└──────────────────────────────────────────────────────────┘
-```
-
-No local pixel sizes, colors, fonts, toolbar/grid styling, pagination, audit, RTL or DPI rules are created.
-
-## Fields — TEAM-D03 PASS
-| FieldKey | Arabic Label | FieldProfile | ValueType | Required | Edit policy | Lookup / validation | Visibility |
-|---|---|---|---|---|---|---|---|
-| `shipmentId` | رقم البوليصة | KeyText | UUID | No | Read-only | server assigned | after identity exists |
-| `customerRef` | العميل | Lookup | Reference | Yes | Draft only | permitted customer | normal |
-| `originRef` | المصدر | Lookup | Reference | Yes | Draft only | scope-valid location | normal |
-| `destinationRef` | الوجهة | Lookup | Reference | Yes | Draft only | scope-valid location | normal |
-| `shipmentState` | الحالة | State | Enum | Yes | Read-only | W1/W2 lifecycle | normal |
-| `itemLines` | البنود | LineGrid | Collection | Yes | Draft only | nonempty on confirm | Items tab |
-| `packageLines` | الطرود | LineGrid | Collection | No | Draft only | package/item consistency | Packages tab |
-| `legLines` | المراحل | LineGrid | Collection | No | Draft only | chronology validation | Legs tab |
-| `expectedVersion` | إصدار التزامن | Hidden | Integer | update/confirm only | Read-only client token | required on update/confirm | hidden |
-
-No field is promoted from legacy repository UI.
-
-## FIELD_GRID design authority and boundaries
-The Project Owner explicitly authorized TEAM-D03 to define screen-specific design metadata for `ItemsGrid`, `PackagesGrid`, and `LegsGrid`, bounded by current CoreUI and already issued FLOW01 business semantics.
-
-This section is **design metadata**, not a new API/DTO/DDL/persistence contract. Exact unissued technical provider identifiers remain `TBD-GATED` and nonblocking.
-
-Shared rules for all three grids:
-- `GridProfile = TransactionLines`.
-- `AutoGenerateColumns = false`.
-- Grid workspace = `Fill` through CoreUI.
-- CoreUI owns RTL, row/header styling, row height, editing infrastructure and focus rendering.
-- `MultiSelect = false` / single-row selection because no issued bulk capability exists for this screen.
-- Row/field editing is available only while the shipment is `Draft` and the issued edit capability/permission is available; outside Draft all line columns are read-only.
-- No separate row-level permission or command is invented.
-- Reference editors use `TransportLookup` only where the design semantic is Reference; exact domain provider/endpoint remains gated unless already issued.
-- Width policy is semantic and CoreUI-owned: content-sized for compact reference/state/numeric columns and remaining-space/fill priority for descriptive text; no fixed pixel widths are specified.
-
-### ItemsGrid — explicit design contract
-Purpose: edit/view shipment item lines in Draft.
-
-| Order | Key | Arabic Header | ValueType | Semantic | Required in editable row | Edit policy | Sortable design | Width policy | Editor |
-|---:|---|---|---|---|---|---|---|---|---|
-| 1 | `itemOrPackageRef` | مرجع الصنف/الطرد | Reference | issued item/package reference | Yes | Draft only | Yes* | CoreUI content-sized | `TransportLookup`; provider `TBD-GATED` |
-| 2 | `description` | الوصف | String | issued description | No | Draft only | Yes* | CoreUI primary fill | text editor |
-| 3 | `quantity` | الكمية | Decimal | issued quantity | Yes | Draft only | Yes* | CoreUI content-sized numeric | numeric editor |
-| 4 | `weight` | الوزن | Decimal | issued mass/weight | No | Draft only | Yes* | CoreUI content-sized numeric | numeric editor; mass precision follows governing W1/A9 authority |
-| 5 | `volume` | الحجم | Decimal | issued volume | No | Draft only | Yes* | CoreUI content-sized numeric | numeric editor; volume precision follows governing W1/A9 authority |
-| 6 | `state` | الحالة | Enum | issued item state | Yes | Read-only | Yes* | CoreUI content-sized state | state display |
-
-`*` Sort presentation is permitted by this design; actual server sort-key mapping remains `TBD-GATED`. No arbitrary database expression is authorized.
-
-Grid behavior:
-- `UsesServerPaging = true` because the issued typed ScreenDefinition explicitly requires server paging for `ItemsGrid`.
-- Typed sort is enabled only after an allow-listed server mapping exists; the design does not invent sort keys.
-- `SelectionPolicy = SingleRow`.
-- Confirm requires at least one item line, as already issued.
-
-### PackagesGrid — explicit design contract
-Purpose: edit/view package lines owned by the Shipment aggregate without inventing a new package-to-item cardinality or persistence model.
-
-| Order | Key | Arabic Header | ValueType | Semantic | Required in editable row | Edit policy | Sortable | Width policy | Editor |
-|---:|---|---|---|---|---|---|---|---|---|
-| 1 | `packageRef` | مرجع الطرد | Reference | shipment package reference | Yes | Draft only | No | CoreUI content-sized | `TransportLookup`; provider `TBD-GATED` |
-| 2 | `weight` | الوزن | Decimal | package weight within issued measurement semantics | No | Draft only | No | CoreUI content-sized numeric | numeric editor; governing mass precision applies |
-| 3 | `volume` | الحجم | Decimal | package volume within issued measurement semantics | No | Draft only | No | CoreUI content-sized numeric | numeric editor; governing volume precision applies |
-| 4 | `state` | الحالة | Enum | issued package lifecycle/state | Yes | Read-only | No | CoreUI content-sized state | state display |
-
-Grid behavior:
-- `UsesServerPaging = false` as a screen-design choice for the embedded Draft package collection; this does not create or constrain an API route. If a future issued technical contract requires paging, that binding supersedes this design choice.
-- `SelectionPolicy = SingleRow`.
-- Package/item consistency remains a domain/API validation rule; the UI does not invent a cardinality, mapping formula or hidden relationship field.
-
-### LegsGrid — explicit design contract
-Purpose: edit/view the ordered operational stages/stations attached to the shipment while preserving the issued chronology requirement.
-
-| Order | Key | Arabic Header | ValueType | Semantic | Required in editable row | Edit policy | Sortable | Width policy | Editor |
-|---:|---|---|---|---|---|---|---|---|---|
-| 1 | `sequence` | الترتيب | Integer | chronology order for the issued leg/stage collection | Yes | Draft only | No | CoreUI content-sized numeric | integer editor |
-| 2 | `stageOrStationRef` | المرحلة/المحطة | Reference | issued operational stage/station reference | Yes | Draft only | No | CoreUI primary fill | `TransportLookup`; provider `TBD-GATED` |
-
-Grid behavior:
-- `UsesServerPaging = false` as a screen-design choice for the embedded Draft chronology collection; no API contract is created by this choice.
-- `SelectionPolicy = SingleRow`.
-- Chronology validity remains authoritative in domain/API validation. The UI does not invent dates, times, from/to pairs, route formulas or transition rules not already issued.
-
-### Explicit non-inventions in FIELD_GRID
-TEAM-D03 deliberately did **not** create:
-- package-to-item cardinality or a hidden package-item FK;
-- leg dates/times, from/to endpoints, route IDs or operational transition rules;
-- API endpoints, DTO fields or provider identifiers;
-- permissions, security scope or offline-write behavior;
-- storage types, tables, columns, migrations or indexes.
-
-## Tabs / Sections
-| Order | Tab | Purpose | LayoutRole | Visibility |
-|---:|---|---|---|---|
-| 1 | General | shipment header/general data | Workspace child under Fill | issued |
-| 2 | Items | item lines | ItemsGrid owns Fill | issued |
-| 3 | Packages | package lines | PackagesGrid owns Fill | issued |
-| 4 | Legs | operational stages/legs | LegsGrid owns Fill | issued |
-| 5 | Audit | audit/context display | shared audit behavior | issued |
-
-## Commands
-| Command | Capability | Permission | Enabled when | Result |
+## 3. Permissions and capabilities
+| Command | Capability | Permission | Enabled when | Contract result |
 |---|---|---|---|---|
-| إنشاء | `F01.Shipment.Create` | `f01.shipment.create` | new Draft | `POST /api/v1/shipments` → ShipmentResource |
+| إنشاء | `F01.Shipment.Create` | `f01.shipment.create` | new Draft | `POST /api/v1/shipments` → `ShipmentResource` |
 | تعديل مسودة | `F01.Shipment.UpdateDraft` | `f01.shipment.edit` | Draft + `expectedVersion` | `PATCH /api/v1/shipments/{shipmentId}` |
 | تأكيد | `F01.Shipment.Confirm` | `f01.shipment.confirm` | Draft only | Draft → Confirmed; reason/audit contract applies |
-| عرض | `F01.Shipment.Get` | `f01.shipment.view` | authorized scope | read ShipmentResource |
+| عرض | `F01.Shipment.Get` | `f01.shipment.view` | authorized scope | read `ShipmentResource` |
 | بحث | `F01.Shipment.Search` | `f01.shipment.view` | authorized scope | paged search |
 
-No legacy toolbar command is promoted.
+UI permission state is a UX layer only; server permission and data scope remain authoritative.
 
-## Lookups — TEAM-D03 PASS
-Shared UI contract for `customerRef`, `originRef`, `destinationRef`, and reference-type grid editors:
-- server-side debounced search via shared `TransportLookup` behavior;
+## 4. Layout contract — TEAM-D02 PASS
+Approved project-owner resolution:
+- Header/MainData = `Content`;
+- Tabs/Workspace = `Fill`;
+- line grids = `Fill`;
+- LocalException = `NONE`.
+
+```text
+RTL Transaction / HeaderLines
+┌──────────────────────────────────────────────────────────────┐
+│ Shared TransportToolbar / shell                              │
+├──────────────────────────────────────────────────────────────┤
+│ Header / MainData — Content                                  │
+│ status | shipment id | customer | origin | destination      │
+├──────────────────────────────────────────────────────────────┤
+│ Tabs / Workspace — Fill                                      │
+│ General | Items | Packages | Legs | Audit                    │
+│ relevant grid owns Fill inside its tab                       │
+├──────────────────────────────────────────────────────────────┤
+│ Shared validation/status/action/audit presenters             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+No local size, padding, font, color, toolbar, grid, pagination, audit, RTL, or DPI override.
+
+## 5. Fields — TEAM-D03 PASS
+| FieldKey | Arabic Label | Profile / Type | Required | Edit policy | Validation / semantics |
+|---|---|---|---|---|---|
+| `shipmentId` | رقم البوليصة | KeyText / UUID | No | Read-only | server assigned |
+| `customerRef` | العميل | Lookup / Reference | Yes | Draft only | permitted customer |
+| `originRef` | المصدر | Lookup / Reference | Yes | Draft only | scope-valid location |
+| `destinationRef` | الوجهة | Lookup / Reference | Yes | Draft only | scope-valid location |
+| `shipmentState` | الحالة | State / Enum | Yes | Read-only | governing lifecycle |
+| `itemLines` | البنود | LineGrid / Collection | Yes | Draft only | nonempty on confirm |
+| `packageLines` | الطرود | LineGrid / Collection | No | Draft only | package/item consistency |
+| `legLines` | المراحل | LineGrid / Collection | No | Draft only | chronology validation |
+| `expectedVersion` | إصدار التزامن | Hidden / Integer | update/confirm | read-only token | required on update/confirm |
+
+No field is promoted from legacy `SHP-005/006/007/008` merely because it exists there.
+
+## 6. Grids — TEAM-D03 PASS
+Shared rules:
+- `GridProfile = TransactionLines`;
+- `AutoGenerateColumns = false`;
+- `SelectionPolicy = SingleRow`;
+- CoreUI owns RTL, header/row style, row height, editing/focus states;
+- Draft-only editing; outside Draft all line columns are read-only;
+- no row-level permission is invented;
+- reference editors use `TransportLookup` where declared;
+- widths use semantic CoreUI policies, not fixed local pixels.
+
+### ItemsGrid
+| # | Key | Arabic Header | Type | Required | Edit | Sort design | Width / editor |
+|---:|---|---|---|---|---|---|---|
+| 1 | `itemOrPackageRef` | مرجع الصنف/الطرد | Reference | Yes | Draft | Yes* | content / `TransportLookup` |
+| 2 | `description` | الوصف | String | No | Draft | Yes* | primary Fill / text |
+| 3 | `quantity` | الكمية | Decimal | Yes | Draft | Yes* | content numeric |
+| 4 | `weight` | الوزن | Decimal | No | Draft | Yes* | content numeric |
+| 5 | `volume` | الحجم | Decimal | No | Draft | Yes* | content numeric |
+| 6 | `state` | الحالة | Enum | Yes | Read-only | Yes* | content state |
+
+`*` Actual server sort-key mapping remains `TBD-GATED`; arbitrary database expressions are not authorized.
+
+Items behavior:
+- server paging = true;
+- confirm requires at least one item line;
+- typed sort only when an allow-listed server mapping exists.
+
+### PackagesGrid
+| # | Key | Arabic Header | Type | Required | Edit | Width / editor |
+|---:|---|---|---|---|---|---|
+| 1 | `packageRef` | مرجع الطرد | Reference | Yes | Draft | content / `TransportLookup` |
+| 2 | `weight` | الوزن | Decimal | No | Draft | content numeric |
+| 3 | `volume` | الحجم | Decimal | No | Draft | content numeric |
+| 4 | `state` | الحالة | Enum | Yes | Read-only | content state |
+
+- embedded Draft collection; no API paging contract is created by the design;
+- package/item consistency remains authoritative domain/API validation;
+- no package-item cardinality or hidden FK is invented.
+
+### LegsGrid
+| # | Key | Arabic Header | Type | Required | Edit | Width / editor |
+|---:|---|---|---|---|---|---|
+| 1 | `sequence` | الترتيب | Integer | Yes | Draft | content numeric |
+| 2 | `stageOrStationRef` | المرحلة/المحطة | Reference | Yes | Draft | primary Fill / `TransportLookup` |
+
+- embedded Draft chronology collection;
+- chronology validity remains domain/API authority;
+- no dates/times/from-to/route formulas are invented.
+
+## 7. Tabs
+| Order | Tab | Role |
+|---:|---|---|
+| 1 | General | shipment header/general data |
+| 2 | Items | ItemsGrid Fill |
+| 3 | Packages | PackagesGrid Fill |
+| 4 | Legs | LegsGrid Fill |
+| 5 | Audit | shared audit/context display |
+
+Tabs are real functional sections; no decorative/empty tab is added.
+
+## 8. Lookups
+Shared contract for header lookups and declared grid references:
+- server-side debounced search;
 - selected identity = `LookupItem.Id`;
 - maximum results = `50`;
-- `Code`, `DisplayName`, `SecondaryName` are presentation/search values only;
-- permission, active/status and company/branch filtering remain server authority;
+- Code/DisplayName/SecondaryName are presentation/search values only;
+- permission/status/company/branch filtering is server-authoritative;
 - no full-table client loading.
 
-Screen semantics:
-- `customerRef`: permitted customer.
-- `originRef`: scope-valid location.
+Semantics:
+- `customerRef`: permitted customer;
+- `originRef`: scope-valid location;
 - `destinationRef`: scope-valid location.
-- grid reference fields: bounded reference selection only where declared above.
 
 Nonblocking `TBD-GATED` technical bindings:
-- exact customer lookup source/action/endpoint/provider identifier;
-- exact location lookup source/action/endpoint/provider identifier;
-- exact item/package/stage lookup provider identifiers;
-- exact screen-specific search keys beyond shared LookupItem values.
+- exact customer/location/item/package/stage provider or endpoint identifiers;
+- exact screen-specific lookup search keys beyond shared LookupItem values.
 
-No API identifier is invented to fill these gates.
+No API identifier is invented.
 
-## Search / filters
+## 9. Search / paging
 Issued `ShipmentSearchQuery` filters:
-- shipment number
-- customer
-- origin
-- destination
-- state
-- date range
+- shipment number;
+- customer;
+- origin;
+- destination;
+- state;
+- date range.
 
-Shared paging authority: page size maximum `200`; filtering and sorting remain typed and allow-listed server-side. Client-provided company/branch scope is never authority.
+Shared maximum page size = 200. Filtering/sorting are typed/allow-listed server-side. Client-provided company/branch values are not authorization authority.
 
-## States and workflow
-Business vocabulary: `Draft / Confirmed / Active / Completed / Cancelled`.
+## 10. Online / offline
+FLOW01 write contracts are `ONLINE_AUTHORITATIVE`:
+- `OFFLINE_WRITE = 0`;
+- `Can Queue = NO`;
+- no Outbox/ACK/Replay/sync write path is created by this screen design.
 
-Issued screen transitions:
-- Create → Draft.
-- UpdateDraft → Draft only, with `expectedVersion`.
-- Confirm → Draft → Confirmed, reason/audit contract.
-- No transition command is invented for Active/Completed/Cancelled.
+## 11. UX contract — TEAM-D04 PASS
+Detailed evidence: `ux-stage-evidence.md`.
 
-Concurrency:
-- stale update/confirm → governing concurrency conflict;
-- no silent overwrite;
-- exact reload/recovery interaction belongs to TEAM-D04 / UX.
+### Modes
+- New Draft: issued editable fields/grids available under capability/permission.
+- Existing Draft: update requires `expectedVersion`; confirm requires Draft + permission/capability + valid data.
+- Non-Draft: Draft-only fields/grids become read-only; no extra lifecycle command is invented.
 
-## Online / Offline classification
-FLOW01 is `ONLINE_ONLY`:
-- `OFFLINE_WRITE = 0`
-- `Can Queue = NO`
-- all issued writes are `ONLINE_AUTHORITATIVE`.
+### Loading / submit
+- use shared `TransportLoadingState`;
+- disable conflicting state-changing commands during active request;
+- prevent UI double-submit; server idempotency remains authoritative.
 
-No outbox/replay/sync design is created.
+### Validation
+- use `TransportValidationPresenter` for field/summary errors;
+- map validation errors by field key/semantic path when available;
+- no local MessageBox validation path;
+- required visual state is not itself an error.
 
-## Validation and messages
+### Concurrency
+On stale version:
+- present shared conflict state;
+- offer Refresh/Reload;
+- never silently overwrite;
+- no client merge algorithm is invented;
+- returned current resource/version becomes authoritative after reload.
+
+### Permission/error privacy
+- permission/scope denial reveals no hidden data;
+- unexpected error uses shared error state;
+- CorrelationId appears only in technical/support details;
+- retry only when contract says retry may be meaningful.
+
+### Keyboard/focus
+- shared CoreUI/Grid keyboard behavior only;
+- no screen-specific Enter/Escape/global shortcut is invented;
+- focus/tab order follows RTL visual flow and shared host behavior;
+- exact runtime TabIndex is implementation-owned.
+
+## 12. Visual contract — TEAM-D05 PASS
+Detailed evidence: `visual-stage-evidence.md`.
+
+- central CoreUI typography only; no per-screen font;
+- central spacing/sizing tokens only;
+- MainData maximum two columns;
+- semantic states: Normal, Required, ReadOnly, Disabled, Error, Focused;
+- Required uses required semantic presentation, not error color;
+- `shipmentId` and `shipmentState` use ReadOnly state;
+- grids use shared `TransportDataGrid` styles and semantic widths;
+- tabs use central RTL/right-origin visual policy;
+- toolbar uses central command styling/order;
+- validation/loading/empty/error/audit/pagination are shared presenters/controls;
+- no raw colors, local font/height/margin, or LocalException;
+- logical-pixel tokens scale for DPI; Arabic text must not clip at reference DPI scales;
+- focus cues remain visible and accessibility metadata comes from ScreenDefinition metadata where supported.
+
+## 13. Validation and messages
 Authority-backed conditions:
-- customer permitted;
-- origin/destination scope-valid;
-- item lines nonempty on confirm;
+- permitted customer;
+- scope-valid origin/destination;
+- at least one item on confirm;
 - package/item consistency;
 - leg chronology validity;
-- expectedVersion required for update/confirm;
-- server-side default-deny permission and scope enforcement.
+- expectedVersion on update/confirm;
+- default-deny permission/scope enforcement.
 
-Shared error mapping is inherited from approved W2/CoreUI contracts. No local error taxonomy is created.
+Shared error categories include validation, not-found, permission/scope denial, concurrency/state/idempotency conflict, and unexpected server error with CorrelationId. No screen-local error taxonomy is created.
 
-## Accessibility / keyboard — input to TEAM-D04
-- CoreUI accessibility/RTL/DPI/common grid keyboard infrastructure is inherited.
-- Default `MultiSelect=false` is fixed by FIELD_GRID because no bulk capability is issued.
-- Screen-specific default focus, Enter/Escape behavior, tab order, confirmation/recovery interactions and shortcut policy are TEAM-D04 responsibilities.
-- No legacy shortcut may be promoted without authority.
+## 14. Acceptance criteria
+1. Identity is only `FLOW01-W3-SCR-001 / SHP-001`, not legacy `SHP-005`.
+2. Profile/Variant is `Transaction / HeaderLines`.
+3. Header/MainData=Content; Tabs/Workspace=Fill; line grids=Fill; no LocalException.
+4. No local toolbar/grid/pagination/audit/validation/loading/error implementation is specified.
+5. Create/edit/confirm/view/search remain bound to issued permissions/capabilities/state.
+6. Draft edit requires `expectedVersion`; stale conflict never silently overwrites.
+7. Confirm requires at least one item line.
+8. All concrete grid columns are explicit and `AutoGenerateColumns=false`.
+9. No unissued package cardinality, leg timing/route formula, API, DTO, permission, or storage field is invented.
+10. Lookup is server-side, debounced, max 50, identity by Id, server scope authoritative.
+11. UI prevents double-submit while server idempotency remains authority.
+12. All write actions are online-authoritative; no offline queue/replay is exposed.
+13. Visual system uses only CoreUI tokens and shared state presenters.
+14. RTL/DPI/accessibility behavior is inherited and no Arabic clipping/local sizing hack is introduced.
+15. Nonblocking TBD technical bindings are documented and do not masquerade as approved API contracts.
 
-## Acceptance criteria
-1. Identity remains `FLOW01-W3-SCR-001 / SHP-001`, `Transaction / HeaderLines`.
-2. Layout remains Header/MainData=Content, Tabs/Workspace=Fill, Lines/Grid=Fill, LocalException=None.
-3. Shared Toolbar/Grid/Pagination/Audit/RTL/DPI behavior is inherited, not recreated.
-4. Create/Edit/Confirm/View/Search remain bound only to issued capabilities/permissions/states.
-5. Confirm with zero item lines remains invalid.
-6. Stale version produces concurrency conflict; no silent overwrite.
-7. Confirmed does not imply accounting posting, revenue recognition or commission.
-8. All writes remain online-only; no queue/replay path.
-9. Five issued tabs remain intact.
-10. All three concrete grids have explicit screen-specific columns and `AutoGenerateColumns=false`.
-11. ItemsGrid uses server paging and typed allow-listed sorting only after technical mapping exists.
-12. PackagesGrid does not invent package-item cardinality; package/item consistency stays domain/API authority.
-13. LegsGrid represents only chronology order + stage/station reference; no unissued timing/route model is invented.
-14. Grid editing is Draft-only and single-row; no bulk capability is implied.
-15. Shared lookup behavior uses server-side bounded search, Id identity and cap 50; exact unissued provider IDs remain gated.
-16. No legacy SHP-005/006/007/008 field/column/command becomes governing by lineage.
+## 15. Nonblocking gated items
+These do **not** block design approval and remain technical binding work for the appropriate authority/implementation stage:
+- exact lookup provider/endpoint identifiers;
+- exact ItemsGrid server sort-key mapping;
+- any future screen-specific keyboard shortcut only if separately issued.
 
-`TAE-F01-001` remains `NOT RUN`; this document records design inputs, not runtime PASS.
+## 16. Evidence
+- Layout decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`
+- FIELD_GRID authority decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`
+- UX evidence: `documentation/design/screens/Waybills/FLOW01-W3-SCR-001/ux-stage-evidence.md`
+- Visual evidence: `documentation/design/screens/Waybills/FLOW01-W3-SCR-001/visual-stage-evidence.md`
+- Independent review: pending `independent-review.md`
 
-## Known gated details after FIELD_GRID
-Nonblocking technical bindings:
-1. Exact lookup provider/endpoint/action IDs for customer/location/item/package/stage references.
-2. Exact ItemsGrid server sort-key allow-list mapping.
-3. Any future technical paging contract for PackagesGrid/LegsGrid; none is created here.
+## 17. Handoff
+- CurrentStage: `INDEPENDENT_REVIEW`
+- OwnerTeam: `TEAM-D06`
+- BlockingIssue: none at design level; only documented nonblocking technical gates.
+- HandoffReady: `YES`
 
-TEAM-D04 UX-stage work still required:
-4. default focus;
-5. Enter/Escape behavior;
-6. tab order and focus return after modal lookup/validation;
-7. confirmation behavior for Confirm;
-8. loading/double-submit behavior;
-9. concurrency conflict reload/retry path;
-10. validation summary/field focus behavior;
-11. empty/loading/error presentation per shared CoreUI;
-12. exact minimum-click workflow within issued capabilities.
+## 18. Independent review
+- Reviewer: `TEAM-D06`
+- Verdict: `PENDING`
+- Findings: pending
+- ClosedAt: pending
 
-These UX items are not pre-decided by TEAM-D03.
-
-## Evidence
-- Layout authority decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`.
-- FIELD_GRID authority decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`.
-- Canonical field/grid evidence: this document.
-- Visual: not yet produced; TEAM-D05 not reached.
-- Independent review: not yet produced; TEAM-D06 not reached.
-- Repository implementation: lineage evidence only.
-
-## Stage history
-### TEAM-D01 — ANALYSIS
-- Verdict: `PASS`.
-- Result: canonical identity, business boundary, fields, issued commands/states, online-only classification and acceptance inputs established.
-
-### TEAM-D02 — LAYOUT
-- Verdict: `PASS` after owner resolution.
-- Result: Transaction/HeaderLines; Header/MainData Content; Tabs/Workspace Fill; Lines/Grid Fill; no LocalException.
-
-### TEAM-D03 — FIELD_GRID
-- Prior state: `HOLD_AUTHORITY` because complete concrete GridColumnDefinitions had not been issued.
-- Owner decision: `2026-08-24_FLOW01-W3-SCR-001_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md` resolved that design-authority gap and made unissued technical lookup/provider IDs nonblocking.
-- Verdict: `PASS`.
-- CompletedStage: `FIELD_GRID`.
-- Result: explicit ItemsGrid, PackagesGrid and LegsGrid design contracts; single-row/Draft edit policy; shared lookup UI contract; exact unissued technical providers remain `TBD-GATED` without invention.
-
-## Handoff
-- CurrentStage: `UX`.
-- OwnerTeam: `TEAM-D04`.
-- NextTeam: `TEAM-D04`.
-- HandoffReadyToUX: `YES`.
-- Required input: this canonical specification + current CoreUI/Profile/W2 error/lookup contracts.
-- TEAM-D04 must not alter FIELD_GRID business semantics or introduce new commands/permissions/API contracts.
-
-## Independent review
-- Reviewer: pending; stage not reached.
-- Verdict: pending.
-- Findings: pending.
-- ClosedAt: pending.
-
-No application code, official kurrasa, DDL, migration, permission, API contract or offline-write authority is modified or created by this design artifact.
+No application code, official kurrasa, DDL, migration, permission, API contract, or offline-write authority is modified or created by this design record.
