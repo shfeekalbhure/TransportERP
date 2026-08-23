@@ -50,11 +50,12 @@ public sealed class Wave1PostgreSqlMigrationOrderTests
             seed.Companies.Add(company);
             await seed.SaveChangesAsync();
 
-            await seed.Database.ExecuteSqlInterpolatedAsync($@"
+            await seed.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO transport_erp.countries
-                    (\"Id\",\"Code\",\"ArabicName\",\"EnglishName\",\"IsActive\",\"Version\",\"NationalityName\")
+                    ("Id","Code","ArabicName","EnglishName","IsActive","Version","NationalityName")
                 VALUES
-                    ({legacyCountryId}, 'LEGACY', 'دولة تاريخية', NULL, TRUE, 1, NULL);");
+                    ({legacyCountryId}, 'LEGACY', 'دولة تاريخية', NULL, TRUE, 1, NULL);
+                """);
 
             seed.Set<NumberSequenceEntity>().Add(new NumberSequenceEntity
             {
