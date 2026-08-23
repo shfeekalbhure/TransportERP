@@ -64,6 +64,7 @@ Rules:
 - permission/scope denial reveals no hidden data.
 - query refresh preserves current typed filter context.
 - no write command, lifecycle action, bulk action, Print/Export or DrillDown is invented because none is issued for this screen.
+- A10 for FLOW01 is `ONLINE_ONLY`; this design does not invent offline cache/snapshot authority for tracking.
 
 ## VISUAL — TEAM-D05 PASS
 - shared ReportInquiry visual system only: CoreUI typography/colors/spacing, right-origin RTL filters, read-only result grid, shared pagination/loading/empty/error.
