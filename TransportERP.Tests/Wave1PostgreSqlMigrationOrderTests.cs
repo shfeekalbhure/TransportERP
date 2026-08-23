@@ -31,8 +31,25 @@ public sealed class Wave1PostgreSqlMigrationOrderTests
 
         var legacyCountryId = Guid.NewGuid();
         var legacySequenceId = Guid.NewGuid();
+        var legacyCompanyId = Guid.NewGuid();
         await using (var seed = CreateMain(connection))
         {
+            var currency = new Currency
+            {
+                Id = Guid.NewGuid(), Code = "W1T", NameAr = "عملة اختبار WAVE-1", MinorUnit = 2, IsBase = true,
+                Status = "ACTIVE", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            var company = new Company
+            {
+                Id = legacyCompanyId, Code = "W1-UPGRADE", LegalNameAr = "شركة ترقية WAVE-1", BaseCurrencyId = currency.Id,
+                DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE", CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow, RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            seed.Currencies.Add(currency);
+            seed.Companies.Add(company);
+            await seed.SaveChangesAsync();
+
             await seed.Database.ExecuteSqlInterpolatedAsync($@"
                 INSERT INTO transport_erp.countries
                     (\"Id\",\"Code\",\"ArabicName\",\"EnglishName\",\"IsActive\",\"Version\",\"NationalityName\")
@@ -42,7 +59,7 @@ public sealed class Wave1PostgreSqlMigrationOrderTests
             seed.Set<NumberSequenceEntity>().Add(new NumberSequenceEntity
             {
                 Id = legacySequenceId,
-                CompanyId = await seed.Companies.Select(x => x.Id).FirstAsync(),
+                CompanyId = legacyCompanyId,
                 BranchId = null,
                 DocumentType = "LEGACYDOC",
                 Prefix = "L-",
