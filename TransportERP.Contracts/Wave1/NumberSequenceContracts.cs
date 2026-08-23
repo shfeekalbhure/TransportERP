@@ -14,7 +14,7 @@ public sealed record NumberSequenceDto(
     long Version)
 {
     public string Code { get; init; } = string.Empty;
-    public string ArabicName { get; init; } = string.Empty;
+    public string? ArabicName { get; init; }
     public string? EnglishName { get; init; }
     public string? Notes { get; init; }
     public Guid? FiscalYearId { get; init; }
@@ -42,10 +42,24 @@ public sealed record NumberReservationTransitionCommandRequest(
     string IdempotencyKey,
     string? Reason = null);
 
+// Current W2 governing request: protected numbering mutation requires an approved ApprovalRequest binding.
+public sealed record NumberingProtectedActionRequest(
+    long LastNumber,
+    long ExpectedVersion,
+    string Reason,
+    Guid ApprovalRequestId)
+{
+    [JsonIgnore]
+    public long NextValue => checked(LastNumber + 1);
+}
+
+// Historical compatibility DTO retained only for non-governing lineage tests/services.
+// Runtime WAVE-1 routes must use NumberingProtectedActionRequest.
 public sealed record ProtectedNumberSequenceActionRequest(
     long LastNumber,
     long ExpectedVersion,
-    string Reason)
+    string Reason,
+    Guid ApprovalRequestId = default)
 {
     [JsonIgnore]
     public long NextValue => checked(LastNumber + 1);
