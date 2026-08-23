@@ -1,5 +1,5 @@
 ScreenCode,ArabicName,Domain,Profile,Variant,CurrentState,OwnerTeam,InputVersion,OutputVersion,BlockingIssue,NextTeam,EvidencePath,ReviewedBy,UpdatedAt
-SHP-005,رأس البوليصة,Waybills,Transaction,TBD,ANALYSIS,TEAM-D01,master@5d58a420,,"Must reconcile current implementation with governing kurrasa/CoreUI before layout",TEAM-D02,documentation/design/screens/Waybills/SHP-005/screen-spec.md,,2026-08-24
+SHP-005,رأس البوليصة,Waybills,Transaction,TBD-GATED,HOLD_AUTHORITY,DESIGN-LEAD / ORCHESTRATOR,master@5d58a420,master@773039b6,"Current governing SHP-005 identity/Variant relationship to SHP-006/007/008 is not source-backed strongly enough to proceed without inference",DESIGN-LEAD / ORCHESTRATOR,documentation/design/screens/Waybills/SHP-005/screen-spec.md,DESIGN-LEAD / ORCHESTRATOR,2026-08-24
 SHP-006,أطراف البوليصة,Waybills,Transaction,TBD,BACKLOG,DESIGN-LEAD,,,,TEAM-D01,,,2026-08-24
 SHP-007,أصناف البوليصة,Waybills,Transaction,TBD,BACKLOG,DESIGN-LEAD,,,,TEAM-D01,,,2026-08-24
 SHP-008,الأوزان والأبعاد والقيم,Waybills,Transaction,TBD,BACKLOG,DESIGN-LEAD,,,,TEAM-D01,,,2026-08-24
