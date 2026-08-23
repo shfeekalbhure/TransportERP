@@ -39,7 +39,7 @@ Shared `Transaction / HeaderLines` authority:
 - no LocalException; central RTL/DPI/sizing only.
 
 ## FIELD_GRID — TEAM-D03 PASS
-`GridProfile=TransactionLines/Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true`, `SelectionPolicy=SingleRow`. This screen has no allocation-edit capability, so the allocation grid is read-only display.
+`GridProfile=Display`, `AutoGenerateColumns=false`, `UsesServerPaging=true`, `SelectionPolicy=SingleRow`. This screen has no allocation-edit capability, so the allocation grid is read-only display.
 
 | # | Key | Arabic Header | UI Type | Edit | Width policy |
 |---:|---|---|---|---|---|
@@ -59,7 +59,7 @@ Exact provider/sort identifiers remain `TBD-GATED`; no allocation mutation is in
 - loading state prevents duplicate submit and conflicting mutations.
 - capacity contribution/allocation state are display-only server results; no local capacity formula.
 - lookups are shared server-side/debounced/Id-bound/scope-authoritative; provider identifiers may remain gated.
-- all writes remain online-authoritative.
+- all issued FLOW01 actions are online-only; no offline transition/queue is exposed.
 
 ## VISUAL — TEAM-D05 PASS
 - shared Transaction CoreUI tokens only: central typography, spacing, state colors, toolbar, grids, tabs, RTL, DPI, validation/loading/error/audit.
