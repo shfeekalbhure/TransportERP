@@ -34,6 +34,8 @@ If an exact required fact is absent, contradictory, stale, or not authority-back
 - record the blocking issue and required authority/evidence;
 - do not create API/DTO/Permission/DDL/Offline-write authority from UI needs.
 
+If a reviewed/current authority explicitly classifies a repository or historical screen ID as non-governing, the orchestrator must not keep designing under that ID. It records that identity as `NON_GOVERNING_LINEAGE`, excludes it from active routing, and continues only under an independently issued canonical identity when one exists. No fuzzy alias equivalence is permitted.
+
 ## 5. Single-conversation control plane
 The owner may use one central conversation/session for direction and approvals. Specialist roles operate through repository artifacts and queue state. Separate team conversations, if ever used by humans, are advisory only and cannot become a competing source of truth.
 
@@ -44,6 +46,8 @@ Canonical progression:
 `BACKLOG → ANALYSIS → LAYOUT → FIELD_GRID → UX → VISUAL → INDEPENDENT_REVIEW → DESIGN_APPROVED`
 
 Revision and hold paths remain governed by `02_SCREEN_WORKFLOW_AND_TEAM_HANDOFF_V1.md`.
+
+`NON_GOVERNING_LINEAGE` is a terminal evidence disposition, not a workflow stage. Rows in that disposition are skipped by specialist routing and retained only for traceability.
 
 ## 7. Stage ownership
 - `ANALYSIS` → TEAM-D01
@@ -56,8 +60,15 @@ Revision and hold paths remain governed by `02_SCREEN_WORKFLOW_AND_TEAM_HANDOFF_
 
 The next team never needs a copied brief; it reads the same repository state.
 
-## 8. Pilot policy
-`SHP-005` remains the first pilot. No broad batch release occurs until SHP-005 reaches independent-review PASS and the Design Lead confirms the workflow itself did not create duplication, authority leakage, or ambiguous ownership.
+## 8. Pilot policy — reconciled to current authority
+The original repository pilot was opened under R2/repository ID `SHP-005`. Current 2026-08-23 reviewed kurrasa material classifies that R2 identity as non-governing/ID-conflict material. It is therefore retained only as `NON_GOVERNING_LINEAGE`.
+
+The active design pilot is the independently issued canonical FLOW01 screen:
+`FLOW01-W3-SCR-001 — إدخال البوليصة — Transaction / HeaderLines`.
+
+The rebind does **not** assert that `SHP-005 == FLOW01-W3-SCR-001`; it replaces an ineligible pilot identity with a separately authoritative canonical identity. Repository implementation under SHP-005 remains reconciliation evidence only.
+
+No broad batch release occurs until `FLOW01-W3-SCR-001` reaches independent-review PASS and the Design Lead confirms the workflow itself did not create duplication, authority leakage, or ambiguous ownership.
 
 ## 9. Authority boundary
 This protocol governs design coordination only. It does not change the official kurrasa, application code, API contracts, database schema, permissions, or offline-write authority.
