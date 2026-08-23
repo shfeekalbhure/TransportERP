@@ -40,7 +40,7 @@ public static class Wave1BalanceSheetApiModule
             catch (ArgumentException ex) { return Bad(ex, context); }
         });
 
-        group.MapPost("/export", async (ACC049ExportRequest request, HttpContext context, Wave1BalanceSheetService service, CancellationToken cancellationToken) =>
+        group.MapPost("/export", async (ACC049ExportRequest request, HttpContext context, Wave1BalanceSheetService service, Wave1DeliveryAuditWriter audit, CancellationToken cancellationToken) =>
         {
             if (!HasPermission(context.User, "ACC049.Export")) return Forbidden("PERMISSION_DENIED", context);
             if (!TryResolveScope(context.User, request.BranchId, out var companyId, out var branchId)) return Forbidden("SCOPE_DENIED", context);
@@ -49,6 +49,8 @@ public static class Wave1BalanceSheetApiModule
                 _ = Paging(request.Page, request.PageSize);
                 var report = await service.QueryAsync(companyId, branchId, new BalanceSheetQueryRequest(request.AsOf, branchId, request.CurrencyId), cancellationToken);
                 var export = Wave1BalanceSheetService.Export(report);
+                var correlation = Correlation(context);
+                await audit.AppendSuccessAsync("ACC-049", "Export", request, AuditContext(context, companyId, branchId, correlation), cancellationToken);
                 return Results.Ok(new ExportJobOrFileResponse(export.FileName, export.ContentType, export.Content));
             }
             catch (ArgumentException ex) { return Bad(ex, context); }
@@ -94,6 +96,12 @@ public static class Wave1BalanceSheetApiModule
         branchId = requestedBranchId;
         return true;
     }
+
+    private static Wave1DeliveryAuditContext AuditContext(HttpContext context, Guid companyId, Guid? branchId, Guid correlation)
+        => new(TryActor(context.User), companyId, branchId, correlation, context.User.FindFirstValue("device_id"), context.Connection.RemoteIpAddress?.ToString());
+
+    private static Guid? TryActor(ClaimsPrincipal principal)
+        => Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var id) ? id : null;
 
     private static bool HasPermission(ClaimsPrincipal principal, string permission)
         => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role && string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
