@@ -12,11 +12,31 @@ internal static class Wave1MigrationBuilderCompatibilityExtensions
         Func<ColumnsBuilder, TColumns> columns,
         Action<CreateTableBuilder<TColumns>> constraints)
     {
-        migrationBuilder.CreateTable(
+        var table = migrationBuilder.CreateTable(
             name: name,
             columns: columns,
             schema: schema,
             constraints: constraints);
+
+        // Earlier WAVE-1 hand-written migrations used the compact positional
+        // ForeignKey(name, column, schema, table, column) form. EF Core's actual
+        // positional order is (name, column, principalTable, principalColumn,
+        // principalSchema), which produces malformed PostgreSQL such as
+        // REFERENCES "Id".transport_erp (companies). Normalize only that exact
+        // legacy signature; correctly constructed foreign keys are untouched.
+        foreach (var foreignKey in table.Operation.ForeignKeys)
+        {
+            if (!string.Equals(foreignKey.PrincipalTable, schema, StringComparison.Ordinal) ||
+                !string.Equals(foreignKey.PrincipalSchema, "Id", StringComparison.Ordinal) ||
+                foreignKey.PrincipalColumns.Length != 1 ||
+                string.Equals(foreignKey.PrincipalColumns[0], "Id", StringComparison.Ordinal))
+                continue;
+
+            var actualPrincipalTable = foreignKey.PrincipalColumns[0];
+            foreignKey.PrincipalTable = actualPrincipalTable;
+            foreignKey.PrincipalSchema = schema;
+            foreignKey.PrincipalColumns = ["Id"];
+        }
     }
 
     public static void CreateIndex(
