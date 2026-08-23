@@ -2,8 +2,8 @@
 
 **Alias:** `TRIP-001`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-01`
 
 ## Authority
@@ -65,6 +65,11 @@ Exact provider/sort identifiers remain `TBD-GATED`; no allocation mutation is in
 - shared Transaction CoreUI tokens only: central typography, spacing, state colors, toolbar, grids, tabs, RTL, DPI, validation/loading/error/audit.
 - no local route/capacity graphics, fixed sizes, raw colors or custom lifecycle styling.
 
+## Independent review — TEAM-D06 PASS
+- Review artifact: `documentation/design/batches/BATCH-01_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Open design findings: `0`.
+- Runtime test `TAE-F01-006`: issued, not run.
+
 ## Acceptance criteria
 1. create/edit/transition/view are permission/state bound exactly as issued.
 2. client does not invent legal transition edges or capacity formulas.
@@ -73,6 +78,5 @@ Exact provider/sort identifiers remain `TBD-GATED`; no allocation mutation is in
 5. no invented API/DTO/Permission/DDL/offline behavior.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
-- Current: `INDEPENDENT_REVIEW`.
-- Reviewer: `TEAM-D06`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.
+- Final: `DESIGN_APPROVED`.
