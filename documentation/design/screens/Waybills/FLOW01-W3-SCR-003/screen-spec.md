@@ -2,8 +2,8 @@
 
 **Alias:** `SHP-003`  
 **Profile / Variant:** `ReportInquiry / Inquiry`  
-**CurrentDesignState:** `FIELD_GRID`  
-**OwnerTeam:** `TEAM-D03`  
+**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**OwnerTeam:** `TEAM-D06`  
 **Batch:** `BATCH-01`
 
 ## Authority
@@ -13,47 +13,72 @@
 - Permission: `f01.shipment.tracking.view`.
 - Typed definition: `FLOW01-W3-SCR-003_TYPED_SCREENDEFINITION.md`.
 - Design test input: `TAE-F01-003` (issued; runtime PASS not claimed).
+- FIELD_GRID authority: `documentation/design/decisions/2026-08-24_BATCH-01_FIELD_GRID_DESIGN_AUTHORITY_DECISION.md`.
 
 ## ANALYSIS — TEAM-D01 PASS
 Purpose: scoped read-only shipment tracking over server-authoritative current state, custody and ordered tracking events.
 
-### Fields / filters / results
-- `shipmentRef` — البوليصة — Lookup/UUID — required query target — visible scope.
-- `currentState` — الحالة الحالية — Enum/read-only — server result.
-- `custodyOwner` — الحيازة الحالية — Reference/read-only — server result.
-- `eventRange` — الفترة — DateRange — optional typed filter.
-- `eventState` — حالة الحدث — Enum lookup/filter.
-- `trackingEvents` — سجل التتبع — ReadGrid/Collection — immutable result view.
+Filters/summary:
+- `shipmentRef` — البوليصة — Lookup/UUID — required query target.
+- `currentState` — الحالة الحالية — Enum/read-only server result.
+- `custodyOwner` — الحيازة الحالية — Reference/read-only server result.
+- `eventRange` — الفترة — DateRange optional typed filter.
+- `eventState` — حالة الحدث — Enum filter.
+- `trackingEvents` — سجل التتبع — immutable ReadGrid.
 
 No client company/branch scope field is authorized.
 
 ## LAYOUT — TEAM-D02 PASS
-Current `ReportInquiry` profile governs:
+Shared `ReportInquiry / Inquiry` authority:
 - Filters = `Content`.
 - Summary = `Content`.
 - ResultsGrid = `Fill / ReadOnly`.
 - Pagination = shared `Fixed` region.
-- RTL/DPI/spacing/error/loading/empty states = CoreUI.
-- No LocalException.
+- no LocalException; RTL/DPI/spacing/loading/empty/error = CoreUI.
 
-The typed historical `Filters(Fixed)` shorthand is not promoted over the approved shared profile.
+## FIELD_GRID — TEAM-D03 PASS
+`GridProfile=ReportResults`, `AutoGenerateColumns=false`, `UsesServerPaging=true` with issued cursor paging, `SelectionPolicy=SingleRow`, all result columns ReadOnly.
 
-## FIELD_GRID — TEAM-D03 IN PROGRESS
-Typed result columns:
-`occurredAt, eventType, priorState, currentState, sourceCustody, targetCustody, actorDisplay, reason`.
+| # | Key | Arabic Header | UI Type | Width policy |
+|---:|---|---|---|---|
+| 1 | `occurredAt` | وقت الحدث | Instant | content datetime |
+| 2 | `eventType` | نوع الحدث | Enum | content state |
+| 3 | `priorState` | الحالة السابقة | Enum | content state |
+| 4 | `currentState` | الحالة الحالية | Enum | content state |
+| 5 | `sourceCustody` | الحيازة المصدر | Reference | content/reference |
+| 6 | `targetCustody` | الحيازة المستهدفة | Reference | content/reference |
+| 7 | `actorDisplay` | المنفذ | String | content/display |
+| 8 | `reason` | السبب | String | primary Fill |
 
-Known rules:
-- `AutoGenerateColumns=false`.
-- cursor paging is issued.
-- results are immutable/read-only.
-- filters bind only to the issued tracking query contract.
+Rules:
+- no grid editor; immutable tracking view.
+- exact server sort keys/provider identifiers remain `TBD-GATED` unless issued; no arbitrary sort expression.
+- lookup identity binds by Id and server scope.
 
-Required TEAM-D03 closure: explicit per-column labels/types/order/CoreUI width policy, read-only contract and typed filter presentation; no endpoint/provider identifier may be invented.
+## UX — TEAM-D04 PASS
+- Idle: filters editable; no fake result data.
+- Loading/Refreshing: shared loading state, conflicting query actions disabled while request active.
+- Loaded: Summary + Results + Pagination reflect one server response context.
+- Empty: `TransportEmptyState`; no synthetic rows.
+- Error: `TransportErrorState`; CorrelationId only in technical/support details.
+- permission/scope denial reveals no hidden data.
+- query refresh preserves current typed filter context.
+- no write command, lifecycle action, bulk action, Print/Export or DrillDown is invented because none is issued for this screen.
 
-## Non-inventions
-No write command, lifecycle transition, hidden-data inference, API route, DTO, permission, DDL or offline behavior is created by this design.
+## VISUAL — TEAM-D05 PASS
+- shared ReportInquiry visual system only: CoreUI typography/colors/spacing, right-origin RTL filters, read-only result grid, shared pagination/loading/empty/error.
+- no local pixel sizing, raw colors, custom grid/header styling, or LocalException.
+- accessible focus cues and DPI-scaled Arabic labels remain CoreUI-owned.
+
+## Acceptance criteria
+1. read-only `ReportInquiry / Inquiry` only.
+2. Filters Content; Summary Content; Results Fill/ReadOnly; Pagination shared.
+3. explicit eight tracking columns; no autogenerated columns.
+4. no client scope authority or hidden-data inference.
+5. no unissued write/print/export/drilldown capability.
+6. no invented API/DTO/Permission/DDL/offline behavior.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`.
-- Current: `FIELD_GRID`.
-- Next after PASS: `TEAM-D04 / UX`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
+- Current: `INDEPENDENT_REVIEW`.
+- Reviewer: `TEAM-D06`.
