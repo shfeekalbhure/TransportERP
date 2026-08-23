@@ -1,54 +1,60 @@
-# FLOW01-W3-SCR-001 — إدخال البوليصة — Canonical Design Pilot
+# FLOW01-W3-SCR-001 — إدخال البوليصة — Canonical Screen Specification
 
 ## Mandatory pre-read / evidence readiness
-- Live queue: read and reconciled.
-- Current governing kurrasa/current-design authority: read.
+- Queue row read: `YES`.
+- Current governing kurrasa/current-design authority: read and reconciled.
 - Current canonical W3 identity/transition authority: read.
-- `SRC-053 / OWNER-FLOW01-W2-W3-TECHNICAL-ISSUANCE-001`: read; current governing within FLOW01.
+- `SRC-053 / OWNER-FLOW01-W2-W3-TECHNICAL-ISSUANCE-001`: read; governing within FLOW01 for issued W2/W3 facts.
 - W1 screen-level trace: read.
 - W2 exact contract/security binding: read.
 - Typed W3 ScreenDefinition: read.
 - FLOW01 acceptance specification and atomic trace: read.
-- Current repository waybill implementation: read as implementation evidence only.
-- Current approved CoreUI/Profile authority for TEAM-D02: `Transaction_Profile_Specification_V1.1`, `CoreUI_Containers_and_Layout_Specification_V1.1`, `ScreenProfile_Variant_Capability_Matrix_V1`, `ScreenDefinition_Contract_V1`, and CoreUI architecture test contract: read and reconciled as far as current authority permits.
-- Legacy R2/V4 `SHP-005/006/007/008`: reconciled as non-governing lineage for this pilot; no field/action/layout is imported from them merely because it exists there.
+- Current repository waybill implementation: read as implementation/lineage evidence only.
+- Current approved CoreUI/Profile authority: `Transaction_Profile_Specification_V1.1`, `CoreUI_Containers_and_Layout_Specification_V1.1`, `ScreenProfile_Variant_Capability_Matrix_V1`, `ScreenDefinition_Contract_V1`, and CoreUI architecture test contract: read.
+- Legacy R2/V4 `SHP-005/006/007/008`: reconciled as non-governing lineage; no field/action/layout is imported merely because it exists there.
+- Layout authority decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`: read and applied.
 
-Readiness verdict for TEAM-D01 analysis: `READY / COMPLETED`.
-Readiness verdict for TEAM-D02 layout: `HOLD_AUTHORITY` — current issued FLOW01 layout conflicts with current approved frozen Transaction/CoreUI vertical-sizing authority; no approved reconciliation or LocalException was found.
+Readiness verdict for TEAM-D01 analysis: `COMPLETED`.
+Readiness verdict for TEAM-D02 layout: `COMPLETED`.
+Readiness verdict for TEAM-D03 field/grid stage: `READY_FOR_STAGE`, subject to the explicit `TBD-GATED` details recorded below.
 
 ## Identity
-- Canonical ScreenCode: `FLOW01-W3-SCR-001`
+- ScreenCode: `FLOW01-W3-SCR-001`
 - Current FLOW01 alias: `SHP-001`
 - ArabicName: `إدخال البوليصة`
 - English role: `Shipment Entry`
 - Domain: `Waybills / FLOW01`
+- GoverningKurrasaRefs: current FLOW01 W1/W2/W3 issuance and identity/trace artifacts listed in Authority chain.
 - ScreenProfile: `Transaction`
 - Variant: `HeaderLines`
-- CurrentDesignState: `HOLD_AUTHORITY`
-- CompletedStage: `ANALYSIS`
-- BlockedStage: `LAYOUT`
-- OwnerTeam: `DESIGN-LEAD / ORCHESTRATOR`
-- ResumeTeamWhenResolved: `TEAM-D02`
+- Capabilities: Create Draft, Update Draft, Confirm, Get, Search — exactly as issued below.
+- CurrentDesignState: `FIELD_GRID`
+- CompletedStages: `ANALYSIS`, `LAYOUT`
+- OwnerTeam: `TEAM-D03`
 
 ## Authority chain
 1. `CHG-20260818-FLOW01-W3-ID-002` — canonical FLOW01 identity map: `FLOW01-W3-SCR-001 / SHP-001 / إدخال البوليصة / Transaction / HeaderLines`.
 2. `SRC-053 / OWNER-FLOW01-W2-W3-TECHNICAL-ISSUANCE-001` — current FLOW01 W2/W3 issuance; no DDL/code/runtime authority.
-3. `FLOW01_W1_SCREEN_LEVEL_TRACE_2026-08-22.md` — logical boundary only, no DDL.
+3. `FLOW01_W1_SCREEN_LEVEL_TRACE_2026-08-22.md` — logical boundary only; no DDL authority.
 4. `FLOW01_W2_EXACT_CONTRACT_AND_SECURITY_BINDING_2026-08-22.md` — exact actions/routes/DTO/permissions/scope.
 5. `FLOW01-W3-SCR-001_TYPED_SCREENDEFINITION.md` — typed screen definition.
 6. `FLOW01_ACCEPTANCE_TEST_SPECIFICATIONS_2026-08-22.md` — `TAE-F01-001`, issued but not run.
 7. `FLOW01_ATOMIC_TRACEABILITY_AND_E2E_SPEC_2026-08-22.md` — F01-RQ-001 → SCR-001 → W1 → W2 → permission/scope → TAE-F01-001.
-8. Current approved CoreUI/Profile authority used by layout gate: `Transaction_Profile_Specification_V1.1`, `CoreUI_Containers_and_Layout_Specification_V1.1`, `ScreenProfile_Variant_Capability_Matrix_V1`, `ScreenDefinition_Contract_V1`, CoreUI architecture tests.
+8. Current approved CoreUI/Profile authority: `Transaction_Profile_Specification_V1.1`, `CoreUI_Containers_and_Layout_Specification_V1.1`, `ScreenProfile_Variant_Capability_Matrix_V1`, `ScreenDefinition_Contract_V1`, CoreUI architecture tests.
+9. Project-owner layout resolution dated 2026-08-24: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`.
 
 ## Legacy / repository reconciliation
-The current repository implementation uses `SHP-005` as "رأس البوليصة" and presents `SHP-005/006/007/008` as tabs. The current 2026-08-23 reviewed kurrasa material classifies those R2 identities as `NON-GOVERNING` / `ID-CONFLICT` material. They therefore remain implementation/lineage evidence only and do not define this canonical screen.
+The current repository implementation uses `SHP-005` as `رأس البوليصة` and presents `SHP-005/006/007/008` as tabs. The reviewed current kurrasa material classifies those R2 identities as `NON-GOVERNING / ID-CONFLICT` material. They remain implementation/lineage evidence only and do not define this canonical screen.
 
-The canonical FLOW01 waybill-entry surface is `FLOW01-W3-SCR-001`, not `SHP-005`. Its issued tabs are `General | Items | Packages | Legs | Audit`.
+The canonical FLOW01 waybill-entry surface is `FLOW01-W3-SCR-001`, not repository-lineage `SHP-005`. Its issued tabs are `General | Items | Packages | Legs | Audit`.
 
-## Business purpose and actors
-Business purpose: create a Shipment as Draft, edit the Draft under optimistic concurrency, confirm Draft → Confirmed, and read/search shipments within server-authorized company/branch scope.
+## Purpose and actors
+- Business purpose: create a Shipment as Draft, edit the Draft under optimistic concurrency, confirm Draft → Confirmed, and read/search shipments within server-authorized company/branch scope.
+- Primary roles: no business role name is invented here; authority is represented only by issued permissions.
+- Entry points: create, get, search through issued FLOW01 contracts.
+- Preconditions: server-authorized scope and the action-specific permission/state rules below.
 
-No business role name is invented here. Authority is expressed by the issued permission codes:
+Issued permission codes:
 - `f01.shipment.create`
 - `f01.shipment.edit`
 - `f01.shipment.confirm`
@@ -66,46 +72,69 @@ Issued lifecycle vocabulary visible to this contract: `Draft / Confirmed / Activ
 
 Issued write boundary for this screen: create/edit `Draft`, then `Confirm`. `Confirmed` creates a commercial commitment/reference only; it does not post a journal, recognize revenue, or create commission.
 
-## Capabilities and commands
-| Capability | Action ID | Method / Route | DTO | Permission | Enabled / state rule |
-|---|---|---|---|---|---|
-| إنشاء | `F01.Shipment.Create` | `POST /api/v1/shipments` | `CreateShipmentRequest → ShipmentResource` | `f01.shipment.create` | new Draft |
-| تعديل مسودة | `F01.Shipment.UpdateDraft` | `PATCH /api/v1/shipments/{shipmentId}` | `UpdateShipmentDraftRequest → ShipmentResource` | `f01.shipment.edit` | Draft + `expectedVersion` |
-| تأكيد | `F01.Shipment.Confirm` | `POST /api/v1/shipments/{shipmentId}:confirm` | `ConfirmShipmentRequest → ShipmentResource` | `f01.shipment.confirm` | Draft → Confirmed; reason/audit |
-| عرض | `F01.Shipment.Get` | `GET /api/v1/shipments/{shipmentId}` | `ShipmentResource` | `f01.shipment.view` | authorized scope |
-| بحث | `F01.Shipment.Search` | `GET /api/v1/shipments` | `ShipmentSearchQuery → PagedShipmentResult` | `f01.shipment.view` | authorized scope |
+## Layout contract — TEAM-D02 completed
+- Screen shell: governed `Transaction / HeaderLines` shell.
+- Header/MainData role: `Content`.
+- Workspace role: `Fill`.
+- Fill owner: tabs/workspace occupies the remaining vertical space; line grids inside the relevant tabs use `Fill`.
+- Summary/Action/Audit regions: shared CoreUI/Profile behavior only; no local duplicate toolbar, pagination, audit chrome, or sizing system is introduced.
+- RTL notes: inherit current CoreUI RTL behavior; no screen-local RTL exception.
+- DPI/resize notes: inherit current CoreUI DPI/resize behavior; no screen-local pixel dimensions are authorized here.
+- Local exception: `NONE`.
+- Approval reference: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`.
 
-No other toolbar command is promoted from the current repository form by this analysis.
+### Governed composition
 
-## Issued fields
-| FieldKey | Arabic Label | FieldProfile | ValueType | Required | Editable rule | Lookup / validation |
-|---|---|---|---|---|---|---|
-| `shipmentId` | رقم البوليصة | KeyText | UUID | No | Read-only | server assigned |
-| `customerRef` | العميل | Lookup | Reference | Yes | Draft only | permitted customer |
-| `originRef` | المصدر | Lookup | Reference | Yes | Draft only | scope-valid location |
-| `destinationRef` | الوجهة | Lookup | Reference | Yes | Draft only | scope-valid location |
-| `shipmentState` | الحالة | State | Enum | Yes | Read-only | W1/W2 lifecycle |
-| `itemLines` | البنود | LineGrid | Collection | Yes | Draft only | nonempty on confirm |
-| `packageLines` | الطرود | LineGrid | Collection | No | Draft only | package/item consistency |
-| `legLines` | المراحل | LineGrid | Collection | No | Draft only | chronology validation |
-| `expectedVersion` | إصدار التزامن | Hidden | Integer | Edit/confirm only | Read-only client token | required on update/confirm |
+```text
+Transaction / HeaderLines shell
+┌──────────────────────────────────────────────────────────┐
+│ Shared CoreUI command / shell regions                    │
+├──────────────────────────────────────────────────────────┤
+│ Header / MainData — Content                              │
+│ status | customer | origin | destination                 │
+├──────────────────────────────────────────────────────────┤
+│ Tabs / Workspace — Fill                                  │
+│ General | Items | Packages | Legs | Audit                │
+│                                                          │
+│ Relevant Lines/Grid content owns Fill inside workspace   │
+│ where an issued line grid exists.                        │
+└──────────────────────────────────────────────────────────┘
+```
 
-## Issued tabs / regions
-| Order | Tab / region | Authority-backed role |
-|---:|---|---|
-| 1 | General | shipment header/general data |
-| 2 | Items | item lines |
-| 3 | Packages | package lines |
-| 4 | Legs | shipment legs |
-| 5 | Audit | audit/context display |
+No local height, width, padding, color, font, toolbar, grid, pagination, audit, RTL, or DPI value is invented by this stage.
 
-`SRC-053` typed ScreenDefinition issues this structural text:
-`Header(Fixed): shipment status, customer, origin, destination → Tabs(Content): General | Items | Packages | Legs | Audit → LinesGrid(Fill): items/packages/legs`.
+### Historical layout contradiction and resolution
+`SRC-053` retained the issued structural text `Header(Fixed) → Tabs(Content) → LinesGrid(Fill)`. The approved shared Transaction/CoreUI authority instead governs `Header/MainData(Content) → Tabs/Workspace(Fill) → Lines/Grid(Fill)`.
 
-That text is retained verbatim as issued evidence, but TEAM-D02 may not implement or normalize the `Fixed`/`Content` sizing labels while the authority contradiction below remains open.
+On 2026-08-24 the project owner explicitly selected the current approved CoreUI/Transaction profile for this screen. Therefore:
+- `Header = Content`;
+- `Tabs/Workspace = Fill`;
+- `Lines/Grid = Fill`;
+- no `LocalException` is created;
+- the earlier `Fixed/Content` labels remain historical evidence only and are not implemented as a screen-local deviation.
 
-## Grid contract known at analysis exit
-Authoritative `ItemsGrid` columns:
+The former `HOLD_AUTHORITY` is resolved.
+
+## Fields — authority-backed inventory
+| FieldKey | Arabic Label | FieldProfile | ValueType | Required | Editable rule | Lookup / validation | Visibility rule | Authority/Evidence Ref |
+|---|---|---|---|---|---|---|---|---|
+| `shipmentId` | رقم البوليصة | KeyText | UUID | No | Read-only | server assigned | visible after identity exists | current FLOW01 typed definition |
+| `customerRef` | العميل | Lookup | Reference | Yes | Draft only | permitted customer | normal | current FLOW01 typed definition |
+| `originRef` | المصدر | Lookup | Reference | Yes | Draft only | scope-valid location | normal | current FLOW01 typed definition |
+| `destinationRef` | الوجهة | Lookup | Reference | Yes | Draft only | scope-valid location | normal | current FLOW01 typed definition |
+| `shipmentState` | الحالة | State | Enum | Yes | Read-only | W1/W2 lifecycle | normal | current FLOW01 typed definition |
+| `itemLines` | البنود | LineGrid | Collection | Yes | Draft only | nonempty on confirm | Items tab | current FLOW01 typed definition |
+| `packageLines` | الطرود | LineGrid | Collection | No | Draft only | package/item consistency | Packages tab | current FLOW01 typed definition |
+| `legLines` | المراحل | LineGrid | Collection | No | Draft only | chronology validation | Legs tab | current FLOW01 typed definition |
+| `expectedVersion` | إصدار التزامن | Hidden | Integer | Edit/confirm only | Read-only client token | required on update/confirm | hidden | W2 concurrency contract |
+
+No additional field is promoted from the repository lineage implementation by this contract.
+
+## Grids
+### ItemsGrid — issued
+Purpose: edit/view item lines for a Draft shipment within the issued transaction contract.
+
+Authority-backed columns:
 - item/package reference
 - description
 - quantity
@@ -113,9 +142,46 @@ Authoritative `ItemsGrid` columns:
 - volume
 - state
 
-Other issued behavior: `AutoGenerate=false` is implied by the typed explicit definition; server paging and typed sort; selection may be single/multi only as an issued capability requires.
+Other authority-backed behavior:
+- explicit typed definition; no AutoGenerate-based design is promoted;
+- server paging and typed sort are governing where issued by the contract;
+- editable only while the shipment is Draft and only through authorized edit capability;
+- confirm requires nonempty item lines.
 
-Exact column sets for a separate Packages grid or Legs grid are **not issued in the retrieved typed definition**. They remain `TBD-GATED` for TEAM-D03 and must not be invented. They are not the cause of the current TEAM-D02 layout hold.
+Exact UI column keys/order/widths beyond the issued semantic set must be established by TEAM-D03 from exact authority; otherwise mark `TBD-GATED`.
+
+### Packages grid — `TBD-GATED`
+The detailed package-grid column inventory is not issued in the retrieved typed definition. TEAM-D03 must not infer it from legacy `SHP-007` or repository UI.
+
+### Legs grid — `TBD-GATED`
+The detailed legs-grid column inventory is not issued in the retrieved typed definition. TEAM-D03 must not infer it from legacy `SHP-008` or repository UI.
+
+## Tabs / Sections
+| Order | Tab/Section | Purpose | LayoutRole | Visibility Rule | Authority/Evidence Ref |
+|---:|---|---|---|---|---|
+| 1 | General | shipment header/general data | Workspace child under `Fill` | issued | FLOW01 typed definition + owner layout decision |
+| 2 | Items | item lines | Workspace child; lines grid `Fill` | issued | FLOW01 typed definition + owner layout decision |
+| 3 | Packages | package lines | Workspace child; grid details gated | issued | FLOW01 typed definition + owner layout decision |
+| 4 | Legs | shipment legs | Workspace child; grid details gated | issued | FLOW01 typed definition + owner layout decision |
+| 5 | Audit | audit/context display | Workspace child; shared audit behavior inherited | issued | FLOW01 typed definition + CoreUI |
+
+## Commands
+| Command | Capability | Permission Need | Enabled When | Confirmation | Result | Authority/Evidence Ref |
+|---|---|---|---|---|---|---|
+| إنشاء | `F01.Shipment.Create` | `f01.shipment.create` | new Draft | contract-governed | `POST /api/v1/shipments` → `ShipmentResource` | W2 exact binding |
+| تعديل مسودة | `F01.Shipment.UpdateDraft` | `f01.shipment.edit` | Draft + `expectedVersion` | contract-governed | `PATCH /api/v1/shipments/{shipmentId}` | W2 exact binding |
+| تأكيد | `F01.Shipment.Confirm` | `f01.shipment.confirm` | Draft only | reason/audit contract applies | Draft → Confirmed | W2 exact binding |
+| عرض | `F01.Shipment.Get` | `f01.shipment.view` | authorized scope | none invented | read `ShipmentResource` | W2 exact binding |
+| بحث | `F01.Shipment.Search` | `f01.shipment.view` | authorized scope | none invented | paged search | W2 exact binding |
+
+No other toolbar command is promoted from the current repository form.
+
+## Lookups
+- `customerRef`: permitted customer.
+- `originRef`: scope-valid location.
+- `destinationRef`: scope-valid location.
+- Exact server/cache behavior, search key, result cap, keyboard interaction and company/branch lookup UX beyond issued scope: `TBD-GATED` unless TEAM-D03 locates current authority.
+- Client must not invent or submit company/branch scope authority; server/session scope is governing.
 
 ## Search / filters
 Issued filters bind to `ShipmentSearchQuery`:
@@ -126,22 +192,32 @@ Issued filters bind to `ShipmentSearchQuery`:
 - state
 - date range
 
-No client-provided company/branch scope field is authorized; scope is server/session derived.
+No client-provided company/branch scope field is authorized.
 
-## State and concurrency analysis
+## States and workflow
+### Business states
+`Draft / Confirmed / Active / Completed / Cancelled`.
+
+### Issued transitions on this screen
 - Create → new `Draft`.
 - UpdateDraft → `Draft` only and requires `expectedVersion`.
 - Confirm → only `Draft → Confirmed`, with reason/audit contract.
-- `Active / Completed / Cancelled` are issued lifecycle vocabulary, but this screen analysis does not invent transition commands for them.
-- Stale update/confirm → `version.conflict`.
+- `Active / Completed / Cancelled` are issued lifecycle vocabulary, but this screen does not invent transition commands for them.
 
-## Online / offline classification
-`SRC-053` classifies all FLOW01 contracts as `ONLINE_ONLY`:
+### Conflict/reload behavior
+- stale update/confirm → `version.conflict`;
+- no silent overwrite;
+- exact UI conflict interaction beyond governing error behavior is a later UX-stage responsibility and must remain authority-backed.
+
+## Online / Offline classification
+`SRC-053` classifies FLOW01 contracts as `ONLINE_ONLY`:
 - `OFFLINE_WRITE = 0`
 - `Can Queue = NO`
 - no Outbox / ACK / Replay / sync contract is created by this screen design.
 
-## Validation / error contract
+All issued state-changing actions are therefore `ONLINE_AUTHORITATIVE` for this design. No offline write path is exposed.
+
+## Validation and messages
 Authority-backed conditions include:
 - customer must be permitted;
 - origin/destination must be scope-valid locations;
@@ -151,74 +227,85 @@ Authority-backed conditions include:
 - `expectedVersion` on update/confirm;
 - server-side default-deny permission and scope enforcement.
 
-Common issued FLOW01 errors applicable when returned by the contract include `validation.failed`, `not_found`, `forbidden`, `scope.denied`, `version.conflict`, `idempotency.conflict`, and `invalid.transition`. No screen-local replacement error taxonomy is created.
+Common issued FLOW01 errors applicable when returned by the contract include:
+- `validation.failed`
+- `not_found`
+- `forbidden`
+- `scope.denied`
+- `version.conflict`
+- `idempotency.conflict`
+- `invalid.transition`
 
-## Acceptance criteria — TEAM-D01 output
+No screen-local replacement error taxonomy is created.
+
+## Accessibility / keyboard
+- Shared accessibility, RTL, DPI and focus infrastructure: inherited from current CoreUI where governed.
+- Screen-specific default focus: `TBD-GATED` unless current authority is located.
+- Screen-specific Enter behavior: `TBD-GATED` unless current authority is located.
+- Screen-specific Escape behavior: `TBD-GATED` unless current authority is located.
+- Exact tab order beyond semantic layout: TEAM-D04 responsibility after field/grid closure.
+- No legacy shortcut is promoted from repository lineage without current authority.
+
+## Acceptance criteria
 1. The design identifies the screen only as `FLOW01-W3-SCR-001` with alias `SHP-001`, `Transaction / HeaderLines`.
-2. Create is available only under `f01.shipment.create` and produces a Draft through `F01.Shipment.Create`.
-3. Draft edit is available only under `f01.shipment.edit` and requires `expectedVersion`.
-4. Confirm is available only under `f01.shipment.confirm`, only for Draft → Confirmed, and preserves reason/audit behavior.
-5. Read/search requires `f01.shipment.view` and server-authorized scope.
-6. Confirm with no item lines is represented as invalid and maps to the governing validation contract.
-7. A stale version is represented as a concurrency conflict; no silent overwrite is designed.
-8. Repeated state-changing requests preserve the governing idempotency contract.
-9. Confirmed produces a CommercialCharge reference/commitment only; the design does not show or imply automatic journal posting, revenue recognition, or commission creation.
-10. All write actions are online-only; the design exposes no offline queue/replay path.
-11. The five issued tabs and their business roles remain intact; their vertical sizing remains blocked pending authority reconciliation.
-12. No field, command, permission, route, DTO, grid column, or layout behavior is imported from legacy `SHP-005/006/007/008` unless separately issued by current authority.
+2. Layout conforms to shared CoreUI: `Header/MainData=Content`, `Tabs/Workspace=Fill`, `Lines/Grid=Fill`; there is no local layout exception.
+3. Shared Toolbar/Grid/Pagination/Audit, RTL and DPI behavior are inherited rather than recreated locally.
+4. Create is available only under `f01.shipment.create` and produces a Draft through `F01.Shipment.Create`.
+5. Draft edit is available only under `f01.shipment.edit` and requires `expectedVersion`.
+6. Confirm is available only under `f01.shipment.confirm`, only for Draft → Confirmed, and preserves reason/audit behavior.
+7. Read/search requires `f01.shipment.view` and server-authorized scope.
+8. Confirm with no item lines is invalid and maps to the governing validation contract.
+9. A stale version is represented as a concurrency conflict; no silent overwrite is designed.
+10. Repeated state-changing requests preserve the governing idempotency contract.
+11. Confirmed produces a CommercialCharge reference/commitment only; the design does not show or imply automatic journal posting, revenue recognition, or commission creation.
+12. All write actions are online-only; the design exposes no offline queue/replay path.
+13. The five issued tabs and their business roles remain intact.
+14. No field, command, permission, route, DTO, grid column, or layout behavior is imported from legacy `SHP-005/006/007/008` unless separately issued by current authority.
+15. Missing Packages/Legs column details remain `TBD-GATED`; they are not guessed.
 
 `TAE-F01-001` remains `NOT RUN`; these are design acceptance inputs, not runtime PASS.
 
 ## Known gated details for later stages
 - Packages-grid detailed column inventory: `TBD-GATED`.
 - Legs-grid detailed column inventory: `TBD-GATED`.
+- Exact lookup search/caching/result-cap interaction: `TBD-GATED` unless current source is located.
 - Any screen-specific keyboard shortcut beyond frozen CoreUI/profile behavior: `TBD-GATED` unless a current source is located.
 - Any visual exception beyond CoreUI: none authorized.
 
-## Historical handoff — ANALYSIS → LAYOUT
-- CompletedBy: `TEAM-D01` under DESIGN-LEAD orchestration
-- AnalysisVerdict: `PASS FOR LAYOUT`
-- OriginalNextTeam: `TEAM-D02`
-- OriginalNextState: `LAYOUT`
-- AnalysisHandoffReady: `YES`
+## Evidence
+- Wireframe/layout evidence: governed text wireframe in this canonical spec under `Layout contract`.
+- Visual: not yet produced; TEAM-D05 stage.
+- Review report: not yet produced; TEAM-D06 stage.
+- Source references: Authority chain above.
+- Repository evidence: current waybill implementation retained as lineage evidence only.
+- Layout decision: `documentation/design/decisions/2026-08-24_FLOW01-W3-SCR-001_LAYOUT_AUTHORITY_DECISION.md`.
 
-This handoff remains valid as an analysis-stage record. TEAM-D02 then performed the mandatory CoreUI/Profile reconciliation and discovered the blocking contradiction below.
+## Stage history
+### TEAM-D01 — ANALYSIS
+- Verdict: `PASS`
+- CompletedStage: `ANALYSIS`
+- Key result: identity, business boundary, fields, issued commands, states, online-only classification and acceptance inputs established from current authority.
 
-## TEAM-D02 layout authority reconciliation — HOLD_AUTHORITY
-- ReconciledOn: `2026-08-24`
-- Stage: `LAYOUT`
-- StageOwner: `TEAM-D02` under DESIGN-LEAD orchestration
-- LayoutVerdict: `HOLD_AUTHORITY`
-- NextTeamAfterResolution: `TEAM-D02`
+### TEAM-D02 — LAYOUT
+- Prior state: `HOLD_AUTHORITY` because `SRC-053` sizing labels contradicted current approved shared Transaction/CoreUI authority.
+- Owner decision: 2026-08-24 selected shared CoreUI/Transaction composition; no LocalException.
+- Layout verdict: `PASS`.
+- CompletedStage: `LAYOUT`.
+- Output: `Transaction/HeaderLines`, Header/MainData `Content`, Tabs/Workspace `Fill`, Lines/Grid `Fill`, shared CoreUI shell behavior inherited.
 
-### Exact contradiction
-1. Current FLOW01 typed definition issued under `SRC-053` states `Header(Fixed)` and `Tabs(Content)` for `FLOW01-W3-SCR-001`.
-2. Current approved `Transaction_Profile_Specification_V1.1` states `Header = Content`, `Lines workspace = Fill`, `Totals/Actions = Content/Fixed`; its reconciliation also fixes Transaction MainData/Header to `Content` and preserves Lines/Grid as `Fill`.
-3. Current approved `CoreUI_Containers_and_Layout_Specification_V1.1` states the Transaction layering as `Header/MainData(Content) → Tabs/Workspace(Fill) → Lines/Grid(Fill) + Totals(Content) + Actions(Content/Fixed)`.
-4. Current approved ScreenProfile/Variant matrix likewise records Transaction header as `Content`, workspace as `Fill`, and `HeaderLines` as the approved Transaction variant.
-5. `ScreenDefinition_Contract_V1` permits only `Fixed | Content | Fill` through governed LayoutRoles and requires a documented `LocalException`/approval for a screen deviation; it does not allow a screen definition silently to redefine frozen shared architecture.
-6. No current approved reconciliation, Change Request, or `LocalException` authorizing `Header(Fixed)` / `Tabs(Content)` for this screen was found in the governing material reviewed for this stage.
+## Handoff
+- InputVersion: `SRC-053 + current CoreUI/Profile authority + OWNER-DEC-2026-08-24`.
+- OutputVersion: canonical `screen-spec.md` updated 2026-08-24.
+- BlockingIssue: none for transition from LAYOUT to FIELD_GRID.
+- NextTeam: `TEAM-D03`.
+- HandoffReady: `YES`.
 
-### Non-guess decision
-TEAM-D02 will not silently choose either source, reinterpret `Fixed` as `Content`, or normalize `Tabs(Content)` into a `Fill` workspace. That would invent precedence or a local exception. Therefore LAYOUT cannot be closed safely.
+TEAM-D03 must preserve `TBD-GATED` for any package/leg grid detail or lookup behavior not supported by current authority.
 
-### What is already safe and retained
-The following facts remain authority-backed and are not disputed by this hold:
-- identity `FLOW01-W3-SCR-001 / SHP-001`;
-- `Transaction / HeaderLines`;
-- five business tabs `General | Items | Packages | Legs | Audit`;
-- lines grid is the primary work area and uses `Fill`;
-- shared CoreUI Toolbar/Grid/Pagination/Audit styling is not recreated locally;
-- RTL/DPI behavior comes from CoreUI;
-- W2 permissions/state predicates remain server-authoritative;
-- repository `SHP-005` layout remains lineage/implementation evidence only.
-
-### Required authority to unblock
-An authority-backed reconciliation must explicitly establish the governing vertical sizing/composition for this screen, specifically:
-- whether `Header` is `Content` or an approved `Fixed` exception;
-- whether the tab workspace is `Fill` or an approved `Content` exception;
-- if deviating from the frozen Transaction profile, the governing `LocalException` / CR / owner decision and scope.
-
-Until that exists, state remains `HOLD_AUTHORITY`; no UX/UI/visual stage may consume a guessed layout.
+## Independent review
+- Reviewer: not yet assigned.
+- Verdict: pending.
+- Findings: pending.
+- ClosedAt: pending.
 
 No application code, official kurrasa, DDL, migration, permission, API contract, or offline-write authority is modified or created by this design artifact.
