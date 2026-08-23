@@ -74,8 +74,8 @@ public sealed class Wave1PostgreSqlMigrationOrderTests
             await seed.SaveChangesAsync();
         }
 
-        await using (var country = CreateCountry(connection))
-            await country.Database.MigrateAsync();
+        await using (var countryDb = CreateCountry(connection))
+            await countryDb.Database.MigrateAsync();
 
         await using (var numbering = CreateNumbering(connection))
             await numbering.Database.MigrateAsync();
@@ -87,10 +87,10 @@ public sealed class Wave1PostgreSqlMigrationOrderTests
         await verify.Database.OpenConnectionAsync();
         var conn = verify.Database.GetDbConnection();
 
-        var country = await QuerySingleAsync(conn,
+        var countryFields = await QuerySingleAsync(conn,
             "SELECT COALESCE(\"ISO2\",'<NULL>') || '|' || COALESCE(\"ISO3\",'<NULL>') || '|' || COALESCE(\"DialingCode\",'<NULL>') FROM transport_erp.countries WHERE \"Id\" = @id",
             legacyCountryId);
-        Assert.Equal("<NULL>|<NULL>|<NULL>", country);
+        Assert.Equal("<NULL>|<NULL>|<NULL>", countryFields);
 
         var metadata = await QuerySingleAsync(conn,
             "SELECT \"Code\" || '|' || COALESCE(\"ArabicName\",'<NULL>') FROM transport_erp.number_sequence_metadata WHERE \"SequenceId\" = @id",
