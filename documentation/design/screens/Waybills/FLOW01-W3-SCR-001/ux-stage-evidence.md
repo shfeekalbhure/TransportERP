@@ -78,19 +78,20 @@ Exact provider/endpoint identifiers remain `TBD-GATED` and nonblocking; none are
 - Shared `TransportDataGrid` owns keyboard/focus/edit-state rendering.
 - Items server paging remains shared CoreUI/W2 behavior.
 - Sort affordance is active only where the server allow-listed mapping exists; unresolved Items sort-key mapping remains `TBD-GATED` and nonblocking.
-- Packages and Legs retain their current embedded-collection design; no hidden route/cardinality behavior is added.
+- Packages/Legs paging behavior is not made authoritative by UX; any unissued paging binding remains technical `TBD-GATED` and does not invent an API contract.
+- Packages and Legs retain their current collection semantics; no hidden route/cardinality behavior is added.
 
 ## Tabs and navigation
-- Tabs remain `General | Items | Packages | Legs | Audit`.
+- Tabs remain `General | Items | Packages | Legs | Audit` because they are issued by the governing screen definition.
 - RTL order and tab rendering are inherited from CoreUI.
-- No empty or decorative tab is introduced.
+- No additional decorative tab is introduced.
 - No nested scroll is introduced into MainData; workspace/grid remains the scroll/fill owner according to the approved Transaction layout.
 
 ## Keyboard and focus
 - Shared CoreUI/Grid keyboard behavior is inherited.
-- No screen-specific Enter shortcut, Escape shortcut, global shortcut, or override is introduced because no current authority issues one.
-- Default focus follows the shared first-eligible-interactive-control behavior of the host implementation; no screen-local hard-coded focus target is made authoritative by this design artifact.
-- Semantic tab order is Header/MainData first, then active workspace/tab content, then shared action/audit regions as exposed by CoreUI; exact runtime TabIndex values remain implementation-owned.
+- No screen-specific Enter shortcut, Escape shortcut, global shortcut, default-focus target, or override is introduced because no current authority issues one.
+- Tab/focus sequence follows the shared RTL visual-order rule.
+- Exact runtime TabIndex/focus-target details remain implementation-owned unless separately governed.
 
 ## Success feedback
 - Successful create/update/confirm uses shared success/status feedback.
@@ -108,14 +109,14 @@ Exact provider/endpoint identifiers remain `TBD-GATED` and nonblocking; none are
 7. CorrelationId stays in support/technical details.
 8. Lookup is server-side, debounced, capped at 50, and binds by Id.
 9. No local MessageBox validation, local grid behavior clone, or screen-specific loading/error presenter is created.
-10. No unissued shortcut, endpoint, permission, lifecycle transition, offline path, or business rule is invented.
+10. No unissued shortcut, default-focus target, endpoint, permission, lifecycle transition, paging contract, offline path, or business rule is invented.
 
 ## Verdict
-`TEAM-D04 UX = PASS`.
+`TEAM-D04 UX = PASS` after independent-review cleanup of unsupported focus wording.
 
 Nonblocking gates carried forward:
 - exact lookup provider/endpoint identifiers;
 - ItemsGrid exact server sort-key mapping;
-- any future screen-specific keyboard shortcut only if separately issued.
+- any future screen-specific keyboard/focus rule only if separately issued.
 
 Next stage: `TEAM-D05 — VISUAL`.
