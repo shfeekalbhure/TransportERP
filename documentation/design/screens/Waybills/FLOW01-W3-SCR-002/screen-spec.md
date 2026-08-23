@@ -2,8 +2,8 @@
 
 **Alias:** `SHP-002`  
 **Profile / Variant:** `Transaction / Allocation`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-01`
 
 ## Authority
@@ -70,6 +70,11 @@ Rules:
 - no raw color, local font, fixed pixel width/height, or local toolbar/grid styling.
 - Arabic labels must not clip across governed DPI scales.
 
+## Independent review — TEAM-D06 PASS
+- Review artifact: `documentation/design/batches/BATCH-01_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Open design findings: `0`.
+- Runtime test `TAE-F01-002`: issued, not run; DESIGN APPROVAL does not claim runtime PASS.
+
 ## Acceptance criteria
 1. `Transaction / Allocation` only; no local profile/variant invention.
 2. Header Content; workspace/grid Fill; no LocalException.
@@ -81,6 +86,5 @@ Rules:
 8. unresolved provider/sort identifiers remain technical nonblocking gates.
 
 ## Handoff
-- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.
-- Current: `INDEPENDENT_REVIEW`.
-- Reviewer: `TEAM-D06`.
+- Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.
+- Final: `DESIGN_APPROVED`.
