@@ -3,8 +3,8 @@
 **English:** Opening Balances  
 **Module:** Accounting  
 **Profile / Variant:** `Transaction / Opening`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-14`
 
 ## Authority
@@ -47,7 +47,7 @@ No local toolbar/grid/RTL/DPI/validation/audit architecture.
 | 9 | `accountingAmount` | المبلغ المحاسبي | Derived amount | Automatic | ReadOnly / server-authoritative |
 | 10 | `batchState` | حالة الدفعة | Workflow state | Automatic | ReadOnly |
 
-The screen does not promote candidate-only extra fields such as Company/Branch/year-period/document/date/party/amount/reference/status that are explicitly quarantined in the current crosswalk.
+The screen does not promote candidate-only extra fields. Exact physical/DTO/provider bindings remain implementation-owned.
 
 ### OpeningLinesGrid
 `AutoGenerateColumns=false`; primary workspace Fill. Exactly **9 display columns**:
@@ -61,7 +61,7 @@ The screen does not promote candidate-only extra fields such as Company/Branch/y
 8. سعر الصرف
 9. المبلغ المحاسبي
 
-Account/cost center/debit/credit/currency/rate follow the issued draft-edit semantics above. `المبلغ المحاسبي` is read-only/server-derived. The grid-only `البيان` exists by current W3 grid authority; exact persistence/requiredness is not invented and remains `TBD-GATED`.
+`المبلغ المحاسبي` is read-only/server-derived. The grid-only `البيان` exists by current W3 grid authority; exact persistence/requiredness remains `TBD-GATED`.
 
 No client accounting formula, balancing engine or early exchange-rate rounding is authorized.
 
@@ -76,8 +76,10 @@ No client accounting formula, balancing engine or early exchange-rate rounding i
 ## VISUAL — TEAM-D05 PASS
 Use shared Transaction spacing, RTL/DPI, tabs, grid, numeric/reference presentation and lifecycle/read-only states only. Monetary/rate/accounting-amount formatting is centrally governed; no local formulas or colors.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Must confirm 10 fields, five tabs, 9-column grid, exact View/Create/Edit/Cancel/Post surface and server-authoritative financial/posting semantics.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+`PASS — 0 open design findings` per `documentation/design/batches/BATCH-14_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+Confirmed: exact 10 fields, five tabs, nine display columns, exact `View/Create/Edit/Cancel/Post` surface, server-authoritative financial/posting semantics, and no W1/API/DTO/provider invention.
 
 ## Remaining technical gates
-Exact W1 physical mapping for unresolved fields, lookup providers, DTO/line properties, sort keys, runtime acceptance and release evidence remain separate.
+Exact W1 physical mapping for unresolved fields, lookup providers, DTO/line properties, sort keys, runtime acceptance and release evidence remain separate and nonblocking for design approval.
