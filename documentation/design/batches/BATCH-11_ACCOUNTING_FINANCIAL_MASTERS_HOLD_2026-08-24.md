@@ -1,59 +1,54 @@
-# BATCH-11 — Accounting Financial Masters — Authority Gate
+# BATCH-11 — Accounting Financial Masters — Owner Design Authority Decision
 
 **Screens:** `ACC-038`, `ACC-039`, `ACC-040`  
 **Date:** 2026-08-24  
-**Current state:** `FIELD_GRID / HOLD_AUTHORITY`  
+**Decision state:** `APPROVED — DESIGN-ONLY`  
 **Owner:** `DESIGN-LEAD / ORCHESTRATOR`
 
-## Completed design stages
-- `TEAM-D01 ANALYSIS = PASS`
-- `TEAM-D02 LAYOUT = PASS`
-- `TEAM-D03 FIELD_GRID = HOLD_AUTHORITY`
+## Owner decision
+The owner approved the recommended design-only authority decision on 2026-08-24.
 
-## Current governing identity / W2
-- `ACC-038 — الصناديق` = `MasterData / Tabbed`; W2 actions: View/Create/Edit/Disable; exact 5 current routes under `ACC038.View/Create/Edit/Disable`.
-- `ACC-039 — الحسابات البنكية` = `MasterData / Tabbed`; W2 actions: View/Create/Edit/Disable; exact 5 current routes under `ACC039.View/Create/Edit/Disable`.
-- `ACC-040 — طرق الدفع` = `MasterData / Standard`; W2 actions: View/Create/Edit/Disable; exact 5 current routes under `ACC040.View/Create/Edit/Disable`.
+For `ACC-038 / ACC-039 / ACC-040`, the current V1.3 screen field/tab inventory is the governing **UI design contract**. `TEAM-D03` may define only UI-design metadata:
+- UI semantic / ValueType;
+- required / optional / read-only / editable presentation policy;
+- field order and tab grouping;
+- CoreUI width policy;
+- lookup presentation/selection semantics;
+- list/grid presentation, including a bounded `ACC-040` list projection where the baseline had `Columns=0`.
 
-## Current W3 screen inventory
-### ACC-038
-Tabs: البيانات الرئيسية | بيانات إضافية | الربط المحاسبي | الحدود والصلاحيات | المرفقات | سجل العمليات.
+All unresolved W1 / DTO / API / permission / DDL / physical lookup-provider bindings remain explicit `TBD-GATED` implementation blockers and are not promoted by this decision.
 
-11 current design fields: رمز الصندوق | اسم الصندوق | الشركة | الفرع | العملة | حساب الأستاذ | أمين الصندوق الافتراضي | الحد الأقصى للرصيد | حد العملية الواحدة | يتطلب إقفال وردية | الحالة.
-
-Current list/grid inventory is a 7-column display contract: الرمز | الاسم | الشركة | الفرع/النطاق | العملة | الحالة | آخر تعديل.
-
-### ACC-039
-Tabs: البيانات الرئيسية | بيانات إضافية | الربط المحاسبي | الحدود والصلاحيات | المرفقات | سجل العمليات.
-
-14 current design fields: رمز الحساب البنكي | اسم البنك | اسم الحساب | رقم الحساب | IBAN | SWIFT/BIC | الشركة | الفرع | العملة | حساب الأستاذ | حساب رسوم البنك | حساب فروق التسوية | حد السحب/التحويل | الحالة.
-
-Current list/grid inventory is a 7-column display contract: الرمز | الاسم | الشركة | الفرع/النطاق | العملة | الحالة | آخر تعديل.
-
-### ACC-040
-Tabs: البيانات الرئيسية | الربط المحاسبي | قواعد الاستخدام | سجل العمليات.
-
-9 current design fields: رمز الطريقة | اسم طريقة الدفع | نوع الوسيلة | يتطلب صندوقًا | يتطلب حسابًا بنكيًا | حساب المقاصة | يسمح بالقبض | يسمح بالصرف | الحالة.
-
-Current baseline has no concrete primary grid-column contract (`Columns=0`); TEAM-D03 must not invent one without design authority.
-
-## Why FIELD_GRID is held
-The current specialist field review still classifies multiple field-level bindings as `BLOCKING / NEEDS FIX` because exact persisted/read/API/permission/audit/offline mappings are not evidenced. Examples include:
-- ACC-038: رمز الصندوق, اسم الصندوق, الحد الأقصى للرصيد, حد العملية الواحدة, يتطلب إقفال وردية.
-- ACC-039: رمز الحساب البنكي, اسم البنك, اسم الحساب, SWIFT/BIC, حساب رسوم البنك, حساب فروق التسوية, حد السحب/التحويل; Account Number vs IBAN storage semantics are not fully reconciled.
-- ACC-040: رمز الطريقة, اسم طريقة الدفع, نوع الوسيلة, يتطلب صندوقًا, يتطلب حسابًا بنكيًا, حساب المقاصة, يسمح بالقبض, يسمح بالصرف.
-
-No mapping is invented. Current W1/W2 technical binding gaps remain implementation-authority gaps.
-
-## One owner decision requested
-**Recommended design-only decision:** authorize TEAM-D03 to treat the current V1.3 screen field/tab inventory as the governing **UI design contract** for ACC-038/039/040 and to define only screen-design metadata (UI semantic/value type, required/read-only/edit policy, display order, CoreUI width policy, selection/editor/lookup presentation and missing ACC-040 list-column presentation where needed), while preserving all unresolved W1/DTO/API/permission/DDL bindings as explicit `TBD-GATED` implementation blockers.
-
-This decision would NOT authorize:
+## Explicitly NOT authorized
 - W1 columns/tables/DDL/migrations;
 - API routes or DTO properties;
 - new permissions/security scope;
-- accounting/business formulas or limits not already issued;
-- lookup provider identifiers not already issued;
-- application code or official Kurrasa changes.
+- accounting formulas or financial limit enforcement not already issued;
+- lookup provider identifiers/endpoints not already issued;
+- application code;
+- official Kurrasa modification;
+- offline write/queue/outbox authority.
 
-If approved, TEAM-D03 resumes immediately and the batch continues through UX → VISUAL → INDEPENDENT_REVIEW. If not approved, all three remain `HOLD_AUTHORITY` until field-level W1/W2 evidence is issued.
+## Governing identities / W2 surface
+- `ACC-038 — الصناديق` = `MasterData / Tabbed`; exact W2 surface: List/Get/Create/Update/Disable; `ACC038.View/Create/Edit/Disable`.
+- `ACC-039 — الحسابات البنكية` = `MasterData / Tabbed`; exact W2 surface: List/Get/Create/Update/Disable; `ACC039.View/Create/Edit/Disable`.
+- `ACC-040 — طرق الدفع` = `MasterData / Standard`; exact W2 surface: List/Get/Create/Update/Disable; `ACC040.View/Create/Edit/Disable`.
+
+## Stage disposition after approval
+- `TEAM-D01 ANALYSIS = PASS`
+- `TEAM-D02 LAYOUT = PASS`
+- `TEAM-D03 FIELD_GRID = PASS — owner design-only authority applied`
+- `TEAM-D04 UX = PASS`
+- `TEAM-D05 VISUAL = PASS`
+- next gate: `TEAM-D06 INDEPENDENT_REVIEW`
+
+## Technical gates retained
+### ACC-038
+Unresolved implementation bindings include Cashbox code/name, GL Account lookup provider, default cashier lookup provider, balance/transaction limit persistence, shift-close persistence and related field-level audit/offline binding.
+
+### ACC-039
+Unresolved implementation bindings include bank-account code/name fields, Account Number vs IBAN physical semantics, SWIFT/BIC storage, GL/fees/reconciliation-account lookup providers, withdrawal/transfer limit persistence and field-level audit/offline binding.
+
+### ACC-040
+Unresolved implementation bindings include PaymentMethod physical schema for code/name/type/booleans, Clearing Account lookup provider/storage and field-level audit/offline binding.
+
+These are implementation gates only after this owner decision; they do not authorize invention and they do not by themselves block the UI design record from independent review.
