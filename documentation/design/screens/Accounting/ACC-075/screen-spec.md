@@ -2,12 +2,12 @@
 
 **English:** Vendor Aging  
 **Profile / Variant:** `ReportInquiry / Aging`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-18`
 
 ## Authority
-Current baseline + current W2 + CoreUI ReportInquiry. Read model: `SupplierAging` projection; context: Supplier/OpenItem/PaymentAllocation.
+Current baseline + current W2 + CoreUI ReportInquiry. Read model: `SupplierAging` projection; context: Supplier/OpenItem/PaymentAllocation. Current P0 implementation/runtime HOLD remains separate and is not cleared by design approval.
 
 ## ANALYSIS / LAYOUT — PASS
 Purpose: read-only supplier aging analysis within authorized scope.
@@ -26,7 +26,9 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown preserves re
 
 Total liability, due classification and aging buckets are server/read-model authoritative. No client aging/balance formula.
 
-The current runtime `OPEN_ITEM_SOURCE_RECONCILIATION` hold is explicitly separate: this design spec does not claim implementation/runtime/release readiness.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-18_INDEPENDENT_REVIEW_2026-08-24.md`.
 
-## TEAM-D06
-Pending independent review. Confirm Aging variant, 9 criteria, 9 result columns, exact four capabilities and runtime/design separation.
+## Remaining technical gates
+Current `OPEN_ITEM_SOURCE_RECONCILIATION` / P0 implementation-runtime HOLD, exact DTO/property/sort/provider bindings and runtime/acceptance/release evidence remain separate.
