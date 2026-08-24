@@ -2,8 +2,8 @@
 
 **English:** Trial Balance by Currency  
 **Profile / Variant:** `ReportInquiry / Report`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-15`
 
 ## Authority
@@ -34,5 +34,8 @@ Capabilities exactly `View | DrillDown | Export | Print`, permission-bound to AC
 
 Opening/debit/credit/closing/accounting-equivalent values are server-authoritative. No client currency conversion, balance formula or rounding logic is introduced. Shared RTL/DPI/grid/paging/loading/error/audit only.
 
-## TEAM-D06
-Pending independent review. Confirm 9 criteria, 8 columns, Report variant, exact four capabilities, scope preservation and no client financial recomputation.
+## TEAM-D06 — PASS
+`PASS — 0 open design findings`. Independent review confirmed 9 criteria, 8 columns, Report variant, exact four capabilities, scope preservation and no client financial recomputation.
+
+## Final disposition
+`DESIGN_APPROVED`. Runtime/acceptance/release evidence remains separate.
