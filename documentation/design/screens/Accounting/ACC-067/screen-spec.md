@@ -2,8 +2,8 @@
 
 **English:** Cash Box Movement Statement  
 **Profile / Variant:** `ReportInquiry / Statement`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-16`
 
 ## Authority
@@ -33,5 +33,6 @@ Server-paged read-only result columns exactly:
 ## UX / VISUAL — PASS
 Capabilities exactly `View | DrillDown | Export | Print`. Context, sorting, scope, paging, export and print are server-authoritative. Running balance/in/out values are read-model facts; no client recomputation. No mutation/offline write. Shared CoreUI presentation only.
 
-## TEAM-D06
-Pending independent review.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-16A_REPORTS_INDEPENDENT_REVIEW_2026-08-24.md`.
