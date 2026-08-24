@@ -36,6 +36,8 @@ Functional tabs:
 5. المرفقات
 6. سجل العمليات
 
+The `المرفقات` tab is retained because it is part of the current V1.3 screen inventory, but current W2 does not issue attachment Upload/Download/Delete commands. Therefore the design does not create an attachment mutation surface; any attachment provider/action remains `TBD-GATED` until explicit authority is issued.
+
 CoreUI owns toolbar, RTL, typography, spacing, validation/error/loading states, Search/List/Grid, pagination and audit. No local pixel sizing, toolbar/grid clone or nested scrolling is introduced.
 
 ## FIELD_GRID — TEAM-D03 PASS
@@ -79,6 +81,7 @@ Width policy is semantic only: Code/content; Name=primary Fill; Company/Branch/C
 - New/Edit/Disable are capability-driven; server permission/scope is authoritative.
 - Disable is the only issued state-change command; no Enable or direct Status mutation is shown.
 - Shared TransportLookup presentation is used for Company/Branch/Currency/GL Account/Default Cashier; unissued providers do not become local hardcoded lists.
+- The Attachments tab exposes no local upload/download/delete command without explicit W2 attachment authority.
 - Shared validation presenter handles field errors; no MessageBox duplicate validation path.
 - Concurrency conflicts use shared reload/refresh handling where returned by W2; no silent overwrite.
 - Loading disables conflicting commands and prevents duplicate submission through shared command state.
@@ -91,7 +94,7 @@ Width policy is semantic only: Code/content; Name=primary Fill; Company/Branch/C
 - Tabs are functional only; no extra decorative tab is introduced.
 
 ## Technical gates retained
-The design approval does not resolve Cashbox code/name persistence, GL/default-cashier lookup providers, limit persistence/enforcement, shift-close storage, DTO field mappings, field-level audit mapping or offline classification. These remain explicit implementation `TBD-GATED` items.
+The design approval does not resolve Cashbox code/name persistence, GL/default-cashier lookup providers, limit persistence/enforcement, shift-close storage, attachment provider/actions, DTO field mappings, field-level audit mapping or offline classification. These remain explicit implementation `TBD-GATED` items.
 
 ## TEAM-D06 review input
 Verify:
@@ -101,6 +104,7 @@ Verify:
 4. Seven current list columns preserved exactly.
 5. Actions exactly View/Create/Edit/Disable.
 6. Status is not directly edited and no Enable/Delete/Print/Export/Post/Reverse is invented.
-7. Lookup providers and physical/DTO bindings remain `TBD-GATED` rather than invented.
-8. CoreUI owns shared layout/RTL/visual behavior.
-9. No offline write authority or accounting formula is created.
+7. Attachment tab does not invent attachment commands.
+8. Lookup providers and physical/DTO bindings remain `TBD-GATED` rather than invented.
+9. CoreUI owns shared layout/RTL/visual behavior.
+10. No offline write authority or accounting formula is created.
