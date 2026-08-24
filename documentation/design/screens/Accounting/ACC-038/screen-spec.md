@@ -3,15 +3,17 @@
 **English:** Cash Boxes  
 **Module:** Accounting  
 **Profile / Variant:** `MasterData / Tabbed`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
-**Batch:** `BATCH-11`
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Batch:** `BATCH-11`  
+**ApprovedOn:** `2026-08-24`
 
 ## Authority
 - Current 57-screen governing baseline + Unified Design/Execution V1.3.
 - W2 exact surface: List/Get/Create/Update/Disable; `ACC038.View/Create/Edit/Disable`.
 - Primary W1 entity: `Cashbox`.
 - Owner design-only decision: `BATCH-11_ACCOUNTING_FINANCIAL_MASTERS_HOLD_2026-08-24.md` — approved 2026-08-24.
+- Independent review: `BATCH-11_INDEPENDENT_REVIEW_2026-08-24.md` — TEAM-D06 PASS / 0 open design findings.
 - Specialist field review supplies UI type/requiredness evidence but unresolved physical/API/lookup mappings remain `TBD-GATED`; no W1/API/DTO mapping is invented.
 
 ## ANALYSIS — TEAM-D01 PASS
@@ -93,18 +95,14 @@ Width policy is semantic only: Code/content; Name=primary Fill; Company/Branch/C
 - Monetary fields use shared numeric formatting/alignment; no financial computation is performed by Desktop.
 - Tabs are functional only; no extra decorative tab is introduced.
 
+## INDEPENDENT_REVIEW — TEAM-D06 PASS
+- Initial review finding F-01: attachment tab could be misread as attachment command authority.
+- Corrected by explicitly retaining the tab while prohibiting unissued attachment commands/providers.
+- Re-review result: PASS.
+- Open design findings: **0**.
+
 ## Technical gates retained
 The design approval does not resolve Cashbox code/name persistence, GL/default-cashier lookup providers, limit persistence/enforcement, shift-close storage, attachment provider/actions, DTO field mappings, field-level audit mapping or offline classification. These remain explicit implementation `TBD-GATED` items.
 
-## TEAM-D06 review input
-Verify:
-1. Identity/Profile/Variant = `ACC-038 / MasterData / Tabbed`.
-2. Six governing functional tabs retained.
-3. Eleven governing design fields explicit with UI metadata only.
-4. Seven current list columns preserved exactly.
-5. Actions exactly View/Create/Edit/Disable.
-6. Status is not directly edited and no Enable/Delete/Print/Export/Post/Reverse is invented.
-7. Attachment tab does not invent attachment commands.
-8. Lookup providers and physical/DTO bindings remain `TBD-GATED` rather than invented.
-9. CoreUI owns shared layout/RTL/visual behavior.
-10. No offline write authority or accounting formula is created.
+## Final design verdict
+`DESIGN_APPROVED` — design only. Runtime/implementation readiness is not claimed.
