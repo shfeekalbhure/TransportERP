@@ -2,8 +2,8 @@
 
 **Alias:** `COD-002`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-02`
 
 ## Authority
@@ -62,6 +62,9 @@ Provider/sort identifiers remain `TBD-GATED`; no custody calculation is invented
 ## VISUAL — TEAM-D05 PASS
 Shared Transaction/CoreUI tokens only: RTL/DPI, central currency/read-only/lookup states, grid/tabs/audit/validation/loading/error. No local balance color, raw sizes or toolbar clone.
 
+## Independent review — TEAM-D06 PASS
+Review report: `documentation/design/reviews/2026-08-24_BATCH-02_INDEPENDENT_REVIEW.md`. Open design findings: `0`. Runtime `TAE-F01-011` not run.
+
 ## Acceptance criteria
 1. six explicit read-only custody grid columns.
 2. custody amount is server-calculated.
@@ -69,5 +72,5 @@ Shared Transaction/CoreUI tokens only: RTL/DPI, central currency/read-only/looku
 4. no API/DTO/Permission/DDL/offline/accounting invention.
 
 ## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.  
+Final: `DESIGN_APPROVED`.
