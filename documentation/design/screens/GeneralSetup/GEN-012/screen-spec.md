@@ -2,8 +2,8 @@
 
 **English:** Fiscal Year  
 **Profile / Variant:** `ControlApproval / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-07`
 
 ## Authority
@@ -62,6 +62,7 @@ Use shared ControlApproval CoreUI: RTL/DPI, search/filter presentation, read-onl
 6. no Create/Edit/Delete/Print/Export/Disable/Enable/Offline capability.
 7. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+W2/W3/acceptance cross-check confirmed read-only fiscal-year data, protected-action-only state control, ApprovalRequest version/state recheck, SoD, Reopen reason/version, no direct lifecycle command invention and no unissued CRUD/print/offline actions. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
