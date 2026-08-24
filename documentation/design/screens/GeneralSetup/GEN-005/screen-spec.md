@@ -2,8 +2,8 @@
 
 **English:** Directorates  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-03`
 
 ## Authority
@@ -57,6 +57,7 @@ Shared MasterData CoreUI only: RTL, DPI, typography, spacing, lookup/text/state 
 4. no unissued capabilities or offline path.
 5. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+Current W2, atomic trace and acceptance specification confirm parent-aware Create, immutable Governorate parent on Update, expectedVersion conflict handling, reasoned Disable and prohibited Print/Delete/Enable/Move/Offline. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
