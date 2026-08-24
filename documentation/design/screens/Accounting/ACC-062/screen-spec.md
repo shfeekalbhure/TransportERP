@@ -2,8 +2,8 @@
 
 **English:** Account Balances by Currency  
 **Profile / Variant:** `ReportInquiry / Report`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-15`
 
 ## Authority
@@ -32,5 +32,8 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown/export/print
 
 Original balance, valuation rate, accounting equivalent and valuation difference are server/read-model authoritative. No client valuation, FX formula or early rounding is introduced. Shared CoreUI presentation only.
 
-## TEAM-D06
-Pending independent review. Confirm Report variant, 9 criteria, 7 columns, exact four capabilities and server-authoritative valuation semantics.
+## TEAM-D06 — PASS
+`PASS — 0 open design findings`. Independent review confirmed Report variant, 9 criteria, 7 columns, exact four capabilities and server-authoritative valuation semantics.
+
+## Final disposition
+`DESIGN_APPROVED`. Runtime/acceptance/release evidence remains separate.
