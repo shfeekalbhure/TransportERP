@@ -2,8 +2,8 @@
 
 **English:** Cost Center Tree  
 **Profile / Variant:** `TreeMaster / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-08`
 
 ## Authority
@@ -66,6 +66,7 @@ Shared TreeMaster CoreUI owns RTL/DPI, tree indentation/expand-collapse, selecti
 6. no Print/Export/Delete/Enable/offline capability.
 7. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+W2/W3/acceptance cross-check confirmed lazy TreeMaster behavior, immutable Company/parent on Update, Move-only reparenting with hierarchy errors, optional Branch reference without invented cross-company rule and absence of posting/report/offline capabilities. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
