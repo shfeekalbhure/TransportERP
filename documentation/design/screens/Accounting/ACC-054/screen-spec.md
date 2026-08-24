@@ -3,8 +3,8 @@
 **English:** Open / Close Accounting Periods  
 **Module:** Accounting  
 **Profile / Variant:** `ControlApproval / PeriodAction`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-14`
 
 ## Authority
@@ -23,7 +23,7 @@ Tabs:
 4. الاعتمادات
 5. سجل العمليات
 
-Executable surface exactly: View, Execute, Approve, Reject, Return, Reopen. No direct Create/Edit, Close/Open button invented outside the generic protected-action contract, Print/Export, attachment mutation or offline final write.
+Executable surface exactly: View, Execute, Approve, Reject, Return, Reopen. No direct Create/Edit, Close/Open button invented outside the protected-action contract, Print/Export, attachment mutation or offline final write.
 
 ## LAYOUT — TEAM-D02 PASS
 Shared ControlApproval foundation:
@@ -34,8 +34,8 @@ There is **no concrete screen-specific grid** for ACC-054. No local grid is crea
 ## FIELD_GRID — TEAM-D03 PASS
 | # | UI design key | Arabic label | Type | Requiredness | Edit policy |
 |---:|---|---|---|---|---|
-| 1 | `fiscalYearRef` | السنة المالية | Lookup | Required | Editable only while initiating eligible protected action |
-| 2 | `periodRef` | الفترة | Lookup | Required | Editable only while initiating eligible protected action |
+| 1 | `fiscalYearRef` | السنة المالية | Lookup | Required | Eligible protected-action context only |
+| 2 | `periodRef` | الفترة | Lookup | Required | Eligible protected-action context only |
 | 3 | `currentState` | الحالة الحالية | State display | Automatic | ReadOnly |
 | 4 | `requestedAction` | الإجراء المطلوب | Enum/Combo | Required | Eligible action request only; values server-contract governed |
 | 5 | `reason` | السبب | Multiline Text | Required | Action-request context |
@@ -58,8 +58,10 @@ Exact lookup providers/action-code identifiers are not invented. `unpostedCheckR
 ## VISUAL — TEAM-D05 PASS
 Use shared ControlApproval RTL/DPI/decision-state/history/action presenters only. Current state, approval state and check result are semantic server values; no local state engine or custom styling.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Must confirm 9 fields, five tabs, no concrete grid, exact six capability permissions, SoD/version behavior and separation from ACC-041.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+`PASS — 0 open design findings` per `documentation/design/batches/BATCH-14_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+Confirmed: nine fields, five tabs, no concrete grid, exact `View/Execute/Approve/Reject/Return/Reopen` surface, SoD/version/target-state behavior, and separation from ACC-041.
 
 ## Remaining technical gates
-Exact provider/action-code/DTO bindings, unresolved physical field mapping, runtime acceptance and release evidence remain separate.
+Exact provider/action-code/DTO bindings, unresolved physical field mapping, runtime acceptance and release evidence remain separate and nonblocking for design approval.
