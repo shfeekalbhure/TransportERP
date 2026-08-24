@@ -1,14 +1,21 @@
-# BATCH-12 — Accounting Core Transactions — Authority Gate / Resolution
+# BATCH-12 — Accounting Core Transactions — Final Design Closure
 
 **Screens:** `ACC-042`, `ACC-043`, `ACC-044`, `ACC-045`  
 **Date:** 2026-08-24  
-**Current state:** `OWNER_DECISION_APPROVED / DESIGN CONTINUES`  
-**Owner:** `DESIGN-LEAD / ORCHESTRATOR`
+**Current state:** `DESIGN_APPROVED`  
+**Owner:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Independent review:** `TEAM-D06 PASS / 0 open design findings`
 
-## Completed design stages before decision
+## Completed stages
 - `TEAM-D01 ANALYSIS = PASS`
 - `TEAM-D02 LAYOUT = PASS`
-- `TEAM-D03 FIELD_GRID = previously HOLD_AUTHORITY`
+- `TEAM-D03 FIELD_GRID = PASS` under owner-approved design-only authority
+- `TEAM-D04 UX = PASS`
+- `TEAM-D05 VISUAL = PASS`
+- `TEAM-D06 INDEPENDENT_REVIEW = PASS`
+- `DESIGN-LEAD CLOSURE = DESIGN_APPROVED`
+
+Independent review evidence: `documentation/design/batches/BATCH-12_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## Governing identity and exact executable surface
 - `ACC-042 — القيد اليومي` = `Transaction / HeaderLines`; W2 actions exactly View/Create/Edit/Cancel/Post/Reverse.
@@ -16,7 +23,7 @@
 - `ACC-044 — سند الصرف` = `Transaction / HeaderLines`; W2 actions exactly View/Create/Edit/Cancel/Post/Reverse.
 - `ACC-045 — سند التحويل بين الصناديق والبنوك` = `Transaction / Transfer`; W2 actions exactly View/Create/Edit/Cancel/Post/Reverse.
 
-Current W2 exposes seven transaction endpoints per screen: List, Get, Create draft, Update draft, Cancel, Post and Reverse. No screen-specific Print/Export, attachment mutation, or Approve/Reject/Return endpoint/permission is promoted here.
+Current W2 exposes seven transaction endpoints per screen: List, Get, Create draft, Update draft, Cancel, Post and Reverse. No screen-specific Print/Export, attachment mutation, or Approve/Reject/Return endpoint/permission is promoted.
 
 ## Shared current V1.3 transaction contract
 Functional tabs for all four:
@@ -26,9 +33,9 @@ Functional tabs for all four:
 4. الاعتمادات
 5. سجل العمليات
 
-The Attachments tab does not authorize Upload/Download/Delete without explicit W2 binding. The Approvals tab does not authorize direct approval decisions on these screens; approval queue/decision authority remains separate (`ACC-057`) where applicable.
+The Attachments tab is a governing structural area but does not authorize Upload/Download/Delete without explicit W2 binding. The Approvals tab is a governing structural/read-only area and does not authorize direct approval decisions; approval queue/decision authority remains separate where applicable.
 
-Posted records are immutable; Cancel/Reverse/Post are explicit permission/state-bound commands and server authority is final.
+Posted records are immutable. Cancel/Reverse/Post are explicit permission/state-bound commands and server authority is final.
 
 ## Current field/grid inventory
 ### ACC-042
@@ -41,26 +48,31 @@ Governing line grid: `# | الحساب | مركز التكلفة/الأبعاد 
 
 Governing line grid: `# | الطرف/الجهة | الحساب المقابل | البيان | العملة | المبلغ | سعر الصرف | المبلغ المحاسبي`.
 
-## Prior authority gap
-Specialist review retains field-level implementation gaps:
-- ACC-042: التاريخ المحاسبي, المرجع, الوصف (`FBR-035..037`) plus unresolved lookup-provider detail where separately flagged.
-- ACC-043: التاريخ, البيان (`FBR-038..039`) plus unresolved lookup-provider detail where separately flagged.
-- ACC-044: التاريخ, البيان (`FBR-040..041`) plus unresolved lookup-provider detail where separately flagged.
-- ACC-045: التاريخ, البيان (`FBR-042..043`) plus unresolved lookup-provider detail where separately flagged.
-
-These gaps concern exact persisted/read/API/permission/audit/offline field-level mapping. They do not erase the current V1.3 UI field/tab/grid inventory.
-
 ## OWNER DECISION — APPROVED 2026-08-24
-Owner approved the recommended **design-only authority**:
+Owner approved design-only authority to treat the current V1.3 field/tab/grid inventory as the governing UI design contract and allow TEAM-D03 to issue UI-only metadata: ValueType/UI semantic, required/read-only/edit policy, field/grid order, CoreUI width/editor/selection presentation.
 
-> Treat the current V1.3 field/tab/grid inventory as the governing UI design contract for ACC-042..045. TEAM-D03 may issue UI-only metadata: ValueType/UI semantic, required/read-only/edit policy, field/grid order, CoreUI width/editor/selection presentation. Every unresolved W1/DTO/API/permission/DDL/lookup/attachment/print binding remains explicit `TBD-GATED` implementation authority.
+Every unresolved W1/DTO/API/permission/DDL/lookup/attachment/print binding remains `TBD-GATED` implementation authority.
 
-### This approval does NOT authorize
-- W1/DDL/schema/migration changes;
-- API routes or DTO fields;
-- new permissions, approval commands, Print/Export, attachment commands, or offline writes;
-- accounting formulas, posting rules, exchange-rate calculations, balancing logic or numbering behavior beyond current server contracts;
-- application code or official Kurrasa modification.
+This approval did **not** authorize W1/DDL/schema/migrations, API routes or DTO fields, new permissions, approval commands, Print/Export, attachment commands, offline writes, accounting formulas, posting rules, exchange-rate calculations, balancing logic, numbering behavior, application code, or official Kurrasa modification.
 
-## Resolution
-`FIELD_GRID HOLD_AUTHORITY` is lifted for **design only**. TEAM-D03 may complete UI metadata, after which the screens proceed through UX → VISUAL → TEAM-D06 independent review. Technical field/lookup/storage bindings remain `TBD-GATED` until their own authority is issued.
+## TEAM-D06 final disposition
+`PASS` with `0` open design findings.
+
+Review confirmed:
+- identity/profile/variant correctness;
+- exact tabs, field inventory and grids;
+- exact W2 action surface only;
+- posted immutability and expected-version/server authority;
+- no client accounting formula or local CoreUI duplication;
+- no unissued Print/Export/Attachment/Approval/Offline commands;
+- technical field/lookup/storage gaps are explicit rather than silently designed around.
+
+## Remaining technical gates — nonblocking for design approval
+- FBR-035..043 field-level persistence/read/API/audit/offline mapping closure as applicable per screen.
+- Unissued lookup provider/source/search/revalidation bindings.
+- Exact DTO property/line/sort-key bindings and accountingAmount server binding.
+- Attachment/approval data-source authority if later issued.
+- Runtime/acceptance execution.
+
+## Scope statement
+No application code, official Kurrasa, W1/DDL, API, DTO or permission contract was modified by this design closure.
