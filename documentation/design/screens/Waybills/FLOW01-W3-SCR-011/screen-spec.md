@@ -2,8 +2,8 @@
 
 **Alias:** `COD-001`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-02`
 
 ## Authority
@@ -62,6 +62,9 @@ The issued `sum = amount` relationship remains domain/API validation; no competi
 ## VISUAL — TEAM-D05 PASS
 CoreUI Transaction visual system only: RTL/DPI, central currency/reference states, shared grid/tabs/validation/loading/error/audit. No local financial colors, totals logic, dimensions or toolbar clones.
 
+## Independent review — TEAM-D06 PASS
+Review report: `documentation/design/reviews/2026-08-24_BATCH-02_INDEPENDENT_REVIEW.md`. Open design findings: `0`. Runtime `TAE-F01-010` not run.
+
 ## Acceptance criteria
 1. five explicit reference grid columns.
 2. one currency and total/linkage validation remain authoritative outside presentation.
@@ -69,5 +72,5 @@ CoreUI Transaction visual system only: RTL/DPI, central currency/reference state
 4. no API/DTO/Permission/DDL/offline/accounting invention.
 
 ## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.  
+Final: `DESIGN_APPROVED`.
