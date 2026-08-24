@@ -2,8 +2,8 @@
 
 **English:** Customer Aging  
 **Profile / Variant:** `ReportInquiry / Aging`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-17`
 
 ## Authority
@@ -26,5 +26,9 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown preserves pa
 
 Total balance, due classification and all aging buckets are server/read-model authoritative. No client day-bucket, overdue or balance formula is introduced. Shared CoreUI only.
 
-## TEAM-D06
-Pending independent review. Confirm Aging variant, 9 criteria, 9 columns, exact four capabilities and server-authoritative aging buckets.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-17_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact DTO/property/sort/provider bindings and runtime/acceptance/release evidence remain separate implementation items.
