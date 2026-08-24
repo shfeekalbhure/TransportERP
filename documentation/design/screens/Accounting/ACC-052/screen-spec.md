@@ -3,8 +3,8 @@
 **English:** General Journal  
 **Module:** Accounting / Reporting  
 **Profile / Variant:** `ReportInquiry / Inquiry`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-13`
 
 ## Authority
@@ -50,8 +50,14 @@ Query/DrillDown/Export/Print preserve parent query context and recheck permissio
 ## VISUAL — TEAM-D05 PASS
 CoreUI owns RTL/DPI/layout/summary/grid/pagination/details. Totals use shared server-value presentation without local accounting logic.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Review must confirm `Inquiry`, nine criteria, exact 10 columns and W2 four-action surface.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+- Review: `documentation/design/batches/BATCH-13_INDEPENDENT_REVIEW_2026-08-24.md`.
+- `Inquiry`, nine criteria, exact 10 columns and W2 View/DrillDown/Export/Print surface: PASS.
+- Server-authoritative journal totals/state and no mutation/invention: PASS.
+- Open design findings: `0`.
 
 ## Remaining technical gates
 Exact provider/DTO/sort bindings and runtime/acceptance/release evidence remain separate.
+
+## DESIGN-LEAD closure
+`ACC-052 = DESIGN_APPROVED`.
