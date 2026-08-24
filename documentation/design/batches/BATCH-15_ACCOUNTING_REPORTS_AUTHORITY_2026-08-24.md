@@ -1,8 +1,9 @@
-# BATCH-15 — Accounting Reports — Design Authority
+# BATCH-15 — Accounting Reports — Final Design Closure
 
 **Screens:** `ACC-059`, `ACC-060`, `ACC-061`, `ACC-062`  
 **Date:** 2026-08-24  
-**State:** `INDEPENDENT_REVIEW`
+**State:** `DESIGN_APPROVED`  
+**Independent review:** `TEAM-D06 PASS / 0 open design findings`
 
 ## Governing contract
 Current baseline V1.1 + V1.3 reconciliation + current W2 ReportInquiry contracts + CoreUI ReportInquiry foundation.
@@ -27,4 +28,14 @@ Layout is shared CoreUI only: `Toolbar → Filters(Content) → Summary(Content)
 
 Technical DTO property names, server sort keys and provider ids remain implementation-level where not explicitly issued.
 
-`TEAM-D01..D05 = PASS`; next gate: `TEAM-D06 INDEPENDENT_REVIEW`.
+## Completed stages
+`TEAM-D01 ANALYSIS = PASS`  
+`TEAM-D02 LAYOUT = PASS`  
+`TEAM-D03 FIELD_GRID = PASS`  
+`TEAM-D04 UX = PASS`  
+`TEAM-D05 VISUAL = PASS`  
+`TEAM-D06 INDEPENDENT_REVIEW = PASS`
+
+Independent review evidence: `documentation/design/batches/BATCH-15_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+No application code, official Kurrasa, W1/DDL, API, DTO or permission contract was modified by this closure.
