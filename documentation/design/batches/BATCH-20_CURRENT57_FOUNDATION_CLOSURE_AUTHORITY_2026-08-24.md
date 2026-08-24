@@ -1,8 +1,9 @@
-# BATCH-20 — Current57 Foundation Closure — Design Authority
+# BATCH-20 — Current57 Foundation Closure — Final Design Closure
 
 **Screens:** `GEN-013`, `ACC-036`  
 **Date:** 2026-08-24  
-**State:** `INDEPENDENT_REVIEW`
+**State:** `DESIGN_APPROVED`  
+**Independent review:** `TEAM-D06 PASS / 0 open design findings`
 
 ## Authority
 - Current57 baseline / Final Execution Register V1.0.
@@ -11,23 +12,33 @@
 - `ORG-OD-004` numbering semantics and controlled resolution R-008.
 - CoreUI Settings and MasterData foundations.
 
-## Owner closures consumed
-### GEN-013
-- Numbering is server-side and atomic; no `MAX+1`.
-- Lifecycle is `Reserve → Commit | Cancel`.
-- No reuse of cancelled numbers; durable history retained.
-- Scope dimensions are Company / Branch / Fiscal Year / Document Type as governed by the sequence.
-- `Last Number` is a protected/read-only business concept derived from durable committed allocation, not silently mapped to legacy `NextValue`.
-- Protected reset/change-last-number uses `GEN013.Override`, reason, permission, ExpectedVersion and approval when policy requires.
-- Legacy `NextValue → LastNumber` migration/backfill remains an implementation/runtime gate only.
+## Final states
+### GEN-013 — الترقيم العام
+- `Settings / NumberingControlled`
+- 10 governing fields, 4 tabs.
+- Exact executable surface: `View | Edit | Reserve | Commit | Cancel | Override`.
+- Number reservation is server-side/atomic; no `MAX+1` or client numbering authority.
+- `Last Number` is read-only and derived from durable committed allocation.
+- Protected reset/change-last-number remains `Override` with permission, reason, ExpectedVersion and approval when required.
+- Legacy `NextValue → LastNumber` migration/backfill remains an implementation/runtime/release gate only.
 
-### ACC-036
-- Current owner decision requires separate `AccountGroup` + `AccountType` implementation with a discriminated DTO.
-- Legacy merged classification persistence is excluded from governing runtime.
-- Screen remains `MasterData / Standard`, using only `View/Create/Edit/Disable`.
-- Exact physical field mapping remains implementation-owned where not closed; no merged classification storage is invented by design.
+### ACC-036 — مجموعات وأنواع الحسابات
+- `MasterData / Standard`
+- 8 governing fields, 3 tabs, no screen-specific local grid-column contract.
+- Exact executable surface: `View | Create | Edit | Disable`.
+- `AccountGroup` and `AccountType` remain separate governed record kinds under the current discriminated contract.
+- Legacy merged classification persistence is not promoted.
+- Exact discriminator/DTO/physical mappings remain implementation-owned where not issued.
+
+## Completed stages
+`TEAM-D01 ANALYSIS = PASS`  
+`TEAM-D02 LAYOUT = PASS`  
+`TEAM-D03 FIELD_GRID = PASS`  
+`TEAM-D04 UX = PASS`  
+`TEAM-D05 VISUAL = PASS`  
+`TEAM-D06 INDEPENDENT_REVIEW = PASS`
+
+Independent review evidence: `documentation/design/batches/BATCH-20_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## Design boundary
-This batch may define UI field presentation, edit/read-only semantics, layout and shared component use from current governed screen content. It does not create/change W1 columns, migrations, DTO fields, routes, permissions, accounting formulas, numbering algorithms, or offline-final-write authority.
-
-`TEAM-D01..D05 = PASS`; next gate: `TEAM-D06 INDEPENDENT_REVIEW`.
+No application code, official Kurrasa, W1/DDL, API, DTO, permission, migration or offline-final-write authority was modified by this closure. Runtime/release evidence remains separate.
