@@ -3,15 +3,18 @@
 **English:** Cash/Bank Transfer Voucher  
 **Module:** Accounting  
 **Profile / Variant:** `Transaction / Transfer`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
-**Batch:** `BATCH-12`
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Batch:** `BATCH-12`  
+**ApprovedOn:** `2026-08-24`
 
 ## Authority
 - Current 57-screen baseline + Unified Design/Execution V1.3.
 - W1 aggregate: `TransferVoucher`; related context Cashbox/BankAccount/Currency/JournalEntry.
 - W2 exact actions only: `ACC045.View/Create/Edit/Cancel/Post/Reverse`; List/Get/Create/Update/Cancel/Post/Reverse.
-- Owner design-only decision is recorded in the Batch-12 authority file; unresolved field/lookup bindings remain `TBD-GATED`.
+- Owner design-only decision is recorded in `documentation/design/batches/BATCH-12_ACCOUNTING_CORE_TRANSACTIONS_HOLD_2026-08-24.md`.
+- Independent review: `documentation/design/batches/BATCH-12_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Unresolved field/lookup bindings remain `TBD-GATED`; no W1/API/DTO/lookup mapping is invented.
 
 ## ANALYSIS — TEAM-D01 PASS
 Purpose: create and maintain a cash/bank transfer Draft with explicit source/destination semantics, then cancel/post/reverse through server-authoritative commands.
@@ -64,19 +67,24 @@ Primary description owns Fill; reference/numeric columns use shared semantic wid
 - Cancel requires eligible state and reason/version per W2; no silent transition.
 - Reverse applies to eligible posted records only; original remains immutable.
 - Concurrency conflicts use shared Refresh/Reload UX; no silent overwrite.
-- Approvals tab is read-only status/history/context; no direct approval decision command.
-- Attachments tab has no Upload/Download/Delete command until explicit W2 authority exists.
+- Approvals tab is a governing structural/read-only area; it creates no direct decision command, and exact content/source binding remains implementation-owned where not issued.
+- Attachments tab is a governing structural area; no Upload/Download/Delete command or data-source contract is created without W2 authority.
 - No Print/Export and no offline write/outbox/replay.
 
 ## VISUAL — TEAM-D05 PASS
 CoreUI owns RTL, typography, spacing, toolbar, validation/error/loading states, tabs, grid, audit, focus and DPI. Source/destination references are visually distinct labels but use the same shared lookup component; no local provider or business rule is embedded. Amount/rate/accounting amount use shared numeric presentation.
 
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+- Result: `PASS`; open design findings: `0`.
+- Identity/Profile/Variant = ACC-045 / Transaction / Transfer confirmed.
+- Exact five tabs, 11 fields and 8-column line grid preserved.
+- Executable actions remain exactly View/Create/Edit/Cancel/Post/Reverse.
+- No Print/Export, attachment mutation, direct approval decision, offline write, local accounting formula or CoreUI duplication.
+- Owner decision remains UI-only; technical mappings remain explicit gates.
+
 ## Remaining technical gates
 - FBR-042..043 field-level mapping closure.
 - Unissued lookup provider/source/revalidation contracts.
 - Exact DTO/line/sort-key bindings and accountingAmount formula/binding.
-- Attachment authority if later issued.
+- Attachment/approval data-source authority if later issued.
 - Runtime/acceptance execution.
-
-## TEAM-D06 review input
-Verify identity/profile/variant = ACC-045 / Transaction / Transfer; exact five tabs, 11 fields and 8 columns; actions exactly View/Create/Edit/Cancel/Post/Reverse; no Print/Export/attachment/direct-approval/offline action; source/destination semantics do not invent accounting rules; posted immutability; owner decision remains UI-only; technical gaps remain TBD-GATED; no CoreUI duplication or client accounting formula.
