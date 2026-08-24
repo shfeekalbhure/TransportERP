@@ -2,8 +2,8 @@
 
 **English:** Account Groups and Types  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-20`
 
 ## Authority
@@ -55,8 +55,9 @@ Current baseline marks concrete screen grid columns N/A. Shared MasterData list/
 ## VISUAL — TEAM-D05 PASS
 Use shared MasterData RTL/DPI/field/status/audit presentation. Group/type distinction must be visible from server-provided discriminator/context without inventing a local persistence model.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending. Confirm 8 fields, three tabs, no local grid columns, exact View/Create/Edit/Disable surface, separate AccountGroup/AccountType semantics and no legacy merged persistence promotion.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-20_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## Remaining implementation/release gates
 Exact physical field mapping, discriminator/DTO property names, migrations and final runtime/release evidence remain separate from design approval.
