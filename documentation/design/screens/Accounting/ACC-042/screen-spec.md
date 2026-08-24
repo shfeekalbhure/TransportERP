@@ -4,9 +4,10 @@
 **Module:** Accounting  
 **Profile / Variant:** `Transaction / HeaderLines`  
 **Toolbar:** shared Transaction family / capability-bound  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
-**Batch:** `BATCH-12`
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Batch:** `BATCH-12`  
+**ApprovedOn:** `2026-08-24`
 
 ## Authority
 - Current 57-screen baseline + Unified Design/Execution V1.3.
@@ -14,6 +15,7 @@
 - W2 exact commands: `ACC042.View/Create/Edit/Cancel/Post/Reverse`; seven endpoints only: List/Get/Create/Update/Cancel/Post/Reverse.
 - Owner design-only decision recorded in `documentation/design/batches/BATCH-12_ACCOUNTING_CORE_TRANSACTIONS_HOLD_2026-08-24.md`.
 - Specialist field gaps remain technical `TBD-GATED`; no W1/API/DTO/lookup mapping is invented.
+- Independent review: `documentation/design/batches/BATCH-12_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## ANALYSIS — TEAM-D01 PASS
 Purpose: create and maintain a journal draft, then cancel/post/reverse through explicit server-authoritative lifecycle commands.
@@ -43,7 +45,7 @@ Owner decision authorizes UI metadata only. Exact field-to-W1/DTO/API mappings a
 | Order | W3 design key | Arabic label | UI type | Requiredness | Edit policy |
 |---:|---|---|---|---|---|
 | 1 | `documentNumber` | رقم المستند | Display / Text | server generated | ReadOnly |
-| 2 | `accountingDate` | التاريخ المحاسبي | Input / Date | required | Draft-editable when `ACC042.Edit`/Create context allows |
+| 2 | `accountingDate` | التاريخ المحاسبي | Input / Date | required | Draft-editable when Create/Edit context allows |
 | 3 | `externalReference` | المرجع | Input / Text | optional | Draft-editable |
 | 4 | `description` | الوصف | Input / Text | required | Draft-editable |
 | 5 | `currencyRef` | العملة | Lookup / Reference | required | Draft-editable; provider binding TBD-GATED |
@@ -87,8 +89,8 @@ Exact lookup providers, line DTO property names, server sort keys and accounting
 - Cancel is an explicit eligible-state command requiring current version/reason as W2 dictates; no silent state rewrite.
 - Reverse is available only for posted eligible records under `ACC042.Reverse`; original remains immutable and reversal is server-generated/linked.
 - Concurrency conflict uses shared conflict UX with Refresh/Reload; no silent overwrite or client merge.
-- The Approvals tab is read-only status/history/context. No direct Approve/Reject/Return command is created; approval decision authority remains outside this screen.
-- The Attachments tab remains a governed functional area, but no Upload/Download/Delete command is created without W2 binding.
+- The Approvals tab is a governing structural/read-only area; it creates no decision command, and exact content/source binding remains implementation-owned where not issued.
+- The Attachments tab is a governing structural area; no Upload/Download/Delete command or data-source contract is created without W2 authority.
 - No Print/Export surface is created.
 - No offline final write, queue, outbox or replay is created.
 - Validation/loading/error/empty/audit/focus/keyboard behavior is shared CoreUI only.
@@ -102,21 +104,17 @@ Exact lookup providers, line DTO property names, server sort keys and accounting
 - Toolbar actions follow shared order/style and capability visibility; UI visibility is never authorization authority.
 - DPI/resize/Arabic clipping and accessible focus metadata remain CoreUI-owned.
 
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+- Result: `PASS`.
+- Open design findings: `0`.
+- Confirmed identity/profile/variant, five functional tabs, 11-field inventory and 9-column line grid.
+- Confirmed executable actions remain exactly View/Create/Edit/Cancel/Post/Reverse.
+- Confirmed no Print/Export, attachment mutation, direct approval action, offline final write, local accounting formula or CoreUI duplication.
+- Confirmed owner decision did not create W1/DDL/DTO/API/permission authority.
+
 ## Remaining technical gates — nonblocking for design approval
 - FBR-035..037 exact field-level persistence/read/API/audit/offline mappings.
 - Lookup provider/source/revalidation bindings for account/cost center and any other unissued lookup detail.
 - Exact DTO property names, line binding and server sort keys.
-- Attachment APIs/permissions if later issued.
+- Attachment/approval data-source APIs and permissions if later issued.
 - Runtime/acceptance execution.
-
-## TEAM-D06 review input
-Verify:
-1. Identity/Profile/Variant = ACC-042 / Transaction / HeaderLines.
-2. Exact five functional tabs and exact 11-field inventory preserved.
-3. Exact 9-column line grid preserved.
-4. Executable actions remain exactly View/Create/Edit/Cancel/Post/Reverse.
-5. No Print/Export/attachment mutation/direct approval command invented.
-6. Posted immutability, expected-version conflict behavior and server posting authority preserved.
-7. Owner design-only decision has not been converted into W1/DTO/API/DDL authority.
-8. Lookup and field-mapping gaps remain explicit TBD-GATED implementation items.
-9. No local CoreUI duplication or client accounting formula.
