@@ -2,8 +2,8 @@
 
 **English:** Payment Allocation & Settlement  
 **Profile / Variant:** `Transaction / Allocation`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-18`
 
 ## Authority
@@ -48,5 +48,9 @@ W2 actions exactly `View | Allocate | Unallocate`.
 - No Post/Cancel/Print/Export/Approval/attachment mutation/offline final write is invented.
 - Shared CoreUI selection/loading/error/conflict/audit behavior only.
 
-## TEAM-D06
-Pending independent review. Confirm ODR-ACC076-001 exact three-action surface, 11 fields, 7 columns and atomic server allocation authority.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-18B_TRANSACTIONS_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact W1/DTO/property/lookup/provider/sort bindings and runtime/acceptance/release evidence remain separate `TBD-GATED` implementation items.
