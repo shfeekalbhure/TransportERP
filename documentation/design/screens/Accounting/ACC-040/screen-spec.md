@@ -3,15 +3,17 @@
 **English:** Payment Methods  
 **Module:** Accounting  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
-**Batch:** `BATCH-11`
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Batch:** `BATCH-11`  
+**ApprovedOn:** `2026-08-24`
 
 ## Authority
 - Current 57-screen governing baseline + Unified Design/Execution V1.3.
 - W2 exact surface: List/Get/Create/Update/Disable; `ACC040.View/Create/Edit/Disable`.
 - Primary W1 entity: `PaymentMethod`.
 - Owner design-only decision: `BATCH-11_ACCOUNTING_FINANCIAL_MASTERS_HOLD_2026-08-24.md` — approved 2026-08-24.
+- Independent review: `BATCH-11_INDEPENDENT_REVIEW_2026-08-24.md` — TEAM-D06 PASS / 0 open design findings.
 - Specialist field review supplies UI type/requiredness evidence; unresolved physical/API/lookup mappings remain `TBD-GATED`.
 
 ## ANALYSIS — TEAM-D01 PASS
@@ -91,16 +93,14 @@ Width policy: Code/content; Name=primary Fill; Type/content; Boolean columns com
 - Required fields use shared required semantics; Status uses shared read-only status presentation.
 - No local visual exception is issued.
 
+## INDEPENDENT_REVIEW — TEAM-D06 PASS
+- Verified the eight-column list is permitted only by the owner-approved UI-only decision and does not imply storage.
+- Verified Clearing Account remains detail-only with lookup/storage `TBD-GATED`.
+- Verified boolean flags do not create local business formulas or transaction workflows.
+- Open design findings: **0**.
+
 ## Technical gates retained
 Physical/API mapping for Method Code/Name/Type, the boolean flags, Clearing Account lookup/storage, field-level audit mapping and offline classification remain explicit implementation `TBD-GATED` items.
 
-## TEAM-D06 review input
-Verify:
-1. Identity/Profile/Variant = `ACC-040 / MasterData / Standard`.
-2. Four governing functional areas and nine governing fields retained.
-3. The new eight-column list is justified only by the owner-approved design-only decision and does not invent persistence.
-4. Clearing Account remains detail-only with provider/storage `TBD-GATED`.
-5. Actions exactly View/Create/Edit/Disable; no Pay/Deposit/Post/Reverse/Print/Export/Delete/Enable action invented.
-6. Boolean flags do not create local business formulas/workflows.
-7. CoreUI owns shared visuals/RTL/paging/audit.
-8. No offline write authority is introduced.
+## Final design verdict
+`DESIGN_APPROVED` — design only. Runtime/implementation readiness is not claimed.
