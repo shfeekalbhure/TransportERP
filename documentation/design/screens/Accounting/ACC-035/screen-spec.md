@@ -2,8 +2,8 @@
 
 **English:** Account Tree  
 **Profile / Variant:** `TreeMaster / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-08`
 
 ## Authority
@@ -72,6 +72,7 @@ Shared TreeMaster CoreUI owns RTL/DPI, indentation/expand-collapse states, focus
 6. no AccountBranchScope or unissued Print/Export/Delete/Enable/offline capability.
 7. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+W2/W3/acceptance cross-check confirmed true lazy TreeMaster behavior, immutable Company/parent on Update, Move-only reparenting with hierarchy errors, null-only CurrencyPolicy, no AccountBranchScope and no prohibited capabilities. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
