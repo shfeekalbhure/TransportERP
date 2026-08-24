@@ -2,8 +2,8 @@
 
 **Alias:** `DLV-001`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-02`
 
 ## Authority
@@ -43,7 +43,7 @@ Shared `Transaction / HeaderLines` authority:
 |---:|---|---|---|---|---|---|
 | 1 | `taskRef` | المهمة | Reference | No | ReadOnly/server identity | content/reference |
 | 2 | `itemOrPackageRef` | البند/الطرد | Reference | Yes | Draft/Assigned | content / `TransportLookup` |
-| 3 | `destination` | الوجهة | Reference | Yes | ReadOnly/derived from issued subject context | content/reference |
+| 3 | `destination` | الوجهة | Reference | Yes | ReadOnly display | content/reference |
 | 4 | `assignee` | المكلف | Reference | Conditional | Draft/Assigned | content / `TransportLookup` |
 | 5 | `taskState` | حالة المهمة | Enum | Yes | ReadOnly/server state | content state |
 | 6 | `scheduledAt` | الموعد | Instant | No | Draft/Assigned | content datetime |
@@ -63,6 +63,9 @@ Exact lookup providers/server sort keys remain `TBD-GATED` and nonblocking.
 ## VISUAL — TEAM-D05 PASS
 Shared Transaction CoreUI visual system only: RTL/DPI, central typography/spacing/state styling, tabs, task grid, lookup editors, action/error/audit presenters. No raw/local style.
 
+## Independent review — TEAM-D06 PASS
+Review report: `documentation/design/reviews/2026-08-24_BATCH-02_INDEPENDENT_REVIEW.md`. Open design findings: `0`. Runtime `TAE-F01-008` not run.
+
 ## Acceptance criteria
 1. current `HeaderLines` profile/variant is used.
 2. six explicit task columns and single-row selection.
@@ -70,5 +73,5 @@ Shared Transaction CoreUI visual system only: RTL/DPI, central typography/spacin
 4. no API/DTO/Permission/DDL/offline invention.
 
 ## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.  
+Final: `DESIGN_APPROVED`.
