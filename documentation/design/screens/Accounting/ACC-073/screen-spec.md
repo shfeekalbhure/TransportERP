@@ -2,8 +2,8 @@
 
 **English:** Vendor Statement  
 **Profile / Variant:** `ReportInquiry / Statement`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-17`
 
 ## Authority
@@ -26,5 +26,9 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown preserves re
 
 Debit/credit/running balance/due-date context is server/read-model authoritative; no client balance or open-item formula. Shared CoreUI only.
 
-## TEAM-D06
-Pending independent review. Confirm Statement variant, 9 criteria, 10 columns, exact four capabilities and server-authoritative supplier balance.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-17_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact DTO/property/sort/provider bindings and runtime/acceptance/release evidence remain separate implementation items.
