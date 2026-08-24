@@ -3,8 +3,8 @@
 **English:** Account Statement  
 **Module:** Accounting / Reporting  
 **Profile / Variant:** `ReportInquiry / Statement`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-13`
 
 ## Authority
@@ -55,8 +55,14 @@ Query/DrillDown/Export/Print preserve the server query context and each rechecks
 ## VISUAL — TEAM-D05 PASS
 CoreUI owns RTL/DPI/layout/grid/pagination/details. Running balance and debit/credit use shared server-value presentation; no local financial calculation or color rule.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Review must confirm `Statement`, nine criteria, exact 11 columns and four W2 permissions only.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+- Review: `documentation/design/batches/BATCH-13_INDEPENDENT_REVIEW_2026-08-24.md`.
+- `Statement`, nine criteria, exact 11 columns and W2 View/DrillDown/Export/Print surface: PASS.
+- Server-authoritative running balance and no mutation/invention: PASS.
+- Open design findings: `0`.
 
 ## Remaining technical gates
 Exact lookup providers, DTO fields, sort allow-list bindings and runtime/release evidence remain implementation/release gates.
+
+## DESIGN-LEAD closure
+`ACC-047 = DESIGN_APPROVED`.
