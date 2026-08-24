@@ -3,8 +3,8 @@
 **English:** General Operational Settings & Shared Variables  
 **Profile / Variant:** `Settings / ScopedSettings`  
 **Toolbar:** `TB-S`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-09`
 
 ## Authority
@@ -88,6 +88,7 @@ Editor policy derives only from the governed `ValueType` and property catalog va
 7. shared concurrency/audit/localization/BiDi behavior preserved.
 8. no Print/Export or invented offline authority.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+Cross-check against the full GEN-015 closure confirmed the eight tabs, 24-property catalog, W1 storage boundary, four W2 operations, six permission identifiers, strict scope intersection, NearestOverride, audit/localization/BiDi and no free-key/offline authority drift. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
