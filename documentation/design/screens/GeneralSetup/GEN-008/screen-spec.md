@@ -2,8 +2,8 @@
 
 **English:** Currency  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-04`
 
 ## Authority
@@ -51,6 +51,7 @@ Shared MasterData CoreUI owns RTL/DPI/typography/spacing/grid/pagination/audit a
 4. no Print/Export/Delete/Enable/Move/offline capability.
 5. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+Acceptance/W2/W3 cross-check confirmed exact Currency field surface, decimal policy, server paging/sort, reasoned Disable, concurrency handling, absence of IsBaseCurrency/Company side effects and prohibited Print/Export/Delete/Enable/Offline. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
