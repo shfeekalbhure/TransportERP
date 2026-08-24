@@ -2,8 +2,8 @@
 
 **English:** Language  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-04`
 
 ## Authority
@@ -49,6 +49,7 @@ The screen itself follows shared CoreUI RTL/DPI/typography/spacing regardless of
 4. no invented display names or Print/Export/Delete/Enable/Move/offline behavior.
 5. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+Acceptance/W2/W3 cross-check confirmed exact Language fields, unique Code/CultureCode, RTL/LTR Direction, reasoned Disable, concurrency handling and absence of unissued display names or Print/Export/Delete/Enable/Offline. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
