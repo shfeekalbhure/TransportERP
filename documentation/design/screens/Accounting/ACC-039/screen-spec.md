@@ -3,15 +3,17 @@
 **English:** Bank Accounts  
 **Module:** Accounting  
 **Profile / Variant:** `MasterData / Tabbed`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
-**Batch:** `BATCH-11`
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**Batch:** `BATCH-11`  
+**ApprovedOn:** `2026-08-24`
 
 ## Authority
 - Current 57-screen governing baseline + Unified Design/Execution V1.3.
 - W2 exact surface: List/Get/Create/Update/Disable; `ACC039.View/Create/Edit/Disable`.
 - Primary W1 entity: `BankAccount`.
 - Owner design-only decision: `BATCH-11_ACCOUNTING_FINANCIAL_MASTERS_HOLD_2026-08-24.md` — approved 2026-08-24.
+- Independent review: `BATCH-11_INDEPENDENT_REVIEW_2026-08-24.md` — TEAM-D06 PASS / 0 open design findings.
 - Specialist field review supplies UI type/requiredness evidence; unresolved physical/API/lookup mappings remain `TBD-GATED`.
 
 ## ANALYSIS — TEAM-D01 PASS
@@ -101,17 +103,14 @@ Width policy: Code/content; Name=primary Fill; Company/Branch/Currency=content; 
 - Monetary limit uses shared numeric formatting only; Desktop does not enforce or calculate financial policy beyond UI pre-validation.
 - No local style exception is issued.
 
+## INDEPENDENT_REVIEW — TEAM-D06 PASS
+- Initial review finding F-01: attachment tab could be misread as attachment command authority.
+- Corrected by explicitly retaining the tab while prohibiting unissued attachment commands/providers.
+- Re-review result: PASS.
+- Open design findings: **0**.
+
 ## Technical gates retained
 Physical/API mappings for Bank Account Code, Bank Name, Account Name, Account Number vs IBAN, SWIFT/BIC, GL/fees/reconciliation account references, withdrawal/transfer limit, attachment provider/actions, field-level audit and offline classification remain `TBD-GATED` implementation items.
 
-## TEAM-D06 review input
-Verify:
-1. Identity/Profile/Variant = `ACC-039 / MasterData / Tabbed`.
-2. Six governing tabs and fourteen governing fields retained.
-3. Seven current list columns preserved.
-4. Account Number and IBAN are distinct UI fields without invented physical semantics.
-5. Actions exactly View/Create/Edit/Disable; no reconciliation/posting/print/export/delete/enable action invented.
-6. Attachment tab does not invent attachment commands.
-7. Lookup providers remain `TBD-GATED`.
-8. CoreUI owns shared visuals/RTL/paging/audit.
-9. No offline write authority or financial formula is introduced.
+## Final design verdict
+`DESIGN_APPROVED` — design only. Runtime/implementation readiness is not claimed.
