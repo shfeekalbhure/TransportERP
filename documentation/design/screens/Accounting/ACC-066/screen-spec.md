@@ -1,7 +1,8 @@
 # ACC-066 — تسوية البنك — Canonical Screen Specification
 
 **Profile / Variant:** `Transaction / Reconciliation`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-16`
 
 ## Authority
@@ -20,5 +21,9 @@ No matching/accounting formula is implemented in the client; balances, differenc
 ## UX / VISUAL — PASS
 Actions exactly `View/Create/Edit/Cancel/Match/Finalize/Reopen`. Match/Finalize/Reopen are explicit state/permission/version-bound server commands. No Post/Reverse/Print/Export/direct approval/attachment mutation/offline final write is invented. Shared CoreUI conflict/loading/error/audit only.
 
-## TEAM-D06
-Pending independent review.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-16B_TRANSACTIONS_CONTROLS_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact W1/DTO/property/provider/sort bindings and runtime/acceptance/release evidence remain separate `TBD-GATED` implementation items.
