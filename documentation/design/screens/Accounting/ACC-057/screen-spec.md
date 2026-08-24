@@ -3,8 +3,8 @@
 **English:** Accounting Approval Requests  
 **Module:** Accounting  
 **Profile / Variant:** `ControlApproval / ApprovalQueue`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-14`
 
 ## Authority
@@ -64,8 +64,10 @@ No screen-specific column list is created. Selection, loading, paging, details-h
 ## VISUAL — TEAM-D05 PASS
 Use shared ApprovalQueue RTL/DPI/queue/details/decision/history semantics only. Decision states and target context use CoreUI semantic presentation; no local queue styling or column invention.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition after pre-PASS correction: existing request target/context fields are read-only because ACC-057 has no Create/Edit authority. Must confirm 11 fields, four tabs, no screen-specific grid columns, exact View/Execute/Approve/Reject/Return surface, SoD/version/target-state behavior and no benchmark promotion.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+`PASS — 0 open design findings` per `documentation/design/batches/BATCH-14_INDEPENDENT_REVIEW_2026-08-24.md` after the pre-PASS correction that made existing request target/context fields read-only.
+
+Confirmed: 11 fields, four tabs, no screen-specific grid columns, exact `View/Execute/Approve/Reject/Return` surface, SoD/version/target-state behavior, and no benchmark promotion.
 
 ## Remaining technical gates
-Exact queue shared-column contract bindings, target display/provider bindings, DTO properties, unresolved physical mappings and runtime/release evidence remain separate.
+Exact queue shared-column contract bindings, target display/provider bindings, DTO properties, unresolved physical mappings and runtime/release evidence remain separate and nonblocking for design approval.
