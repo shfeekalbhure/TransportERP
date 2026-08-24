@@ -2,8 +2,8 @@
 
 **English:** Vendors  
 **Profile / Variant:** `MasterData / Tabbed`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-17`
 
 ## Authority
@@ -46,5 +46,9 @@ Company/branch/list projection values are server-scope derived. No client balanc
 ## UX / VISUAL — PASS
 Actions exactly `View/Create/Edit/Disable`. Disable is explicit permission/state-bound server command. No Delete/Enable/Print/Export/attachment mutation/offline final write is invented. Attachments tab is structural until W2 binding exists. Shared CoreUI only.
 
-## TEAM-D06
-Pending independent review. Confirm 13 fields, 6 tabs, exact 7-column list, View/Create/Edit/Disable only, and no client financial authority.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-17_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact W1/DTO/property/lookup/provider/attachment/sort bindings and runtime/acceptance/release evidence remain separate `TBD-GATED` implementation items.
