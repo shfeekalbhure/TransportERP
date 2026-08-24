@@ -35,25 +35,26 @@ The queue host is a shared CoreUI/foundation component. **No local ACC-057 busin
 | # | UI design key | Arabic label | Type | Requiredness | Edit policy |
 |---:|---|---|---|---|---|
 | 1 | `requestNumber` | رقم الطلب | Display | Automatic | ReadOnly |
-| 2 | `documentTypeRef` | نوع المستند | Lookup/Reference | Required | Selectable only in eligible Execute/request context |
-| 3 | `linkedDocumentRef` | المستند المرتبط | Lookup/Reference | Required | Selectable only in eligible Execute/request context; authorized scope |
+| 2 | `documentTypeRef` | نوع المستند | Reference display | Required context | ReadOnly / request-derived |
+| 3 | `linkedDocumentRef` | المستند المرتبط | Reference display | Required context | ReadOnly / request-derived; authorized target scope |
 | 4 | `requestedBy` | مقدم الطلب | Display | Automatic | ReadOnly |
 | 5 | `requestedAt` | وقت الطلب | Display/DateTime | Automatic | ReadOnly |
 | 6 | `documentAmount` | مبلغ المستند | Display | Automatic | ReadOnly / source-derived |
 | 7 | `currency` | العملة | Display | Automatic | ReadOnly / source-derived |
-| 8 | `requestReasonNote` | سبب/ملاحظة الطلب | Text | Optional | Editable only in request/decision context allowed by W2 |
+| 8 | `requestReasonNote` | سبب/ملاحظة الطلب | Text display | Optional context | ReadOnly / request-derived on this queue screen |
 | 9 | `approvalLevel` | مستوى الاعتماد | Display | Automatic | ReadOnly / policy-derived |
-| 10 | `decision` | القرار | Enum | Conditional | Decision context only; server-governed choices |
-| 11 | `decisionReason` | سبب القرار | Text | Conditional | Required for Reject/Return as issued |
+| 10 | `decision` | القرار | Enum | Conditional | Decision command surface only; server-governed choices |
+| 11 | `decisionReason` | سبب القرار | Text | Conditional | Decision context; required for Reject/Return as issued |
 
-Exact target-type provider ids, linked-document provider contracts and DTO property names remain `TBD-GATED` where not exposed.
+Exact target-type display/provider ids, linked-document provider contracts and DTO property names remain `TBD-GATED` where not exposed.
 
 ### Queue grid
 No screen-specific column list is created. Selection, loading, paging, details-host behavior and shared queue presentation belong to ControlApproval Shared Foundation. The server filters the queue by authorized target/company/branch scope.
 
 ## UX — TEAM-D04 PASS
 - View/list is server-scope filtered; UI visibility is never authorization.
-- Execute uses the generic request/action endpoint and does not invent target action codes.
+- `documentTypeRef`, `linkedDocumentRef` and request-note context describe the selected existing ApprovalRequest and are not edited/re-targeted from this queue.
+- Execute uses the generic issued protected-action endpoint for the selected existing request and does not create/edit the request target or invent action codes.
 - Approve uses expected ApprovalRequest version and target-state recheck; self-approval/SoD is server-enforced.
 - Reject/Return append decision history and enforce valid approval state; reason rules remain server contract authority.
 - Linked target preview/details remain read-only unless the target screen separately authorizes mutation.
@@ -64,7 +65,7 @@ No screen-specific column list is created. Selection, loading, paging, details-h
 Use shared ApprovalQueue RTL/DPI/queue/details/decision/history semantics only. Decision states and target context use CoreUI semantic presentation; no local queue styling or column invention.
 
 ## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Must confirm 11 fields, four tabs, no screen-specific grid columns, exact View/Execute/Approve/Reject/Return surface, SoD/version/target-state behavior and no benchmark promotion.
+Pending final disposition after pre-PASS correction: existing request target/context fields are read-only because ACC-057 has no Create/Edit authority. Must confirm 11 fields, four tabs, no screen-specific grid columns, exact View/Execute/Approve/Reject/Return surface, SoD/version/target-state behavior and no benchmark promotion.
 
 ## Remaining technical gates
-Exact queue shared-column contract bindings, target lookup providers, DTO properties, unresolved physical mappings and runtime/release evidence remain separate.
+Exact queue shared-column contract bindings, target display/provider bindings, DTO properties, unresolved physical mappings and runtime/release evidence remain separate.
