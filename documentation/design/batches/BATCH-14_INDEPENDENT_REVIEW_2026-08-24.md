@@ -40,5 +40,8 @@ Older intelligence dossiers marked PARTIAL were not used as release gates becaus
 11. **Technical gaps — PASS as nonblocking.** `NEEDS_REVIEW` / `LOOKUP_REVIEW` persistence/provider mappings remain `TBD-GATED`; no W1/DTO/API/DDL invention.
 12. **Runtime boundary — PASS.** Design approval does not claim runtime/acceptance/release PASS.
 
+## Pre-PASS correction
+`ACC-057` initially had ambiguous wording that could be read as allowing `documentTypeRef`, `linkedDocumentRef`, and request-note context to be edited/re-targeted from the approval queue. W2 exposes no Create/Edit operation for ApprovalRequest in this screen. The canonical spec was corrected so these existing-request target/context values are read-only; only the issued `Execute/Approve/Reject/Return` decision context remains actionable. The correction introduced no API/DTO/permission change.
+
 ## Final disposition
 `TEAM-D06 = PASS`, **0 open design findings**. All five screens are eligible for `DESIGN_APPROVED`.
