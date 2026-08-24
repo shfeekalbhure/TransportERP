@@ -2,8 +2,8 @@
 
 **English:** Cost Center Statement  
 **Profile / Variant:** `ReportInquiry / Statement`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-15`
 
 ## Authority
@@ -34,5 +34,8 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown preserves re
 
 Running balance/debit/credit are read-model/server authoritative; no client accounting formula. CoreUI owns RTL/DPI/grid/paging/loading/errors/audit.
 
-## TEAM-D06
-Pending independent review. Confirm Statement variant, 9 criteria, 9 result columns, exact four capabilities and server-authoritative balance.
+## TEAM-D06 — PASS
+`PASS — 0 open design findings`. Independent review confirmed Statement variant, 9 criteria, 9 result columns, exact four capabilities and server-authoritative balance.
+
+## Final disposition
+`DESIGN_APPROVED`. Runtime/acceptance/release evidence remains separate.
