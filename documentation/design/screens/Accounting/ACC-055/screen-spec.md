@@ -3,8 +3,8 @@
 **English:** Adjustment & Year-End Closing Entries  
 **Module:** Accounting  
 **Profile / Variant:** `Transaction / Closing`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-14`
 
 ## Authority
@@ -50,7 +50,7 @@ No local visual/control architecture.
 `AutoGenerateColumns=false`; primary workspace Fill. Exactly **9 display columns**:
 `# | الحساب | مركز التكلفة/الأبعاد | البيان | مدين | دائن | العملة | سعر الصرف | المبلغ المحاسبي`.
 
-The first is ordinal. Account/cost center/debit/credit/currency/rate follow issued draft-line semantics. `المبلغ المحاسبي` is read-only/server-derived. Grid-only `البيان` is W3-governing; exact persistence/requiredness remains `TBD-GATED`.
+The first is ordinal. `المبلغ المحاسبي` is read-only/server-derived. Grid-only `البيان` is W3-governing; exact persistence/requiredness remains `TBD-GATED`.
 
 Balancing, posting eligibility, year-end logic, exchange-rate validity and accounting amount remain server/domain-authoritative; no client formula.
 
@@ -66,8 +66,10 @@ Balancing, posting eligibility, year-end logic, exchange-rate validity and accou
 ## VISUAL — TEAM-D05 PASS
 Shared Transaction RTL/DPI/tab/grid/numeric/state presentation only. No local accounting formulas, colors, spacing, toolbar or validation architecture.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Must confirm 11 fields, five tabs, 9 display columns, exact View/Create/Edit/Cancel/Post/Reverse surface and server-authoritative closing/posting/reversal semantics.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+`PASS — 0 open design findings` per `documentation/design/batches/BATCH-14_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+Confirmed: 11 fields, five tabs, nine display columns, exact `View/Create/Edit/Cancel/Post/Reverse` surface, and server-authoritative closing/posting/reversal semantics.
 
 ## Remaining technical gates
-Exact field persistence, lookup providers, DTO/line mappings, sort keys and runtime/release evidence remain separate.
+Exact field persistence, lookup providers, DTO/line mappings, sort keys and runtime/release evidence remain separate and nonblocking for design approval.
