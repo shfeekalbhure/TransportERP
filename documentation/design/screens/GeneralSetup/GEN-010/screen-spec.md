@@ -2,8 +2,8 @@
 
 **English:** Company  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-05`
 
 ## Authority
@@ -54,6 +54,7 @@ Shared MasterData CoreUI only: RTL/DPI, typography, spacing, lookup/text/state p
 5. no Print/Export/Delete/Enable/Move/offline capability.
 6. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+W2/W3/acceptance cross-check confirmed required BaseCurrencyId, optional CountryId, no Currency-side IsBaseCurrency control, no Branch child-management surface, controlled Disable and server-authoritative scope. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
