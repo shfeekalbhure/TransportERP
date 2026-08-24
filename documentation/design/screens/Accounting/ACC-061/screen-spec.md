@@ -2,8 +2,8 @@
 
 **English:** Unposted / Draft / Cancelled Journal Report  
 **Profile / Variant:** `ReportInquiry / Inquiry`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-15`
 
 ## Authority
@@ -34,5 +34,8 @@ Capabilities exactly `View | DrillDown | Export | Print`. ApplyFilters/Refresh a
 
 Journal totals and lifecycle state are server/read-model authoritative; no client recomputation. Shared CoreUI presentation only.
 
-## TEAM-D06
-Pending independent review. Confirm Inquiry variant, 9 criteria, 9 result columns, exact four capabilities and no candidate-only actions promoted.
+## TEAM-D06 — PASS
+`PASS — 0 open design findings`. Independent review confirmed Inquiry variant, 9 criteria, 9 result columns, exact four capabilities and no candidate-only actions promoted.
+
+## Final disposition
+`DESIGN_APPROVED`. Runtime/acceptance/release evidence remains separate.
