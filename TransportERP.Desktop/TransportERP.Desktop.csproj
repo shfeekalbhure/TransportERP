@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <!-- The repository can carry the Desktop contract surface before the executable shell is restored.
+         Build as WinExe only when the real entry point exists; otherwise keep the project visible/buildable as a library. -->
+    <HasDesktopEntryPoint Condition="Exists('Program.cs')">true</HasDesktopEntryPoint>
+    <HasDesktopEntryPoint Condition="'$(HasDesktopEntryPoint)' == ''">false</HasDesktopEntryPoint>
+    <OutputType Condition="'$(HasDesktopEntryPoint)' == 'true'">WinExe</OutputType>
+    <OutputType Condition="'$(HasDesktopEntryPoint)' != 'true'">Library</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
