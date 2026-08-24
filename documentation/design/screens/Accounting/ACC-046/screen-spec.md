@@ -3,8 +3,8 @@
 **English:** Trial Balance  
 **Module:** Accounting / Reporting  
 **Profile / Variant:** `ReportInquiry / Report`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-13`
 
 ## Authority
@@ -68,8 +68,14 @@ No local balance formula or recomputation. Exact row DTO/sort-key bindings remai
 ## VISUAL — TEAM-D05 PASS
 CoreUI owns RTL, DPI, filters, summary, grid, pagination, details, focus and error states. Financial values use shared server-value formatting; no local accounting visual formula.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Review must confirm identity/variant, 9 criteria, exact 8 result columns, W2 four-action surface, server-authoritative semantics and no mutation/invention.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+- Review: `documentation/design/batches/BATCH-13_INDEPENDENT_REVIEW_2026-08-24.md`.
+- Identity/Variant, 9 criteria, exact 8 result columns and W2 View/DrillDown/Export/Print surface: PASS.
+- Server-authoritative financial semantics and no mutation/invention: PASS.
+- Open design findings: `0`.
 
 ## Remaining technical gates
-Exact provider/DTO/sort-key mappings and runtime/acceptance/release evidence remain separate and nonblocking for design review.
+Exact provider/DTO/sort-key mappings and runtime/acceptance/release evidence remain separate and nonblocking for design approval.
+
+## DESIGN-LEAD closure
+`ACC-046 = DESIGN_APPROVED`.
