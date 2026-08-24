@@ -2,8 +2,8 @@
 
 **English:** General Numbering  
 **Profile / Variant:** `Settings / NumberingControlled`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-20`
 
 ## Authority
@@ -52,8 +52,9 @@ Current baseline issues no concrete screen-specific grid. Reservation/history pr
 ## VISUAL — TEAM-D05 PASS
 Use shared Settings typography, RTL/DPI, semantic state and audit/history presentation. Protected values are visually read-only. No local color/state engine or numbering visualization that implies client authority.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending. Confirm exact 10 fields, four tabs, six W2 capabilities, no client `MAX+1`, read-only Last Number, protected Override separation and no migration claim.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-20_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## Remaining implementation/release gates
 Legacy `NextValue → LastNumber` supersession/migration/backfill, exact physical/DTO bindings, scope FKs and final runtime/release evidence remain separate from design approval.
