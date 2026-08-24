@@ -2,8 +2,8 @@
 
 **English:** Branch  
 **Profile / Variant:** `MasterData / Standard`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-05`
 
 ## Authority
@@ -56,6 +56,7 @@ Shared MasterData CoreUI only: RTL/DPI/typography/spacing, lookup/text/state pre
 5. no invented geographic-consistency rule or Move/Print/Export/Delete/Enable/offline capability.
 6. no API/DTO/permission/DDL invention.
 
-## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+## INDEPENDENT REVIEW — TEAM-D06 PASS
+W2/W3/acceptance cross-check confirmed immutable CompanyId, optional geographic references with existence/scope checks only, no invented geographic-consistency rule, controlled Disable and default-deny scope. Open design findings: `0`.
+
+Runtime tests remain `NOT RUN`; design approval is not runtime PASS.
