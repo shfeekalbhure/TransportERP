@@ -1,7 +1,8 @@
 # ACC-064 — إيداع نقدي في البنك — Canonical Screen Specification
 
 **Profile / Variant:** `Transaction / Transfer`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-16`
 
 ## Authority
@@ -19,5 +20,9 @@ Draft edit only; accounting amount read-only/server-derived. Attachment tab does
 ## UX / VISUAL — PASS
 Actions exactly `View/Create/Edit/Cancel/Post/Reverse`. Cashbox/bank eligibility, amount/rate, posting and reversal are server-authoritative. No Print/Export/direct approval/offline final write. Shared CoreUI only.
 
-## TEAM-D06
-Pending independent review.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-16B_TRANSACTIONS_CONTROLS_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact W1/DTO/property/lookup/attachment/sort bindings and runtime/acceptance/release evidence remain separate `TBD-GATED` implementation items.
