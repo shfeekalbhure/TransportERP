@@ -2,8 +2,8 @@
 
 **Alias:** `COD-003`  
 **Profile / Variant:** `Transaction / Reconciliation`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-02`
 
 ## Authority
@@ -69,6 +69,9 @@ Exact provider/sort identifiers remain `TBD-GATED`; no financial formula or post
 ## VISUAL — TEAM-D05 PASS
 Shared Transaction/Reconciliation CoreUI only: RTL/DPI, central currency/state/variance presentation, reconciliation grid, shared actions/reason/validation/loading/error/audit. No local financial colors, raw dimensions or custom approval toolbar.
 
+## Independent review — TEAM-D06 PASS
+Review report: `documentation/design/reviews/2026-08-24_BATCH-02_INDEPENDENT_REVIEW.md`. Open design findings: `0`. Runtime `TAE-F01-012` not run.
+
 ## Acceptance criteria
 1. current Variant is `Reconciliation`.
 2. six explicit reconciliation columns; expected/variance remain read-only server results.
@@ -76,5 +79,5 @@ Shared Transaction/Reconciliation CoreUI only: RTL/DPI, central currency/state/v
 4. no posting, API/DTO/Permission/DDL/offline invention.
 
 ## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.  
+Final: `DESIGN_APPROVED`.
