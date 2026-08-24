@@ -36,6 +36,8 @@ Functional tabs:
 5. المرفقات
 6. سجل العمليات
 
+The `المرفقات` tab is retained because it is part of the current V1.3 screen inventory, but current W2 does not issue attachment Upload/Download/Delete commands. No attachment mutation command/provider is invented; that surface remains `TBD-GATED` until explicit authority exists.
+
 CoreUI owns toolbar, RTL, typography, spacing, validation/error/loading states, Search/List/Grid, pagination and audit. No local styling or nested scrolling is introduced.
 
 ## FIELD_GRID — TEAM-D03 PASS
@@ -88,6 +90,7 @@ Width policy: Code/content; Name=primary Fill; Company/Branch/Currency=content; 
 - Disable is the only issued state-change command; no Enable or direct Status editor.
 - IBAN/SWIFT technical text uses LTR/BiDi isolation within the RTL screen.
 - Company/Branch/Currency/GL/Fees/Reconciliation account fields use shared TransportLookup presentation; missing providers remain `TBD-GATED` and are not replaced by local lists.
+- The Attachments tab exposes no local upload/download/delete command without explicit W2 attachment authority.
 - Shared validation/loading/error/concurrency behavior applies; no silent overwrite or local validation clone.
 - No reconciliation action is executed from this master screen; it only maintains references consumed by reconciliation flows.
 - No offline write/queue/outbox/replay is introduced.
@@ -99,7 +102,7 @@ Width policy: Code/content; Name=primary Fill; Company/Branch/Currency=content; 
 - No local style exception is issued.
 
 ## Technical gates retained
-Physical/API mappings for Bank Account Code, Bank Name, Account Name, Account Number vs IBAN, SWIFT/BIC, GL/fees/reconciliation account references, withdrawal/transfer limit, field-level audit and offline classification remain `TBD-GATED` implementation items.
+Physical/API mappings for Bank Account Code, Bank Name, Account Name, Account Number vs IBAN, SWIFT/BIC, GL/fees/reconciliation account references, withdrawal/transfer limit, attachment provider/actions, field-level audit and offline classification remain `TBD-GATED` implementation items.
 
 ## TEAM-D06 review input
 Verify:
@@ -108,6 +111,7 @@ Verify:
 3. Seven current list columns preserved.
 4. Account Number and IBAN are distinct UI fields without invented physical semantics.
 5. Actions exactly View/Create/Edit/Disable; no reconciliation/posting/print/export/delete/enable action invented.
-6. Lookup providers remain `TBD-GATED`.
-7. CoreUI owns shared visuals/RTL/paging/audit.
-8. No offline write authority or financial formula is introduced.
+6. Attachment tab does not invent attachment commands.
+7. Lookup providers remain `TBD-GATED`.
+8. CoreUI owns shared visuals/RTL/paging/audit.
+9. No offline write authority or financial formula is introduced.
