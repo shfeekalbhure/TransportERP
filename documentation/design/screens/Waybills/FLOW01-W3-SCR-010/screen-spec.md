@@ -2,8 +2,8 @@
 
 **Alias:** `DLV-002`  
 **Profile / Variant:** `Transaction / HeaderLines`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-02`
 
 ## Authority
@@ -62,6 +62,9 @@ Provider/sort identifiers remain `TBD-GATED`; no attachment API is invented.
 ## VISUAL — TEAM-D05 PASS
 Shared Transaction/CoreUI only: RTL/DPI, attachment/evidence state presentation, central typography/spacing, read-only evidence grid, tabs, validation/loading/error/audit. No local style or evidence-specific color semantics.
 
+## Independent review — TEAM-D06 PASS
+Review report: `documentation/design/reviews/2026-08-24_BATCH-02_INDEPENDENT_REVIEW.md`. Open design findings: `0`. Runtime `TAE-F01-009` not run.
+
 ## Acceptance criteria
 1. outcome recording remains state/permission bound.
 2. five explicit immutable evidence columns.
@@ -69,5 +72,5 @@ Shared Transaction/CoreUI only: RTL/DPI, attachment/evidence state presentation,
 4. no API/DTO/Permission/DDL/offline invention.
 
 ## Handoff
-Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`.  
-Current: `INDEPENDENT_REVIEW` — `TEAM-D06`.
+Completed: `ANALYSIS`, `LAYOUT`, `FIELD_GRID`, `UX`, `VISUAL`, `INDEPENDENT_REVIEW`.  
+Final: `DESIGN_APPROVED`.
