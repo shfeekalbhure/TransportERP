@@ -1,7 +1,8 @@
 # ACC-063 — تحويل نقدي بين الصناديق — Canonical Screen Specification
 
 **Profile / Variant:** `Transaction / Transfer`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-16`
 
 ## Authority
@@ -20,5 +21,9 @@ Grid exact 8 columns: `# | الطرف/الجهة | الحساب المقابل |
 ## UX / VISUAL — PASS
 Actions exactly `View/Create/Edit/Cancel/Post/Reverse`. Source/destination eligibility, balance, currency/rate, posting and reversal remain server-authoritative. No Print/Export/direct approval/attachment mutation/offline final write. Shared CoreUI only.
 
-## TEAM-D06
-Pending independent review.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-16B_TRANSACTIONS_CONTROLS_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+## Remaining technical gates
+Exact W1/DTO/property/lookup/sort bindings and runtime/acceptance/release evidence remain separate `TBD-GATED` implementation items.
