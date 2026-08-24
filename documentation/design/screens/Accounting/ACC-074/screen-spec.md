@@ -2,8 +2,8 @@
 
 **English:** Customer Aging  
 **Profile / Variant:** `ReportInquiry / Aging`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-18`
 
 ## Authority
@@ -26,8 +26,9 @@ Capabilities exactly `View | DrillDown | Export | Print`. DrillDown preserves pa
 
 Total balance, due classification and all aging buckets are server/read-model authoritative. No client day-bucket, overdue or balance formula is introduced. Shared CoreUI only.
 
-## TEAM-D06
-Pending Batch-18 independent review.
+## TEAM-D06 — PASS
+Independent review: `PASS / 0 open design findings`.
+Evidence: `documentation/design/batches/BATCH-18_INDEPENDENT_REVIEW_2026-08-24.md`.
 
 ## Remaining technical gates
-Current P0 implementation/runtime HOLD, exact DTO/property/sort/provider bindings and runtime/acceptance/release evidence remain separate.
+Current P0/OpenItem-source implementation/runtime HOLD, exact DTO/property/sort/provider bindings and runtime/acceptance/release evidence remain separate.
