@@ -3,8 +3,8 @@
 **English:** Reversal Entries  
 **Module:** Accounting  
 **Profile / Variant:** `Transaction / Reversal`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
 **Batch:** `BATCH-14`
 
 ## Authority
@@ -65,8 +65,10 @@ All reversal eligibility, policy semantics, period validity, resulting entry val
 ## VISUAL — TEAM-D05 PASS
 Use shared Transaction RTL/DPI/tab/detail-grid/state/reference presentation only. Original/reversing distinction is semantic content, not custom local colors or architecture.
 
-## TEAM-D06 — INDEPENDENT REVIEW
-Pending final disposition. Must confirm 10 fields, five tabs, read-only 9-column detail grid, exact View/Create/Edit/Cancel/Reverse surface and server-generated reversal semantics.
+## TEAM-D06 — INDEPENDENT REVIEW PASS
+`PASS — 0 open design findings` per `documentation/design/batches/BATCH-14_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+Confirmed: 10 fields, five tabs, read-only nine-column detail grid, exact `View/Create/Edit/Cancel/Reverse` surface, original immutability, and server-generated reversal semantics.
 
 ## Remaining technical gates
-Exact lookup provider, field persistence/DTO mappings, reversal-policy identifiers, sort bindings and runtime/release evidence remain separate.
+Exact lookup provider, field persistence/DTO mappings, reversal-policy identifiers, sort bindings and runtime/release evidence remain separate and nonblocking for design approval.
