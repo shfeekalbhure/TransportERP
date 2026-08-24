@@ -4,120 +4,110 @@
 **Module:** Accounting / Reporting  
 **Profile / Variant:** `ReportInquiry / Report`  
 **Toolbar:** `TB-R`  
-**CurrentDesignState:** `INDEPENDENT_REVIEW`  
-**OwnerTeam:** `TEAM-D06`  
+**CurrentDesignState:** `DESIGN_APPROVED`  
+**OwnerTeam:** `DESIGN-LEAD / ORCHESTRATOR`  
+**CompletedStages:** `ANALYSIS, LAYOUT, FIELD_GRID, UX, VISUAL, INDEPENDENT_REVIEW`  
 **Batch:** `BATCH-10`
 
 ## Authority
 - Current 57-screen baseline: `CURRENT_TRANSPORTERP_SCREEN_BASELINE_V1.1.csv` — ACC-049 detailed governing screen content.
-- Current authority family: Current Approved References V1.26 + Unified Design/Execution V1.3 + W1/W2/W3 current contracts.
+- Current authority family: Current Approved References V1.26 + Unified Design/Execution V1.3 + current W1/W2/W3 contracts.
 - W2 exact actions: Query / DrillDown / Export / Print under `ACC049.View`, `ACC049.DrillDown`, `ACC049.Export`, `ACC049.Print`.
-- CoreUI layout: `ReportInquiry` = `Filters(Content) → Summary(Content) → ResultsGrid(Fill) → Pagination(Fixed) → DetailsHost(ReadOnly optional)`.
-- Runtime E2E evidence is separate from this design closure and does not replace W3 authority.
-- No historical concrete typed ScreenDefinition is claimed as recovered; this canonical file is the bounded design closure over current governing content.
+- CoreUI `ReportInquiry` layout: `Filters(Content) → Summary(Content) → ResultsGrid(Fill) → Pagination(Fixed) → DetailsHost(ReadOnly optional)`.
+- No historical separate typed ScreenDefinition is claimed as recovered; this file is the canonical design closure over current governing content.
+- Runtime E2E evidence remains separate from design/release authority.
 
 ## ANALYSIS — TEAM-D01 PASS
-Purpose: provide a read-only, server-authoritative Balance Sheet projection with financial filters, source-calculated balances, contextual drill-down, export and print.
+Purpose: read-only server-authoritative Balance Sheet projection with financial criteria, source-calculated balances, contextual drill-down, export and print.
 
-Data ownership:
-- Primary persistence entity: none; this is a read model.
-- Read model: `BalanceSheet projection`.
-- Governing source entities include JournalEntry / JournalLine / Account / AccountType only as server-side sources; the client does not recompute financial results.
-
-Capabilities:
-- View/query → `ACC049.View`.
-- DrillDown → `ACC049.DrillDown`.
-- Export → `ACC049.Export`.
-- Print → `ACC049.Print`.
+- Primary persistence entity: none; `BalanceSheet projection` read model.
+- Server source domain may include JournalEntry / JournalLine / Account / AccountType; the client does not recompute financial results.
+- Capabilities: View, DrillDown, Export, Print only.
+- Company scope is required/server-filtered; Branch is optional or context-required/server-filtered.
 - No Create/Edit/Delete/Post/Reverse or local financial mutation capability.
-
-Scope:
-- Company required and filtered by server permission.
-- Branch optional or required by context and server-filtered.
-- Export/Print/DrillDown preserve the authorized parent query context; target permission/scope is re-evaluated server-side.
 
 ## LAYOUT — TEAM-D02 PASS
 CoreUI only:
 
-`TransportScreenHost → TransportToolbarHost(TB-R) → TransportContentHost → Filters(Content) → Summary(Content) → ResultsGrid(Fill) → Pagination(Fixed) → DetailsHost(ReadOnly optional) → Audit/Context hosts as shared policy dictates`.
+`TransportScreenHost → TransportToolbarHost(TB-R) → TransportContentHost → Filters(Content) → Summary(Content) → ResultsGrid(Fill) → Pagination(Fixed) → DetailsHost(ReadOnly optional) → shared Audit/Context hosts`.
 
-Current functional areas are preserved as:
+Current functional areas preserved:
 1. `معايير التقرير`
 2. `النتائج`
 3. `الملخص والتفاصيل`
 
-These are functional areas mapped to ReportInquiry roles; no local nested scrolling, pixel heights, colors, fonts, padding, toolbar, grid, pagination or audit implementation is introduced.
+No local nested scrolling, pixel sizes, fonts, colors, padding, toolbar, grid, pagination or audit implementation.
 
 ## FIELD_GRID — TEAM-D03 PASS
-### Query/filter contract
-The current governing screen inventory defines the following report criteria. W3 keys below are design aliases and do **not** claim W2 DTO property names:
+### Query/filter design
+W3 keys below are design aliases, not claims about W2 DTO property names.
 
-| W3 design key | Arabic label | UI semantic | Requiredness / authority |
+| W3 design key | Arabic label | UI semantic | Authority |
 |---|---|---|---|
 | `companyRef` | الشركة | Lookup / Reference | required authorized scope |
-| `branchRef` | الفرع | Lookup / Reference | optional / context-dependent; server filtered |
+| `branchRef` | الفرع | Lookup / Reference | optional/context-dependent; server filtered |
 | `fromDate` | من تاريخ | Date | W2 date/period rule |
 | `toDate` | إلى تاريخ | Date | W2 date/period rule |
-| `fiscalPeriodRef` | السنة/الفترة | Lookup / Reference | W2-bound optional/context filter |
+| `fiscalPeriodRef` | السنة/الفترة | Lookup / Reference | W2-bound filter |
 | `currencyRef` | العملة | Lookup / Reference | W2-bound filter |
 | `accountScopeRef` | الحساب/النطاق | Lookup / Reference | W2-bound filter |
 | `costCenterRef` | مركز التكلفة | Lookup / Reference | W2-bound filter |
 | `entryStateType` | الحالة/نوع القيد | Enum / typed filter | W2-bound filter |
 | `searchText` | البحث | SearchText | shared W2 typed search where supported |
 
-Rules:
-- Filter validation, date/period consistency and scope decisions remain server-authoritative.
-- Exact DTO property names and exact sort-key allow-list mapping are not invented here.
-- Page/PageSize are server-paged under the shared ReportInquiry contract; effective PageSize is server-authoritative.
+Filter validation, date/period rules and authorization are server-authoritative. Page/PageSize use server paging. Exact DTO property names and exact server sort-key mapping are not invented.
 
 ### ResultsGrid
-- `GridProfile = Display` / read-only.
+- `GridProfile = Display`; read-only.
 - `AutoGenerateColumns = false`.
 - `Selection = SingleRow` for contextual DrillDown.
 - `UsesServerPaging = true`.
-- Financial totals and balances are server-calculated; no client recomputation.
+- No client financial recomputation.
 
-| Order | W3 design key | Arabic column | Display semantic | Edit | Width policy |
-|---:|---|---|---|---|---|
-| 1 | `item` | البند | DisplayText | read-only | content-sized |
-| 2 | `accountGroup` | الحساب/المجموعة | Reference/Text | read-only | primary fill |
-| 3 | `currentBalance` | الرصيد الحالي | MonetaryAmount | read-only | compact numeric |
-| 4 | `comparativeBalance` | الرصيد المقارن | MonetaryAmount | read-only | compact numeric |
-| 5 | `difference` | الفرق | MonetaryAmount | read-only | compact numeric |
+| Order | W3 design key | Arabic column | Display semantic | Width policy |
+|---:|---|---|---|---|
+| 1 | `item` | البند | DisplayText | content-sized |
+| 2 | `accountGroup` | الحساب/المجموعة | Reference/Text | primary fill |
+| 3 | `currentBalance` | الرصيد الحالي | MonetaryAmount | compact numeric |
+| 4 | `comparativeBalance` | الرصيد المقارن | MonetaryAmount | compact numeric |
+| 5 | `difference` | الفرق | MonetaryAmount | compact numeric |
 
-Exact server sort-key binding remains `TBD-GATED` where the W2 allow-list does not expose a named key in current evidence; this is nonblocking for the visual/design contract.
+Exact server sort-key mapping remains `TBD-GATED` where not explicitly exposed by current evidence; binding must use the W2 allow-list only. This is nonblocking for design.
 
-### DrillDown details
-DrillDown uses the selected server result key plus the parent query context and returns read-only details through the shared DetailsHost. No local detail DTO, extra columns or navigation route is invented.
+DrillDown uses the selected server result key plus parent query context and returns shared read-only details; no local detail DTO/route/extra columns are invented.
 
 ## UX — TEAM-D04 PASS
-- Initial query/filter surface is permission-advisory only; server enforces `ACC049.View` and scope.
-- Query submission uses shared loading/error/empty states and prevents duplicate submit through shared command state.
-- Result data, summary values and comparative balances are read-only server results.
-- DrillDown preserves parent filter/sort/scope context; permission is re-evaluated and `DRILLDOWN_NOT_ALLOWED` is handled through shared error UX.
-- Export uses the exact current result context and `ACC049.Export`; `EXPORT_TOO_LARGE` / `EXPORT_FAILED` use shared error handling.
-- Print uses the exact current result context and `ACC049.Print`; `PRINT_FAILED` uses shared error handling.
-- Validation/scope/permission/not-found/conflict/concurrency errors use shared error contracts; no local error vocabulary is created.
-- No New/Save/Edit/Delete commands are presented.
-- No offline write, queue, outbox, retry or replay is introduced.
+- UI permission state is advisory; server enforces View/scope.
+- Query uses shared loading/error/empty/double-submit prevention behavior.
+- Summary and balances are read-only server results.
+- DrillDown preserves parent context and rechecks permission/scope; `DRILLDOWN_NOT_ALLOWED` uses shared error UX.
+- Export preserves current query context under `ACC049.Export`; `EXPORT_TOO_LARGE` / `EXPORT_FAILED` are shared errors.
+- Print preserves current query context under `ACC049.Print`; `PRINT_FAILED` is a shared error.
+- No New/Save/Edit/Delete commands.
+- No offline write/queue/outbox/retry/replay.
 
 ## VISUAL — TEAM-D05 PASS
-- CoreUI owns RTL, typography, spacing, dimensions, focus, validation/error/loading states, TB-R, grid, pagination, summary and details visuals.
-- Filters are Content-sized; Summary is Content-sized; ResultsGrid owns Fill; Pagination is Fixed.
-- Numeric balance columns use shared numeric alignment/formatting; no local color or font semantics are created.
-- Print/Export/DrillDown visibility follows capability binding and is never treated as authorization authority.
+- CoreUI owns RTL, typography, spacing, dimensions, focus, loading/error/validation, TB-R, grid, pagination, summary and details visuals.
+- Filters=`Content`; Summary=`Content`; ResultsGrid=`Fill`; Pagination=`Fixed`.
+- Numeric values use shared numeric formatting/alignment; no local visual semantics.
+
+## INDEPENDENT_REVIEW — TEAM-D06 PASS
+Review record: `documentation/design/reviews/BATCH-10_ACC049_ACC058_INDEPENDENT_REVIEW_2026-08-24.md`.
+
+Result:
+- Identity/Profile/Variant PASS.
+- Exact current five result columns PASS.
+- Governing criteria family PASS.
+- W2 View/DrillDown/Export/Print binding PASS.
+- Server-authoritative financial semantics PASS.
+- CoreUI layout/visual ownership PASS.
+- No mutation/offline/local formula invention PASS.
+- Historical typed-file absence disclosed PASS.
+- Runtime/design/release separation PASS.
+- **Open design findings: 0.**
 
 ## Runtime evidence boundary
-A separate WAVE-1 runtime E2E package reports ACC-049 coverage for posted ledger, reversal, branch/currency isolation, drill-down, export/print and PageSize cap 200 on an exact implementation SHA. That evidence is **not** used to claim delivery/release approval here; release-independent review remains a separate gate.
+A separate WAVE-1 E2E package reports runtime coverage for posted ledger, reversal, branch/currency isolation, drill-down, export/print and PageSize cap 200 on an exact implementation SHA. This design approval does **not** declare the release/delivery independent-review gate closed.
 
-## TEAM-D06 review input
-Verify at minimum:
-1. Identity/Profile/Variant = ACC-049 / ReportInquiry / Report.
-2. Current functional areas and exact 5 result columns are preserved.
-3. Current criteria family is preserved without inventing DTO property names.
-4. W2 capabilities are exactly View/DrillDown/Export/Print.
-5. Financial values are server-authoritative/read-only.
-6. ReportInquiry vertical sizing is CoreUI-owned.
-7. No unsupported local styles, mutation actions, offline authority or financial formulas.
-8. Historical absence of a separate typed ScreenDefinition file is stated rather than concealed.
-9. Runtime evidence is not conflated with design or release approval.
+## DESIGN-LEAD closure
+`ACC-049 = DESIGN_APPROVED`.
