@@ -125,9 +125,7 @@ public sealed class AuditEventPersistenceTests
     }
 
     private static TransportErpDbContext CreateDb(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection)
-            .Options);
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static async Task<(Guid CompanyId, Guid BranchId)> SeedScopeAsync(
         TransportErpDbContext db,

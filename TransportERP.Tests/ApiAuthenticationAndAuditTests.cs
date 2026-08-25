@@ -176,7 +176,7 @@ public sealed class ApiAuthenticationAndAuditTests
     }
 
     private static TransportErpDbContext CreateDb(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>().UseNpgsql(connection).Options);
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static string Sha256(string payload)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();

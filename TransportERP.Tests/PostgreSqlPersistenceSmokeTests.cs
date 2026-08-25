@@ -12,10 +12,7 @@ public sealed class PostgreSqlPersistenceSmokeTests
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
 
-        var options = new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection)
-            .Options;
-        await using var db = new TransportErpDbContext(options);
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
         await db.Database.MigrateAsync();
 
         var currencyCode = await NextCurrencyCodeAsync(db);

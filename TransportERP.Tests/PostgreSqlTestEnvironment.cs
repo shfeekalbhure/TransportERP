@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using TransportERP.Infrastructure.Persistence;
+
 namespace TransportERP.Tests;
 
 internal static class PostgreSqlTestEnvironment
@@ -15,5 +18,12 @@ internal static class PostgreSqlTestEnvironment
         }
 
         return connection;
+    }
+
+    internal static TransportErpDbContext CreateDbContext(string connection)
+    {
+        var options = new DbContextOptionsBuilder<TransportErpDbContext>();
+        options.ConfigureTransportErpPostgreSql(connection);
+        return new TransportErpDbContext(options.Options);
     }
 }

@@ -145,7 +145,7 @@ public sealed class SyncOperationPersistenceTests
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
 
     private static TransportErpDbContext CreateDb(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>().UseNpgsql(connection).Options);
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix)
     {
