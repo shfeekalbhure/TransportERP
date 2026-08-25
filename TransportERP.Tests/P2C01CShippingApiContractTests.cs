@@ -249,12 +249,22 @@ public sealed class P2C01CShippingApiContractTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IShippingExecutionStore>();
+                services.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>();
+                services.RemoveAll<ISystemPermissionCatalogVerifier>();
                 services.AddSingleton(store);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+                services.AddSingleton<ISystemPermissionCatalogVerifier, TestPermissionCatalogVerifier>();
             });
         });
+
+    private sealed class TestPermissionCatalogVerifier : ISystemPermissionCatalogVerifier
+    {
+        public Task VerifyAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
 
     private static string CreateToken(
         Guid userId, Guid companyId, Guid? branchId, string permission)
@@ -275,7 +285,7 @@ public sealed class P2C01CShippingApiContractTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" },
                 SecurityAlgorithms.HmacSha256)
         };
         var handler = new JwtSecurityTokenHandler();

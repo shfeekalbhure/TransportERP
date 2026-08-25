@@ -1,7 +1,7 @@
 using System.Data;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -51,6 +51,10 @@ public sealed class AuditEventService(TransportErpDbContext db)
     {
         ValidateDraft(draft);
 
+        // The caller owns retry/rollback when an identity mutation and audit share one transaction.
+        if (db.Database.CurrentTransaction is not null)
+            return await AppendOnceAsync(draft, cancellationToken);
+
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -83,8 +87,7 @@ public sealed class AuditEventService(TransportErpDbContext db)
         if (query.To.HasValue) events = events.Where(x => x.OccurredAt < NormalizePostgreSqlTimestamp(query.To.Value));
 
         return await events
-            .OrderBy(x => x.OccurredAt)
-            .ThenBy(x => x.Id)
+            .OrderBy(x => x.SequenceNo)
             .Skip(query.Skip)
             .Take(query.Take)
             .ToListAsync(cancellationToken);
@@ -112,22 +115,23 @@ public sealed class AuditEventService(TransportErpDbContext db)
         if (deviceId is not null) query = query.Where(x => x.DeviceId == deviceId);
 
         var events = await query
-            .OrderBy(x => x.OccurredAt)
-            .ThenBy(x => x.Id)
+            .OrderBy(x => x.SequenceNo)
             .ToListAsync(cancellationToken);
 
-        if (companyId.HasValue || branchId.HasValue || deviceId is not null)
-            return VerifyStream(events, GetStreamKey(companyId, branchId, deviceId));
-
         var total = events.Count;
-        foreach (var group in events.GroupBy(x => GetStreamKey(x.CompanyId, x.BranchId, x.DeviceId)))
+        var groups = events.GroupBy(x => GetStreamKey(x.CompanyId, x.BranchId, x.DeviceId)).ToArray();
+        AuditChainVerificationResult? onlyResult = null;
+        foreach (var group in groups)
         {
-            var result = VerifyStream(group.OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).ToList(), group.Key);
+            var result = VerifyStream(group.OrderBy(x => x.SequenceNo).ToList(), group.Key);
+            onlyResult = result;
             if (!result.IsValid)
                 return result with { EventCount = total };
         }
 
-        return new(true, total, null, null, null);
+        return groups.Length == 1
+            ? onlyResult! with { EventCount = total }
+            : new(true, total, null, null, null);
     }
 
     public Task<IReadOnlyList<AuditEvent>> ExportAuditEventsAsync(
@@ -159,18 +163,15 @@ public sealed class AuditEventService(TransportErpDbContext db)
 
     private async Task<AuditEvent> AppendOnceAsync(AuditEventDraft draft, CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
+        var ownsTransaction = db.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
 
         var occurredAt = NormalizePostgreSqlTimestamp(draft.OccurredAt ?? DateTimeOffset.UtcNow);
         var deviceId = NullIfWhiteSpace(draft.DeviceId);
-        var previousHash = await db.AuditEvents
-            .AsNoTracking()
-            .Where(x => x.CompanyId == draft.CompanyId && x.BranchId == draft.BranchId && x.DeviceId == deviceId)
-            .OrderByDescending(x => x.OccurredAt)
-            .ThenByDescending(x => x.Id)
-            .Select(x => x.Hash)
-            .FirstOrDefaultAsync(cancellationToken);
+        var streamKey = GetStreamKey(draft.CompanyId, draft.BranchId, deviceId);
+        var head = await LockStreamHeadAsync(streamKey, occurredAt, cancellationToken);
 
         var audit = new AuditEvent
         {
@@ -189,14 +190,45 @@ public sealed class AuditEventService(TransportErpDbContext db)
             AfterJson = draft.AfterJson,
             Reason = NullIfWhiteSpace(draft.Reason),
             Ip = NullIfWhiteSpace(draft.Ip),
-            PreviousHash = previousHash
+            PreviousHash = head.LastHash
         };
         audit.Hash = ComputeHash(audit);
 
         db.AuditEvents.Add(audit);
+        head.LastHash = audit.Hash;
+        head.UpdatedAt = occurredAt;
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return audit;
+    }
+
+    private async Task<AuditStreamHead> LockStreamHeadAsync(
+        string streamKey,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        if (db.Database.IsNpgsql())
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($$"""
+                INSERT INTO transport_erp.audit_stream_heads ("StreamKey", "LastHash", "UpdatedAt")
+                VALUES ({{streamKey}}, NULL, {{occurredAt}})
+                ON CONFLICT ("StreamKey") DO NOTHING
+                """, cancellationToken);
+            return await db.AuditStreamHeads
+                .FromSqlInterpolated($$"""
+                    SELECT "StreamKey", "LastHash", "UpdatedAt"
+                    FROM transport_erp.audit_stream_heads
+                    WHERE "StreamKey" = {{streamKey}}
+                    FOR UPDATE
+                    """)
+                .SingleAsync(cancellationToken);
+        }
+
+        var head = await db.AuditStreamHeads.SingleOrDefaultAsync(x => x.StreamKey == streamKey, cancellationToken);
+        if (head is not null) return head;
+        head = new AuditStreamHead { StreamKey = streamKey, UpdatedAt = occurredAt };
+        db.AuditStreamHeads.Add(head);
+        return head;
     }
 
     private static IQueryable<AuditEvent> ApplyFilters(IQueryable<AuditEvent> events, AuditEventQuery query)
@@ -276,6 +308,7 @@ public sealed record AuditQueryRequest(
 
 public sealed record AuditEventResponse(
     Guid Id,
+    long SequenceNo,
     DateTimeOffset OccurredAt,
     Guid? ActorUserId,
     Guid? CompanyId,
@@ -293,7 +326,7 @@ public sealed record AuditEventResponse(
     string Hash,
     string? PreviousHash)
 {
-    public static AuditEventResponse From(AuditEvent x) => new(x.Id, x.OccurredAt, x.ActorUserId,
+    public static AuditEventResponse From(AuditEvent x) => new(x.Id, x.SequenceNo, x.OccurredAt, x.ActorUserId,
         x.CompanyId, x.BranchId, x.Action, x.Outcome, x.EntityType, x.EntityId, x.CorrelationId,
         x.DeviceId, x.BeforeJson, x.AfterJson, x.Reason, x.Ip, x.Hash, x.PreviousHash);
 }

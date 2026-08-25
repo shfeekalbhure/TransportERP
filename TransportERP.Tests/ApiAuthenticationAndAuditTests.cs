@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Contracts.Identity;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
@@ -43,7 +44,7 @@ public sealed class ApiAuthenticationAndAuditTests
 
     [Fact]
     [Trait("Category", "HTTP")]
-    public async Task Sync_batch_accepts_a_valid_token_and_enforces_claim_scope()
+    public async Task Sync_batch_fails_closed_until_a_device_trust_provider_is_installed()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
 
@@ -77,12 +78,8 @@ public sealed class ApiAuthenticationAndAuditTests
             }
         });
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<SyncBatchResponse>();
-        Assert.NotNull(body);
-        Assert.Single(body!.Results);
-        Assert.Equal("QUEUED", body.Results[0].Status);
-        Assert.Equal(scope.DeviceId, await db.SyncOperations.Select(x => x.DeviceId).SingleAsync(x => x == scope.DeviceId));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Empty(await db.SyncOperations.Where(x => x.DeviceId == scope.DeviceId).ToListAsync());
     }
 
     [Fact]
@@ -140,13 +137,41 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string connection)
+    [Fact]
+    [Trait("Category", "HTTP")]
+    public async Task Login_rate_limit_is_generic_and_supplies_retry_after_without_partition_data()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        using var factory = CreateFactory(connection, loginRateLimit: 1);
+        using var client = factory.CreateClient();
+
+        var first = await client.PostAsJsonAsync("/api/v1/auth/sessions",
+            new CreateIdentitySessionRequest("missing-a", "wrong-password", null, null, "device-a"));
+        Assert.Equal(HttpStatusCode.Unauthorized, first.StatusCode);
+
+        var second = await client.PostAsJsonAsync("/api/v1/auth/sessions",
+            new CreateIdentitySessionRequest("missing-b", "wrong-password", null, null, "device-b"));
+        Assert.Equal((HttpStatusCode)429, second.StatusCode);
+        Assert.True(second.Headers.TryGetValues("Retry-After", out var values));
+        Assert.True(int.TryParse(values.Single(), out var seconds) && seconds > 0);
+        var body = await second.Content.ReadAsStringAsync();
+        Assert.Contains("RATE_LIMITED", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("missing", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("device", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(string connection, int? loginRateLimit = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:TransportErp", connection);
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
+            if (loginRateLimit.HasValue)
+                builder.UseSetting("Auth:LoginRateLimitPermitCount", loginRateLimit.Value.ToString());
         });
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string deviceId,
@@ -158,8 +183,9 @@ public sealed class ApiAuthenticationAndAuditTests
             new Claim("company_id", companyId.ToString()),
             new Claim("branch_id", branchId.ToString()),
             new Claim("device_id", deviceId),
-            new Claim("device_registered", "true"),
-            new Claim("permission", permission)
+            new Claim("sid", userId.ToString()),
+            new Claim("security_stamp", userId.ToString("N")),
+            new Claim("auth_version", "1")
         };
         var identity = new ClaimsIdentity(claims);
         var descriptor = new SecurityTokenDescriptor
@@ -169,7 +195,7 @@ public sealed class ApiAuthenticationAndAuditTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" },
                 SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
@@ -205,10 +231,11 @@ public sealed class ApiAuthenticationAndAuditTests
                 Timezone = "Asia/Aden", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
                 RowVersion = Guid.NewGuid().ToByteArray()
             };
+            var deviceId = $"http-device-{suffix}-{Guid.NewGuid():N}";
             var user = new User
             {
                 Id = Guid.NewGuid(), UserName = $"http-{Guid.NewGuid():N}", NormalizedUserName = $"HTTP{suffix}",
-                DisplayName = "مستخدم اختبار HTTP", PasswordHash = "test-only", Status = "ACTIVE",
+                DisplayName = "مستخدم اختبار HTTP", PasswordHash = "test-only", SecurityStamp = Guid.Empty.ToString("N"), AuthVersion = 1, Status = "ACTIVE",
                 CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
                 RowVersion = Guid.NewGuid().ToByteArray()
             };
@@ -216,10 +243,37 @@ public sealed class ApiAuthenticationAndAuditTests
             db.Companies.Add(company);
             db.Branches.Add(branch);
             db.Users.Add(user);
+            user.SecurityStamp = user.Id.ToString("N");
+            db.AuthSessions.Add(new AuthSession
+            {
+                Id = user.Id, UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id, DeviceId = deviceId,
+                Mode = "LOCAL", SecurityStampAtIssue = user.SecurityStamp, AuthVersionAtIssue = user.AuthVersion,
+                RefreshTokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(user.Id.ToByteArray())).ToLowerInvariant(),
+                RefreshTokenFamilyId = Guid.NewGuid(), IssuedAt = now, AccessTokenExpiresAt = now.AddMinutes(10),
+                RefreshTokenExpiresAt = now.AddDays(1), CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            });
+            var permissionCodes = new[] { "sync.operations.execute", "audit.events.read" };
+            var role = new Role { Id = Guid.NewGuid(), Code = $"HTTP-{suffix}-{Guid.NewGuid():N}", NameAr = "دور اختبار",
+                CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray() };
+            db.Roles.Add(role);
+            db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+                CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray() });
+            foreach (var code in permissionCodes)
+            {
+                var permissionEntity = await db.Permissions.SingleOrDefaultAsync(x => x.Code == code) ?? new Permission
+                {
+                    Id = Guid.NewGuid(), Code = code, NameAr = code, Resource = code.Split('.')[0], Action = code.Split('.')[^1],
+                    ScopeType = "BRANCH", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+                };
+                if (db.Entry(permissionEntity).State == EntityState.Detached) db.Permissions.Add(permissionEntity);
+                db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permissionEntity.Id,
+                    ScopeType = "BRANCH", CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
+                    RowVersion = Guid.NewGuid().ToByteArray() });
+            }
             try
             {
                 await db.SaveChangesAsync();
-                return new TestScope(company.Id, branch.Id, user.Id, $"http-device-{suffix}-{Guid.NewGuid():N}");
+                return new TestScope(company.Id, branch.Id, user.Id, deviceId);
             }
             catch (Exception ex) when (IsUniqueViolation(ex) && attempt < 7)
             {

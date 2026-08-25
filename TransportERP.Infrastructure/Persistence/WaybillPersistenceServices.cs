@@ -1,4 +1,6 @@
 using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TransportERP.Application.Waybills;
@@ -28,6 +30,7 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
 
     public async Task<WaybillAggregate?> GetByCreateOperationAsync(Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken)
     {
+        await LockIdempotencyKeyAsync($"waybill|{companyId}|{branchId}|{clientOperationId.Trim()}", cancellationToken);
         var entity = await Waybills.AsNoTracking()
             .Include(x => x.Parties)
             .Include(x => x.Items)
@@ -72,18 +75,30 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
             Items = aggregate.Items.Select(x => ToEntity(aggregate.Id, x)).ToList()
         };
 
+        var ambient = db.Database.CurrentTransaction;
+        var savepoint = $"waybill_insert_{entity.Id:N}";
+        if (ambient is not null)
+            await ambient.CreateSavepointAsync(savepoint, cancellationToken);
         Waybills.Add(entity);
         try
         {
             await SaveWithConcurrencyMapping(cancellationToken);
+            if (ambient is not null)
+                await ambient.ReleaseSavepointAsync(savepoint, cancellationToken);
             return aggregate;
         }
         catch (WaybillPersistenceException ex) when (ex.Code == "DUPLICATE_OPERATION")
         {
+            if (ambient is not null)
+                await ambient.RollbackToSavepointAsync(savepoint, cancellationToken);
             db.ChangeTracker.Clear();
             existing = await GetByCreateOperationAsync(aggregate.CompanyId, aggregate.BranchId, operationId, cancellationToken);
             if (existing is not null)
+            {
+                if (ambient is not null)
+                    await ambient.ReleaseSavepointAsync(savepoint, cancellationToken);
                 return existing;
+            }
             throw;
         }
     }
@@ -164,6 +179,13 @@ public sealed class EfWaybillRepository(TransportErpDbContext db) : IWaybillRepo
         for (var current = exception; current is not null; current = current.InnerException)
             if (current is PostgresException { SqlState: "23505" }) return true;
         return false;
+    }
+
+    private async Task LockIdempotencyKeyAsync(string key, CancellationToken cancellationToken)
+    {
+        if (db.Database.CurrentTransaction is null || !db.Database.IsNpgsql()) return;
+        var lockKey = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
     }
 
     private static WaybillAggregate ToAggregate(WaybillEntity x)
@@ -255,6 +277,12 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
 
     public async Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken)
     {
+        if (db.Database.CurrentTransaction is not null && db.Database.IsNpgsql())
+        {
+            var key = $"party|{companyId}|{clientOperationId.Trim()}";
+            var lockKey = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
+        }
         var entity = await OperationalParties.AsNoTracking()
             .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.ClientOperationId == clientOperationId, cancellationToken);
         return entity is null ? null : ToRecord(entity);
@@ -378,49 +406,48 @@ public sealed class EfWaybillUnitOfWork(TransportErpDbContext db) : IWaybillUnit
     {
         if (db.Database.CurrentTransaction is not null)
             return await action(cancellationToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            var result = await action(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            try
+            {
+                var result = await action(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            }
+            catch (Exception ex) when (attempt < 4 && RetryWholeUnitOfWork(ex))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(20 * attempt), cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+    }
+
+    private static bool RetryWholeUnitOfWork(Exception exception)
+    {
+        if (exception is WaybillPersistenceException { Code: "DUPLICATE_OPERATION" or "PARTY_DUPLICATE_WARNING" })
+            return true;
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is PostgresException { SqlState: "40001" or "40P01" }) return true;
+        return false;
     }
 }
 
-public sealed class EfWaybillAuditSink(TransportErpDbContext db, AuditEventService auditService) : IWaybillAuditSink
+public sealed class EfWaybillAuditSink(TransportErpDbContext _, AuditEventService auditService) : IWaybillAuditSink
 {
     public async Task WriteAsync(
         OperationContext context, string action, string outcome, string entityType, Guid entityId,
         string? beforeJson, string? afterJson, string? reason, CancellationToken cancellationToken)
     {
-        if (db.Database.CurrentTransaction is null)
-        {
-            await auditService.AppendAuditEventAsync(new AuditEventDraft(
-                action, outcome, entityType, entityId, context.UserId, context.CompanyId, context.BranchId,
-                context.CorrelationId, BeforeJson: beforeJson, AfterJson: afterJson, Reason: reason), cancellationToken);
-            return;
-        }
-
-        var previousHash = await db.AuditEvents.AsNoTracking()
-            .Where(x => x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.DeviceId == null)
-            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
-            .Select(x => x.Hash).FirstOrDefaultAsync(cancellationToken);
-        var evt = new AuditEvent
-        {
-            Id = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow, ActorUserId = context.UserId,
-            CompanyId = context.CompanyId, BranchId = context.BranchId, Action = action, Outcome = outcome,
-            EntityType = entityType, EntityId = entityId, CorrelationId = context.CorrelationId,
-            BeforeJson = beforeJson, AfterJson = afterJson, Reason = reason, PreviousHash = previousHash
-        };
-        evt.Hash = AuditEventService.ComputeHash(evt);
-        db.AuditEvents.Add(evt);
-        await db.SaveChangesAsync(cancellationToken);
+        await auditService.AppendAuditEventAsync(new AuditEventDraft(
+            action, outcome, entityType, entityId, context.UserId, context.CompanyId, context.BranchId,
+            context.CorrelationId, BeforeJson: beforeJson, AfterJson: afterJson, Reason: reason), cancellationToken);
     }
 }
 

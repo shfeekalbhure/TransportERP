@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using TransportERP.Application.Waybills;
@@ -119,10 +120,131 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         await using var verifyDb = CreateP2Db(connection);
         Assert.Equal(1, await verifyDb.Set<WaybillEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId && x.CreateClientOperationId == createKey));
+        Assert.Equal(1, await verifyDb.AuditEvents.CountAsync(x =>
+            x.EntityId == first.Id && x.Action == "WaybillDraftCreate"));
         Assert.Equal(r1.Id, r2.Id);
         Assert.Equal(r1.RenderedNumber, r2.RenderedNumber);
         Assert.Equal(1, await verifyDb.Set<NumberReservationEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.IdempotencyKey == numberKey));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Concurrent_create_with_same_operation_returns_one_waybill_and_one_audit()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2A2RACE", withSequence: false);
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var createKey = $"create-race-{Guid.NewGuid():N}";
+        var request = new CreateWaybillDraftRequest(
+            scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), scope.CurrencyId,
+            1m, "STANDARD", "NORMAL", createKey);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task<WaybillResponse> CreateAsync()
+        {
+            await using var db = CreateP2Db(connection);
+            await start.Task;
+            return await CreateService(db).CreateDraftAsync(context, request);
+        }
+
+        var first = CreateAsync();
+        var second = CreateAsync();
+        start.SetResult();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.Equal(results[0].Id, results[1].Id);
+        await using var verifyDb = CreateP2Db(connection);
+        Assert.Equal(1, await verifyDb.Set<WaybillEntity>().CountAsync(x =>
+            x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId &&
+            x.CreateClientOperationId == createKey));
+        Assert.Equal(1, await verifyDb.AuditEvents.CountAsync(x =>
+            x.EntityType == "Waybill" && x.EntityId == results[0].Id && x.Action == "WaybillDraftCreate"));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Concurrent_party_create_with_same_operation_returns_one_party_and_one_audit()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2PARTYRACE", withSequence: false);
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var operationId = $"party-race-{Guid.NewGuid():N}";
+        var request = new OperationalPartyCreateRequest(
+            "طرف اختبار متزامن", "777100003", null, null,
+            new GeoAddressSnapshot(null, null, null, null, "عنوان الطرف المتزامن"), operationId);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task<OperationalPartyResponse> CreateAsync()
+        {
+            await using var db = CreateP2Db(connection);
+            await start.Task;
+            return await CreateService(db).CreatePartyAsync(context, request);
+        }
+
+        var first = CreateAsync();
+        var second = CreateAsync();
+        start.SetResult();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.Equal(results[0].Id, results[1].Id);
+        await using var verifyDb = CreateP2Db(connection);
+        Assert.Equal(1, await verifyDb.Set<OperationalPartyEntity>().CountAsync(x =>
+            x.CompanyId == scope.CompanyId && x.ClientOperationId == operationId));
+        Assert.Equal(1, await verifyDb.AuditEvents.CountAsync(x =>
+            x.EntityType == "OperationalParty" && x.EntityId == results[0].Id && x.Action == "OperationalPartyCreate"));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Waybill_create_rolls_back_when_audit_insert_fails()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2AUDFAIL", withSequence: false);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var createKey = $"audit-fail-{Guid.NewGuid():N}";
+        var suffix = Guid.NewGuid().ToString("N");
+        var function = $"fail_waybill_audit_{suffix}";
+        var trigger = $"trg_fail_waybill_audit_{suffix}";
+        await using var admin = CreateP2Db(connection);
+        await admin.Database.ExecuteSqlRawAsync($$"""
+            CREATE FUNCTION transport_erp.{{function}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+              IF NEW."Action" = 'WaybillDraftCreate' THEN RAISE EXCEPTION 'forced waybill audit failure'; END IF;
+              RETURN NEW;
+            END $body$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON transport_erp.audit_events
+              FOR EACH ROW EXECUTE FUNCTION transport_erp.{{function}}();
+            """);
+        try
+        {
+            await using var db = CreateP2Db(connection);
+            await Assert.ThrowsAnyAsync<Exception>(() => CreateService(db).CreateDraftAsync(context,
+                new CreateWaybillDraftRequest(scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(),
+                    scope.CurrencyId, 1m, "STANDARD", "NORMAL", createKey)));
+        }
+        finally
+        {
+            await admin.Database.ExecuteSqlRawAsync($$"""
+                DROP TRIGGER IF EXISTS {{trigger}} ON transport_erp.audit_events;
+                DROP FUNCTION IF EXISTS transport_erp.{{function}}();
+                """);
+        }
+
+        await using var verify = CreateP2Db(connection);
+        Assert.False(await verify.Set<WaybillEntity>().AnyAsync(x => x.CreateClientOperationId == createKey));
+        Assert.False(await verify.AuditEvents.AnyAsync(x => x.Action == "WaybillDraftCreate" && x.CorrelationId == context.CorrelationId));
     }
 
     [Fact]
@@ -194,6 +316,12 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
+            builder.ConfigureServices(services =>
+            {
+                Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>(services);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+            });
         });
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string permission)
@@ -212,7 +340,7 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)), SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" }, SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
@@ -243,7 +371,7 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             var user = new User
             {
                 Id = Guid.NewGuid(), UserName = $"p2-{Guid.NewGuid():N}", NormalizedUserName = $"P2{suffix}{Guid.NewGuid():N}"[..24],
-                DisplayName = "مستخدم اختبار P2", PasswordHash = "test-only", Status = "ACTIVE",
+                DisplayName = "مستخدم اختبار P2", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
                 CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
                 RowVersion = Guid.NewGuid().ToByteArray()
             };

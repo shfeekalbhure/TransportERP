@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
+using TransportERP.Api.Security;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Numbering;
@@ -24,115 +24,124 @@ public static class WaybillApiModule
 
     public static IEndpointRouteBuilder MapP2C01AWaybillFoundation(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1").RequireAuthorization("Authenticated");
+        var group = app.MapGroup("/api/v1");
 
         group.MapPost("/waybills/drafts", async Task<IResult> (
             CreateWaybillDraftRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Create)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.CreateDraftAsync(context, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Create));
 
         group.MapPut("/waybills/{waybillId:guid}/draft", async Task<IResult> (
             Guid waybillId,
             UpdateWaybillDraftRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Edit)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.UpdateDraftAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Edit));
 
         group.MapGet("/operational-parties", async Task<IResult> (
             string? query,
             int? skip,
             int? take,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.PartyView)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.SearchPartiesAsync(context,
                 new OperationalPartySearchRequest(query, skip ?? 0, take ?? 50), ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.PartyView));
 
         group.MapPost("/operational-parties", async Task<IResult> (
             OperationalPartyCreateRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.PartyCreate)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.CreatePartyAsync(context, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.PartyCreate));
 
         group.MapPost("/waybills/{waybillId:guid}:validate", async Task<IResult> (
             Guid waybillId,
             ValidateWaybillRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Validate)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.ValidateAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Validate));
 
         group.MapPost("/waybills/{waybillId:guid}:submit", async Task<IResult> (
             Guid waybillId,
             SubmitWaybillRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Submit)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.SubmitAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Submit));
 
         group.MapPost("/waybills/{waybillId:guid}:approve", async Task<IResult> (
             Guid waybillId,
             ApproveWaybillRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Approve)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.ApproveAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Approve));
 
         group.MapPost("/waybills/{waybillId:guid}:return", async Task<IResult> (
             Guid waybillId,
             ReturnWaybillRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Return)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.ReturnForCorrectionAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Return));
 
         group.MapPost("/waybills/{waybillId:guid}:cancel", async Task<IResult> (
             Guid waybillId,
             CancelWaybillRequest request,
             HttpContext http,
+            ICurrentSecurityContext security,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Cancel)) return Forbidden(context.CorrelationId);
+            var (context, failure) = await TryContextAsync(http, security, ct);
+            if (failure is not null) return failure;
             return await Execute(context, () => service.CancelAsync(context, waybillId, request, ct));
-        });
+        }).RequireAuthorization(SecurityPolicies.Permission(WaybillPermissionCodes.Cancel));
 
         return app;
     }
@@ -180,35 +189,13 @@ public static class WaybillApiModule
     private static IResult Forbidden(Guid correlationId)
         => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
 
-    private static bool TryContext(HttpContext http, out OperationContext context, out IResult? failure)
+    private static async Task<(OperationContext Context, IResult? Failure)> TryContextAsync(
+        HttpContext http, ICurrentSecurityContext security, CancellationToken ct)
     {
-        context = default!;
-        failure = null;
-        if (http.User.Identity?.IsAuthenticated != true)
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        if (!TryGuid(http.User, ClaimTypes.NameIdentifier, "sub", out var userId) ||
-            !TryGuid(http.User, "company_id", null, out var companyId) ||
-            !TryGuid(http.User, "branch_id", null, out var branchId))
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
+        var current = await security.ResolveAsync(http.User, ct);
+        if (current is null || !current.BranchId.HasValue) return (default!, Results.Unauthorized());
         var correlationId = Guid.TryParse(http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var parsed)
             ? parsed : Guid.NewGuid();
-        context = new OperationContext(userId, companyId, branchId, correlationId);
-        return true;
+        return (current.ToOperationContext(correlationId), null);
     }
-
-    private static bool TryGuid(ClaimsPrincipal principal, string first, string? second, out Guid value)
-    {
-        var raw = principal.FindFirstValue(first) ?? (second is null ? null : principal.FindFirstValue(second));
-        return Guid.TryParse(raw, out value);
-    }
-
-    private static bool HasPermission(ClaimsPrincipal principal, string permission)
-        => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role &&
-            string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
 }

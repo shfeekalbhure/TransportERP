@@ -8,6 +8,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
@@ -24,6 +25,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<ReceiptVoucher> ReceiptVouchers => Set<ReceiptVoucher>();
     public DbSet<PaymentVoucher> PaymentVouchers => Set<PaymentVoucher>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<AuditStreamHead> AuditStreamHeads => Set<AuditStreamHead>();
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
     public DbSet<ConflictCase> ConflictCases => Set<ConflictCase>();
 
@@ -62,7 +64,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     private static void ConfigureCommon(ModelBuilder mb)
     {
         foreach (var type in new[] {
-            typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(Role), typeof(Permission),
+            typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(AuthSession), typeof(Role), typeof(Permission),
             typeof(GlobalSetting), typeof(CompanySetting), typeof(BranchSetting), typeof(ChartOfAccount),
             typeof(FiscalPeriod), typeof(FinancialDimension), typeof(JournalEntry), typeof(ReceiptVoucher),
             typeof(PaymentVoucher), typeof(SyncOperation), typeof(ConflictCase) })
@@ -122,21 +124,61 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     private static void ConfigureIdentityAndSettings(ModelBuilder mb)
     {
         var user = mb.Entity<User>();
-        user.ToTable("users", t => t.HasCheckConstraint("ck_users_status", "\"Status\" IN ('ACTIVE','LOCKED','DISABLED')"));
+        user.ToTable("users", t =>
+        {
+            t.HasCheckConstraint("ck_users_status", "\"Status\" IN ('ACTIVE','LOCKED','DISABLED')");
+            t.HasCheckConstraint("ck_users_security_stamp", "length(\"SecurityStamp\") >= 32");
+            t.HasCheckConstraint("ck_users_auth_version", "\"AuthVersion\" >= 1");
+            t.HasCheckConstraint("ck_users_branch_company", "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL");
+        });
         user.HasKey(x => x.Id);
         user.Property(x => x.UserName).HasMaxLength(100).IsRequired();
         user.Property(x => x.NormalizedUserName).HasMaxLength(100).IsRequired();
         user.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
         user.Property(x => x.Email).HasMaxLength(320);
+        user.Property(x => x.NormalizedEmail).HasMaxLength(320);
         user.Property(x => x.Phone).HasMaxLength(30);
         user.Property(x => x.PasswordHash).HasMaxLength(500).IsRequired();
+        user.Property(x => x.SecurityStamp).HasMaxLength(64).IsRequired();
+        user.Property(x => x.AccessFailedCount).HasDefaultValue(0);
+        user.Property(x => x.AuthVersion).HasDefaultValue(1);
         user.Property(x => x.Status).HasMaxLength(20).IsRequired();
-        user.HasIndex(x => new { x.NormalizedUserName, x.CompanyId }).IsUnique().HasFilter("\"DeletedAt\" IS NULL");
-        user.HasIndex(x => new { x.Email, x.CompanyId }).IsUnique().HasFilter("\"Email\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+        user.HasIndex(x => new { x.NormalizedUserName, x.CompanyId }).IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL")
+            .HasAnnotation("Npgsql:NullsDistinct", false);
+        user.HasIndex(x => new { x.NormalizedEmail, x.CompanyId }).IsUnique()
+            .HasFilter("\"NormalizedEmail\" IS NOT NULL AND \"DeletedAt\" IS NULL")
+            .HasAnnotation("Npgsql:NullsDistinct", false);
         user.HasIndex(x => new { x.BranchId, x.Status });
         user.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
-        user.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        user.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
         user.HasQueryFilter(x => x.DeletedAt == null);
+
+        var session = mb.Entity<AuthSession>();
+        session.ToTable("auth_sessions", t =>
+        {
+            t.HasCheckConstraint("ck_auth_sessions_mode", "\"Mode\" IN ('LOCAL')");
+            t.HasCheckConstraint("ck_auth_sessions_expiry", "\"AccessTokenExpiresAt\" <= \"RefreshTokenExpiresAt\"");
+            t.HasCheckConstraint("ck_auth_sessions_security_stamp", "length(\"SecurityStampAtIssue\") >= 32");
+            t.HasCheckConstraint("ck_auth_sessions_auth_version", "\"AuthVersionAtIssue\" >= 1");
+        });
+        session.HasKey(x => x.Id);
+        session.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        session.Property(x => x.Mode).HasMaxLength(20).IsRequired();
+        session.Property(x => x.SecurityStampAtIssue).HasMaxLength(64).IsRequired();
+        session.Property(x => x.RefreshTokenHash).HasMaxLength(64).IsRequired();
+        session.Property(x => x.RevokeReason).HasMaxLength(200);
+        session.HasIndex(x => x.RefreshTokenHash).IsUnique();
+        session.HasIndex(x => new { x.UserId, x.RevokedAt, x.RefreshTokenExpiresAt });
+        session.HasIndex(x => x.RefreshTokenFamilyId);
+        session.HasIndex(x => new { x.CompanyId, x.BranchId });
+        session.HasIndex(x => x.DeviceId);
+        session.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<AuthSession>().WithMany().HasForeignKey(x => x.ReplacedBySessionId).OnDelete(DeleteBehavior.Restrict);
 
         var role = mb.Entity<Role>();
         role.ToTable("roles", t => t.HasCheckConstraint("ck_roles_status", "\"Status\" IN ('ACTIVE','INACTIVE')"));
@@ -164,24 +206,35 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         permission.HasQueryFilter(x => x.DeletedAt == null);
 
         var rolePermission = mb.Entity<RolePermission>();
-        rolePermission.ToTable("role_permissions");
+        rolePermission.ToTable("role_permissions", t => t.HasCheckConstraint("ck_role_permissions_scope_fields",
+            "(\"ScopeType\" = 'PLATFORM' AND \"CompanyId\" IS NULL AND \"BranchId\" IS NULL) OR " +
+            "(\"ScopeType\" = 'COMPANY' AND \"CompanyId\" IS NOT NULL AND \"BranchId\" IS NULL) OR " +
+            "(\"ScopeType\" = 'BRANCH' AND \"CompanyId\" IS NOT NULL AND \"BranchId\" IS NOT NULL)"));
         rolePermission.HasKey(x => new { x.RoleId, x.PermissionId, x.ScopeType });
         rolePermission.Property(x => x.ScopeType).HasMaxLength(20).IsRequired();
         rolePermission.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         rolePermission.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Restrict);
+        rolePermission.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
 
         var userRole = mb.Entity<UserRole>();
-        userRole.ToTable("user_roles");
+        userRole.ToTable("user_roles", t => t.HasCheckConstraint("ck_user_roles_scope_fields",
+            "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL"));
         userRole.HasKey(x => new { x.UserId, x.RoleId });
         userRole.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         userRole.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+        userRole.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
 
         var overrideEntity = mb.Entity<UserPermissionOverride>();
-        overrideEntity.ToTable("user_permission_overrides");
+        overrideEntity.ToTable("user_permission_overrides", t => t.HasCheckConstraint("ck_user_permission_overrides_scope_fields",
+            "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL"));
         overrideEntity.HasKey(x => new { x.UserId, x.PermissionId });
         overrideEntity.Property(x => x.Reason).HasMaxLength(500);
         overrideEntity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         overrideEntity.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Restrict);
+        overrideEntity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
 
         var global = mb.Entity<GlobalSetting>();
         global.ToTable("global_settings", t => t.HasCheckConstraint("ck_global_settings_status", "\"Status\" IN ('ACTIVE','INACTIVE')"));
@@ -335,6 +388,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         var audit = mb.Entity<AuditEvent>();
         audit.ToTable("audit_events");
         audit.HasKey(x => x.Id);
+        audit.Property(x => x.SequenceNo).ValueGeneratedOnAdd()
+            .HasDefaultValueSql("nextval('transport_erp.audit_event_sequence_no_seq')");
         audit.Property(x => x.OccurredAt).HasColumnType("timestamptz");
         audit.Property(x => x.Action).HasMaxLength(120).IsRequired();
         audit.Property(x => x.Outcome).HasMaxLength(40).IsRequired();
@@ -350,9 +405,17 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         audit.HasIndex(x => new { x.EntityType, x.EntityId, x.OccurredAt });
         audit.HasIndex(x => x.CorrelationId);
         audit.HasIndex(x => x.Hash).IsUnique();
+        audit.HasIndex(x => x.SequenceNo).IsUnique();
         audit.HasOne<User>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
         audit.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         audit.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+
+        var auditHead = mb.Entity<AuditStreamHead>();
+        auditHead.ToTable("audit_stream_heads");
+        auditHead.HasKey(x => x.StreamKey);
+        auditHead.Property(x => x.StreamKey).HasMaxLength(200);
+        auditHead.Property(x => x.LastHash).HasMaxLength(128);
+        auditHead.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
 
         var sync = mb.Entity<SyncOperation>();
         sync.ToTable("sync_operations", t =>

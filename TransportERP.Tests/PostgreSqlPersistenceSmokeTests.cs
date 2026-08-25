@@ -36,7 +36,8 @@ public sealed class PostgreSqlPersistenceSmokeTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"p1-{Guid.NewGuid():N}"[..14], NormalizedUserName = "P1TEST",
-            DisplayName = "مستخدم اختبار", PasswordHash = "test-only", CompanyId = company.Id, BranchId = branch.Id,
+            DisplayName = "مستخدم اختبار", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1,
+            CompanyId = company.Id, BranchId = branch.Id,
             CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, RowVersion = Guid.NewGuid().ToByteArray()
         };
         db.Currencies.Add(currency);

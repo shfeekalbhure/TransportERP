@@ -1,0 +1,342 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TransportERP.Api.Identity;
+using TransportERP.Api.Security;
+using TransportERP.Contracts.Identity;
+using TransportERP.Infrastructure.Persistence;
+
+namespace TransportERP.Tests;
+
+[Collection("PostgreSql")]
+public sealed class P1SecurityHttpPostgreSqlTests
+{
+    private const string Password = "P1-security-test-password!";
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Real_identity_pipeline_enforces_unified_login_refresh_stamp_and_self_revoke()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "PIPE");
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+
+        var login = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId, "device-pipe");
+        Assert.Equal(HttpStatusCode.OK, login.Response.StatusCode);
+        Assert.NotNull(login.Session);
+
+        await AssertInvalidCredentialsAsync(await client.PostAsJsonAsync("/api/v1/auth/sessions",
+            new CreateIdentitySessionRequest("unknown-user", Password, scope.CompanyId, scope.BranchId, "unknown-device")));
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, "wrong-password", scope.CompanyId,
+            scope.BranchId, "wrong-device")).Response);
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, Password, Guid.NewGuid(),
+            scope.BranchId, "scope-device")).Response);
+
+        await db.Entry(scope.User).ReloadAsync();
+        scope.User.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(15);
+        scope.User.UpdatedAt = DateTimeOffset.UtcNow;
+        scope.User.RowVersion = Guid.NewGuid().ToByteArray();
+        await db.SaveChangesAsync();
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, Password, scope.CompanyId,
+            scope.BranchId, "locked-device")).Response);
+        scope.User.LockoutEnd = null;
+        scope.User.Status = "ACTIVE";
+        scope.User.UpdatedAt = DateTimeOffset.UtcNow;
+        scope.User.RowVersion = Guid.NewGuid().ToByteArray();
+        await db.SaveChangesAsync();
+
+        var rotatedResponse = await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(login.Session!.RefreshToken, "device-pipe"));
+        Assert.Equal(HttpStatusCode.OK, rotatedResponse.StatusCode);
+        var rotated = await rotatedResponse.Content.ReadFromJsonAsync<IdentitySessionResponse>();
+        Assert.NotNull(rotated);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(login.Session.RefreshToken, "device-pipe"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(rotated!.RefreshToken, "device-pipe"))).StatusCode);
+
+        var stampLogin = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId, "device-stamp");
+        Assert.NotNull(stampLogin.Session);
+        await db.Entry(scope.User).ReloadAsync();
+        scope.User.SecurityStamp = Guid.NewGuid().ToString("N");
+        scope.User.AuthVersion++;
+        scope.User.UpdatedAt = DateTimeOffset.UtcNow;
+        scope.User.RowVersion = Guid.NewGuid().ToByteArray();
+        await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(stampLogin.Session!.RefreshToken, "device-stamp"))).StatusCode);
+
+        var revokeLogin = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId, "device-revoke");
+        Assert.NotNull(revokeLogin.Session);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", revokeLogin.Session!.AccessToken);
+        var revoke = await client.PostAsJsonAsync($"/api/v1/auth/sessions/{revokeLogin.Session.SessionId}:revoke",
+            new RevokeIdentitySessionRequest("test self revoke"));
+        Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+        var afterRevoke = await client.GetAsync("/api/v1/audit/events?take=10");
+        Assert.Contains(afterRevoke.StatusCode, new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden });
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Oversized_credentials_and_cross_field_login_ambiguity_fail_closed_with_generic_responses()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "BOUNDS");
+        var now = DateTimeOffset.UtcNow;
+        var ambiguous = new User
+        {
+            Id = Guid.NewGuid(), UserName = $"ambiguous-{Guid.NewGuid():N}",
+            NormalizedUserName = $"AMBIGUOUS-{Guid.NewGuid():N}",
+            Email = scope.User.UserName, NormalizedEmail = scope.User.NormalizedUserName,
+            DisplayName = "مستخدم التباس مقصود", CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            Status = "ACTIVE", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        ambiguous.PasswordHash = new PasswordHasher<User>().HashPassword(ambiguous, Password);
+        db.Users.Add(ambiguous);
+        await db.SaveChangesAsync();
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, Password, scope.CompanyId,
+            scope.BranchId, "ambiguous-device")).Response);
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope,
+            new string('p', IdentitySessionService.MaxPasswordLength + 1), scope.CompanyId,
+            scope.BranchId, "oversized-password-device")).Response);
+
+        var invalidRefresh = await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(
+                new string('a', IdentitySessionService.MaxRefreshTokenLength + 1), "oversized-refresh-device"));
+        Assert.Equal(HttpStatusCode.Unauthorized, invalidRefresh.StatusCode);
+        using var body = JsonDocument.Parse(await invalidRefresh.Content.ReadAsStringAsync());
+        Assert.Equal("REFRESH_TOKEN_INVALID", body.RootElement.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Concurrent_refresh_has_one_winner_and_reuse_revokes_the_family()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "RACE");
+        using var factory = CreateFactory(connection);
+        using var clientA = factory.CreateClient();
+        using var clientB = factory.CreateClient();
+        var login = await LoginAsync(clientA, scope, Password, scope.CompanyId, scope.BranchId, "device-race");
+        Assert.NotNull(login.Session);
+
+        var request = new RefreshIdentitySessionRequest(login.Session!.RefreshToken, "device-race");
+        var responses = await Task.WhenAll(
+            clientA.PostAsJsonAsync("/api/v1/auth/sessions:refresh", request),
+            clientB.PostAsJsonAsync("/api/v1/auth/sessions:refresh", request));
+        Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.OK));
+        Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.Unauthorized));
+        var winner = await responses.Single(x => x.StatusCode == HttpStatusCode.OK)
+            .Content.ReadFromJsonAsync<IdentitySessionResponse>();
+        Assert.NotNull(winner);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await clientA.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(winner!.RefreshToken, "device-race"))).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Database_resolved_deny_and_tenant_query_mismatch_are_forbidden()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "RBAC");
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var login = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId, "device-rbac");
+        Assert.NotNull(login.Session);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.Session!.AccessToken);
+
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            UserId = scope.User.Id, PermissionId = scope.AuditPermissionId, IsAllowed = false,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Reason = "explicit deny test",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/audit/events?take=10")).StatusCode);
+
+        db.UserPermissionOverrides.Remove(await db.UserPermissionOverrides.SingleAsync(x =>
+            x.UserId == scope.User.Id && x.PermissionId == scope.AuditPermissionId));
+        await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.GetAsync($"/api/v1/audit/events?companyId={Guid.NewGuid()}&take=10")).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Concurrent_identity_stream_audits_preserve_the_hash_chain()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        var scope = await SeedAsync(seedDb, "AUDIT");
+        const string device = "p1-concurrent-audit";
+
+        await Task.WhenAll(Enumerable.Range(0, 6).Select(async index =>
+        {
+            await using var eventDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            await new AuditEventService(eventDb).AppendAuditEventAsync(new AuditEventDraft(
+                "IdentityConcurrencyTest", "SUCCESS", nameof(AuthSession), ActorUserId: scope.User.Id,
+                CompanyId: scope.CompanyId, BranchId: scope.BranchId, DeviceId: device,
+                CorrelationId: Guid.NewGuid(), Reason: index.ToString()));
+        }));
+
+        await using var verifyDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var result = await new AuditEventService(verifyDb).VerifyHashChainAsync(scope.CompanyId, scope.BranchId, device);
+        Assert.True(result.IsValid, result.FailureReason);
+        Assert.Equal(6, result.EventCount);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Session_creation_rolls_back_when_audit_append_fails()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "ROLLBACK");
+        var permissions = new EffectivePermissionResolver(db);
+        var hasher = new PasswordHasher<User>();
+        var service = new IdentitySessionService(db, hasher, new IdentityPasswordSentinel(hasher),
+            new TenantScopeResolver(db, permissions), new AuditEventService(db),
+            Options.Create(new TransportSecurityOptions
+            {
+                Mode = TransportAuthMode.LocalSessions, Issuer = "rollback-test", Audience = "rollback-test",
+                SigningKeyId = "rollback-current", SigningKey = "transport-erp-rollback-test-key-minimum-32-characters"
+            }));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(
+            new CreateIdentitySessionRequest(scope.User.UserName, Password, scope.CompanyId, scope.BranchId, "rollback-device"),
+            Guid.NewGuid(), new string('x', 65), default));
+
+        await using var verifyDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verifyDb.AuthSessions.AnyAsync(x => x.UserId == scope.User.Id && x.DeviceId == "rollback-device"));
+        Assert.False(await verifyDb.AuditEvents.AnyAsync(x => x.ActorUserId == scope.User.Id && x.DeviceId == "rollback-device"));
+    }
+
+    private static async Task AssertInvalidCredentialsAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("INVALID_CREDENTIALS", body.RootElement.GetProperty("errorCode").GetString());
+        Assert.False(body.RootElement.TryGetProperty("reason", out _));
+    }
+
+    private static async Task<(HttpResponseMessage Response, IdentitySessionResponse? Session)> LoginAsync(
+        HttpClient client, SecurityScope scope, string password, Guid? companyId, Guid? branchId, string deviceId)
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/auth/sessions",
+            new CreateIdentitySessionRequest(scope.User.UserName, password, companyId, branchId, deviceId));
+        return (response, response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<IdentitySessionResponse>()
+            : null);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(string connection)
+        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:TransportErp", connection);
+            builder.UseSetting("Auth:Mode", "LocalSessions");
+            builder.UseSetting("Auth:Issuer", "TransportERP.P1.Security.Tests");
+            builder.UseSetting("Auth:Audience", "TransportERP.P1.Security.Tests.Api");
+            builder.UseSetting("Auth:SigningKeyId", "p1-current");
+            builder.UseSetting("Auth:SigningKey", "transport-erp-p1-security-test-key-32-chars-minimum");
+        });
+
+    private static async Task<SecurityScope> SeedAsync(TransportErpDbContext db, string suffix)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var currency = new Currency
+        {
+            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(), NameAr = "عملة أمن",
+            MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        var company = new Company
+        {
+            Id = Guid.NewGuid(), Code = $"SEC-{suffix}-{Guid.NewGuid():N}"[..18], LegalNameAr = "شركة أمن",
+            BaseCurrencyId = currency.Id, DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE",
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        var branch = new Branch
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, Code = "MAIN", NameAr = "الفرع الرئيسي",
+            Timezone = "Asia/Riyadh", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        var userName = $"p1-{suffix}-{Guid.NewGuid():N}";
+        var user = new User
+        {
+            Id = Guid.NewGuid(), UserName = userName, NormalizedUserName = userName.ToUpperInvariant(),
+            Email = $"{Guid.NewGuid():N}@example.invalid", DisplayName = "مستخدم أمن", CompanyId = company.Id,
+            BranchId = branch.Id, Status = "ACTIVE", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1,
+            CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        user.NormalizedEmail = user.Email.ToUpperInvariant();
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, Password);
+
+        var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == "audit.events.read");
+        if (permission is null)
+        {
+            permission = new Permission
+            {
+                Id = Guid.NewGuid(), Code = "audit.events.read", NameAr = "قراءة التدقيق", Resource = "audit.events",
+                Action = "read", ScopeType = "BRANCH", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.Permissions.Add(permission);
+        }
+        var role = new Role
+        {
+            Id = Guid.NewGuid(), Code = $"P1-{suffix}-{Guid.NewGuid():N}", NameAr = "دور اختبار الأمن",
+            CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        db.AddRange(currency, company, branch, user, role);
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        var (grantCompany, grantBranch) = permission.ScopeType switch
+        {
+            "PLATFORM" => ((Guid?)null, (Guid?)null),
+            "COMPANY" => (company.Id, (Guid?)null),
+            _ => (company.Id, (Guid?)branch.Id)
+        };
+        db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = role.Id, PermissionId = permission.Id, ScopeType = permission.ScopeType,
+            CompanyId = grantCompany, BranchId = grantBranch, CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();
+        return new SecurityScope(company.Id, branch.Id, user, permission.Id);
+    }
+
+    private sealed record SecurityScope(Guid CompanyId, Guid BranchId, User User, Guid AuditPermissionId);
+}

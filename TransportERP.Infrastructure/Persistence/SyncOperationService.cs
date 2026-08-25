@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -111,14 +112,24 @@ public sealed class SyncOperationService(
             RowVersion = Guid.NewGuid().ToByteArray()
         };
 
-        db.SyncOperations.Add(operation);
+        var canRecoverIdempotentRace = db.Database.CurrentTransaction is null;
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await ExecuteMutationAsync(async () =>
+            {
+                db.SyncOperations.Add(operation);
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncOperationQueued", "SUCCESS", nameof(SyncOperation), operation.Id,
+                    security.UserId, operation.CompanyId, operation.BranchId,
+                    CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId), cancellationToken);
+                return operation;
+            }, cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.GetBaseException() is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (canRecoverIdempotentRace &&
+                                           ex.GetBaseException() is PostgresException { SqlState: "23505" })
         {
-            db.Entry(operation).State = EntityState.Detached;
+            db.ChangeTracker.Clear();
             var concurrent = await db.SyncOperations
                 .Include(x => x.ConflictCase)
                 .SingleAsync(
@@ -129,11 +140,6 @@ public sealed class SyncOperationService(
                 throw new SyncRuleException("IDEMPOTENCY_HASH_MISMATCH", command.ClientOperationId);
             return concurrent;
         }
-
-        await audit.AppendAuditEventAsync(new AuditEventDraft(
-            "SyncOperationQueued", "SUCCESS", nameof(SyncOperation), operation.Id,
-            security.UserId, operation.CompanyId, operation.BranchId,
-            CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId), cancellationToken);
         return operation;
     }
 
@@ -171,12 +177,15 @@ public sealed class SyncOperationService(
             operation.ErrorCode = null;
             operation.NextRetryAt = null;
         }
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.AppendAuditEventAsync(new AuditEventDraft(
-            "SyncOperationTransition", "SUCCESS", nameof(SyncOperation), operation.Id,
-            security.UserId, operation.CompanyId, operation.BranchId,
-            CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: newStatus), cancellationToken);
-        return operation;
+        return await ExecuteMutationAsync(async () =>
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationTransition", "SUCCESS", nameof(SyncOperation), operation.Id,
+                security.UserId, operation.CompanyId, operation.BranchId,
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: newStatus), cancellationToken);
+            return operation;
+        }, cancellationToken);
     }
 
     public async Task<SyncOperation> RetryOperationAsync(
@@ -197,13 +206,16 @@ public sealed class SyncOperationService(
             operation.NextRetryAt = null;
             operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
             operation.RowVersion = Guid.NewGuid().ToByteArray();
-            await db.SaveChangesAsync(cancellationToken);
-            await audit.AppendAuditEventAsync(new AuditEventDraft(
-                "SyncOperationRetryRejected", "REJECTED", nameof(SyncOperation), operation.Id,
-                security.UserId, operation.CompanyId, operation.BranchId,
-                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId,
-                Reason: operation.ErrorCode ?? "ERROR_NOT_RETRYABLE"), cancellationToken);
-            return operation;
+            return await ExecuteMutationAsync(async () =>
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncOperationRetryRejected", "REJECTED", nameof(SyncOperation), operation.Id,
+                    security.UserId, operation.CompanyId, operation.BranchId,
+                    CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId,
+                    Reason: operation.ErrorCode ?? "ERROR_NOT_RETRYABLE"), cancellationToken);
+                return operation;
+            }, cancellationToken);
         }
 
         if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
@@ -213,8 +225,15 @@ public sealed class SyncOperationService(
             operation.NextRetryAt = null;
             operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
             operation.RowVersion = Guid.NewGuid().ToByteArray();
-            await db.SaveChangesAsync(cancellationToken);
-            return operation;
+            return await ExecuteMutationAsync(async () =>
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncOperationRetryRejected", "REJECTED", nameof(SyncOperation), operation.Id,
+                    security.UserId, operation.CompanyId, operation.BranchId,
+                    CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: "RETRY_EXHAUSTED"), cancellationToken);
+                return operation;
+            }, cancellationToken);
         }
 
         var retryNumber = operation.RetryCount + 1;
@@ -224,12 +243,15 @@ public sealed class SyncOperationService(
         operation.ErrorCode = null;
         operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
         operation.RowVersion = Guid.NewGuid().ToByteArray();
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.AppendAuditEventAsync(new AuditEventDraft(
-            "SyncOperationRetry", "SUCCESS", nameof(SyncOperation), operation.Id,
-            security.UserId, operation.CompanyId, operation.BranchId,
-            CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: $"RetryCount={retryNumber}"), cancellationToken);
-        return operation;
+        return await ExecuteMutationAsync(async () =>
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationRetry", "SUCCESS", nameof(SyncOperation), operation.Id,
+                security.UserId, operation.CompanyId, operation.BranchId,
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: $"RetryCount={retryNumber}"), cancellationToken);
+            return operation;
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<SyncOperation>> GetPendingRetriesAsync(
@@ -285,17 +307,19 @@ public sealed class SyncOperationService(
             UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
-        db.ConflictCases.Add(conflict);
-        await db.SaveChangesAsync(cancellationToken);
-        operation.ConflictCase = conflict;
-        operation.UpdatedAt = now;
-        operation.RowVersion = Guid.NewGuid().ToByteArray();
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.AppendAuditEventAsync(new AuditEventDraft(
-            "SyncOperationConflict", "CONFLICT", nameof(SyncOperation), operation.Id,
-            security.UserId, operation.CompanyId, operation.BranchId,
-            CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.ConflictReason), cancellationToken);
-        return conflict;
+        return await ExecuteMutationAsync(async () =>
+        {
+            db.ConflictCases.Add(conflict);
+            operation.ConflictCase = conflict;
+            operation.UpdatedAt = now;
+            operation.RowVersion = Guid.NewGuid().ToByteArray();
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationConflict", "CONFLICT", nameof(SyncOperation), operation.Id,
+                security.UserId, operation.CompanyId, operation.BranchId,
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.ConflictReason), cancellationToken);
+            return conflict;
+        }, cancellationToken);
     }
 
     public async Task<ConflictCase> ResolveSyncConflictAsync(
@@ -335,12 +359,33 @@ public sealed class SyncOperationService(
         operation.ErrorCode = null;
         operation.UpdatedAt = now;
         operation.RowVersion = Guid.NewGuid().ToByteArray();
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.AppendAuditEventAsync(new AuditEventDraft(
-            "SyncOperationConflictResolved", "SUCCESS", nameof(SyncOperation), operation.Id,
-            security.UserId, operation.CompanyId, operation.BranchId,
-            CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.Resolution), cancellationToken);
-        return conflict;
+        return await ExecuteMutationAsync(async () =>
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationConflictResolved", "SUCCESS", nameof(SyncOperation), operation.Id,
+                security.UserId, operation.CompanyId, operation.BranchId,
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.Resolution), cancellationToken);
+            return conflict;
+        }, cancellationToken);
+    }
+
+    private async Task<T> ExecuteMutationAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        if (db.Database.CurrentTransaction is not null)
+            return await action();
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            var result = await action();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private async Task EnsureSecurityAsync(

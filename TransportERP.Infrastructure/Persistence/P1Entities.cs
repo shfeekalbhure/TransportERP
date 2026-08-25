@@ -67,13 +67,38 @@ public sealed class User : P1Entity
     public string NormalizedUserName { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? Email { get; set; }
+    public string? NormalizedEmail { get; set; }
     public string? Phone { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
     public string Status { get; set; } = "ACTIVE";
     public Guid? CompanyId { get; set; }
     public Guid? BranchId { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+    public int AccessFailedCount { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+    public int AuthVersion { get; set; } = 1;
     public DateTimeOffset? DeletedAt { get; set; }
+}
+
+public sealed class AuthSession : P1Entity
+{
+    public Guid UserId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public string Mode { get; set; } = "LOCAL";
+    public string SecurityStampAtIssue { get; set; } = string.Empty;
+    public int AuthVersionAtIssue { get; set; }
+    public string RefreshTokenHash { get; set; } = string.Empty;
+    public Guid RefreshTokenFamilyId { get; set; }
+    public Guid? ReplacedBySessionId { get; set; }
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset AccessTokenExpiresAt { get; set; }
+    public DateTimeOffset RefreshTokenExpiresAt { get; set; }
+    public DateTimeOffset? LastUsedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public string? RevokeReason { get; set; }
 }
 
 public sealed class Role : P1Entity
@@ -272,6 +297,7 @@ public sealed class PaymentVoucher : P1Entity, IP1Voucher
 public sealed class AuditEvent
 {
     public Guid Id { get; set; }
+    public long SequenceNo { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
     public Guid? ActorUserId { get; set; }
     public Guid? CompanyId { get; set; }
@@ -288,6 +314,13 @@ public sealed class AuditEvent
     public string? Ip { get; set; }
     public string Hash { get; set; } = string.Empty;
     public string? PreviousHash { get; set; }
+}
+
+public sealed class AuditStreamHead
+{
+    public string StreamKey { get; set; } = string.Empty;
+    public string? LastHash { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class ConflictCase : P1Entity

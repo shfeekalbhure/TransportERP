@@ -28,67 +28,75 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
     public async Task<PaymentPlanResponse> SetPaymentPlanAsync(
         OperationContext context, Guid waybillId, SetPaymentPlanRequest request, CancellationToken cancellationToken)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var waybill = await RequireWaybill(context, waybillId, cancellationToken);
-        var operationId = request.ClientOperationId.Trim();
-
-        if (waybill.LastClientOperationId == operationId)
+        try
         {
-            var replay = await ActivePlan(waybillId, cancellationToken);
-            await tx.CommitAsync(cancellationToken);
-            return PlanResponse(context, waybill, replay);
-        }
-        if (waybill.Version != request.ExpectedVersion)
-            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT");
-        if (waybill.Status is not ("DRAFT" or "APPROVED"))
-            throw new WaybillPersistenceException("INVALID_STATE");
-        if (waybill.Status == "APPROVED" && await Collections.AnyAsync(x => x.WaybillId == waybillId, cancellationToken))
-            throw new WaybillPersistenceException("INVALID_STATE");
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var waybill = await RequireWaybill(context, waybillId, cancellationToken);
+            var operationId = request.ClientOperationId.Trim();
 
-        var now = DateTimeOffset.UtcNow;
-        var active = await Plans.Where(x => x.WaybillId == waybillId && x.Status == "ACTIVE")
-            .OrderBy(x => x.LineNo).ToListAsync(cancellationToken);
-        var beforeJson = PaymentPlanAuditJson(active);
-
-        foreach (var line in active)
-        {
-            line.Status = "CANCELLED";
-            line.Version++;
-            line.UpdatedAt = now;
-        }
-
-        foreach (var input in request.Lines)
-        {
-            Plans.Add(new PaymentPlanLineEntity
+            if (waybill.LastClientOperationId == operationId)
             {
-                Id = Guid.NewGuid(),
-                WaybillId = waybillId,
-                LineNo = input.LineNo,
-                PayerRole = input.PayerRole.Trim().ToUpperInvariant(),
-                PartyId = input.PartyId,
-                PaymentMethodCode = input.PaymentMethodCode.Trim().ToUpperInvariant(),
-                AmountCurrencyId = input.Amount?.CurrencyId,
-                Amount = input.Amount?.Amount,
-                Percent = input.Percent,
-                DueTrigger = input.DueTrigger.Trim().ToUpperInvariant(),
-                DueAt = input.DueAt,
-                Status = "ACTIVE",
-                CreatedAt = now,
-                UpdatedAt = now,
-                Version = 1
-            });
+                var replay = await ActivePlan(waybillId, cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+                return PlanResponse(context, waybill, replay);
+            }
+            if (waybill.Version != request.ExpectedVersion)
+                throw new WaybillPersistenceException("CONCURRENCY_CONFLICT");
+            if (waybill.Status is not ("DRAFT" or "APPROVED"))
+                throw new WaybillPersistenceException("INVALID_STATE");
+            if (waybill.Status == "APPROVED" && await Collections.AnyAsync(x => x.WaybillId == waybillId, cancellationToken))
+                throw new WaybillPersistenceException("INVALID_STATE");
+
+            var now = DateTimeOffset.UtcNow;
+            var active = await Plans.Where(x => x.WaybillId == waybillId && x.Status == "ACTIVE")
+                .OrderBy(x => x.LineNo).ToListAsync(cancellationToken);
+            var beforeJson = PaymentPlanAuditJson(active);
+
+            foreach (var line in active)
+            {
+                line.Status = "CANCELLED";
+                line.Version++;
+                line.UpdatedAt = now;
+            }
+
+            foreach (var input in request.Lines)
+            {
+                Plans.Add(new PaymentPlanLineEntity
+                {
+                    Id = Guid.NewGuid(),
+                    WaybillId = waybillId,
+                    LineNo = input.LineNo,
+                    PayerRole = input.PayerRole.Trim().ToUpperInvariant(),
+                    PartyId = input.PartyId,
+                    PaymentMethodCode = input.PaymentMethodCode.Trim().ToUpperInvariant(),
+                    AmountCurrencyId = input.Amount?.CurrencyId,
+                    Amount = input.Amount?.Amount,
+                    Percent = input.Percent,
+                    DueTrigger = input.DueTrigger.Trim().ToUpperInvariant(),
+                    DueAt = input.DueAt,
+                    Status = "ACTIVE",
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    Version = 1
+                });
+            }
+
+            waybill.LastClientOperationId = operationId;
+            waybill.Version++;
+            waybill.UpdatedAt = now;
+            await Save(cancellationToken);
+            await audit.WriteAsync(context, "WaybillPaymentPlanSet", "SUCCESS", "Waybill", waybill.Id,
+                beforeJson, PaymentPlanInputAuditJson(request.Lines), null, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+
+            var lines = await ActivePlan(waybillId, cancellationToken);
+            return PlanResponse(context, waybill, lines);
         }
-
-        waybill.LastClientOperationId = operationId;
-        waybill.Version++;
-        waybill.UpdatedAt = now;
-        await Save(cancellationToken);
-        await audit.WriteAsync(context, "WaybillPaymentPlanSet", "SUCCESS", "Waybill", waybill.Id,
-            beforeJson, PaymentPlanInputAuditJson(request.Lines), null, cancellationToken);
-        await tx.CommitAsync(cancellationToken);
-
-        var lines = await ActivePlan(waybillId, cancellationToken);
-        return PlanResponse(context, waybill, lines);
+        catch (Exception ex) when (IsSerializationFailure(ex))
+        {
+            db.ChangeTracker.Clear();
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
+        }
     }
 
     public async Task<CollectionResponse> RecordCollectionAsync(
@@ -397,7 +405,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
     private static bool IsSerializationFailure(Exception exception)
     {
         for (var current = exception; current is not null; current = current.InnerException)
-            if (current is PostgresException { SqlState: "40001" }) return true;
+            if (current is PostgresException { SqlState: "40001" or "40P01" }) return true;
         return false;
     }
 }

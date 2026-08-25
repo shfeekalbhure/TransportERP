@@ -40,7 +40,7 @@ public sealed class P2C01CPhysicalMeasurePostgreSqlTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"measure-{Guid.NewGuid():N}", NormalizedUserName = $"MEASURE{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم قياسات", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم قياسات", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

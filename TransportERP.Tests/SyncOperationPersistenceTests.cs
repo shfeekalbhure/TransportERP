@@ -27,6 +27,7 @@ public sealed class SyncOperationPersistenceTests
 
         Assert.Equal(first.Id, replay.Id);
         Assert.Equal(1, await db.SyncOperations.CountAsync(x => x.Id == first.Id));
+        Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued" && x.EntityId == first.Id));
 
         var mismatch = command with { PayloadJson = "{\"amount\":11}" };
         await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(mismatch, security));
@@ -52,6 +53,48 @@ public sealed class SyncOperationPersistenceTests
             command, scope.Security with { CompanyId = Guid.NewGuid() }));
         await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(
             command, scope.Security with { DeviceId = "other-device" }));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Enqueue_rolls_back_the_operation_when_audit_insert_fails()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "AUDFAIL");
+        var command = CreateCommand(scope, "{\"auditFailure\":true}");
+        var suffix = Guid.NewGuid().ToString("N");
+        var function = $"fail_sync_audit_{suffix}";
+        var trigger = $"trg_fail_sync_audit_{suffix}";
+        await using var admin = CreateDb(connection);
+        await admin.Database.ExecuteSqlRawAsync($$"""
+            CREATE FUNCTION transport_erp.{{function}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+              IF NEW."Action" = 'SyncOperationQueued' THEN RAISE EXCEPTION 'forced sync audit failure'; END IF;
+              RETURN NEW;
+            END $body$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON transport_erp.audit_events
+              FOR EACH ROW EXECUTE FUNCTION transport_erp.{{function}}();
+            """);
+        try
+        {
+            await Assert.ThrowsAnyAsync<Exception>(() => CreateService(db)
+                .EnqueueSyncOperationAsync(command, scope.Security));
+        }
+        finally
+        {
+            await admin.Database.ExecuteSqlRawAsync($$"""
+                DROP TRIGGER IF EXISTS {{trigger}} ON transport_erp.audit_events;
+                DROP FUNCTION IF EXISTS transport_erp.{{function}}();
+                """);
+        }
+
+        await using var verify = CreateDb(connection);
+        Assert.False(await verify.SyncOperations.AnyAsync(x =>
+            x.DeviceId == command.DeviceId && x.ClientOperationId == command.ClientOperationId));
+        Assert.False(await verify.AuditEvents.AnyAsync(x =>
+            x.Action == "SyncOperationQueued" && x.DeviceId == command.DeviceId));
     }
 
     [Fact]
@@ -171,7 +214,7 @@ public sealed class SyncOperationPersistenceTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"sync-{Guid.NewGuid():N}", NormalizedUserName = "SYNC",
-            DisplayName = "مستخدم مزامنة", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم مزامنة", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

@@ -89,6 +89,11 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<long>("SequenceNo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValueSql("nextval('transport_erp.audit_event_sequence_no_seq')");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ActorUserId");
@@ -100,11 +105,71 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.HasIndex("Hash")
                         .IsUnique();
 
+                    b.HasIndex("SequenceNo")
+                        .IsUnique();
+
                     b.HasIndex("CompanyId", "OccurredAt");
 
                     b.HasIndex("EntityType", "EntityId", "OccurredAt");
 
                     b.ToTable("audit_events", "transport_erp");
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AuditStreamHead", b =>
+                {
+                    b.Property<string>("StreamKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LastHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz");
+
+                    b.HasKey("StreamKey");
+
+                    b.ToTable("audit_stream_heads", "transport_erp");
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AuthSession", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("AccessTokenExpiresAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("AuthVersionAtIssue").HasColumnType("integer");
+                    b.Property<Guid?>("BranchId").HasColumnType("uuid");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamptz");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<DateTimeOffset>("IssuedAt").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset?>("LastUsedAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Mode").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<DateTimeOffset>("RefreshTokenExpiresAt").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("RefreshTokenFamilyId").HasColumnType("uuid");
+                    b.Property<string>("RefreshTokenHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<Guid?>("ReplacedBySessionId").HasColumnType("uuid");
+                    b.Property<string>("RevokeReason").HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
+                    b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().HasColumnType("bytea");
+                    b.Property<string>("SecurityStampAtIssue").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamptz");
+                    b.Property<Guid>("UserId").HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("BranchId", "CompanyId");
+                    b.HasIndex("DeviceId");
+                    b.HasIndex("RefreshTokenFamilyId");
+                    b.HasIndex("RefreshTokenHash").IsUnique();
+                    b.HasIndex("ReplacedBySessionId");
+                    b.HasIndex("CompanyId", "BranchId");
+                    b.HasIndex("UserId", "RevokedAt", "RefreshTokenExpiresAt");
+                    b.ToTable("auth_sessions", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_auth_sessions_expiry", "\"AccessTokenExpiresAt\" <= \"RefreshTokenExpiresAt\"");
+                            t.HasCheckConstraint("ck_auth_sessions_mode", "\"Mode\" IN ('LOCAL')");
+                            t.HasCheckConstraint("ck_auth_sessions_security_stamp", "length(\"SecurityStampAtIssue\") >= 32");
+                            t.HasCheckConstraint("ck_auth_sessions_auth_version", "\"AuthVersionAtIssue\" >= 1");
+                        });
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.Branch", b =>
@@ -1976,6 +2041,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ScopeType")
+                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -1999,7 +2065,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("role_permissions", "transport_erp");
+                    b.HasIndex("BranchId", "CompanyId");
+
+                    b.ToTable("role_permissions", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_role_permissions_scope_fields", "(\"ScopeType\" = 'PLATFORM' AND \"CompanyId\" IS NULL AND \"BranchId\" IS NULL) OR (\"ScopeType\" = 'COMPANY' AND \"CompanyId\" IS NOT NULL AND \"BranchId\" IS NULL) OR (\"ScopeType\" = 'BRANCH' AND \"CompanyId\" IS NOT NULL AND \"BranchId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncOperation", b =>
@@ -2314,6 +2385,14 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.User", b =>
                 {
+                    b.Property<int>("AccessFailedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("AuthVersion")
+                        .ValueGeneratedOnAdd().HasColumnType("integer").HasDefaultValue(1);
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
@@ -2342,10 +2421,16 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("NormalizedUserName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(320).HasColumnType("character varying(320)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -2360,6 +2445,11 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2380,17 +2470,24 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BranchId", "Status");
 
-                    b.HasIndex("Email", "CompanyId")
+                    b.HasIndex("BranchId", "CompanyId");
+
+                    b.HasIndex("NormalizedEmail", "CompanyId")
                         .IsUnique()
-                        .HasFilter("\"Email\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+                        .HasAnnotation("Npgsql:NullsDistinct", false)
+                        .HasFilter("\"NormalizedEmail\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("NormalizedUserName", "CompanyId")
                         .IsUnique()
+                        .HasAnnotation("Npgsql:NullsDistinct", false)
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("users", "transport_erp", t =>
                         {
                             t.HasCheckConstraint("ck_users_status", "\"Status\" IN ('ACTIVE','LOCKED','DISABLED')");
+                            t.HasCheckConstraint("ck_users_security_stamp", "length(\"SecurityStamp\") >= 32");
+                            t.HasCheckConstraint("ck_users_auth_version", "\"AuthVersion\" >= 1");
+                            t.HasCheckConstraint("ck_users_branch_company", "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL");
                         });
                 });
 
@@ -2429,7 +2526,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("user_permission_overrides", "transport_erp");
+                    b.HasIndex("BranchId", "CompanyId");
+
+                    b.ToTable("user_permission_overrides", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_user_permission_overrides_scope_fields", "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.UserRole", b =>
@@ -2460,7 +2562,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("user_roles", "transport_erp");
+                    b.HasIndex("BranchId", "CompanyId");
+
+                    b.ToTable("user_roles", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_user_roles_scope_fields", "\"BranchId\" IS NULL OR \"CompanyId\" IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.WaybillEntity", b =>
@@ -3281,6 +3388,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RolePermission", b =>
                 {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TransportERP.Infrastructure.Persistence.Permission", null)
                         .WithMany()
                         .HasForeignKey("PermissionId")
@@ -3359,11 +3472,25 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Navigation("Trip");
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AuthSession", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany().HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
+                        .WithMany().HasForeignKey("CompanyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.AuthSession", null)
+                        .WithMany().HasForeignKey("ReplacedBySessionId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.User", b =>
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
                         .WithMany()
-                        .HasForeignKey("BranchId")
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
@@ -3374,6 +3501,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.UserPermissionOverride", b =>
                 {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TransportERP.Infrastructure.Persistence.Permission", null)
                         .WithMany()
                         .HasForeignKey("PermissionId")
@@ -3389,6 +3522,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.UserRole", b =>
                 {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TransportERP.Infrastructure.Persistence.Role", null)
                         .WithMany()
                         .HasForeignKey("RoleId")

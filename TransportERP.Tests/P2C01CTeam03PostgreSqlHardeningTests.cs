@@ -611,6 +611,8 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
             NormalizedUserName = $"TEAM03{suffix}{Guid.NewGuid():N}"[..24],
             DisplayName = "مستخدم TEAM-03",
             PasswordHash = "test-only",
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            AuthVersion = 1,
             Status = "ACTIVE",
             CompanyId = companyId, BranchId = branchId,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()

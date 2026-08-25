@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
@@ -108,6 +109,65 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         Assert.Contains("CollectedById", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("ReversalOfId", reversalAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
         Assert.Equal(context.CorrelationId, collectionAudit.CorrelationId);
+    }
+
+    [Theory]
+    [InlineData("40001")]
+    [InlineData("40P01")]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Payment_plan_maps_audit_serialization_failure_and_rolls_back_business_and_stream_head(string sqlState)
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BSERIAL");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var operationId = $"plan-serial-{Guid.NewGuid():N}";
+        var suffix = Guid.NewGuid().ToString("N");
+        var function = $"fail_payment_plan_serial_{suffix}";
+        var trigger = $"trg_fail_payment_plan_serial_{suffix}";
+        await using var admin = CreateP2Db(connection);
+        await admin.Database.ExecuteSqlRawAsync($$"""
+            CREATE FUNCTION transport_erp.{{function}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+              IF NEW."Action" = 'WaybillPaymentPlanSet' THEN
+                RAISE EXCEPTION 'forced serialization failure' USING ERRCODE = '{{sqlState}}';
+              END IF;
+              RETURN NEW;
+            END $body$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON transport_erp.audit_events
+              FOR EACH ROW EXECUTE FUNCTION transport_erp.{{function}}();
+            """);
+        try
+        {
+            await using var db = CreateP2Db(connection);
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).SetPaymentPlanAsync(context, scope.WaybillId, new SetPaymentPlanRequest(
+                    1,
+                    [new PaymentPlanLineInput(1, "SENDER", null, "CASH",
+                        new MoneyAmount(scope.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+                    operationId)));
+            Assert.Equal("CONCURRENCY_CONFLICT", ex.Code);
+        }
+        finally
+        {
+            await admin.Database.ExecuteSqlRawAsync($$"""
+                DROP TRIGGER IF EXISTS {{trigger}} ON transport_erp.audit_events;
+                DROP FUNCTION IF EXISTS transport_erp.{{function}}();
+                """);
+        }
+
+        await using var verify = CreateP2Db(connection);
+        var waybill = await verify.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == scope.WaybillId);
+        Assert.Equal(1, waybill.Version);
+        Assert.NotEqual(operationId, waybill.LastClientOperationId);
+        Assert.False(await verify.Set<PaymentPlanLineEntity>().AnyAsync(x => x.WaybillId == scope.WaybillId));
+        Assert.False(await verify.AuditEvents.AnyAsync(x =>
+            x.Action == "WaybillPaymentPlanSet" && x.CorrelationId == context.CorrelationId));
+        Assert.False(await verify.AuditStreamHeads.AnyAsync(x =>
+            x.StreamKey == AuditEventService.GetStreamKey(scope.CompanyId, scope.BranchId, null)));
     }
 
     [Fact]
@@ -320,6 +380,12 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
+            builder.ConfigureServices(services =>
+            {
+                Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>(services);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+            });
         });
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string permission)
@@ -338,7 +404,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)), SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" }, SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
@@ -367,7 +433,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"p2b-{Guid.NewGuid():N}", NormalizedUserName = $"P2B{suffix}{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم اختبار B", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم اختبار B", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

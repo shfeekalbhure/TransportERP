@@ -36,11 +36,42 @@
 
 ### الحالة الحالية لبوابة G3 — 2026-08-25
 
-حالة G3 هي `READY_FOR_OWNER_ACCEPTANCE` وليست `CLOSED`. لا يوجد في السجلات الحاكمة اعتماد مالك صريح يغطي معًا صلاحيات Offline، وحد المحاولات وBackoff، وسياسة التعارض، وفترة الاحتفاظ، وحجم الدفعة، وصلاحيات حل التعارض. إغلاق P1 أو دمج تنفيذ خادمي سابق لا يعوض هذا القرار، ولا يفوض توسعة تنفيذ Offline/Sync قبل تسجيل الاعتماد المطلوب وربطه بالعقد والاختبارات.
+**Decision ID:** `DEC-G3-SYNC-20260825-01`
+
+**Exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
+**Authority:** قرار مفوض من المالك داخل المحادثة بتاريخ 2026-08-25؛ لا يدعي هذا السجل توقيع أشخاص أو مراجعين غير مثبتين.
+
+حالة G3 هي `G3_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`. اعتمد القرار أعمدة وسياسات Offline/Sync فقط في W2، ولا يقبل بقية حقول W2 أو يغير status مراجعتها أو يفوض runtime. ثبت `P1_SYNC_CONTRACT.md` Payload Action allowlist، وهوية العملية والبروتوكول، وميزانيتي retries، وسياسة التعارض، وفترات الاحتفاظ، وحجم الدفعة وذريتها، وصلاحيات حل التعارض، وتسلسل الإعدادات. يبقى `sync.offline.enabled=false` حتى تثبت G4 المطابقة على exact SHA ثم يعتمد المالك G5.
+
+| قرار G3 | القيمة المعتمدة |
+|---|---|
+| Offline Payload writes | P1 drafts: Journal/Receipt/Payment؛ P2-C01 Action mapping الحاكم؛ وما عداها Online؛ `SyncP1Operations` transport لا payload action |
+| Read-cache | `SearchOperationalParties` و`ReadBasicWaybillCache` فقط؛ لا SyncOperation ولا write queue |
+| Identity/protocol | `ActionCode`, `ProtocolVersion=sync-v1`, conditional `EntityId`, `ResultEntityId`, `RequestCorrelationId`; خريطة client operation↔server entity |
+| Retry | ميزانيتان مستقلتان: client transport=`5` وserver execution=`5`; default `5/10/20/40/80s`; يعاد الحساب إذا شدد lower scope base؛ cap `30m` |
+| Batch | `1..100`؛ ذرية ونتيجة لكل عملية؛ partial success مسموح |
+| Conflict | `auto_merge=false`؛ BaseVersion فقط للoptimistic mutation؛ KEEP_SERVER يرفض الأصل، وREAPPLY ينشئ replacement QUEUED ثم يجعل الأصل RESOLVED/SUPERSEDED |
+| Resolver | `sync.conflicts.resolve` + صلاحية الفعل + registered device + Company/Branch + reason |
+| Retention | local success/resolved `24h`؛ rejected `7d`؛ server payload/snapshots `90d` بعد terminal/resolution |
+| Protocol/hierarchy | `sync.protocol.allowed_versions=["sync-v1"]`; Global سقف؛ Company/Branch تضييق فقط؛ Device/Permission تقاطع أخير؛ invalid override fail-closed |
+| Attachment/POD | metadata/hash queue فقط؛ binary runtime مؤجل حتى resumable/hash contract واختبارات G4 |
+| Runtime gate | `sync.offline.enabled=false` حتى G4/G5 |
 
 ## 4. قرارات المالك التي لا يجوز افتراضها
 
-يبقى التفويض النهائي مشروطًا بقرارات موثقة بشأن سياسة التعارض الافتراضية، مدة الاحتفاظ بسجل العمليات والملفات المحلية، حجم دفعة المزامنة، الحد الأقصى للمحاولات، صلاحيات حل التعارض، وقائمة الأفعال المسموحة Offline. كما يجب اعتماد أي قرار لإعادة استخدام كيان من AlTayerERP بدل تصميم TransportERP الجديد.
+لم تعد قرارات G3 المذكورة أعلاه مفتوحة للاجتهاد أو الافتراض؛ أي تغيير في allowlist أو retries أو conflict أو retention أو batch أو resolver أو hierarchy يمر بتغيير حوكمي مستقل واختبارات قبول. يبقى التفويض النهائي محجوبًا حتى G4/G5، كما يبقى أي قرار لإعادة استخدام كيان من AlTayerERP بدل تصميم TransportERP الجديد خاضعًا لاعتماد مستقل.
+
+### شروط نقل G3 إلى G4
+
+يجب أن تثبت G4 ActionCode/protocol allowlists قبل enqueue، وسجل جهاز حقيقي وإلغاءه، وفصل `sync.conflicts.resolve`، وقواعد EntityId/ResultEntityId/local↔server map، واكتشاف BaseVersion للأفعال optimistic فقط، وميزانيتي retry المنفصلتين وworkers/واجهاتها، وطابور عميل durable ومشفر، وretention cleanup/redaction، وتسلسل الإعدادات fail-closed. كما يلزم اختبار مستقل لكل Action واختبار رفض runtime-unavailable، وتنفيذ `T-SYNC-001..010` وحدود `0/1/100/101` والـreplay/counters والصلاحيات والاحتفاظ، ورفض binary Attachment/POD حتى عقده. لا يفتح G5 قبل نجاح ذلك على exact SHA وعدم وجود عيب حرج مفتوح.
+
+### قرار تهيئة الهوية والصلاحيات الأولية — 2026-08-25
+
+**Decision ID:** `DEC-P1-SEC-BOOTSTRAP-20260825-01`
+
+اعتمدت تهيئة المسؤول الأول كأمر CLI صريح لمرة واحدة `--bootstrap-admin`، ولا يعمل في التشغيل العادي ولا يفتح endpoint. يقرأ سر المسؤول من مصدر السر الصريح `TRANSPORTERP_BOOTSTRAP_ADMIN_PASSWORD` فقط، ويمنع تمريره ضمن argv أو `IConfiguration` العام، ولا يطبعه أو يضعه في marker أو AuditEvent. يتحقق الأمر من إعداداته قبل تطبيق Migrations، ثم يستخدم قفل PostgreSQL عامًا ومعاملة واحدة لإنشاء/التحقق من المراجع، والمستخدم المشفر، والدور، والمنح، والـmarker، والتدقيق. وجود marker أو أي مستخدم سابق يرفض التهيئة، والتشغيل العادي يتحقق من catalog فقط ولا يكتب إليه.
+
+النطاق الحاكم لـ`auth.scope.select` هو `PLATFORM`. جميع صلاحيات التشغيل الحالية المسجلة في `SystemPermissionCatalog` — المزامنة، والتدقيق، والبوليصة والأطراف، والتحصيل، والترحيل والرحلات وكشوف التحميل — نطاقها `BRANCH`. أي نقص أو تغيير في `ScopeType` أو metadata أو منح `SYSTEM_ADMIN` يفشل مغلقًا. أما `DefaultCalendarId` في نموذج P1 الحالي فهو UUID إلزامي لكنه مرجع خارجي opaque بلا `DbSet` أو FK أو catalog تقويم داخل هذا النطاق؛ لذلك تتطلب التهيئة قيمة صريحة ولا تدعي التحقق من وجود التقويم حتى يُعتمد كيان التقويم وربطه في مرحلة مستقلة.
 ## 5. مراجع الحزمة
 
 - `W1_DATA_CONTRACT_REGISTER.csv`
