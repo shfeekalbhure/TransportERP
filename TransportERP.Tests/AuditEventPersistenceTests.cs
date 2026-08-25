@@ -112,6 +112,57 @@ public sealed class AuditEventPersistenceTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Reused_context_reloads_locked_stream_head_after_another_context_and_inside_caller_batch()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+
+        await using var contextA = CreateDb(connection);
+        await contextA.Database.MigrateAsync();
+        var (company, branch) = await SeedScopeAsync(contextA, "RELOAD");
+        var device = $"audit-reload-{Guid.NewGuid():N}";
+        var serviceA = new AuditEventService(contextA);
+
+        var first = await serviceA.AppendAuditEventAsync(new AuditEventDraft(
+            "CONTEXT_A_FIRST", "SUCCESS", "TEST_ENTITY", CompanyId: company,
+            BranchId: branch, DeviceId: device));
+
+        AuditEvent second;
+        await using (var contextB = CreateDb(connection))
+        {
+            second = await new AuditEventService(contextB).AppendAuditEventAsync(new AuditEventDraft(
+                "CONTEXT_B", "SUCCESS", "TEST_ENTITY", CompanyId: company,
+                BranchId: branch, DeviceId: device));
+        }
+
+        AuditEvent third;
+        AuditEvent fourth;
+        await using (var callerBatch = await contextA.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted))
+        {
+            third = await serviceA.AppendAuditEventAsync(new AuditEventDraft(
+                "CONTEXT_A_REUSED", "SUCCESS", "TEST_ENTITY", CompanyId: company,
+                BranchId: branch, DeviceId: device));
+            fourth = await serviceA.AppendAuditEventAsync(new AuditEventDraft(
+                "CONTEXT_A_BATCH_NEXT", "SUCCESS", "TEST_ENTITY", CompanyId: company,
+                BranchId: branch, DeviceId: device));
+            await callerBatch.CommitAsync();
+        }
+
+        Assert.Null(first.PreviousHash);
+        Assert.Equal(first.Hash, second.PreviousHash);
+        Assert.Equal(second.Hash, third.PreviousHash);
+        Assert.Equal(third.Hash, fourth.PreviousHash);
+
+        await using var verifyDb = CreateDb(connection);
+        var result = await new AuditEventService(verifyDb).VerifyHashChainAsync(company, branch, device);
+        Assert.True(result.IsValid, result.FailureReason);
+        Assert.Equal(4, result.EventCount);
+        var head = await verifyDb.AuditStreamHeads.AsNoTracking()
+            .SingleAsync(x => x.StreamKey == AuditEventService.GetStreamKey(company, branch, device));
+        Assert.Equal(fourth.Hash, head.LastHash);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Caller_rollback_reverts_both_audit_event_and_stream_head()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();

@@ -214,6 +214,17 @@ public sealed class AuditEventService(TransportErpDbContext db)
                 VALUES ({{streamKey}}, NULL, {{occurredAt}})
                 ON CONFLICT ("StreamKey") DO NOTHING
                 """, cancellationToken);
+
+            // A long-lived DbContext can still track the value read by an earlier append. A tracking
+            // FromSql query would then identity-resolve that stale instance even though FOR UPDATE
+            // locked the current database row. Detach it before the locking read so LastHash always
+            // comes from the row version protected by this transaction. This also works for repeated
+            // appends inside one caller-owned transaction because each preceding append is saved first.
+            var trackedHead = db.ChangeTracker.Entries<AuditStreamHead>()
+                .SingleOrDefault(x => string.Equals(x.Entity.StreamKey, streamKey, StringComparison.Ordinal));
+            if (trackedHead is not null)
+                trackedHead.State = EntityState.Detached;
+
             return await db.AuditStreamHeads
                 .FromSqlInterpolated($$"""
                     SELECT "StreamKey", "LastHash", "UpdatedAt"
