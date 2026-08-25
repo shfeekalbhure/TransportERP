@@ -8,7 +8,8 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Api.Security;
 
 public sealed record CurrentSecurityContext(
-    Guid UserId, Guid CompanyId, Guid? BranchId, Guid? SessionId, string? DeviceId, bool IsLocalSession)
+    Guid UserId, Guid CompanyId, Guid? BranchId, Guid? SessionId, string? DeviceId, bool IsLocalSession,
+    Guid? RegisteredDeviceId = null, int? DeviceCredentialVersion = null)
 {
     public OperationContext ToOperationContext(Guid correlationId)
         => BranchId.HasValue
@@ -63,7 +64,30 @@ public sealed class CurrentSecurityContextService(
             !FixedEquals(stamp, user.SecurityStamp) || !FixedEquals(stamp, session.SecurityStampAtIssue)) return null;
         var tokenDevice = principal.FindFirstValue("device_id");
         if (!string.Equals(tokenDevice, session.DeviceId, StringComparison.Ordinal)) return null;
-        return new CurrentSecurityContext(userId, companyId, branchId, sessionId, session.DeviceId, true);
+        if (session.RegisteredDeviceId.HasValue)
+        {
+            if (!session.DeviceCredentialVersion.HasValue || !branchId.HasValue) return null;
+            if (!TryGuid(principal, "registered_device_id", null, out var tokenRegisteredDeviceId) ||
+                tokenRegisteredDeviceId != session.RegisteredDeviceId ||
+                !int.TryParse(principal.FindFirstValue("device_credential_version"), out var tokenCredentialVersion) ||
+                tokenCredentialVersion != session.DeviceCredentialVersion) return null;
+            var nowCutoff = now - TransportERP.Api.Identity.RegisteredDeviceService.InactivityLimit;
+            var bindingActive = await (
+                from device in db.RegisteredDevices.AsNoTracking()
+                join assignment in db.RegisteredDeviceAssignments.AsNoTracking()
+                    on device.Id equals assignment.RegisteredDeviceId
+                where device.Id == session.RegisteredDeviceId && device.CompanyId == companyId &&
+                      device.Status == "ACTIVE" && device.CredentialVersion == session.DeviceCredentialVersion &&
+                      (device.ExpiresAt == null || device.ExpiresAt > now) &&
+                      (device.LastSeenAt ?? device.ApprovedAt ?? device.CreatedAt) > nowCutoff &&
+                      assignment.CompanyId == companyId && assignment.UserId == userId &&
+                      assignment.BranchId == branchId && assignment.Status == "ACTIVE"
+                select device.Id).AnyAsync(cancellationToken);
+            if (!bindingActive) return null;
+        }
+        else if (principal.HasClaim(x => x.Type is "registered_device_id" or "device_credential_version")) return null;
+        return new CurrentSecurityContext(userId, companyId, branchId, sessionId, session.DeviceId, true,
+            session.RegisteredDeviceId, session.DeviceCredentialVersion);
     }
 
     public Task<bool> HasPermissionAsync(CurrentSecurityContext context, string permissionCode,

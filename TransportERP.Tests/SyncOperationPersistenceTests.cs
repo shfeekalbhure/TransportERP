@@ -26,6 +26,8 @@ public sealed class SyncOperationPersistenceTests
         var replay = await service.EnqueueSyncOperationAsync(command, security);
 
         Assert.Equal(first.Id, replay.Id);
+        Assert.Equal(scope.Security.RegisteredDeviceId, first.RegisteredDeviceId);
+        Assert.Equal(scope.Security.RegisteredDeviceCredentialVersion, first.RegisteredDeviceCredentialVersion);
         Assert.Equal(1, await db.SyncOperations.CountAsync(x => x.Id == first.Id));
         Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued" && x.EntityId == first.Id));
 
@@ -53,6 +55,23 @@ public sealed class SyncOperationPersistenceTests
             command, scope.Security with { CompanyId = Guid.NewGuid() }));
         await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(
             command, scope.Security with { DeviceId = "other-device" }));
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(
+            command, scope.Security with { RegisteredDeviceCredentialVersion = 99 }));
+
+        var device = await db.RegisteredDevices.SingleAsync(x => x.Id == scope.Security.RegisteredDeviceId);
+        device.Status = "SUSPENDED";
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(command, scope.Security));
+        device.Status = "ACTIVE";
+        device.LastSeenAt = DateTimeOffset.UtcNow.AddDays(-91);
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(command, scope.Security));
+        device.LastSeenAt = DateTimeOffset.UtcNow;
+        var assignment = await db.RegisteredDeviceAssignments.SingleAsync(x =>
+            x.RegisteredDeviceId == device.Id && x.UserId == scope.Security.UserId && x.Status == "ACTIVE");
+        assignment.Status = "REVOKED"; assignment.RemovedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(command, scope.Security));
     }
 
     [Fact]
@@ -233,6 +252,45 @@ public sealed class SyncOperationPersistenceTests
         Assert.Contains(await db.AuditEvents.ToListAsync(), x => x.Action == "SyncOperationRetryRejected" && x.EntityId == operation.Id);
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Rotation_denies_stale_execution_but_historical_provenance_is_immutable_and_terminal_update_remains_possible()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "PROVENANCE");
+        var service = CreateService(db);
+        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{\"provenance\":true}"), scope.Security);
+        var originalDevice = operation.RegisteredDeviceId;
+        var originalVersion = operation.RegisteredDeviceCredentialVersion;
+        var device = await db.RegisteredDevices.SingleAsync(x => x.Id == originalDevice);
+        device.CredentialVersion++;
+        device.CredentialHash = new string('b', 64);
+        device.UpdatedAt = DateTimeOffset.UtcNow;
+        device.RowVersion = RandomNumberGenerator.GetBytes(16);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.TransitionSyncOperationAsync(
+            new(operation.Id, "SENDING"), scope.Security));
+        db.ChangeTracker.Clear();
+        var historical = await db.SyncOperations.SingleAsync(x => x.Id == operation.Id);
+        historical.Status = "REJECTED";
+        historical.ErrorCode = "DEVICE_CREDENTIAL_ROTATED";
+        historical.UpdatedAt = DateTimeOffset.UtcNow;
+        historical.RowVersion = RandomNumberGenerator.GetBytes(16);
+        await db.SaveChangesAsync();
+        Assert.Equal(originalVersion, historical.RegisteredDeviceCredentialVersion);
+
+        historical.RegisteredDeviceCredentialVersion = device.CredentialVersion;
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        await using var verify = CreateDb(connection);
+        var persisted = await verify.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
+        Assert.Equal(originalDevice, persisted.RegisteredDeviceId);
+        Assert.Equal(originalVersion, persisted.RegisteredDeviceCredentialVersion);
+        Assert.Equal("REJECTED", persisted.Status);
+    }
+
     private static SyncOperationService CreateService(
         TransportErpDbContext db,
         SyncRetryPolicy? retryPolicy = null)
@@ -282,8 +340,29 @@ public sealed class SyncOperationPersistenceTests
         db.Branches.Add(branch);
         db.Users.Add(user);
         await db.SaveChangesAsync();
+        var deviceId = $"device-{suffix}-{Guid.NewGuid():N}";
+        var device = new RegisteredDevice
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, DeviceId = deviceId,
+            DisplayName = "جهاز مزامنة", Platform = "TEST", AppVersion = "1.0",
+            RegistrationRequestId = $"request-{Guid.NewGuid():N}",
+            CredentialHash = new string('a', 64), CredentialVersion = 1, Status = "ACTIVE",
+            RegisteredByUserId = user.Id, ApprovedByUserId = user.Id, ApprovedAt = now, LastSeenAt = now,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        var assignment = new RegisteredDeviceAssignment
+        {
+            Id = Guid.NewGuid(), RegisteredDeviceId = device.Id, UserId = user.Id,
+            CompanyId = company.Id, BranchId = branch.Id, Status = "ACTIVE",
+            AssignedByUserId = user.Id, AssignedAt = now, CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        db.RegisteredDevices.Add(device);
+        db.RegisteredDeviceAssignments.Add(assignment);
+        await db.SaveChangesAsync();
         return new TestScope(company.Id, branch.Id,
-            new SyncSecurityContext(user.Id, $"device-{suffix}-{Guid.NewGuid():N}", company.Id, branch.Id, true, true));
+            new SyncSecurityContext(user.Id, deviceId, company.Id, branch.Id, true, true,
+                device.Id, device.CredentialVersion));
     }
 
     private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)

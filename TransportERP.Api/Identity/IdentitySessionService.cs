@@ -25,7 +25,7 @@ public sealed class IdentityPasswordSentinel
 
 public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHasher<User> passwordHasher,
     IdentityPasswordSentinel sentinel, TenantScopeResolver scopeResolver, AuditEventService audit,
-    IOptions<TransportSecurityOptions> options)
+    IOptions<TransportSecurityOptions> options, RegisteredDeviceService? registeredDevices = null)
 {
     public const int MaxPasswordLength = 1024;
     public const int MaxRefreshTokenLength = 256;
@@ -82,8 +82,11 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
         User? user = null;
         if (candidateId.HasValue)
         {
+            // Login only mutates non-key account state. NO KEY UPDATE still serializes competing
+            // logins while remaining compatible with the key-share locks taken by tenant-safe
+            // device/assignment foreign keys, avoiding a user-row -> device-row lock inversion.
             user = await db.Users.FromSqlInterpolated(
-                $"SELECT * FROM transport_erp.users WHERE \"Id\" = {candidateId.Value} FOR UPDATE").SingleOrDefaultAsync(ct);
+                $"SELECT * FROM transport_erp.users WHERE \"Id\" = {candidateId.Value} FOR NO KEY UPDATE").SingleOrDefaultAsync(ct);
         }
 
         var verification = VerifyPassword(user, request.Password);
@@ -117,6 +120,20 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             throw InvalidCredentials();
         }
 
+        TrustedDeviceBinding? deviceBinding = null;
+        if (!string.IsNullOrWhiteSpace(request.DeviceCredential))
+        {
+            deviceBinding = registeredDevices is null ? null : await registeredDevices.ValidateBindingAsync(
+                user.Id, scope.Company.Id, scope.Branch?.Id, deviceId, request.DeviceCredential,
+                updateLastSeen: true, correlationId, ct);
+            if (deviceBinding is null)
+            {
+                await AuditAsync("IdentityLogin", "FAILURE", user.Id, scope.Company.Id, scope.Branch?.Id,
+                    deviceId, correlationId, "DEVICE_BINDING_DENIED", ip, ct);
+                await transaction.CommitAsync(ct);
+                throw InvalidCredentials();
+            }
+        }
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
             user.PasswordHash = passwordHasher.HashPassword(user, request.Password);
         user.AccessFailedCount = 0;
@@ -124,7 +141,8 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
         user.LastLoginAt = now;
         Touch(user, now);
         var refresh = NewRefreshToken();
-        var session = NewSession(user, scope.Company.Id, scope.Branch?.Id, deviceId, refresh.Hash, Guid.NewGuid(), now);
+        var session = NewSession(user, scope.Company.Id, scope.Branch?.Id, deviceId, refresh.Hash,
+            Guid.NewGuid(), now, deviceBinding);
         db.AuthSessions.Add(session);
         await db.SaveChangesAsync(ct);
         await AuditAsync("IdentityLogin", "SUCCESS", user.Id, session.CompanyId, session.BranchId, session.DeviceId,
@@ -154,6 +172,34 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+            var preview = await db.AuthSessions.AsNoTracking().SingleOrDefaultAsync(
+                x => x.RefreshTokenHash == hash, ct);
+            TrustedDeviceBinding? provenBinding = null;
+            if (preview?.RegisteredDeviceId.HasValue == true)
+            {
+                if (registeredDevices is not null && preview.BranchId.HasValue &&
+                    !string.IsNullOrWhiteSpace(request.DeviceCredential))
+                {
+                    try
+                    {
+                        provenBinding = await registeredDevices.ValidateBindingAsync(preview.UserId, preview.CompanyId,
+                            preview.BranchId, preview.DeviceId, request.DeviceCredential, updateLastSeen: true,
+                            correlationId, ct);
+                    }
+                    catch (RegisteredDeviceException)
+                    {
+                        provenBinding = null;
+                    }
+                }
+                if (provenBinding is null || provenBinding.RegisteredDeviceId != preview.RegisteredDeviceId ||
+                    provenBinding.CredentialVersion != preview.DeviceCredentialVersion)
+                {
+                    await AuditAsync("IdentityRefresh", "FAILURE", preview.UserId, preview.CompanyId,
+                        preview.BranchId, preview.DeviceId, correlationId, "DEVICE_PROOF_INVALID", ip, ct);
+                    await transaction.CommitAsync(ct);
+                    throw InvalidRefresh();
+                }
+            }
             var old = await LockSessionByRefreshHashAsync(hash, ct);
             if (old is null)
             {
@@ -166,14 +212,36 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             if (old.RefreshTokenExpiresAt <= now) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_EXPIRED", correlationId, ip, transaction, ct);
             if (!string.Equals(old.DeviceId, deviceId, StringComparison.Ordinal)) return await RejectTrustedRefreshAsync(old, "DEVICE_MISMATCH", correlationId, ip, transaction, ct);
 
+            if (old.RegisteredDeviceId.HasValue &&
+                (provenBinding is null || provenBinding.RegisteredDeviceId != old.RegisteredDeviceId ||
+                 provenBinding.CredentialVersion != old.DeviceCredentialVersion))
+                return await RejectTrustedRefreshAsync(old, "DEVICE_BINDING_CHANGED", correlationId, ip, transaction, ct);
+
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == old.UserId, ct);
             var scope = user is null ? null : await scopeResolver.ResolveAsync(user, old.CompanyId, old.BranchId, ct);
+            var deviceBindingActive = !old.RegisteredDeviceId.HasValue ||
+                (old.DeviceCredentialVersion.HasValue && old.BranchId.HasValue && await (
+                    from device in db.RegisteredDevices.AsNoTracking()
+                    join assignment in db.RegisteredDeviceAssignments.AsNoTracking()
+                        on device.Id equals assignment.RegisteredDeviceId
+                    where device.Id == old.RegisteredDeviceId && device.CompanyId == old.CompanyId &&
+                          device.Status == "ACTIVE" && device.CredentialVersion == old.DeviceCredentialVersion &&
+                          (device.ExpiresAt == null || device.ExpiresAt > now) &&
+                          (device.LastSeenAt ?? device.ApprovedAt ?? device.CreatedAt) >
+                              now - RegisteredDeviceService.InactivityLimit &&
+                          assignment.UserId == old.UserId && assignment.CompanyId == old.CompanyId &&
+                          assignment.BranchId == old.BranchId && assignment.Status == "ACTIVE"
+                    select device.Id).AnyAsync(ct));
             if (user is null || user.Status != "ACTIVE" || user.LockoutEnd > now || scope is null ||
-                !FixedEquals(user.SecurityStamp, old.SecurityStampAtIssue) || user.AuthVersion != old.AuthVersionAtIssue)
+                !FixedEquals(user.SecurityStamp, old.SecurityStampAtIssue) ||
+                user.AuthVersion != old.AuthVersionAtIssue || !deviceBindingActive)
                 return await RejectTrustedRefreshAsync(old, "SECURITY_CONTEXT_CHANGED", correlationId, ip, transaction, ct);
 
             var refresh = NewRefreshToken();
-            var replacement = NewSession(user, old.CompanyId, old.BranchId, old.DeviceId, refresh.Hash, old.RefreshTokenFamilyId, now);
+            var binding = old.RegisteredDeviceId.HasValue && old.DeviceCredentialVersion.HasValue
+                ? new TrustedDeviceBinding(old.RegisteredDeviceId.Value, old.DeviceCredentialVersion.Value) : null;
+            var replacement = NewSession(user, old.CompanyId, old.BranchId, old.DeviceId, refresh.Hash,
+                old.RefreshTokenFamilyId, now, binding);
             old.RevokedAt = now; old.RevokeReason = "ROTATED"; old.ReplacedBySessionId = replacement.Id;
             old.LastUsedAt = now; old.UpdatedAt = now; old.RowVersion = RandomNumberGenerator.GetBytes(16);
             db.AuthSessions.Add(replacement);
@@ -248,11 +316,12 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
     }
 
     private AuthSession NewSession(User user, Guid companyId, Guid? branchId, string deviceId,
-        string refreshHash, Guid familyId, DateTimeOffset now) => new()
+        string refreshHash, Guid familyId, DateTimeOffset now, TrustedDeviceBinding? binding = null) => new()
     {
         Id = Guid.NewGuid(), UserId = user.Id, CompanyId = companyId, BranchId = branchId, DeviceId = deviceId,
         Mode = "LOCAL", SecurityStampAtIssue = user.SecurityStamp, AuthVersionAtIssue = user.AuthVersion,
         RefreshTokenHash = refreshHash, RefreshTokenFamilyId = familyId, IssuedAt = now,
+        RegisteredDeviceId = binding?.RegisteredDeviceId, DeviceCredentialVersion = binding?.CredentialVersion,
         AccessTokenExpiresAt = now.AddMinutes(settings.AccessTokenMinutes), RefreshTokenExpiresAt = now.AddDays(settings.RefreshTokenDays),
         CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
     };
@@ -267,6 +336,11 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             new("company_id", session.CompanyId.ToString()), new("device_id", session.DeviceId),
             new("security_stamp", session.SecurityStampAtIssue), new("auth_version", session.AuthVersionAtIssue.ToString()) };
         if (session.BranchId.HasValue) claims.Add(new Claim("branch_id", session.BranchId.Value.ToString()));
+        if (session.RegisteredDeviceId.HasValue)
+        {
+            claims.Add(new Claim("registered_device_id", session.RegisteredDeviceId.Value.ToString()));
+            claims.Add(new Claim("device_credential_version", session.DeviceCredentialVersion!.Value.ToString()));
+        }
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey)) { KeyId = settings.SigningKeyId };
         var descriptor = new SecurityTokenDescriptor { Subject = new ClaimsIdentity(claims), Issuer = settings.Issuer,
             Audience = settings.Audience, NotBefore = session.IssuedAt.UtcDateTime, Expires = session.AccessTokenExpiresAt.UtcDateTime,

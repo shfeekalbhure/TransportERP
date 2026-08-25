@@ -10,6 +10,10 @@
 
 **تثبيت حوكمي — 2026-08-25:** اعتمد القرار المفوض أعمدة وسياسات Offline/Sync فقط في عقود W2 المشار إليها، ولا يقبل بقية حقول W2 أو يغير حالة مراجعتها أو يفوض runtime أو مرحلة P2 لاحقة. يغطي القرار allowlist Payload Actions، وإعادة المحاولة وBackoff، وسياسة التعارض، والاحتفاظ، وحجم الدفعة وذريتها، وصلاحيات حل التعارض، وتسلسل الإعدادات. يبقى `sync.offline.enabled=false` حتى تثبت مطابقة التنفيذ واجتياز G4 ثم يصدر تفويض G5.
 
+**قيد Stage 3 للأجهزة:** credential التثبيت العشوائي per-install ليس request-bound ولا replay-resistant؛ لا يعد وحده تفويضًا للمزامنة. يحفظ العميل السر في OS secure storage ولا يخزن الخادم إلا SHA-256، ولا ينقل السر إلا عبر TLS بوصفها قاعدة نشر/بوابة موثوقة لا ادعاء enforcement داخل التطبيق الحالي. يعيد Runtime في Stage 3 `OFFLINE_DISABLED` دائمًا، حتى لو كانت قيمة الإعداد `true`. لا يفتح المسار قبل Stage 4 الذي يثبت freshness/nonce وrequest-level proof-of-possession أو sender constraint مكافئًا واختبارات replay. لا يغير Stage 3 مفتاح idempotency التاريخي `(DeviceId, ClientOperationId)`؛ المرشح المستقبلي المرتبط بالطلب يحتاج قرار عقد ومهاجرة مستقلة ولا يستنتج هنا.
+
+المصادر الأولية لهذا الحد: [RFC 8252 §8.5](https://www.rfc-editor.org/rfc/rfc8252.html#section-8.5) عن عدم صلاحية static secret الموزع داخل native app كإثبات هوية (بينما سرنا per-install وليس app-wide)، و[RFC 9449](https://www.rfc-editor.org/rfc/rfc9449.html) عن sender-constrained DPoP وتخفيف replay. لا تدعي هذه المرحلة تطبيق DPoP.
+
 ## 1. الغرض
 
 يعرّف هذا العقد كيفية إنشاء عمليات محلية عند انقطاع الاتصال، وإرسالها لاحقًا، ومنع التكرار، والتحقق من نطاق الشركة والفرع، واكتشاف التعارض، وإعادة المحاولة، وحفظ التدقيق. صُمم `SyncOperation` جديدًا لأن مراجعة المصدر المرجعي لم تجد كيانًا مماثلًا في AlTayerERP؛ لذلك لا توجد إعادة استخدام تلقائية.

@@ -99,6 +99,43 @@ public sealed class AuthSession : P1Entity
     public DateTimeOffset? LastUsedAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
     public string? RevokeReason { get; set; }
+    public Guid? RegisteredDeviceId { get; set; }
+    public int? DeviceCredentialVersion { get; set; }
+}
+
+public sealed class RegisteredDevice : P1Entity
+{
+    public Guid CompanyId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Platform { get; set; } = string.Empty;
+    public string AppVersion { get; set; } = string.Empty;
+    public string? DeviceModel { get; set; }
+    public string? OsVersion { get; set; }
+    public string RegistrationRequestId { get; set; } = string.Empty;
+    public string CredentialHash { get; set; } = string.Empty;
+    public int CredentialVersion { get; set; } = 1;
+    public string Status { get; set; } = "PENDING";
+    public Guid RegisteredByUserId { get; set; }
+    public Guid? ApprovedByUserId { get; set; }
+    public DateTimeOffset? ApprovedAt { get; set; }
+    public DateTimeOffset? SuspendedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? LastSeenAt { get; set; }
+}
+
+public sealed class RegisteredDeviceAssignment : P1Entity
+{
+    public Guid RegisteredDeviceId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid BranchId { get; set; }
+    public string Status { get; set; } = "ACTIVE";
+    public Guid AssignedByUserId { get; set; }
+    public Guid? RemovedByUserId { get; set; }
+    public DateTimeOffset AssignedAt { get; set; }
+    public DateTimeOffset? RemovedAt { get; set; }
 }
 
 public sealed class Role : P1Entity
@@ -360,5 +397,7 @@ public sealed class SyncOperation : P1Entity
     public int RetryCount { get; set; }
     public DateTimeOffset? NextRetryAt { get; set; }
     public string? ErrorCode { get; set; }
+    public Guid? RegisteredDeviceId { get; set; }
+    public int? RegisteredDeviceCredentialVersion { get; set; }
     public ConflictCase? ConflictCase { get; set; }
 }

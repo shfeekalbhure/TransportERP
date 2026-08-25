@@ -9,6 +9,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<User> Users => Set<User>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
+    public DbSet<RegisteredDevice> RegisteredDevices => Set<RegisteredDevice>();
+    public DbSet<RegisteredDeviceAssignment> RegisteredDeviceAssignments => Set<RegisteredDeviceAssignment>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
@@ -64,7 +66,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     private static void ConfigureCommon(ModelBuilder mb)
     {
         foreach (var type in new[] {
-            typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(AuthSession), typeof(Role), typeof(Permission),
+            typeof(Currency), typeof(Company), typeof(Branch), typeof(User), typeof(AuthSession), typeof(RegisteredDevice),
+            typeof(RegisteredDeviceAssignment), typeof(Role), typeof(Permission),
             typeof(GlobalSetting), typeof(CompanySetting), typeof(BranchSetting), typeof(ChartOfAccount),
             typeof(FiscalPeriod), typeof(FinancialDimension), typeof(JournalEntry), typeof(ReceiptVoucher),
             typeof(PaymentVoucher), typeof(SyncOperation), typeof(ConflictCase) })
@@ -162,6 +165,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_auth_sessions_expiry", "\"AccessTokenExpiresAt\" <= \"RefreshTokenExpiresAt\"");
             t.HasCheckConstraint("ck_auth_sessions_security_stamp", "length(\"SecurityStampAtIssue\") >= 32");
             t.HasCheckConstraint("ck_auth_sessions_auth_version", "\"AuthVersionAtIssue\" >= 1");
+            t.HasCheckConstraint("ck_auth_sessions_registered_device_binding",
+                "(\"RegisteredDeviceId\" IS NULL AND \"DeviceCredentialVersion\" IS NULL) OR " +
+                "(\"RegisteredDeviceId\" IS NOT NULL AND \"DeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
         });
         session.HasKey(x => x.Id);
         session.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
@@ -174,11 +180,61 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         session.HasIndex(x => x.RefreshTokenFamilyId);
         session.HasIndex(x => new { x.CompanyId, x.BranchId });
         session.HasIndex(x => x.DeviceId);
+        session.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId });
         session.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         session.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         session.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
         session.HasOne<AuthSession>().WithMany().HasForeignKey(x => x.ReplacedBySessionId).OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId }).OnDelete(DeleteBehavior.Restrict);
+
+        var registeredDevice = mb.Entity<RegisteredDevice>();
+        registeredDevice.ToTable("registered_devices", t =>
+        {
+            t.HasCheckConstraint("ck_registered_devices_status",
+                "\"Status\" IN ('PENDING','ACTIVE','SUSPENDED','REVOKED','EXPIRED')");
+            t.HasCheckConstraint("ck_registered_devices_credential_version", "\"CredentialVersion\" >= 1");
+            t.HasCheckConstraint("ck_registered_devices_credential_hash", "length(\"CredentialHash\") = 64");
+        });
+        registeredDevice.HasKey(x => x.Id);
+        registeredDevice.HasAlternateKey(x => new { x.Id, x.CompanyId });
+        registeredDevice.HasAlternateKey(x => new { x.Id, x.CompanyId, x.DeviceId });
+        registeredDevice.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        registeredDevice.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
+        registeredDevice.Property(x => x.Platform).HasMaxLength(40).IsRequired();
+        registeredDevice.Property(x => x.AppVersion).HasMaxLength(40).IsRequired();
+        registeredDevice.Property(x => x.DeviceModel).HasMaxLength(120);
+        registeredDevice.Property(x => x.OsVersion).HasMaxLength(80);
+        registeredDevice.Property(x => x.RegistrationRequestId).HasMaxLength(120).IsRequired();
+        registeredDevice.Property(x => x.CredentialHash).HasMaxLength(64).IsRequired();
+        registeredDevice.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        registeredDevice.HasIndex(x => new { x.CompanyId, x.DeviceId }).IsUnique();
+        registeredDevice.HasIndex(x => new { x.CompanyId, x.RegistrationRequestId }).IsUnique();
+        registeredDevice.HasIndex(x => new { x.CompanyId, x.Status });
+        registeredDevice.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        registeredDevice.HasOne<User>().WithMany().HasForeignKey(x => x.RegisteredByUserId).OnDelete(DeleteBehavior.Restrict);
+        registeredDevice.HasOne<User>().WithMany().HasForeignKey(x => x.ApprovedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+        var deviceAssignment = mb.Entity<RegisteredDeviceAssignment>();
+        deviceAssignment.ToTable("registered_device_assignments", t =>
+            t.HasCheckConstraint("ck_registered_device_assignments_status", "\"Status\" IN ('ACTIVE','REVOKED')"));
+        deviceAssignment.HasKey(x => x.Id);
+        deviceAssignment.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        deviceAssignment.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId });
+        deviceAssignment.HasIndex(x => new { x.UserId, x.CompanyId, x.BranchId, x.Status });
+        deviceAssignment.HasIndex(x => new { x.RegisteredDeviceId, x.UserId, x.BranchId })
+            .IsUnique().HasFilter("\"Status\" = 'ACTIVE'")
+            .HasDatabaseName("IX_registered_device_assignments_active");
+        deviceAssignment.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+        deviceAssignment.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        deviceAssignment.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+        deviceAssignment.HasOne<User>().WithMany().HasForeignKey(x => x.AssignedByUserId).OnDelete(DeleteBehavior.Restrict);
+        deviceAssignment.HasOne<User>().WithMany().HasForeignKey(x => x.RemovedByUserId).OnDelete(DeleteBehavior.Restrict);
 
         var role = mb.Entity<Role>();
         role.ToTable("roles", t => t.HasCheckConstraint("ck_roles_status", "\"Status\" IN ('ACTIVE','INACTIVE')"));
@@ -423,6 +479,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+            t.HasCheckConstraint("ck_sync_registered_device_binding",
+                "(\"RegisteredDeviceId\" IS NULL AND \"RegisteredDeviceCredentialVersion\" IS NULL) OR " +
+                "(\"RegisteredDeviceId\" IS NOT NULL AND \"RegisteredDeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
         });
         sync.HasKey(x => x.Id);
         sync.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
@@ -437,10 +496,15 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.HasIndex(x => new { x.CompanyId, x.Status, x.NextRetryAt });
         sync.HasIndex(x => new { x.EntityType, x.EntityId, x.CreatedAt });
         sync.HasIndex(x => new { x.DeviceId, x.CreatedAt });
+        sync.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId });
         sync.HasIndex(x => x.PayloadHash);
         sync.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
-        sync.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        sync.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
+        sync.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId }).OnDelete(DeleteBehavior.Restrict);
 
         var conflict = mb.Entity<ConflictCase>();
         conflict.ToTable("conflict_cases", t => t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')"));

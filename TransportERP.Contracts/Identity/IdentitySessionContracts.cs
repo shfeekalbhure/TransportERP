@@ -5,9 +5,13 @@ public sealed record CreateIdentitySessionRequest(
     string Password,
     Guid? CompanyId,
     Guid? BranchId,
-    string DeviceId);
+    string DeviceId,
+    string? DeviceCredential = null);
 
-public sealed record RefreshIdentitySessionRequest(string RefreshToken, string DeviceId);
+public sealed record RefreshIdentitySessionRequest(
+    string RefreshToken,
+    string DeviceId,
+    string? DeviceCredential = null);
 
 public sealed record RevokeIdentitySessionRequest(string? Reason = null);
 

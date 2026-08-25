@@ -141,6 +141,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("BranchId").HasColumnType("uuid");
                     b.Property<Guid>("CompanyId").HasColumnType("uuid");
                     b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamptz");
+                    b.Property<int?>("DeviceCredentialVersion").HasColumnType("integer");
                     b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
                     b.Property<DateTimeOffset>("IssuedAt").HasColumnType("timestamp with time zone");
                     b.Property<DateTimeOffset?>("LastUsedAt").HasColumnType("timestamp with time zone");
@@ -149,6 +150,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RefreshTokenFamilyId").HasColumnType("uuid");
                     b.Property<string>("RefreshTokenHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
                     b.Property<Guid?>("ReplacedBySessionId").HasColumnType("uuid");
+                    b.Property<Guid?>("RegisteredDeviceId").HasColumnType("uuid");
                     b.Property<string>("RevokeReason").HasMaxLength(200).HasColumnType("character varying(200)");
                     b.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
                     b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().HasColumnType("bytea");
@@ -161,6 +163,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.HasIndex("RefreshTokenFamilyId");
                     b.HasIndex("RefreshTokenHash").IsUnique();
                     b.HasIndex("ReplacedBySessionId");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
                     b.HasIndex("CompanyId", "BranchId");
                     b.HasIndex("UserId", "RevokedAt", "RefreshTokenExpiresAt");
                     b.ToTable("auth_sessions", "transport_erp", t =>
@@ -169,6 +172,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_auth_sessions_mode", "\"Mode\" IN ('LOCAL')");
                             t.HasCheckConstraint("ck_auth_sessions_security_stamp", "length(\"SecurityStampAtIssue\") >= 32");
                             t.HasCheckConstraint("ck_auth_sessions_auth_version", "\"AuthVersionAtIssue\" >= 1");
+                            t.HasCheckConstraint("ck_auth_sessions_registered_device_binding", "(\"RegisteredDeviceId\" IS NULL AND \"DeviceCredentialVersion\" IS NULL) OR (\"RegisteredDeviceId\" IS NOT NULL AND \"DeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
                         });
                 });
 
@@ -1969,6 +1973,75 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDevice", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid?>("ApprovedByUserId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset?>("ApprovedAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("AppVersion").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamptz");
+                    b.Property<string>("CredentialHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<int>("CredentialVersion").HasColumnType("integer");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<string>("DeviceModel").HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<string>("DisplayName").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<DateTimeOffset?>("ExpiresAt").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset?>("LastSeenAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("OsVersion").HasMaxLength(80).HasColumnType("character varying(80)");
+                    b.Property<string>("Platform").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<Guid>("RegisteredByUserId").HasColumnType("uuid");
+                    b.Property<string>("RegistrationRequestId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
+                    b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().HasColumnType("bytea");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<DateTimeOffset?>("SuspendedAt").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamptz");
+                    b.HasKey("Id");
+                    b.HasAlternateKey("Id", "CompanyId");
+                    b.HasAlternateKey("Id", "CompanyId", "DeviceId");
+                    b.HasIndex("ApprovedByUserId");
+                    b.HasIndex("RegisteredByUserId");
+                    b.HasIndex("CompanyId", "DeviceId").IsUnique();
+                    b.HasIndex("CompanyId", "RegistrationRequestId").IsUnique();
+                    b.HasIndex("CompanyId", "Status");
+                    b.ToTable("registered_devices", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_registered_devices_credential_hash", "length(\"CredentialHash\") = 64");
+                            t.HasCheckConstraint("ck_registered_devices_credential_version", "\"CredentialVersion\" >= 1");
+                            t.HasCheckConstraint("ck_registered_devices_status", "\"Status\" IN ('PENDING','ACTIVE','SUSPENDED','REVOKED','EXPIRED')");
+                        });
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceAssignment", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("AssignedAt").HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("AssignedByUserId").HasColumnType("uuid");
+                    b.Property<Guid>("BranchId").HasColumnType("uuid");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamptz");
+                    b.Property<Guid>("RegisteredDeviceId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset?>("RemovedAt").HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("RemovedByUserId").HasColumnType("uuid");
+                    b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().HasColumnType("bytea");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamptz");
+                    b.Property<Guid>("UserId").HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("AssignedByUserId");
+                    b.HasIndex("BranchId", "CompanyId");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId");
+                    b.HasIndex("RemovedByUserId");
+                    b.HasIndex("UserId", "CompanyId", "BranchId", "Status");
+                    b.HasIndex("RegisteredDeviceId", "UserId", "BranchId")
+                        .IsUnique().HasDatabaseName("IX_registered_device_assignments_active").HasFilter("\"Status\" = 'ACTIVE'");
+                    b.ToTable("registered_device_assignments", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_registered_device_assignments_status", "\"Status\" IN ('ACTIVE','REVOKED')");
+                        });
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2133,6 +2206,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("RegisteredDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("RegisteredDeviceCredentialVersion")
+                        .HasColumnType("integer");
+
                     b.Property<long?>("ResultVersion")
                         .HasColumnType("bigint");
 
@@ -2160,7 +2239,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BranchId");
+                    b.HasIndex("BranchId", "CompanyId");
 
                     b.HasIndex("PayloadHash");
 
@@ -2175,6 +2254,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EntityType", "EntityId", "CreatedAt");
 
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
+
                     b.ToTable("sync_operations", "transport_erp", t =>
                         {
                             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
@@ -2182,6 +2263,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
 
                             t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
+
+                            t.HasCheckConstraint("ck_sync_registered_device_binding", "(\"RegisteredDeviceId\" IS NULL AND \"RegisteredDeviceCredentialVersion\" IS NULL) OR (\"RegisteredDeviceId\" IS NOT NULL AND \"RegisteredDeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
                         });
                 });
 
@@ -3411,7 +3494,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
                         .WithMany()
-                        .HasForeignKey("BranchId")
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
@@ -3425,6 +3509,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripAllocationEntity", b =>
@@ -3481,6 +3571,35 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .WithMany().HasForeignKey("CompanyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
                     b.HasOne("TransportERP.Infrastructure.Persistence.AuthSession", null)
                         .WithMany().HasForeignKey("ReplacedBySessionId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany().HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId").OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDevice", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
+                        .WithMany().HasForeignKey("CompanyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("ApprovedByUserId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("RegisteredByUserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceAssignment", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany().HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany().HasForeignKey("RegisteredDeviceId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("AssignedByUserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("RemovedByUserId").OnDelete(DeleteBehavior.Restrict);
                     b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
                         .WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
                 });

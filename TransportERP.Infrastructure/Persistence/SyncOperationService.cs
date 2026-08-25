@@ -12,7 +12,9 @@ public sealed record SyncSecurityContext(
     Guid CompanyId,
     Guid? BranchId,
     bool IsDeviceRegistered,
-    bool HasExecutePermission);
+    bool HasExecutePermission,
+    Guid? RegisteredDeviceId = null,
+    int? RegisteredDeviceCredentialVersion = null);
 
 public sealed record SyncRetryPolicy(
     int MaxRetryCount,
@@ -107,6 +109,8 @@ public sealed class SyncOperationService(
             ServerReceivedAt = now,
             Status = "QUEUED",
             RetryCount = 0,
+            RegisteredDeviceId = security.RegisteredDeviceId,
+            RegisteredDeviceCredentialVersion = security.RegisteredDeviceCredentialVersion,
             CreatedAt = now,
             UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
@@ -409,6 +413,9 @@ public sealed class SyncOperationService(
         string? requiredDeviceId = null)
     {
         if (!security.IsDeviceRegistered) throw new SyncRuleException("DEVICE_NOT_REGISTERED", security.DeviceId);
+        if (!security.RegisteredDeviceId.HasValue || !security.RegisteredDeviceCredentialVersion.HasValue ||
+            !security.BranchId.HasValue)
+            throw new SyncRuleException("DEVICE_NOT_REGISTERED", security.DeviceId);
         if (!security.HasExecutePermission) throw new SyncRuleException("PERMISSION_DENIED", "sync.operations.execute");
         if (requiredDeviceId is not null && security.DeviceId != requiredDeviceId)
             throw new SyncRuleException("SCOPE_DENIED", companyId.ToString());
@@ -420,8 +427,26 @@ public sealed class SyncOperationService(
         if (!companyExists) throw new SyncRuleException("COMPANY_NOT_FOUND", companyId.ToString());
         if (branchId is not null && !await db.Branches.AnyAsync(x => x.Id == branchId && x.CompanyId == companyId && x.Status == "ACTIVE", cancellationToken))
             throw new SyncRuleException("BRANCH_NOT_FOUND", branchId.ToString()!);
-        if (!await db.Users.AnyAsync(x => x.Id == security.UserId && x.Status == "ACTIVE", cancellationToken))
+        if (!await db.Users.AnyAsync(x => x.Id == security.UserId && x.Status == "ACTIVE" &&
+                x.CompanyId == security.CompanyId &&
+                (x.BranchId == null || x.BranchId == security.BranchId), cancellationToken))
             throw new SyncRuleException("USER_NOT_FOUND", security.UserId.ToString());
+        var now = DateTimeOffset.UtcNow;
+        var activeDeviceBinding = await (
+            from device in db.RegisteredDevices.AsNoTracking()
+            join assignment in db.RegisteredDeviceAssignments.AsNoTracking()
+                on device.Id equals assignment.RegisteredDeviceId
+            where device.Id == security.RegisteredDeviceId && device.CompanyId == security.CompanyId &&
+                  device.DeviceId == security.DeviceId && device.Status == "ACTIVE" &&
+                  device.CredentialVersion == security.RegisteredDeviceCredentialVersion &&
+                  (device.ExpiresAt == null || device.ExpiresAt > now) &&
+                  (device.LastSeenAt ?? device.ApprovedAt ?? device.CreatedAt) >
+                      now - TimeSpan.FromDays(90) &&
+                  assignment.UserId == security.UserId && assignment.CompanyId == security.CompanyId &&
+                  assignment.BranchId == security.BranchId && assignment.Status == "ACTIVE"
+            select device.Id).AnyAsync(cancellationToken);
+        if (!activeDeviceBinding)
+            throw new SyncRuleException("DEVICE_NOT_REGISTERED", security.DeviceId);
     }
 
     private static void EnsureTenantScope(SyncOperation operation, SyncSecurityContext security)

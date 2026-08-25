@@ -44,7 +44,7 @@ public sealed class ApiAuthenticationAndAuditTests
 
     [Fact]
     [Trait("Category", "HTTP")]
-    public async Task Sync_batch_fails_closed_until_a_device_trust_provider_is_installed()
+    public async Task Sync_batch_is_hard_disabled_in_stage3_even_for_authenticated_scope()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
 
@@ -79,6 +79,8 @@ public sealed class ApiAuthenticationAndAuditTests
         });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiError>();
+        Assert.Equal("OFFLINE_DISABLED", error!.ErrorCode);
         Assert.Empty(await db.SyncOperations.Where(x => x.DeviceId == scope.DeviceId).ToListAsync());
     }
 
@@ -162,6 +164,56 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.DoesNotContain("device", body, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    [Trait("Category", "HTTP")]
+    public async Task Device_api_enforces_company_permissions_keeps_correlation_and_never_returns_secret()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var allowed = await SeedScopeAsync(db, "DEVHTTP", devicePermissions: true);
+        var denied = await SeedScopeAsync(db, "DEVNO");
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var request = new RegisterDeviceRequest("http-terminal", "HTTP terminal", "WEB", "1.0", null, null,
+            "http-request", secret);
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/v1/devices", request)).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(
+            denied.UserId, denied.CompanyId, denied.BranchId, denied.DeviceId, "devices.register"));
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.PostAsJsonAsync("/api/v1/devices", request)).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(
+            allowed.UserId, allowed.CompanyId, allowed.BranchId, allowed.DeviceId, "devices.register"));
+        var correlation = Guid.NewGuid();
+        client.DefaultRequestHeaders.Remove("X-Correlation-Id");
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", correlation.ToString());
+        var created = await client.PostAsJsonAsync("/api/v1/devices", request);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var createdJson = await created.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(secret, createdJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("CredentialHash", createdJson, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await db.AuditEvents.AnyAsync(x => x.Action == "RegisteredDeviceCreated" && x.CorrelationId == correlation));
+
+        var conflictCorrelation = Guid.NewGuid();
+        client.DefaultRequestHeaders.Remove("X-Correlation-Id");
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", conflictCorrelation.ToString());
+        var conflict = await client.PostAsJsonAsync("/api/v1/devices", request with { DisplayName = "Changed" });
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        var error = await conflict.Content.ReadFromJsonAsync<ApiError>();
+        Assert.Equal(conflictCorrelation, error!.CorrelationId);
+        Assert.Equal("DEVICE_REGISTRATION_CONFLICT", error.ErrorCode);
+
+        var list = await client.GetFromJsonAsync<RegisteredDeviceResponse[]>("/api/v1/devices");
+        Assert.Single(list!);
+        var current = await client.GetAsync("/api/v1/devices/current");
+        Assert.Equal(HttpStatusCode.Forbidden, current.StatusCode);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string connection, int? loginRateLimit = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -207,7 +259,8 @@ public sealed class ApiAuthenticationAndAuditTests
     private static string Sha256(string payload)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
 
-        private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix)
+        private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix,
+            bool devicePermissions = false)
     {
         for (var attempt = 0; attempt < 8; attempt++)
         {
@@ -252,7 +305,9 @@ public sealed class ApiAuthenticationAndAuditTests
                 RefreshTokenFamilyId = Guid.NewGuid(), IssuedAt = now, AccessTokenExpiresAt = now.AddMinutes(10),
                 RefreshTokenExpiresAt = now.AddDays(1), CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
             });
-            var permissionCodes = new[] { "sync.operations.execute", "audit.events.read" };
+            var permissionCodes = devicePermissions
+                ? new[] { "sync.operations.execute", "audit.events.read", "devices.register", "devices.read", "devices.manage" }
+                : new[] { "sync.operations.execute", "audit.events.read" };
             var role = new Role { Id = Guid.NewGuid(), Code = $"HTTP-{suffix}-{Guid.NewGuid():N}", NameAr = "دور اختبار",
                 CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray() };
             db.Roles.Add(role);
@@ -266,8 +321,10 @@ public sealed class ApiAuthenticationAndAuditTests
                     ScopeType = "BRANCH", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
                 };
                 if (db.Entry(permissionEntity).State == EntityState.Detached) db.Permissions.Add(permissionEntity);
+                var permissionScope = code.StartsWith("devices.", StringComparison.Ordinal) ? "COMPANY" : "BRANCH";
                 db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permissionEntity.Id,
-                    ScopeType = "BRANCH", CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
+                    ScopeType = permissionScope, CompanyId = company.Id,
+                    BranchId = permissionScope == "BRANCH" ? branch.Id : null, CreatedAt = now, UpdatedAt = now,
                     RowVersion = Guid.NewGuid().ToByteArray() });
             }
             try
@@ -297,4 +354,5 @@ public sealed class ApiAuthenticationAndAuditTests
     }
 
     private sealed record TestScope(Guid CompanyId, Guid BranchId, Guid UserId, string DeviceId);
+    private sealed record ApiError(string ErrorCode, Guid CorrelationId);
 }

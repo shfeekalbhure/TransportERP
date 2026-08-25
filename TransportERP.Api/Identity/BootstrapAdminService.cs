@@ -160,7 +160,7 @@ public sealed class BootstrapAdminService(
             var existingGrant = existingGrants.SingleOrDefault(x => x.PermissionId == permission.Id);
             if (existingGrant is not null)
             {
-                var companyId = definition.ScopeType == "BRANCH" ? company.Id : (Guid?)null;
+                var companyId = definition.ScopeType is "COMPANY" or "BRANCH" ? company.Id : (Guid?)null;
                 var branchId = definition.ScopeType == "BRANCH" ? branch.Id : (Guid?)null;
                 if (existingGrant.ScopeType != definition.ScopeType || existingGrant.CompanyId != companyId ||
                     existingGrant.BranchId != branchId)
@@ -172,7 +172,7 @@ public sealed class BootstrapAdminService(
             db.RolePermissions.Add(new RolePermission
             {
                 RoleId = role.Id, PermissionId = permission.Id, ScopeType = definition.ScopeType,
-                CompanyId = definition.ScopeType == "BRANCH" ? company.Id : null,
+                CompanyId = definition.ScopeType is "COMPANY" or "BRANCH" ? company.Id : null,
                 BranchId = definition.ScopeType == "BRANCH" ? branch.Id : null,
                 CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
             });

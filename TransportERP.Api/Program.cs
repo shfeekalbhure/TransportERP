@@ -88,11 +88,13 @@ builder.Services.AddScoped<ICurrentSecurityContext, CurrentSecurityContextServic
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddSingleton<IdentityPasswordSentinel>();
 builder.Services.AddScoped<IdentitySessionService>();
+builder.Services.AddScoped<RegisteredDeviceService>();
+builder.Services.AddScoped<OfflineSyncPolicyService>();
 builder.Services.AddSingleton<IdentityRateLimiter>();
 builder.Services.AddScoped<IAuthorizationHandler, SecurityAuthorizationHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, TransportAuthorizationMiddlewareResultHandler>();
-builder.Services.AddSingleton<IDeviceTrustResolver, DenyAllDeviceTrustResolver>();
+builder.Services.AddScoped<IDeviceTrustResolver, RegisteredDeviceTrustResolver>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -141,6 +143,7 @@ await using (var catalogScope = app.Services.CreateAsyncScope())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapIdentitySessions(securityOptions.Mode);
+app.MapRegisteredDevices();
 app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
@@ -150,6 +153,7 @@ app.MapPost("/api/v1/sync/operations:batch", async (
     HttpContext httpContext,
     ICurrentSecurityContext currentSecurity,
     IDeviceTrustResolver deviceTrust,
+    OfflineSyncPolicyService offlinePolicy,
     SyncOperationService sync,
     CancellationToken cancellationToken) =>
 {
@@ -161,11 +165,17 @@ app.MapPost("/api/v1/sync/operations:batch", async (
         return Results.BadRequest(new { ErrorCode = "BATCH_METADATA_REQUIRED", CorrelationId = correlationId });
     var current = await currentSecurity.ResolveAsync(httpContext.User, cancellationToken);
     if (current is null) return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(current.DeviceId) ||
+    if (!await offlinePolicy.IsEnabledAsync(current.CompanyId, cancellationToken))
+        return Results.Json(new { ErrorCode = "OFFLINE_DISABLED", CorrelationId = correlationId },
+            statusCode: StatusCodes.Status403Forbidden);
+    var binding = await deviceTrust.ResolveForSyncAsync(current, requestDeviceId,
+        request.DeviceCredential, correlationId, cancellationToken);
+    if (string.IsNullOrWhiteSpace(current.DeviceId) || binding is null ||
         !string.Equals(current.DeviceId, requestDeviceId, StringComparison.Ordinal) ||
-        !await deviceTrust.IsTrustedAsync(current.UserId, requestDeviceId, cancellationToken))
+        current.RegisteredDeviceId != binding.RegisteredDeviceId)
         return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
-    var security = new SyncSecurityContext(current.UserId, requestDeviceId, current.CompanyId, current.BranchId, true, true);
+    var security = new SyncSecurityContext(current.UserId, requestDeviceId, current.CompanyId, current.BranchId,
+        true, true, binding.RegisteredDeviceId, binding.CredentialVersion);
     var results = new List<SyncBatchOperationResult>(request.Operations.Count);
 
     foreach (var item in request.Operations)
@@ -243,7 +253,8 @@ static Guid GetCorrelationId(HttpContext context)
 public sealed record SyncBatchRequest(
     string DeviceId,
     string ProtocolVersion,
-    IReadOnlyList<SyncBatchOperationRequest> Operations);
+    IReadOnlyList<SyncBatchOperationRequest> Operations,
+    string? DeviceCredential = null);
 
 public sealed record SyncBatchOperationRequest(
     string OperationType,
