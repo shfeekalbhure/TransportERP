@@ -61,5 +61,5 @@
 
 [1]: ../closeout/P1/W1_DATA_CONTRACT_REGISTER.csv "سجل عقود W1"
 [2]: ../closeout/P1/W2_ACTION_CONTRACT_REGISTER.csv "سجل عقود W2"
-[3]: ../../work_transport_new/deliverables/POC14/POC14_FINAL_DB_SELECTION_OWNER_SIGNOFF.md "اعتماد المالك لقرار قاعدة البيانات"
+[3]: ../closeout/P1/POC14_FINAL_DB_SELECTION_OWNER_SIGNOFF.md "اعتماد المالك لقرار قاعدة البيانات"
 [4]: https://www.postgresql.org/docs/18/ddl-constraints.html "PostgreSQL 18 Constraints"

@@ -12,8 +12,7 @@ public sealed class SyncOperationPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Enqueue_is_idempotent_and_rejects_payload_hash_reuse()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -37,8 +36,7 @@ public sealed class SyncOperationPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Enqueue_enforces_device_permission_and_company_branch_scope()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -60,8 +58,7 @@ public sealed class SyncOperationPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Lifecycle_retry_backoff_conflict_case_and_resolution_are_persisted()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -114,8 +111,7 @@ public sealed class SyncOperationPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Retry_rejects_non_retryable_hash_and_permission_errors()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -150,10 +146,6 @@ public sealed class SyncOperationPersistenceTests
 
     private static TransportErpDbContext CreateDb(string connection)
         => new(new DbContextOptionsBuilder<TransportErpDbContext>().UseNpgsql(connection).Options);
-
-    private static string? GetConnection()
-        => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
-            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
 
     private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix)
     {

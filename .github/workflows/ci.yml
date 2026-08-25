@@ -1,9 +1,9 @@
-name: P2 C01 A waybill foundation
+name: CI
 
 on:
   push:
     branches:
-      - feature/p2-c01-a-waybill-foundation-20260820
+      - master
   pull_request:
     branches:
       - master
@@ -12,9 +12,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   core-postgresql:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
     name: Core + PostgreSQL + HTTP
     runs-on: ubuntu-latest
     services:
@@ -31,11 +34,12 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
+    env:
+      TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+      TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -47,6 +51,9 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Validate P0 and P1 contracts
+        run: python documentation/closeout/validate_p0_p1.py
+
       - name: Validate closed P2-C01 contracts
         run: python documentation/closeout/P2/validate_p2_c01_contracts.py
 
@@ -54,50 +61,34 @@ jobs:
         run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
 
       - name: Build core runtime and tests
-        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
-
-      - name: Run regression suite
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-restore
 
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
       - name: Verify EF model matches committed migrations
-        env:
-          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
         run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
-      - name: Apply P1 plus P2-C01-A migrations to PostgreSQL
-        env:
-          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+      - name: Apply committed migrations to PostgreSQL 18
         run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
-      - name: Run P2-C01-A PostgreSQL and HTTP gates
-        env:
-          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01AWaybillPostgreSqlIntegrationTests"
+      - name: Run the complete test suite fail-closed
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-all-tests.trx"
 
-  desktop-rtl:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-a-waybill-foundation-20260820'
+  desktop-contract:
     name: Desktop RTL contract surface
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
+
       - name: Restore Desktop
         run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
       - name: Build Desktop contract surface
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
-      - name: Confirm P2-C01-A screen contracts only
-        shell: pwsh
-        run: |
-          $file = 'TransportERP.Desktop/Waybills/WaybillFoundationForms.cs'
-          if (-not (Test-Path $file)) { throw 'Waybill foundation forms are missing.' }
-          $text = Get-Content $file -Raw
-          foreach ($id in @('SHP-005','SHP-006','SHP-007','SHP-008','SHP-014')) {
-            if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed screen id $id" }
-          }
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore -p:OutputType=Library

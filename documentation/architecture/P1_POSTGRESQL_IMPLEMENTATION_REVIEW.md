@@ -33,3 +33,11 @@
 هذه ليست نهاية تنفيذ P1 بالكامل. لم تُنفذ بعد طبقات API وواجهة المستخدم، وخدمة التدقيق append-only/hash-chain داخل PostgreSQL، وخدمة SyncOperation الإنتاجية، والقيود المحاسبية التشغيلية الكاملة، واختبارات الصلاحيات وRTL وOffline/Online على التطبيق. كما أن قاعدة الاختبار المحلية ليست قاعدة إنتاج.
 
 **قرار المراجعة:** يمكن نقل التغييرات إلى PR للمراجعة، مع إبقاء حالة المشروع `P1_PRODUCTION_FOUNDATION_READY_FOR_REVIEW`، وليس `PRODUCTION_READY`.
+
+## إضافة الحالة الحالية — 2026-08-25
+
+النتائج أعلاه سجل تاريخي لمرحلة التنفيذ الأولية ولا تصف وحدها حالة شجرة العمل الحالية. نفذت حزمة `P0-CI` الحالية معالجة ساكنة للمخاطر الآتية: إزالة 13 مسار نجاح صامت من اختبارات PostgreSQL/HTTP عبر بوابة اتصال fail-closed مشتركة، وإضافة workflow عام لكل PR وpush إلى `master` يشغل PostgreSQL 18 وفحوص العقود والبناء وEF migrations وجميع الاختبارات، وتحويل workflows المرحلية من `contents: write` إلى `contents: read` مع منع توليد migrations أو commit/push من CI.
+
+نجح المدققان `validate_p0_p1.py` و`validate_p2_c01_contracts.py` بنتيجة `ERROR_COUNT=0`. أما التنفيذ الفعلي لاختبارات .NET وحالتي GitHub Actions فلم يُثبت محليًا لأن .NET SDK غير متاح في بيئة المراجعة؛ لذلك تبقى الحالة `STATIC_VERIFIED / RUNTIME_PENDING_CI` ولا يجوز إعلان `PRODUCTION_READY` أو `CI_PASS` قبل نجاح وظيفتي CI العامتين وجعلهما required checks في حماية `master`.
+
+لا تعالج هذه الحزمة Tenant/RBAC أو تسجيل الأجهزة، ولا تغلق عقد Sync أو بوابة G3.
