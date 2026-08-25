@@ -383,7 +383,19 @@ public sealed class SyncOperationService(
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            finally
+            {
+                // SaveChanges accepts entity states before the database transaction commits. If a
+                // later audit write fails, rollback alone therefore leaves non-persisted operations,
+                // conflicts and audit rows tracked as Unchanged. This service owns this transaction,
+                // so it must reset its unit of work before the scoped context handles another batch
+                // item. The ambient-transaction path above deliberately remains caller-owned.
+                db.ChangeTracker.Clear();
+            }
             throw;
         }
     }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.Extensions.Options;
 
 namespace TransportERP.Api.Security;
@@ -45,5 +46,34 @@ public sealed class PermissionPolicyProvider(
             return Task.FromResult<AuthorizationPolicy?>(policy);
         }
         return base.GetPolicyAsync(policyName);
+    }
+}
+
+public sealed record AuthorizationErrorResponse(string ErrorCode, Guid CorrelationId);
+
+public sealed class TransportAuthorizationMiddlewareResultHandler : IAuthorizationMiddlewareResultHandler
+{
+    private readonly AuthorizationMiddlewareResultHandler fallback = new();
+
+    public async Task HandleAsync(
+        RequestDelegate next,
+        HttpContext context,
+        AuthorizationPolicy policy,
+        PolicyAuthorizationResult authorizeResult)
+    {
+        if (!authorizeResult.Forbidden)
+        {
+            await fallback.HandleAsync(next, context, policy, authorizeResult);
+            return;
+        }
+
+        var correlationId = Guid.TryParse(
+            context.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var suppliedCorrelationId)
+            ? suppliedCorrelationId
+            : Guid.NewGuid();
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(
+            new AuthorizationErrorResponse("SCOPE_DENIED", correlationId),
+            cancellationToken: context.RequestAborted);
     }
 }

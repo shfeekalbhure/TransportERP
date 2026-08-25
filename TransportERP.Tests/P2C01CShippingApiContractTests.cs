@@ -37,12 +37,15 @@ public sealed class P2C01CShippingApiContractTests
         {
             using (var deniedRequest = route.CreateRequest())
             {
+                var deniedCorrelationId = Guid.NewGuid();
                 deniedRequest.Headers.Authorization = new AuthenticationHeaderValue(
                     "Bearer", CreateToken(userId, companyId, branchId, "other.permission"));
+                deniedRequest.Headers.TryAddWithoutValidation("X-Correlation-Id", deniedCorrelationId.ToString());
                 var denied = await client.SendAsync(deniedRequest);
                 Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
                 var error = await denied.Content.ReadFromJsonAsync<ApiError>();
                 Assert.Equal("SCOPE_DENIED", error?.ErrorCode);
+                Assert.Equal(deniedCorrelationId, error?.CorrelationId);
             }
 
             store.Reset();
@@ -85,6 +88,7 @@ public sealed class P2C01CShippingApiContractTests
         {
             var response = await client.SendAsync(unauthenticated);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Empty(await response.Content.ReadAsStringAsync());
         }
 
         using (var missingBranch = route.CreateRequest())

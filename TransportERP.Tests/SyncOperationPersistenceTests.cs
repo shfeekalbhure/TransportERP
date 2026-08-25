@@ -99,6 +99,65 @@ public sealed class SyncOperationPersistenceTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Reused_batch_context_is_clean_after_owned_rollback_and_persists_only_next_operation()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "BATCHRB");
+        var failedCommand = CreateCommand(scope, "{\"batch\":\"failed\"}");
+        var succeedingCommand = CreateCommand(scope, "{\"batch\":\"succeeded\"}");
+        var service = CreateService(db);
+        var suffix = Guid.NewGuid().ToString("N");
+        var function = $"fail_first_sync_audit_{suffix}";
+        var trigger = $"trg_fail_first_sync_audit_{suffix}";
+
+        await using var admin = CreateDb(connection);
+        await admin.Database.ExecuteSqlRawAsync($$"""
+            CREATE FUNCTION transport_erp.{{function}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+              IF NEW."Action" = 'SyncOperationQueued' THEN RAISE EXCEPTION 'forced first batch audit failure'; END IF;
+              RETURN NEW;
+            END $body$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON transport_erp.audit_events
+              FOR EACH ROW EXECUTE FUNCTION transport_erp.{{function}}();
+            """);
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<Exception>(() =>
+                service.EnqueueSyncOperationAsync(failedCommand, scope.Security));
+            Assert.Empty(db.ChangeTracker.Entries());
+        }
+        finally
+        {
+            await admin.Database.ExecuteSqlRawAsync($$"""
+                DROP TRIGGER IF EXISTS {{trigger}} ON transport_erp.audit_events;
+                DROP FUNCTION IF EXISTS transport_erp.{{function}}();
+                """);
+        }
+
+        var succeeded = await service.EnqueueSyncOperationAsync(succeedingCommand, scope.Security);
+
+        await using var verify = CreateDb(connection);
+        Assert.False(await verify.SyncOperations.AnyAsync(x =>
+            x.DeviceId == failedCommand.DeviceId && x.ClientOperationId == failedCommand.ClientOperationId));
+        Assert.False(await verify.AuditEvents.AnyAsync(x =>
+            x.Action == "SyncOperationQueued" && x.EntityId != succeeded.Id && x.DeviceId == scope.Security.DeviceId));
+        Assert.Equal(succeeded.Id, await verify.SyncOperations
+            .Where(x => x.DeviceId == succeedingCommand.DeviceId &&
+                        x.ClientOperationId == succeedingCommand.ClientOperationId)
+            .Select(x => x.Id).SingleAsync());
+        Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
+            x.Action == "SyncOperationQueued" && x.EntityId == succeeded.Id));
+        var chain = await new AuditEventService(verify).VerifyHashChainAsync(
+            scope.CompanyId, scope.BranchId, scope.Security.DeviceId);
+        Assert.True(chain.IsValid, chain.FailureReason);
+        Assert.Equal(1, chain.EventCount);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Lifecycle_retry_backoff_conflict_case_and_resolution_are_persisted()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();

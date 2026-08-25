@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -90,6 +91,7 @@ builder.Services.AddScoped<IdentitySessionService>();
 builder.Services.AddSingleton<IdentityRateLimiter>();
 builder.Services.AddScoped<IAuthorizationHandler, SecurityAuthorizationHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, TransportAuthorizationMiddlewareResultHandler>();
 builder.Services.AddSingleton<IDeviceTrustResolver, DenyAllDeviceTrustResolver>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
