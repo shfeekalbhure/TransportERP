@@ -23,8 +23,7 @@ public sealed class ApiAuthenticationAndAuditTests
     [Trait("Category", "HTTP")]
     public async Task Sync_batch_requires_a_valid_bearer_token()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -46,8 +45,7 @@ public sealed class ApiAuthenticationAndAuditTests
     [Trait("Category", "HTTP")]
     public async Task Sync_batch_accepts_a_valid_token_and_enforces_claim_scope()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -91,8 +89,7 @@ public sealed class ApiAuthenticationAndAuditTests
     [Trait("Category", "HTTP")]
     public async Task Audit_read_requires_permission_and_cannot_escape_company_scope()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -128,8 +125,7 @@ public sealed class ApiAuthenticationAndAuditTests
     [Trait("Category", "HTTP")]
     public async Task Invalid_issuer_token_is_rejected_by_jwt_bearer_provider()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -179,12 +175,8 @@ public sealed class ApiAuthenticationAndAuditTests
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
 
-    private static string? GetConnection()
-        => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
-            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
-
     private static TransportErpDbContext CreateDb(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>().UseNpgsql(connection).Options);
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static string Sha256(string payload)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();

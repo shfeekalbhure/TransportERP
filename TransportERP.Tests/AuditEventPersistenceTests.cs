@@ -11,8 +11,7 @@ public sealed class AuditEventPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Audit_event_append_only_hash_chain_and_company_filter_work()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -41,8 +40,7 @@ public sealed class AuditEventPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Canonical_hash_chain_isolated_by_company_branch_and_device_stream()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -73,8 +71,7 @@ public sealed class AuditEventPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task Concurrent_appends_to_one_stream_are_serializable_and_verify()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var seedDb = CreateDb(connection);
         await seedDb.Database.MigrateAsync();
@@ -103,8 +100,7 @@ public sealed class AuditEventPersistenceTests
     [Trait("Category", "PostgreSQL")]
     public async Task PostgreSQL_trigger_blocks_update_and_delete_of_audit_event()
     {
-        var connection = GetConnection();
-        if (connection is null) return;
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
         await using var db = CreateDb(connection);
         await db.Database.MigrateAsync();
@@ -129,13 +125,7 @@ public sealed class AuditEventPersistenceTests
     }
 
     private static TransportErpDbContext CreateDb(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection)
-            .Options);
-
-    private static string? GetConnection()
-        => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
-            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static async Task<(Guid CompanyId, Guid BranchId)> SeedScopeAsync(
         TransportErpDbContext db,

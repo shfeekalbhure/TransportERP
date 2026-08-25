@@ -37,7 +37,9 @@
 
 ## المراجع
 
-[1]: ../closeout/P1/POC14_INDEPENDENT_REVIEW.md "تقرير المراجعة المستقلة لـPOC-14"
-[2]: /home/ubuntu/work_transport_new/deliverables/TransportERP_POC-14_بروتوكول_اختيار_قاعدة_البيانات.md "بروتوكول POC-14 المعتمد"
-[3]: https://www.postgresql.org/docs/current/transaction-iso.html "PostgreSQL Transaction Isolation"
-[4]: https://postgis.net/documentation/ "PostGIS Documentation"
+- تقرير المراجعة المستقلة لـPOC-14: الملف `POC14_INDEPENDENT_REVIEW.md` المشار إليه تاريخيًا غير موجود في شجرة المستودع الحالية؛ تبقى استعادة النسخة المطابقة والتحقق من بصمتها إجراء تتبع مفتوحًا، ولا يُنشأ بديل تخميني.
+- بروتوكول POC-14 المعتمد: المرجع التاريخي كان مسارًا محليًا غير قابل للنقل خارج بيئة العمل الأصلية، والنسخة المطابقة غير موجودة في شجرة المستودع الحالية.
+- [PostgreSQL Transaction Isolation](https://www.postgresql.org/docs/current/transaction-iso.html).
+- [PostGIS Documentation](https://postgis.net/documentation/).
+
+لا تلغي فجوة التتبع أعلاه قرار المالك المثبت في `POC14_FINAL_DB_SELECTION_OWNER_SIGNOFF.md`، لكنها تمنع الادعاء بأن سلسلة أدلة POC-14 كاملة وقابلة لإعادة الفحص من المستودع وحده حتى استعادة المصدرين المطابقين وربط بصماتهما.

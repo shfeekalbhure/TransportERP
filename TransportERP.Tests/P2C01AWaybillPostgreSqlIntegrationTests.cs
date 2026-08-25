@@ -6,7 +6,6 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using TransportERP.Application.Waybills;
@@ -186,10 +185,7 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             new EfWaybillAuditSink(db, new AuditEventService(db)));
 
     private static TransportErpDbContext CreateP2Db(string connection)
-        => new(new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "transport_erp"))
-            .ReplaceService<IModelCustomizer, TransportErpP2ModelCustomizer>()
-            .Options);
+        => PostgreSqlTestEnvironment.CreateDbContext(connection);
 
     private static WebApplicationFactory<Program> CreateFactory(string connection)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

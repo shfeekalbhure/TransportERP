@@ -7,20 +7,12 @@ namespace TransportERP.Tests;
 public sealed class PostgreSqlPersistenceSmokeTests
 {
     [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Migration_and_receipt_round_trip_work_on_postgresql()
     {
-        var connection = Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
-            ?? Environment.GetEnvironmentVariable("TRANSPORTERP_P1_POSTGRES_CONNECTION");
-        if (string.IsNullOrWhiteSpace(connection))
-        {
-            // Integration test is opt-in so the normal unit-test suite remains database-independent.
-            return;
-        }
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
 
-        var options = new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection)
-            .Options;
-        await using var db = new TransportErpDbContext(options);
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
         await db.Database.MigrateAsync();
 
         var currencyCode = await NextCurrencyCodeAsync(db);

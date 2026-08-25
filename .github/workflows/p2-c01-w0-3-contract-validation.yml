@@ -9,15 +9,18 @@ on:
       - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-contracts:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.13'
 
@@ -25,7 +28,7 @@ jobs:
         run: python documentation/closeout/P2/validate_p2_c01_contracts.py
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
@@ -33,4 +36,4 @@ jobs:
         run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
 
       - name: Run P1 and recovered foundation tests
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore --filter "Category!=P2PostgreSQL"
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"
