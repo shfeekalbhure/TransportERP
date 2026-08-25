@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   core-postgresql:
-    name: Core + PostgreSQL + HTTP
+    name: Required CI / Core + PostgreSQL + HTTP
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -76,7 +76,7 @@ jobs:
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-all-tests.trx"
 
   desktop-contract:
-    name: Desktop RTL contract surface
+    name: Required CI / Desktop RTL contract surface
     runs-on: windows-latest
     steps:
       - name: Checkout
