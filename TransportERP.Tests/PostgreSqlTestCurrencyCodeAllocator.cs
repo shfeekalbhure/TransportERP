@@ -49,7 +49,7 @@ internal static class PostgreSqlTestCurrencyCodeAllocator
 
             try
             {
-                await ExecuteScalarAsync(connection, transaction,
+                await ExecuteNonQueryAsync(connection, transaction,
                     $"SELECT pg_advisory_xact_lock({InitializerLockId})", cancellationToken);
                 await ExecuteNonQueryAsync(connection, transaction,
                     $"CREATE SEQUENCE IF NOT EXISTS {SequenceName} AS bigint MINVALUE 0 START WITH 0 NO MAXVALUE NO CYCLE",
