@@ -414,7 +414,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة اختبار B", MinorUnit = 2, IsBase = true,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };

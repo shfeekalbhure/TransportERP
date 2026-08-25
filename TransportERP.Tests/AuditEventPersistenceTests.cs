@@ -234,7 +234,7 @@ public sealed class AuditEventPersistenceTests
             var currency = new Currency
             {
                 Id = Guid.NewGuid(),
-                Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+                Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
                 NameAr = "عملة اختبار",
                 MinorUnit = 2,
                 IsBase = true,

@@ -546,7 +546,7 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
         var currency = new Currency
         {
             Id = Guid.NewGuid(),
-            Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة TEAM-03",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()

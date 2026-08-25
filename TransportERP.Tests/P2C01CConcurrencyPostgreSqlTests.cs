@@ -274,7 +274,7 @@ public sealed class P2C01CConcurrencyPostgreSqlTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة اختبار تزامن C", MinorUnit = 2, IsBase = true, Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };

@@ -56,14 +56,5 @@ public sealed class PostgreSqlPersistenceSmokeTests
     }
 
     private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)
-    {
-        for (var attempt = 0; attempt < 16; attempt++)
-        {
-            var code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant();
-            if (!await db.Currencies.AnyAsync(x => x.Code == code))
-                return code;
-        }
-
-        throw new InvalidOperationException("Unable to allocate a unique three-character currency code for the PostgreSQL smoke test.");
-    }
+        => await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db);
 }

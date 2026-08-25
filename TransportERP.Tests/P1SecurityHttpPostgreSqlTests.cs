@@ -271,7 +271,7 @@ public sealed class P1SecurityHttpPostgreSqlTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(), NameAr = "عملة أمن",
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db), NameAr = "عملة أمن",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

@@ -471,7 +471,7 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(), NameAr = "عملة",
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db), NameAr = "عملة",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = RandomNumberGenerator.GetBytes(16)
         };
@@ -806,7 +806,7 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
     private static async Task<Scope> SeedAsync(TransportErpDbContext db, string suffix, bool secondUser = false)
     {
         var now = DateTimeOffset.UtcNow;
-        var currency = new Currency { Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+        var currency = new Currency { Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة", MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = RandomNumberGenerator.GetBytes(16) };
         var company = new Company { Id = Guid.NewGuid(), Code = $"D-{suffix}-{Guid.NewGuid():N}"[..18],
