@@ -4,7 +4,10 @@
 **Phase:** `P2-C01-C — Release, Allocation, Trip, Manifest & Load`  
 **Baseline:** `master@22ee24108b3c682d94e9d8693a566d6b479f19c9`  
 **PR:** `#40`  
-**Status:** `FINAL EXACT-HEAD CI RE-RUN REQUIRED`
+**Status at issuance:** `FINAL EXACT-HEAD CI RE-RUN REQUIRED`
+**Current reconciled status:** `FINAL EXACT-HEAD CI PASS — CLOSED_AFTER_MERGE`
+**Final reviewed head:** `0fc0d7446efd66a03b60e4d0f4bf48a0de6d94cc`
+**Master merge:** `5d58a42046e07166e6db76bcb893f32b1d8f2ec7`
 
 ## 1. EF migrations reviewed
 
@@ -13,7 +16,9 @@ Generated migrations:
 - `TransportERP.Infrastructure/Persistence/Migrations/20260821132015_P2C01CShippingExecution.cs`
 - `TransportERP.Infrastructure/Persistence/Migrations/20260821141529_P2C01CShippingExecutionHardening.cs`
 
-Structural review result: `PASS — pending final exact-head CI`.
+Structural review result at issuance: `PASS — pending final exact-head CI`.
+
+Final reconciled result: `PASS — final exact-head CI confirmed on 0fc0d7446efd66a03b60e4d0f4bf48a0de6d94cc`.
 
 The initial migration is additive and creates only the C-authorized persistence set:
 
@@ -67,9 +72,9 @@ On the hardening-predecessor head, workflow `P2 C01 C shipping execution` comple
 
 Because EF generated and pushed the hardening migration, the PR head moved to the bot-created migration commit. This governance evidence update intentionally creates a user-authored head containing both committed migrations and retriggers all C gates for final exact-head review.
 
-## 5. Final closure rule
+## 5. Final closure rule at issuance
 
-No independent PASS or merge is valid until the following all succeed on the exact final head created by this evidence update:
+At issuance, no independent PASS or merge was valid until the following all succeeded on the exact final head created by this evidence update:
 
 1. closed-contract validator PASS;
 2. C phase-boundary PASS;
@@ -80,6 +85,10 @@ No independent PASS or merge is valid until the following all succeed on the exa
 7. C PostgreSQL/HTTP/concurrency tests PASS;
 8. Desktop RTL PASS.
 
-## 6. Next-phase lock
+## 6. Final exact-head evidence
 
-`Arrival / Transit / Warehouse MUST NOT START` before P2-C01-C receives exact-head green CI, independent review PASS, and merge to master.
+Workflow `P2 C01 C shipping execution` [run 32524128894](https://github.com/shfeekalbhure/TransportERP/actions/runs/32524128894) ran on pull-request head `0fc0d7446efd66a03b60e4d0f4bf48a0de6d94cc` and concluded `SUCCESS`. `Shipping + PostgreSQL + HTTP` and `Shipping Desktop RTL` both concluded successfully. The exact-head review records the W0-3 contract validator PASS, regression `103/103`, PostgreSQL/HTTP/concurrency/hardening `12/12`, EF clean, PostgreSQL 18.6, and Desktop RTL/W3 PASS.
+
+## 7. Closure disposition
+
+[Independent review 4997311857](https://github.com/shfeekalbhure/TransportERP/pull/40#pullrequestreview-4997311857) returned `PASS` on the same SHA. [PR #40](https://github.com/shfeekalbhure/TransportERP/pull/40) merged as `5d58a42046e07166e6db76bcb893f32b1d8f2ec7`. The C CI/review/merge lock is satisfied. Any `P2-C01-D` work still requires its own governing scope and pre-programming gates.
