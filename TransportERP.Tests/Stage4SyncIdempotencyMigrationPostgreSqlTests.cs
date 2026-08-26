@@ -71,8 +71,9 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
             Assert.Contains("sync operation provenance is immutable",
                 immutableError.GetBaseException().Message, StringComparison.Ordinal);
             db.ChangeTracker.Clear();
+            var changedPayload = "{\"changed\":true}";
             await AssertPostgresAsync("P0001", () => db.Database.ExecuteSqlInterpolatedAsync($"""
-                UPDATE transport_erp.sync_operations SET "PayloadJson"='{{"changed":true}}'
+                UPDATE transport_erp.sync_operations SET "PayloadJson"={changedPayload}
                 WHERE "Id"={firstOperation.Id}
                 """));
             await AssertPostgresAsync("P0001", () => db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -102,6 +103,7 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
         var legacyId = Guid.NewGuid();
         var entityId = Guid.NewGuid();
         var clientOperationId = $"legacy-client-{Guid.NewGuid():N}";
+        var legacyPayload = "{\"legacy\":true}";
         var now = DateTimeOffset.UtcNow;
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO transport_erp.sync_operations
@@ -111,7 +113,7 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
                "RegisteredDeviceCredentialVersion","CreatedAt","UpdatedAt","RowVersion")
             VALUES
               ({legacyId},{scope.DeviceId},{scope.UserId},{scope.CompanyId},{scope.BranchId},'UPDATE','LegacyEntity',{entityId},
-               {clientOperationId},'{{"legacy":true}}',{new string('a', 64)},{now},{now},1,
+               {clientOperationId},{legacyPayload},{new string('a', 64)},{now},{now},1,
                NULL,'QUEUED',0,NULL,NULL,{scope.RegisteredDeviceId},1,{now},{now},{RandomNumberGenerator.GetBytes(16)})
             """);
 
