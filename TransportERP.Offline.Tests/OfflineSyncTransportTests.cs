@@ -447,11 +447,18 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
 
         var result = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+        var invisible = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+        var operationScope = new OfflineOperationScope(
+            queued.Operation.CompanyId,
+            queued.Operation.BranchId,
+            queued.Operation.UserId,
+            queued.Operation.RegisteredDeviceId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, operationScope);
 
         Assert.Equal(0, calls);
         Assert.Equal(0, result.Claimed);
         Assert.Equal(0, result.Rejected);
+        Assert.Null(invisible);
         Assert.Equal(OfflineOperationStatus.Queued, persisted!.Status);
         Assert.Null(persisted.ResultCode);
     }
