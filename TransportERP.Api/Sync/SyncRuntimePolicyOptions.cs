@@ -6,6 +6,8 @@ namespace TransportERP.Api.Sync;
 public sealed class SyncRuntimePolicyOptions
 {
     public bool? OfflineEnabled { get; init; }
+    public string? OfflineActivationDecisionId { get; init; }
+    public string? OfflineActivationImplementationSha { get; init; }
     public bool? ServerExecutionEnabled { get; init; }
     public string[] AllowedActions { get; init; } = [];
     public string[] AllowedProtocolVersions { get; init; } = [];
@@ -27,6 +29,8 @@ public sealed class SyncRuntimePolicyOptions
     public static SyncRuntimePolicyOptions Load(IConfiguration configuration) => new()
     {
         OfflineEnabled = configuration.GetValue<bool?>("Sync:Offline:Enabled"),
+        OfflineActivationDecisionId = configuration["Sync:Offline:ActivationDecisionId"],
+        OfflineActivationImplementationSha = configuration["Sync:Offline:ActivationImplementationSha"],
         ServerExecutionEnabled = configuration.GetValue<bool?>("Sync:ServerExecution:Enabled"),
         AllowedActions = configuration.GetSection("Sync:Offline:AllowedActions").Get<string[]>() ?? [],
         AllowedProtocolVersions = configuration.GetSection("Sync:Protocol:AllowedVersions").Get<string[]>() ?? [],
@@ -48,8 +52,8 @@ public sealed class SyncRuntimePolicyOptions
 }
 
 /// <summary>
-/// Validates the fixed Stage 4 global ceiling. Offline remains explicitly closed until G5;
-/// server execution is an independent, explicitly configured worker switch.
+/// Validates the fixed global ceiling. Offline is closed by default and can only be
+/// opened by an explicit, traceable G5 deployment decision bound to an exact commit.
 /// </summary>
 public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRuntimePolicyOptions>
 {
@@ -59,10 +63,11 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
     public ValidateOptionsResult Validate(string? name, SyncRuntimePolicyOptions options)
     {
         var errors = new List<string>();
-        if (options.OfflineEnabled is not false)
-            errors.Add("Sync:Offline:Enabled must be explicitly false until the owner grants G5.");
+        if (!options.OfflineEnabled.HasValue)
+            errors.Add("Sync:Offline:Enabled must be explicitly configured.");
         if (!options.ServerExecutionEnabled.HasValue)
             errors.Add("Sync:ServerExecution:Enabled must be explicitly configured.");
+        ValidateOfflineActivation(options, errors);
         ValidateExactSet(options.AllowedProtocolVersions, ["sync-v1"], "Sync:Protocol:AllowedVersions", errors);
         ValidateActions(options.AllowedActions, errors);
         ValidateRange(options.ClientTransportMaxRetryCount, 0, 5, "Sync:Retry:ClientTransport:MaxCount", errors);
@@ -88,6 +93,35 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
             errors.Add("Sync payload limit cannot exceed the request body limit.");
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
+
+    private static void ValidateOfflineActivation(
+        SyncRuntimePolicyOptions options,
+        ICollection<string> errors)
+    {
+        var decisionId = options.OfflineActivationDecisionId;
+        var implementationSha = options.OfflineActivationImplementationSha;
+        if (options.OfflineEnabled is not true)
+        {
+            if (!string.IsNullOrWhiteSpace(decisionId) || !string.IsNullOrWhiteSpace(implementationSha))
+                errors.Add("Offline activation evidence must be absent while Sync:Offline:Enabled is false.");
+            return;
+        }
+
+        if (options.ServerExecutionEnabled is not true)
+            errors.Add("Sync:ServerExecution:Enabled must be true before Offline can be activated.");
+        if (!IsSafeDecisionId(decisionId))
+            errors.Add("Sync:Offline:ActivationDecisionId must be an explicit safe G5 decision identifier.");
+        if (!IsExactCommitSha(implementationSha))
+            errors.Add("Sync:Offline:ActivationImplementationSha must bind G5 activation to an exact 40-character commit SHA.");
+    }
+
+    private static bool IsSafeDecisionId(string? value) =>
+        value is { Length: >= 8 and <= 120 } &&
+        value.StartsWith("DEC-G5-", StringComparison.Ordinal) &&
+        value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
+
+    private static bool IsExactCommitSha(string? value) =>
+        value is { Length: 40 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static void ValidateActions(string[] values, ICollection<string> errors)
     {

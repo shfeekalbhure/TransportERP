@@ -46,7 +46,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
     }
 
     [Fact]
-    public void Configuration_cannot_silently_enable_offline()
+    public void Configuration_cannot_silently_enable_offline_without_governed_activation_evidence()
     {
         var values = RequiredSettings();
         values["Sync:Offline:Enabled"] = "true";
@@ -56,6 +56,57 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, x => x.Contains("G5", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Explicit_G5_activation_requires_server_runtime_and_exact_implementation_sha()
+    {
+        var missingRuntime = RequiredSettings();
+        missingRuntime["Sync:Offline:Enabled"] = "true";
+        missingRuntime["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
+        missingRuntime["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+
+        var malformedSha = new Dictionary<string, string?>(missingRuntime)
+        {
+            ["Sync:ServerExecution:Enabled"] = "true",
+            ["Sync:Offline:ActivationImplementationSha"] = "branch-name-is-not-an-exact-sha"
+        };
+
+        Assert.True(new SyncRuntimePolicyOptionsValidator().Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(missingRuntime))).Failed);
+        Assert.True(new SyncRuntimePolicyOptionsValidator().Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(malformedSha))).Failed);
+    }
+
+    [Fact]
+    public void Explicit_G5_activation_is_supported_but_default_configuration_remains_closed()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+
+        var options = SyncRuntimePolicyOptions.Load(Configuration(values));
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Succeeded);
+        Assert.True(options.OfflineEnabled);
+        Assert.Equal("DEC-G5-PR69-20260827-01", options.OfflineActivationDecisionId);
+    }
+
+    [Fact]
+    public void Closed_default_rejects_stale_activation_evidence()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(values)));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, x => x.Contains("must be absent", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -247,6 +298,8 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         string[] actions) => new()
     {
         OfflineEnabled = source.OfflineEnabled,
+        OfflineActivationDecisionId = source.OfflineActivationDecisionId,
+        OfflineActivationImplementationSha = source.OfflineActivationImplementationSha,
         ServerExecutionEnabled = source.ServerExecutionEnabled,
         AllowedActions = actions,
         AllowedProtocolVersions = source.AllowedProtocolVersions,
