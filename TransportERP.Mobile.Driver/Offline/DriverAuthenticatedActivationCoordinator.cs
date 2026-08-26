@@ -11,12 +11,6 @@ using TransportERP.Offline.Transport;
 
 namespace TransportERP.Mobile.Driver.Offline;
 
-internal static class DriverDeploymentAuthority
-{
-    // Build-pinned authority. It cannot be replaced by UI, arguments or environment variables.
-    internal static readonly Uri Origin = new("https://sync.example.test/", UriKind.Absolute);
-}
-
 /// <summary>
 /// Secrets supplied by the interactive sign-in surface. This is deliberately a class rather than
 /// a record so generated formatting cannot disclose the password or device credential.
@@ -354,7 +348,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             !IsSha256Hex(decision.PolicySourceFingerprint) ||
             decision.BatchEndpoint is null || !decision.BatchEndpoint.IsAbsoluteUri ||
             decision.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
-            !SameOrigin(DriverDeploymentAuthority.Origin, decision.BatchEndpoint) ||
+            !SameOrigin(SyncClientDeploymentAuthority.Origin, decision.BatchEndpoint) ||
             decision.BatchEndpoint.AbsolutePath != "/api/v1/sync/operations:batch" ||
             decision.ProofKeyVersion is <= 0 ||
             decision.ProofKeyVersion is null &&
@@ -454,7 +448,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
 
     private static Uri Endpoint(string path)
     {
-        var origin = DriverDeploymentAuthority.Origin;
+        var origin = SyncClientDeploymentAuthority.Origin;
         if (origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
             !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) ||
             !string.IsNullOrEmpty(origin.UserInfo))

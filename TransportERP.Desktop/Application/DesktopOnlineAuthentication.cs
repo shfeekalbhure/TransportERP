@@ -21,28 +21,6 @@ internal sealed record DesktopOnlineSignInRequest(
     string DeviceCredential,
     string DeviceSigningCertificateThumbprint);
 
-/// <summary>
-/// Immutable deployment trust anchor compiled into this Desktop binary. The repository default is
-/// deliberately non-routable; a governed release must replace this constant with its verified
-/// public HTTPS origin and produce a new signed binary. Runtime/UI/env/argument overrides are forbidden.
-/// </summary>
-internal static class DesktopDeploymentAuthority
-{
-    private const string BinaryPublicOrigin = "https://api.transporterp.invalid/";
-
-    internal static Uri Origin { get; } = CreateOrigin();
-
-    private static Uri CreateOrigin()
-    {
-        var origin = new Uri(BinaryPublicOrigin, UriKind.Absolute);
-        if (origin.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(origin.UserInfo) ||
-            !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) ||
-            origin.AbsolutePath != "/")
-            throw new InvalidOperationException("DESKTOP_DEPLOYMENT_AUTHORITY_INVALID");
-        return origin;
-    }
-}
-
 internal sealed record DesktopOnlineAuthenticationResult(
     bool Succeeded,
     string Code,
@@ -102,7 +80,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_bearer is not null)
             return DesktopOnlineAuthenticationResult.Denied("DESKTOP_SESSION_REPLAY_DENIED");
-        var origin = DesktopDeploymentAuthority.Origin;
+        var origin = SyncClientDeploymentAuthority.Origin;
         if (string.IsNullOrWhiteSpace(request.UserNameOrEmail) ||
             string.IsNullOrEmpty(request.Password) ||
             request.CompanyId == Guid.Empty || request.BranchId == Guid.Empty ||

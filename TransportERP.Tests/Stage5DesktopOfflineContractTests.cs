@@ -88,6 +88,8 @@ public sealed class Stage5DesktopOfflineContractTests
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var bridge = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+        var authority = Read("TransportERP.Application", "Sync", "SyncClientDeploymentAuthority.cs");
+        var applicationProject = Read("TransportERP.Application", "TransportERP.Application.csproj");
 
         var login = onlineAuth.IndexOf("await CreateSessionAsync", StringComparison.Ordinal);
         var policy = onlineAuth.IndexOf("await GetSyncActivationAsync", StringComparison.Ordinal);
@@ -100,10 +102,14 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.DoesNotContain("Origin", onlineAuth[requestStart..requestEnd], StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("_publicOrigin", shell, StringComparison.Ordinal);
         Assert.DoesNotContain("عنوان خادم", shell, StringComparison.Ordinal);
-        Assert.Contains("internal static class DesktopDeploymentAuthority", onlineAuth, StringComparison.Ordinal);
-        Assert.Contains("private const string BinaryPublicOrigin", onlineAuth, StringComparison.Ordinal);
-        Assert.Contains("https://api.transporterp.invalid/", onlineAuth, StringComparison.Ordinal);
-        Assert.Contains("var origin = DesktopDeploymentAuthority.Origin", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("var origin = SyncClientDeploymentAuthority.Origin", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("public static class SyncClientDeploymentAuthority", authority, StringComparison.Ordinal);
+        Assert.Contains("GetCustomAttributes<AssemblyMetadataAttribute>()", authority, StringComparison.Ordinal);
+        Assert.Contains("Uri.UriSchemeHttps", authority, StringComparison.Ordinal);
+        Assert.Contains("TransportERPClientPublicOrigin", applicationProject, StringComparison.Ordinal);
+        Assert.Contains("https://sync.example.test/", applicationProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment", authority, StringComparison.Ordinal);
+        Assert.DoesNotContain("IConfiguration", authority, StringComparison.Ordinal);
         Assert.DoesNotContain("TryCanonicalOrigin", onlineAuth, StringComparison.Ordinal);
 
         Assert.Contains("Uri.UriSchemeHttps", onlineAuth, StringComparison.Ordinal);

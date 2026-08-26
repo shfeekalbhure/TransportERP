@@ -10,6 +10,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         var activation = Read("TransportERP.Mobile.Driver", "Offline", "DriverOfflineActivationService.cs");
         var authenticated = Read("TransportERP.Mobile.Driver", "Offline",
             "DriverAuthenticatedActivationCoordinator.cs");
+        var authority = Read("TransportERP.Application", "Sync", "SyncClientDeploymentAuthority.cs");
+        var applicationProject = Read("TransportERP.Application", "TransportERP.Application.csproj");
 
         Assert.Contains("<TargetFramework>net10.0-android</TargetFramework>", project, StringComparison.Ordinal);
         Assert.Contains("<OutputType>Exe</OutputType>", project, StringComparison.Ordinal);
@@ -27,10 +29,15 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("session.BranchId != request.BranchId", authenticated, StringComparison.Ordinal);
         Assert.Contains("request.CompanyId is null", authenticated, StringComparison.Ordinal);
         Assert.Contains("request.BranchId is null", authenticated, StringComparison.Ordinal);
-        Assert.Contains("DriverDeploymentAuthority.Origin", authenticated, StringComparison.Ordinal);
-        Assert.Contains("https://sync.example.test/", authenticated, StringComparison.Ordinal);
-        Assert.Contains("SameOrigin(DriverDeploymentAuthority.Origin, decision.BatchEndpoint)", authenticated,
+        Assert.Contains("SyncClientDeploymentAuthority.Origin", authenticated, StringComparison.Ordinal);
+        Assert.Contains("SameOrigin(SyncClientDeploymentAuthority.Origin, decision.BatchEndpoint)", authenticated,
             StringComparison.Ordinal);
+        Assert.Contains("public static class SyncClientDeploymentAuthority", authority, StringComparison.Ordinal);
+        Assert.Contains("GetCustomAttributes<AssemblyMetadataAttribute>()", authority, StringComparison.Ordinal);
+        Assert.Contains("TransportERPClientPublicOrigin", applicationProject, StringComparison.Ordinal);
+        Assert.Contains("https://sync.example.test/", applicationProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment", authority, StringComparison.Ordinal);
+        Assert.DoesNotContain("IConfiguration", authority, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerOrigin", authenticated, StringComparison.Ordinal);
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", authenticated, StringComparison.Ordinal);
         Assert.Contains("MaximumJsonResponseBytes = 65_536", authenticated, StringComparison.Ordinal);

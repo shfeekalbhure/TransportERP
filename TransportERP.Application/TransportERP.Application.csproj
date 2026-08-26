@@ -4,7 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- A governed release overrides this at build time. It is embedded in the signed assembly;
+         clients never accept a runtime, UI, argument, environment or file override. -->
+    <TransportERPClientPublicOrigin Condition="'$(TransportERPClientPublicOrigin)' == ''">https://sync.example.test/</TransportERPClientPublicOrigin>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="TransportERPClientPublicOrigin" Value="$(TransportERPClientPublicOrigin)" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TransportERP\TransportERP.Domain.csproj" />
