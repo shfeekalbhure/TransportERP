@@ -150,13 +150,13 @@ public sealed class SyncConflictResolutionService(
                     replacement.EntityId != operation.EntityId || replacement.Status != "QUEUED")
                     throw new SyncRuleException("REAPPLY_SCOPE_MISMATCH", conflictCaseId.ToString());
 
-                var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
+                var reapplyNow = NormalizeTimestamp(DateTimeOffset.UtcNow);
                 conflict.Status = "RESOLVED";
                 conflict.Resolution = SyncConflictResolutionDecisions.ReapplyAsNew;
                 conflict.ResolvedBy = context.UserId.ToString();
-                conflict.ResolvedAt = now;
+                conflict.ResolvedAt = reapplyNow;
                 conflict.ReplacedByOperationId = replacement.Id;
-                conflict.UpdatedAt = now;
+                conflict.UpdatedAt = reapplyNow;
                 conflict.RowVersion = Guid.NewGuid().ToByteArray();
 
                 operation.Status = "RESOLVED";
@@ -167,13 +167,13 @@ public sealed class SyncConflictResolutionService(
                 operation.ExecutionClaimToken = null;
                 operation.ExecutionAttemptStartedAt = null;
                 operation.ExecutionLeaseExpiresAt = null;
-                operation.UpdatedAt = now;
+                operation.UpdatedAt = reapplyNow;
                 operation.RowVersion = Guid.NewGuid().ToByteArray();
 
                 await db.SaveChangesAsync(cancellationToken);
                 await AppendResolutionAuditAsync(conflict, operation, context, request.Reason, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return Result(conflict, operation, context.CorrelationId, now);
+                return Result(conflict, operation, context.CorrelationId, reapplyNow);
             }
 
             var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
