@@ -216,7 +216,7 @@ public static class SyncApiModule
         SyncBatchRequest? request;
         try { request = SyncBatchJsonContract.Deserialize(rawBody); }
         catch (JsonException) { return Results.BadRequest(new { ErrorCode = "REQUEST_SCHEMA_INVALID", CorrelationId = attemptCorrelationId }); }
-        var envelopeError = SyncBatchEnvelopeContract.Validate(request, current.DeviceId, MaximumBatchOperations);
+        var envelopeError = SyncBatchEnvelopeContract.Validate(request, proofSecurity.DeviceId, MaximumBatchOperations);
         if (envelopeError is not null)
             return Results.BadRequest(new { ErrorCode = envelopeError, CorrelationId = attemptCorrelationId });
 

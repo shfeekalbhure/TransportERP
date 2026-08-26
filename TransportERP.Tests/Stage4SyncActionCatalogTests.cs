@@ -44,8 +44,8 @@ public sealed class Stage4SyncActionCatalogTests
         bool entityRequired,
         bool baseVersionRequired)
     {
-        var entityId = entityRequired ? Guid.NewGuid() : null;
-        var baseVersion = baseVersionRequired ? 7L : null;
+        Guid? entityId = entityRequired ? Guid.NewGuid() : null;
+        long? baseVersion = baseVersionRequired ? 7L : null;
 
         var result = SyncActionCatalog.Validate(actionCode, operationType, entityType, entityId, baseVersion);
 
