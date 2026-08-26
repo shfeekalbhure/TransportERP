@@ -773,7 +773,10 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var segments = proof.Split('.');
         Assert.Equal(3, segments.Length);
-        using var header = JsonDocument.Parse(DecodeBase64Url(segments[0]));
+        var rawHeader = DecodeBase64Url(segments[0]);
+        Assert.StartsWith("{\"typ\":\"dpop+jwt\"", Encoding.UTF8.GetString(rawHeader), StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u002B", Encoding.UTF8.GetString(rawHeader), StringComparison.OrdinalIgnoreCase);
+        using var header = JsonDocument.Parse(rawHeader);
         using var payload = JsonDocument.Parse(DecodeBase64Url(segments[1]));
         Assert.Equal("dpop+jwt", header.RootElement.GetProperty("typ").GetString());
         Assert.Equal("ES256", header.RootElement.GetProperty("alg").GetString());

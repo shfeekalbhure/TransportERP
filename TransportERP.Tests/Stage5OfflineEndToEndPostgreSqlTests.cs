@@ -45,8 +45,7 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var scope = await SeedAsync(seedDb, proofKey, "REOPEN");
         using var factory = CreateFactory(connection);
-        using var inspection = new ProofInspectionHandler(factory.Server.CreateHandler());
-        using var http = new HttpClient(inspection) { BaseAddress = PublicOrigin };
+        using var http = new HttpClient(factory.Server.CreateHandler()) { BaseAddress = PublicOrigin };
         var time = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
         var directory = CreateTemporaryDirectory();
         try
@@ -73,7 +72,7 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
             Assert.True(accepted.Claimed == 1 && accepted.AcceptedPending == 1,
                 $"Expected one accepted pending operation; result={accepted}; " +
-                $"local={pendingLocal?.Status}/{pendingLocal?.ResultCode}; proofCheck={inspection.Result}.");
+                $"local={pendingLocal?.Status}/{pendingLocal?.ResultCode}.");
             Assert.Equal(OfflineOperationStatus.Queued, pendingLocal!.Status);
             Assert.Equal("QUEUED", pendingLocal.ResultCode);
             Assert.NotNull(pendingLocal.ServerOperationId);
@@ -111,8 +110,7 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var scope = await SeedAsync(seedDb, proofKey, "LOST");
         using var factory = CreateFactory(connection);
-        using var inspection = new ProofInspectionHandler(factory.Server.CreateHandler());
-        using var dropping = new DropFirstSignedSuccessHandler(inspection);
+        using var dropping = new DropFirstSignedSuccessHandler(factory.Server.CreateHandler());
         using var http = new HttpClient(dropping) { BaseAddress = PublicOrigin };
         var time = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
         var directory = CreateTemporaryDirectory();
@@ -131,8 +129,7 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
             Assert.True(lost.RetryScheduled == 1 && dropping.DroppedResponses == 1,
                 $"Expected one retry after a dropped signed response; result={lost}; " +
-                $"dropped={dropping.DroppedResponses}; local={failedLocal?.Status}/{failedLocal?.ResultCode}; " +
-                $"proofCheck={inspection.Result}.");
+                $"dropped={dropping.DroppedResponses}; local={failedLocal?.Status}/{failedLocal?.ResultCode}.");
             Assert.Equal(OfflineOperationStatus.Failed, failedLocal!.Status);
             Assert.Equal(1, failedLocal.ClientTransportRetryCount);
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "QUEUED", partyCount: 0);
@@ -541,109 +538,4 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         }
     }
 
-    private sealed class ProofInspectionHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
-    {
-        public string Result { get; private set; } = "NOT_SEEN";
-
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            if (request.Headers.TryGetValues("DPoP", out var proofs))
-            {
-                try
-                {
-                    var proof = Assert.Single(proofs);
-                    var body = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
-                    var bearer = request.Headers.Authorization?.Parameter ?? string.Empty;
-                    var correlation = Guid.ParseExact(
-                        Assert.Single(request.Headers.GetValues("X-Correlation-Id")), "D");
-                    var material = new SyncPopProofValidator().Validate(new SyncPopProofValidationInput(
-                        proof, bearer, body, BatchEndpoint.AbsoluteUri, correlation, DateTimeOffset.UtcNow));
-                    Result = $"PASS:{material.ProofKeyThumbprint}";
-                }
-                catch (Exception exception)
-                {
-                    Result = "FAIL:" + exception.GetType().Name + ":" + Diagnose(
-                        Assert.Single(proofs),
-                        request.Headers.Authorization?.Parameter ?? string.Empty,
-                        await request.Content!.ReadAsByteArrayAsync(cancellationToken),
-                        Guid.ParseExact(Assert.Single(request.Headers.GetValues("X-Correlation-Id")), "D"));
-                }
-            }
-            return await base.SendAsync(request, cancellationToken);
-        }
-
-        private static string Diagnose(string proof, string bearer, byte[] body, Guid correlation)
-        {
-            try
-            {
-                if (proof.Length > SyncPopProofValidator.MaximumCompactProofBytes ||
-                    proof.Any(character => character > 0x7f)) return "COMPACT";
-                if (bearer.Length == 0 || bearer.Any(character => character > 0x7f)) return "BEARER";
-                var segments = proof.Split('.');
-                if (segments.Length != 3) return "SEGMENTS";
-                if (segments.Any(segment => segment.Length == 0 || segment.Contains('=') ||
-                    segment.Any(character => character is not (>= 'A' and <= 'Z' or >= 'a' and <= 'z' or
-                        >= '0' and <= '9' or '-' or '_')))) return "BASE64URL";
-                var headerBytes = Decode(segments[0]);
-                var claimBytes = Decode(segments[1]);
-                var signature = Decode(segments[2]);
-                if (signature.Length != 64) return "SIGNATURE_LENGTH";
-                using var header = JsonDocument.Parse(headerBytes);
-                using var claims = JsonDocument.Parse(claimBytes);
-                if (!Encoding.UTF8.GetString(headerBytes).StartsWith("{\"typ\":\"dpop+jwt\"", StringComparison.Ordinal))
-                    return "RAW_TYP";
-                if (!header.RootElement.EnumerateObject().Select(x => x.Name)
-                        .SequenceEqual(["typ", "alg", "jwk"], StringComparer.Ordinal)) return "HEADER_SHAPE";
-                var jwk = header.RootElement.GetProperty("jwk");
-                if (!jwk.EnumerateObject().Select(x => x.Name)
-                        .SequenceEqual(["kty", "crv", "x", "y"], StringComparer.Ordinal)) return "JWK_SHAPE";
-                if (claims.RootElement.EnumerateObject().Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() !=
-                    claims.RootElement.EnumerateObject().Count()) return "DUPLICATE_CLAIM";
-                if (header.RootElement.GetProperty("typ").GetString() != "dpop+jwt") return "TYP";
-                if (header.RootElement.GetProperty("alg").GetString() != "ES256") return "ALG";
-                var x = Decode(jwk.GetProperty("x").GetString()!);
-                var y = Decode(jwk.GetProperty("y").GetString()!);
-                using var publicKey = ECDsa.Create(new ECParameters
-                {
-                    Curve = ECCurve.NamedCurves.nistP256,
-                    Q = new ECPoint { X = x, Y = y }
-                });
-                if (!publicKey.VerifyData(Encoding.ASCII.GetBytes(segments[0] + "." + segments[1]),
-                        signature, HashAlgorithmName.SHA256,
-                        DSASignatureFormat.IeeeP1363FixedFieldConcatenation)) return "SIGNATURE";
-                var jtiText = claims.RootElement.GetProperty("jti").GetString()!;
-                if (!Guid.TryParseExact(jtiText, "D", out var jti)) return "JTI_FORMAT";
-                if (jti.Version != 4) return "JTI_VERSION";
-                if (jtiText.ToLowerInvariant()[19] is not ('8' or '9' or 'a' or 'b')) return "JTI_VARIANT";
-                if (claims.RootElement.GetProperty("htm").GetString() != "POST") return "HTM";
-                if (claims.RootElement.GetProperty("htu").GetString() != BatchEndpoint.AbsoluteUri) return "HTU";
-                if (!Uri.TryCreate(BatchEndpoint.AbsoluteUri, UriKind.Absolute, out var htu) ||
-                    htu.Scheme != Uri.UriSchemeHttps ||
-                    htu.AbsolutePath != "/api/v1/sync/operations:batch") return "HTU_CANONICAL";
-                var issuedAt = DateTimeOffset.FromUnixTimeSeconds(claims.RootElement.GetProperty("iat").GetInt64());
-                if (issuedAt < DateTimeOffset.UtcNow.AddSeconds(-120) ||
-                    issuedAt > DateTimeOffset.UtcNow.AddSeconds(30)) return "IAT";
-                if (claims.RootElement.GetProperty("ath").GetString() !=
-                    Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(bearer)))) return "ATH";
-                if (claims.RootElement.GetProperty("tbh").GetString() !=
-                    Base64Url(SHA256.HashData(body))) return "TBH";
-                if (claims.RootElement.GetProperty("cid").GetString() != correlation.ToString("D")) return "CID";
-                if (Decode(claims.RootElement.GetProperty("nonce").GetString()!).Length != 32) return "NONCE";
-                return "STRICT_SHAPE";
-            }
-            catch (Exception exception)
-            {
-                return "DIAGNOSTIC_" + exception.GetType().Name;
-            }
-        }
-
-        private static byte[] Decode(string value)
-        {
-            var padded = value.Replace('-', '+').Replace('_', '/');
-            padded += new string('=', (4 - padded.Length % 4) % 4);
-            return Convert.FromBase64String(padded);
-        }
-    }
 }

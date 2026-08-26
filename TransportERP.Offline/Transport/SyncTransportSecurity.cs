@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace TransportERP.Offline.Transport;
@@ -103,7 +104,13 @@ internal sealed class SyncDpopProofFactory(IDeviceProofSigningKey signingKey, Ti
     private static byte[] WriteProtectedHeader(DevicePublicP256Jwk jwk)
     {
         using var output = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(output))
+        // The server's strict protected-header parser requires the literal raw token
+        // "dpop+jwt". The default encoder turns '+' into "\\u002B", which has the same
+        // parsed JSON value but is intentionally non-canonical for this wire contract.
+        using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions
+               {
+                   Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+               }))
         {
             writer.WriteStartObject();
             writer.WriteString("typ", "dpop+jwt");
