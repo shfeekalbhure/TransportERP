@@ -177,11 +177,8 @@ public sealed class EffectivePolicyConfigurationValidator(
 
         foreach (var branch in configuration.Branches)
         {
-            if (!configuration.TryGetCompany(branch.Key.CompanyId, out var company))
-            {
-                errors.Add($"Branch {branch.Key.BranchId:D} has no configured company policy.");
-                continue;
-            }
+            SyncPolicyRestriction? company = configuration.TryGetCompany(
+                branch.Key.CompanyId, out var configuredCompany) ? configuredCompany : null;
             var effective = resolver.Resolve(company, branch.Value, allActions, allActions);
             if (effective.ClosedReason == "INVALID_SCOPE_OVERRIDE")
                 errors.Add($"Branch {branch.Key.BranchId:D} sync policy widens or invalidates its company ceiling.");
@@ -189,12 +186,10 @@ public sealed class EffectivePolicyConfigurationValidator(
 
         foreach (var device in configuration.Devices)
         {
-            if (!configuration.TryGetCompany(device.CompanyId, out var company) ||
-                !configuration.TryGetBranch(device.CompanyId, device.BranchId, out var branch))
-            {
-                errors.Add($"Device {device.RegisteredDeviceId:D} has no complete configured company/branch policy chain.");
-                continue;
-            }
+            SyncPolicyRestriction? company = configuration.TryGetCompany(
+                device.CompanyId, out var configuredCompany) ? configuredCompany : null;
+            SyncPolicyRestriction? branch = configuration.TryGetBranch(
+                device.CompanyId, device.BranchId, out var configuredBranch) ? configuredBranch : null;
             var effective = resolver.Resolve(
                 company, branch, device.AllowedActions, allActions, device.Restriction);
             var branchEffective = resolver.Resolve(company, branch, allActions, allActions);
@@ -226,10 +221,12 @@ public sealed class EffectiveSyncPolicyProvider(
         if (!current.IsLocalSession || !current.BranchId.HasValue ||
             !current.RegisteredDeviceId.HasValue || string.IsNullOrEmpty(current.DeviceId))
             return resolver.Close("SYNC_SECURITY_CONTEXT_INCOMPLETE");
-        if (!configuration.TryGetCompany(current.CompanyId, out var company) ||
-            !configuration.TryGetBranch(current.CompanyId, current.BranchId.Value, out var branch) ||
-            !configuration.TryGetDevice(current.RegisteredDeviceId.Value, out var device))
+        if (!configuration.TryGetDevice(current.RegisteredDeviceId.Value, out var device))
             return resolver.Close("SYNC_SCOPE_POLICY_MISSING");
+        SyncPolicyRestriction? company = configuration.TryGetCompany(
+            current.CompanyId, out var configuredCompany) ? configuredCompany : null;
+        SyncPolicyRestriction? branch = configuration.TryGetBranch(
+            current.CompanyId, current.BranchId.Value, out var configuredBranch) ? configuredBranch : null;
         if (device.CompanyId != current.CompanyId || device.BranchId != current.BranchId ||
             !string.Equals(device.DeviceId, current.DeviceId, StringComparison.Ordinal))
             return resolver.Close("SYNC_DEVICE_POLICY_MISMATCH");
@@ -264,12 +261,14 @@ public sealed class EffectiveSyncRetryPolicyResolver(
         CancellationToken cancellationToken = default)
     {
         if (!branchId.HasValue || !registeredDeviceId.HasValue || string.IsNullOrEmpty(deviceId) ||
-            !configuration.TryGetCompany(companyId, out var company) ||
-            !configuration.TryGetBranch(companyId, branchId.Value, out var branch) ||
             !configuration.TryGetDevice(registeredDeviceId.Value, out var device) ||
             device.CompanyId != companyId || device.BranchId != branchId ||
             !string.Equals(device.DeviceId, deviceId, StringComparison.Ordinal))
             return ValueTask.FromResult<SyncRetryPolicy?>(null);
+        SyncPolicyRestriction? company = configuration.TryGetCompany(
+            companyId, out var configuredCompany) ? configuredCompany : null;
+        SyncPolicyRestriction? branch = configuration.TryGetBranch(
+            companyId, branchId.Value, out var configuredBranch) ? configuredBranch : null;
 
         var globalActions = global.Value.AllowedActions;
         var effective = resolver.Resolve(
@@ -292,13 +291,15 @@ public sealed class EffectiveSyncRetryPolicyResolver(
     {
         if (string.IsNullOrWhiteSpace(actionCode) || !branchId.HasValue || !registeredDeviceId.HasValue ||
             string.IsNullOrEmpty(deviceId) ||
-            !configuration.TryGetCompany(companyId, out var company) ||
-            !configuration.TryGetBranch(companyId, branchId.Value, out var branch) ||
             !configuration.TryGetDevice(registeredDeviceId.Value, out var device) ||
             device.CompanyId != companyId || device.BranchId != branchId ||
             !string.Equals(device.DeviceId, deviceId, StringComparison.Ordinal))
             return ValueTask.FromResult(
                 SyncExecutionPolicyDecision.Denied("SYNC_RUNTIME_POLICY_UNAVAILABLE"));
+        SyncPolicyRestriction? company = configuration.TryGetCompany(
+            companyId, out var configuredCompany) ? configuredCompany : null;
+        SyncPolicyRestriction? branch = configuration.TryGetBranch(
+            companyId, branchId.Value, out var configuredBranch) ? configuredBranch : null;
 
         // The business executor performs the final live permission check. This worker-side
         // decision re-applies every immutable hierarchy restriction immediately before claim,

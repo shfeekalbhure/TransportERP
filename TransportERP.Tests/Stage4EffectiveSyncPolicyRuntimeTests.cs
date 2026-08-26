@@ -11,18 +11,15 @@ namespace TransportERP.Tests;
 
 public sealed class Stage4EffectiveSyncPolicyRuntimeTests
 {
-    [Theory]
-    [InlineData("company")]
-    [InlineData("branch")]
-    [InlineData("device")]
-    public async Task Missing_governed_scope_in_immutable_source_fails_closed(string missing)
+    [Fact]
+    public async Task Missing_device_policy_in_immutable_source_fails_closed()
     {
         var scope = Scope();
         var configuration = Configuration(
             scope,
-            includeCompany: missing != "company",
-            includeBranch: missing != "branch",
-            includeDevice: missing != "device");
+            includeCompany: true,
+            includeBranch: true,
+            includeDevice: false);
         var provider = Provider(configuration,
             new HashSet<string>(["CreateWaybillDraft"], StringComparer.Ordinal));
 
@@ -31,6 +28,26 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
         Assert.False(effective.Enabled);
         Assert.Empty(effective.AllowedActions);
         Assert.Equal("SYNC_SCOPE_POLICY_MISSING", effective.ClosedReason);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public async Task Missing_company_or_branch_restriction_falls_back_toward_global(
+        bool includeCompany,
+        bool includeBranch)
+    {
+        var scope = Scope();
+        var configuration = Configuration(scope, includeCompany, includeBranch, includeDevice: true);
+        var provider = Provider(configuration,
+            new HashSet<string>(["CreateWaybillDraft"], StringComparer.Ordinal));
+
+        var effective = await provider.ResolveAsync(scope.Current);
+
+        Assert.True(effective.Enabled);
+        Assert.Contains("CreateWaybillDraft", effective.AllowedActions);
+        Assert.Null(effective.ClosedReason);
     }
 
     [Theory]
@@ -115,7 +132,7 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
     [Theory]
     [InlineData(false, true, false)]
     [InlineData(true, false, true)]
-    public void Orphaned_lower_scope_fails_startup_validation(
+    public void Lower_scope_without_optional_parent_uses_fallback_and_validates(
         bool includeCompany,
         bool includeBranch,
         bool includeDevice)
@@ -127,7 +144,7 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
         var result = new EffectivePolicyConfigurationValidator(
             new SyncEffectivePolicyResolver(options), options).Validate(source);
 
-        Assert.True(result.Failed);
+        Assert.False(result.Failed);
     }
 
     [Fact]
