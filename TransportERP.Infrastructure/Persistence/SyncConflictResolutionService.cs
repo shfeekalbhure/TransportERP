@@ -123,7 +123,25 @@ public sealed class SyncConflictResolutionService(
                 throw new SyncRuleException("invalid_dpop_proof", conflictCaseId.ToString());
             if (conflict.Status != "OPEN" || operation.Status != "CONFLICT" ||
                 conflict.Resolution is not null || conflict.ResolvedAt.HasValue || conflict.ReplacedByOperationId.HasValue)
-                throw new SyncRuleException("CONFLICT_ALREADY_RESOLVED", conflictCaseId.ToString());
+            {
+                if (!await IsExactResolutionReplayAsync(conflict, operation, request, cancellationToken))
+                    throw new SyncRuleException("CONFLICT_ALREADY_RESOLVED", conflictCaseId.ToString());
+
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncConflictResolutionReplayed", "SUCCESS", nameof(ConflictCase), conflict.Id,
+                    context.UserId, context.CompanyId, context.BranchId, context.CorrelationId,
+                    context.DeviceId,
+                    AfterJson: JsonSerializer.Serialize(new
+                    {
+                        Decision = conflict.Resolution,
+                        conflict.SyncOperationId,
+                        conflict.ReplacedByOperationId
+                    }),
+                    Reason: "IDEMPOTENT_RESOLUTION_REPLAY",
+                    OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return Result(conflict, operation, context.CorrelationId, conflict.ResolvedAt!.Value);
+            }
 
             if (request.Decision == SyncConflictResolutionDecisions.ReapplyAsNew)
             {
@@ -320,6 +338,50 @@ public sealed class SyncConflictResolutionService(
         {
             throw new SyncRuleException("REAPPLY_REQUEST_INVALID", exception.ParamName ?? original.Id.ToString());
         }
+    }
+
+    private async Task<bool> IsExactResolutionReplayAsync(
+        ConflictCase conflict,
+        SyncOperation original,
+        ResolveSyncConflictRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (conflict.Status != "RESOLVED" || !conflict.ResolvedAt.HasValue ||
+            !string.Equals(conflict.Resolution, request.Decision, StringComparison.Ordinal))
+            return false;
+
+        var originalReason = await db.AuditEvents.AsNoTracking()
+            .Where(x => x.Action == "SyncConflictResolved" && x.EntityId == conflict.Id)
+            .OrderBy(x => x.SequenceNo)
+            .Select(x => x.Reason)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!string.Equals(originalReason, request.Reason.Trim(), StringComparison.Ordinal))
+            return false;
+
+        if (request.Decision == SyncConflictResolutionDecisions.KeepServerAndRejectLocal)
+            return request.Reapply is null && original.Status == "REJECTED" &&
+                   original.ErrorCode == "KEEP_SERVER" && conflict.ReplacedByOperationId is null;
+
+        if (request.Reapply is null || !conflict.ReplacedByOperationId.HasValue ||
+            original.Status != "RESOLVED" || original.ErrorCode != "SUPERSEDED")
+            return false;
+
+        var replacement = await db.SyncOperations.AsNoTracking().SingleOrDefaultAsync(
+            x => x.Id == conflict.ReplacedByOperationId.Value, cancellationToken);
+        if (replacement is null) return false;
+        var reapply = request.Reapply;
+        return replacement.CompanyId == original.CompanyId && replacement.BranchId == original.BranchId &&
+               replacement.RegisteredDeviceId.HasValue &&
+               string.Equals(replacement.ProtocolVersion, "sync-v1", StringComparison.Ordinal) &&
+               string.Equals(replacement.ClientOperationId, reapply.ClientOperationId.Trim(), StringComparison.Ordinal) &&
+               replacement.OperationCorrelationId == reapply.OperationCorrelationId &&
+               string.Equals(replacement.ActionCode, reapply.ActionCode, StringComparison.Ordinal) &&
+               string.Equals(replacement.OperationType, reapply.OperationType, StringComparison.Ordinal) &&
+               string.Equals(replacement.EntityType, reapply.EntityType, StringComparison.Ordinal) &&
+               replacement.EntityId == reapply.EntityId && replacement.BaseVersion == reapply.BaseVersion &&
+               replacement.ClientOccurredAt == NormalizeTimestamp(reapply.ClientOccurredAt) &&
+               string.Equals(replacement.PayloadHash, reapply.PayloadHash.ToLowerInvariant(), StringComparison.Ordinal) &&
+               string.Equals(replacement.PayloadJson, reapply.PayloadJson, StringComparison.Ordinal);
     }
 
     private static void ValidateRequest(

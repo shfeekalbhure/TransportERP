@@ -79,12 +79,13 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
         var outcomes = await Task.WhenAll(
             Task.Run(() => Resolve(firstResolver)), Task.Run(() => Resolve(secondResolver)));
-        Assert.Single(outcomes, x => x == "SUCCESS");
-        Assert.Single(outcomes, x => x == "CONFLICT_ALREADY_RESOLVED");
+        Assert.Equal(2, outcomes.Count(x => x == "SUCCESS"));
 
         await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
         Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
             x.Action == "SyncConflictResolved" && x.EntityId == scope.ConflictId));
+        Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
+            x.Action == "SyncConflictResolutionReplayed" && x.EntityId == scope.ConflictId));
     }
 
     [Fact]
@@ -125,9 +126,17 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
         _ = await ResolveAsync(Service(db), scope, KeepRequest("final reason"));
         db.ChangeTracker.Clear();
-        var replay = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
-            Service(db), scope, KeepRequest("final reason")));
-        Assert.Equal("CONFLICT_ALREADY_RESOLVED", replay.Code);
+        var replayProof = await SeedFreshProofAsync(db, scope);
+        db.ChangeTracker.Clear();
+        var replay = await Service(db).ResolveAsync(
+            scope.ConflictId, KeepRequest("final reason"), replayProof.Context, replayProof.Proof);
+        Assert.Equal("RESOLVED", replay.ConflictStatus);
+        var changedReasonProof = await SeedFreshProofAsync(db, scope);
+        db.ChangeTracker.Clear();
+        var changedReason = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
+            scope.ConflictId, KeepRequest("different decision evidence"),
+            changedReasonProof.Context, changedReasonProof.Proof));
+        Assert.Equal("CONFLICT_ALREADY_RESOLVED", changedReason.Code);
     }
 
     [Fact]
@@ -205,6 +214,15 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         Assert.DoesNotContain(PayloadHash, resolutionAudit.AfterJson ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Proof", resolutionAudit.AfterJson ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(scope.OperationCorrelationId, resolutionAudit.OperationCorrelationId);
+
+        var replayProof = await SeedFreshProofAsync(db, scope);
+        db.ChangeTracker.Clear();
+        var replay = await Service(db).ResolveAsync(
+            scope.ConflictId, request, replayProof.Context, replayProof.Proof);
+        Assert.Equal(result.ReplacedByOperationId, replay.ReplacedByOperationId);
+        Assert.Equal(2, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
+        Assert.Single(await db.AuditEvents.Where(x =>
+            x.Action == "SyncConflictResolutionReplayed" && x.EntityId == scope.ConflictId).ToListAsync());
     }
 
     [Fact]
