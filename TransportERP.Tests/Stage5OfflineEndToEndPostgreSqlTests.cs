@@ -578,15 +578,29 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         {
             try
             {
+                if (proof.Length > SyncPopProofValidator.MaximumCompactProofBytes ||
+                    proof.Any(character => character > 0x7f)) return "COMPACT";
+                if (bearer.Length == 0 || bearer.Any(character => character > 0x7f)) return "BEARER";
                 var segments = proof.Split('.');
                 if (segments.Length != 3) return "SEGMENTS";
+                if (segments.Any(segment => segment.Length == 0 || segment.Contains('=') ||
+                    segment.Any(character => character is not (>= 'A' and <= 'Z' or >= 'a' and <= 'z' or
+                        >= '0' and <= '9' or '-' or '_')))) return "BASE64URL";
                 var headerBytes = Decode(segments[0]);
                 var claimBytes = Decode(segments[1]);
                 var signature = Decode(segments[2]);
                 if (signature.Length != 64) return "SIGNATURE_LENGTH";
                 using var header = JsonDocument.Parse(headerBytes);
                 using var claims = JsonDocument.Parse(claimBytes);
+                if (!Encoding.UTF8.GetString(headerBytes).StartsWith("{\"typ\":\"dpop+jwt\"", StringComparison.Ordinal))
+                    return "RAW_TYP";
+                if (!header.RootElement.EnumerateObject().Select(x => x.Name)
+                        .SequenceEqual(["typ", "alg", "jwk"], StringComparer.Ordinal)) return "HEADER_SHAPE";
                 var jwk = header.RootElement.GetProperty("jwk");
+                if (!jwk.EnumerateObject().Select(x => x.Name)
+                        .SequenceEqual(["kty", "crv", "x", "y"], StringComparer.Ordinal)) return "JWK_SHAPE";
+                if (claims.RootElement.EnumerateObject().Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() !=
+                    claims.RootElement.EnumerateObject().Count()) return "DUPLICATE_CLAIM";
                 if (header.RootElement.GetProperty("typ").GetString() != "dpop+jwt") return "TYP";
                 if (header.RootElement.GetProperty("alg").GetString() != "ES256") return "ALG";
                 var x = Decode(jwk.GetProperty("x").GetString()!);
@@ -605,6 +619,9 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 if (jtiText.ToLowerInvariant()[19] is not ('8' or '9' or 'a' or 'b')) return "JTI_VARIANT";
                 if (claims.RootElement.GetProperty("htm").GetString() != "POST") return "HTM";
                 if (claims.RootElement.GetProperty("htu").GetString() != BatchEndpoint.AbsoluteUri) return "HTU";
+                if (!Uri.TryCreate(BatchEndpoint.AbsoluteUri, UriKind.Absolute, out var htu) ||
+                    htu.Scheme != Uri.UriSchemeHttps ||
+                    htu.AbsolutePath != "/api/v1/sync/operations:batch") return "HTU_CANONICAL";
                 var issuedAt = DateTimeOffset.FromUnixTimeSeconds(claims.RootElement.GetProperty("iat").GetInt64());
                 if (issuedAt < DateTimeOffset.UtcNow.AddSeconds(-120) ||
                     issuedAt > DateTimeOffset.UtcNow.AddSeconds(30)) return "IAT";
