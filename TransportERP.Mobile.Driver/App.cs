@@ -2,7 +2,7 @@ using TransportERP.Mobile.Driver.Offline;
 
 namespace TransportERP.Mobile.Driver;
 
-public sealed class App : Application
+public sealed class App : Microsoft.Maui.Controls.Application
 {
     private readonly DriverOfflineActivationService _activation;
     private readonly DriverAuthenticatedActivationCoordinator _authenticatedActivation;

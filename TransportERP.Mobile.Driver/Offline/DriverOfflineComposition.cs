@@ -56,8 +56,8 @@ public sealed record DriverOfflineOperationStatusView(
         operation.ConflictReview?.BaseVersion,
         SanitizeConflictReason(operation.ConflictReview?.ConflictReason),
         operation.ConflictReview?.ServerSnapshot?.CurrentVersion,
-        RedactedLocalSnapshot(operation.ConflictReview),
-        RedactedServerSnapshot(operation.ConflictReview),
+        BuildRedactedLocalSnapshot(operation.ConflictReview),
+        BuildRedactedServerSnapshot(operation.ConflictReview),
         operation.ConflictReview is { IsDecisionReady: true, BaseVersion: > 0 });
 
     private static string SanitizeActionCode(string? code) => code switch
@@ -83,12 +83,12 @@ public sealed record DriverOfflineOperationStatusView(
         _ => "INVALID_CONFLICT_REASON"
     };
 
-    private static string? RedactedLocalSnapshot(OfflineConflictReview? review) => review?.LocalSnapshot is { } local
+    private static string? BuildRedactedLocalSnapshot(OfflineConflictReview? review) => review?.LocalSnapshot is { } local
         ? $"action={SanitizeActionCode(local.ActionCode)},entityType={SanitizeActionCode(local.EntityType)}," +
           $"entityId={local.EntityId?.ToString("D") ?? "NONE"},base={local.BaseVersion}"
         : null;
 
-    private static string? RedactedServerSnapshot(OfflineConflictReview? review) => review?.ServerSnapshot is { } server
+    private static string? BuildRedactedServerSnapshot(OfflineConflictReview? review) => review?.ServerSnapshot is { } server
         ? $"entityType={SanitizeActionCode(server.EntityType)},entityId={server.EntityId?.ToString("D") ?? "NONE"}," +
           $"exists={server.Exists},version={server.CurrentVersion?.ToString() ?? "NONE"}"
         : null;

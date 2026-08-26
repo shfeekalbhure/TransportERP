@@ -111,6 +111,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             "DriverDeviceTestActivity.cs");
         var selfTest = Read("TransportERP.Mobile.Driver", "DeviceTesting",
             "AndroidDriverRuntimeSelfTest.cs");
+        var signer = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
+            "AndroidKeystoreDeviceSigningKey.cs");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("Condition=\"'$(TransportERPDeviceTests)' == 'true'\"", project,
@@ -298,9 +300,9 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("SanitizeResultCode(operation.ResultCode)", composition,
             StringComparison.Ordinal);
         Assert.Contains("operation.ConflictReview?.BaseVersion", composition, StringComparison.Ordinal);
-        Assert.Contains("RedactedLocalSnapshot(operation.ConflictReview)", composition,
+        Assert.Contains("BuildRedactedLocalSnapshot(operation.ConflictReview)", composition,
             StringComparison.Ordinal);
-        Assert.Contains("RedactedServerSnapshot(operation.ConflictReview)", composition,
+        Assert.Contains("BuildRedactedServerSnapshot(operation.ConflictReview)", composition,
             StringComparison.Ordinal);
     }
 
