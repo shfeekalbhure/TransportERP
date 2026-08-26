@@ -5,7 +5,6 @@ namespace TransportERP.Desktop.Application;
 internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
 {
     private readonly Label _offlineStatus;
-    private readonly TextBox _publicOrigin;
     private readonly TextBox _userName;
     private readonly TextBox _password;
     private readonly TextBox _companyId;
@@ -36,7 +35,6 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
             Dock = DockStyle.Top,
             Padding = new Padding(16)
         };
-        _publicOrigin = Input("https://transport.example/");
         _userName = Input();
         _password = Input(password: true);
         _companyId = Input();
@@ -77,7 +75,6 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
             Padding = new Padding(16)
         };
         body.Controls.Add(_offlineStatus);
-        body.Controls.Add(Field("عنوان خادم HTTPS العام", _publicOrigin));
         body.Controls.Add(Field("اسم المستخدم أو البريد", _userName));
         body.Controls.Add(Field("كلمة المرور", _password));
         body.Controls.Add(Field("معرّف الشركة", _companyId));
@@ -167,7 +164,6 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _signIn.Enabled = false;
         _offlineStatus.Text = "جارٍ التحقق من الجلسة والجهاز والسياسة...";
         SignInRequested?.Invoke(this, new DesktopOnlineSignInRequest(
-            _publicOrigin.Text,
             _userName.Text,
             _password.Text,
             companyId,

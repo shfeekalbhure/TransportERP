@@ -13,7 +13,6 @@ using TransportERP.Offline.Transport;
 namespace TransportERP.Desktop.Application;
 
 internal sealed record DesktopOnlineSignInRequest(
-    string PublicOrigin,
     string UserNameOrEmail,
     string Password,
     Guid CompanyId,
@@ -21,6 +20,28 @@ internal sealed record DesktopOnlineSignInRequest(
     string DeviceId,
     string DeviceCredential,
     string DeviceSigningCertificateThumbprint);
+
+/// <summary>
+/// Immutable deployment trust anchor compiled into this Desktop binary. The repository default is
+/// deliberately non-routable; a governed release must replace this constant with its verified
+/// public HTTPS origin and produce a new signed binary. Runtime/UI/env/argument overrides are forbidden.
+/// </summary>
+internal static class DesktopDeploymentAuthority
+{
+    private const string BinaryPublicOrigin = "https://api.transporterp.invalid/";
+
+    internal static Uri Origin { get; } = CreateOrigin();
+
+    private static Uri CreateOrigin()
+    {
+        var origin = new Uri(BinaryPublicOrigin, UriKind.Absolute);
+        if (origin.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(origin.UserInfo) ||
+            !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) ||
+            origin.AbsolutePath != "/")
+            throw new InvalidOperationException("DESKTOP_DEPLOYMENT_AUTHORITY_INVALID");
+        return origin;
+    }
+}
 
 internal sealed record DesktopOnlineAuthenticationResult(
     bool Succeeded,
@@ -81,8 +102,8 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_bearer is not null)
             return DesktopOnlineAuthenticationResult.Denied("DESKTOP_SESSION_REPLAY_DENIED");
-        if (!TryCanonicalOrigin(request.PublicOrigin, out var origin) ||
-            string.IsNullOrWhiteSpace(request.UserNameOrEmail) ||
+        var origin = DesktopDeploymentAuthority.Origin;
+        if (string.IsNullOrWhiteSpace(request.UserNameOrEmail) ||
             string.IsNullOrEmpty(request.Password) ||
             request.CompanyId == Guid.Empty || request.BranchId == Guid.Empty ||
             string.IsNullOrWhiteSpace(request.DeviceId) ||
@@ -92,7 +113,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
 
         try
         {
-            var session = await CreateSessionAsync(origin!, request, cancellationToken);
+            var session = await CreateSessionAsync(origin, request, cancellationToken);
             if (session is null)
                 return DesktopOnlineAuthenticationResult.Denied("AUTHENTICATED_SCOPE_INVALID");
             if (session.SessionId == Guid.Empty || session.UserId == Guid.Empty ||
@@ -100,16 +121,16 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 !string.Equals(session.DeviceId, request.DeviceId.Trim(), StringComparison.Ordinal) ||
                 session.AccessTokenExpiresAt <= DateTimeOffset.UtcNow.AddSeconds(30))
                 return await RejectProvisionalSessionAsync(
-                    origin!, session, "AUTHENTICATED_SCOPE_INVALID", cancellationToken);
+                    origin, session, "AUTHENTICATED_SCOPE_INVALID", cancellationToken);
 
             var bearer = new VolatileBearerTokenProvider(session.AccessToken);
             try
             {
-                var authorization = await GetSyncActivationAsync(origin!, bearer, cancellationToken);
-                if (!TryValidateActivation(origin!, session, authorization, out var batchEndpoint,
+                var authorization = await GetSyncActivationAsync(origin, bearer, cancellationToken);
+                if (!TryValidateActivation(origin, session, authorization, out var batchEndpoint,
                         out var allowedActions, out var proofBinding))
                     return await RejectProvisionalSessionAsync(
-                        origin!, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
+                        origin, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
 
                 var scope = new DesktopAuthenticatedSessionScope(
                     session.CompanyId, session.BranchId.Value, session.UserId, authorization!.RegisteredDeviceId);
@@ -151,7 +172,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 _syncHttpClient?.Dispose();
                 _syncHttpClient = null;
                 return await RejectProvisionalSessionAsync(
-                    origin!, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
+                    origin, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
             }
             finally
             {
@@ -445,18 +466,6 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
             await bounded.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
         return JsonSerializer.Deserialize<T>(bounded.ToArray(), ApiJson);
-    }
-
-    private static bool TryCanonicalOrigin(string value, out Uri? origin)
-    {
-        origin = null;
-        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var candidate) ||
-            !string.Equals(candidate.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-            !string.IsNullOrEmpty(candidate.UserInfo) || !string.IsNullOrEmpty(candidate.Query) ||
-            !string.IsNullOrEmpty(candidate.Fragment) || candidate.AbsolutePath != "/")
-            return false;
-        origin = new Uri(candidate.GetLeftPart(UriPartial.Authority) + "/", UriKind.Absolute);
-        return true;
     }
 
     private HttpClient AuthenticationHttpClient =>

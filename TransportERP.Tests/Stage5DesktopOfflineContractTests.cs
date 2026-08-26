@@ -94,6 +94,18 @@ public sealed class Stage5DesktopOfflineContractTests
         var composition = onlineAuth.IndexOf("DesktopOfflineComposition.CreateAsync", StringComparison.Ordinal);
         Assert.True(login >= 0 && login < policy && policy < composition);
 
+        var requestStart = onlineAuth.IndexOf("internal sealed record DesktopOnlineSignInRequest(", StringComparison.Ordinal);
+        var requestEnd = onlineAuth.IndexOf(");", requestStart, StringComparison.Ordinal);
+        Assert.True(requestStart >= 0 && requestEnd > requestStart);
+        Assert.DoesNotContain("Origin", onlineAuth[requestStart..requestEnd], StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("_publicOrigin", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("عنوان خادم", shell, StringComparison.Ordinal);
+        Assert.Contains("internal static class DesktopDeploymentAuthority", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("private const string BinaryPublicOrigin", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("https://api.transporterp.invalid/", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("var origin = DesktopDeploymentAuthority.Origin", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("TryCanonicalOrigin", onlineAuth, StringComparison.Ordinal);
+
         Assert.Contains("Uri.UriSchemeHttps", onlineAuth, StringComparison.Ordinal);
         Assert.Contains("AllowAutoRedirect = false", onlineAuth, StringComparison.Ordinal);
         Assert.Contains("UseCookies = false", onlineAuth, StringComparison.Ordinal);
@@ -124,6 +136,8 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.DoesNotContain("WindowsCertificateDeviceProofSigningKeyStore", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("ProbeDpopNonceAsync", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("DeviceCredential =", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("args[", onlineAuth, StringComparison.Ordinal);
     }
 
     [Fact]
