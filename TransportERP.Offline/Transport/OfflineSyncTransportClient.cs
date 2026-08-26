@@ -352,15 +352,29 @@ public sealed class OfflineSyncTransportClient
                     acceptedPending++;
                     break;
                 case "SUCCEEDED":
+                    if (result.ResultEntityId is not { } resultEntityId || resultEntityId == Guid.Empty)
+                    {
+                        var malformedSuccess = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                        CountFailure(malformedSuccess, ref retryScheduled, ref rejected);
+                        break;
+                    }
                     await _store.MarkSucceededAsync(operation.LocalOperationId,
-                        operation.AttemptCorrelationId!.Value, result.ResultEntityId, result.ResultVersion,
+                        operation.AttemptCorrelationId!.Value, resultEntityId, result.ResultVersion,
                         result.ServerOperationId, cancellationToken);
                     succeeded++;
                     break;
                 case "CONFLICT" when result.ConflictCaseId is { } conflictCaseId && conflictCaseId != Guid.Empty:
+                    if (!TryCreateConflictReview(operation, result, out var conflictReview))
+                    {
+                        var malformedConflict = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                        CountFailure(malformedConflict, ref retryScheduled, ref rejected);
+                        break;
+                    }
                     await _store.MarkConflictAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, conflictCaseId,
-                        result.ErrorCode ?? "BASE_VERSION_CONFLICT", result.ServerOperationId,
+                        result.ErrorCode ?? "BASE_VERSION_CONFLICT", conflictReview, result.ServerOperationId,
                         cancellationToken);
                     conflicted++;
                     break;
@@ -391,6 +405,40 @@ public sealed class OfflineSyncTransportClient
 
         return new(operations.Count, succeeded, conflicted, rejected, retryScheduled, acceptedPending);
     }
+
+    private static bool TryCreateConflictReview(
+        OfflineOperation operation,
+        SyncV1OperationResult result,
+        out OfflineConflictReview review)
+    {
+        review = null!;
+        var source = result.ConflictReview;
+        if (result.ServerOperationId is not { } serverOperationId || serverOperationId == Guid.Empty ||
+            source is null || source.BaseVersion is not { } baseVersion || baseVersion <= 0 ||
+            operation.BaseVersion != baseVersion || !IsSafeReviewCode(source.ConflictReason) ||
+            !string.Equals(result.ErrorCode, source.ConflictReason, StringComparison.Ordinal) ||
+            source.LocalSnapshot is not { } local ||
+            source.ServerSnapshot is not { } server || source.Status != "OPEN" ||
+            source.Resolution is not null || source.ResolvedByAuthorizedUser || source.ResolvedAt.HasValue ||
+            source.ReplacedByOperationId.HasValue || local.RequestedBaseVersion != baseVersion ||
+            local.ActionCode != operation.ActionCode || local.EntityType != operation.EntityType ||
+            local.EntityId != operation.EntityId || server.EntityType != operation.EntityType ||
+            server.EntityId != operation.EntityId || server.Exists is null)
+            return false;
+
+        review = new OfflineConflictReview(
+            baseVersion,
+            source.ConflictReason,
+            new OfflineConflictLocalSnapshot(local.ActionCode, local.EntityType, local.EntityId, baseVersion),
+            new OfflineConflictServerSnapshot(server.EntityType, server.EntityId, server.Exists.Value,
+                server.CurrentVersion),
+            source.Status);
+        return review.IsDecisionReady;
+    }
+
+    private static bool IsSafeReviewCode(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= 120 &&
+        value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
 
     private async Task<OfflineSyncTransportRunResult> CompleteRequestFailureAsync(
         IReadOnlyList<OfflineOperation> operations,

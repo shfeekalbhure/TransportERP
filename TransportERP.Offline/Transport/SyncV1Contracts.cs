@@ -30,7 +30,31 @@ public sealed record SyncV1OperationResult(
     long? ResultVersion,
     string? ErrorCode,
     Guid? ConflictCaseId,
-    DateTimeOffset ServerTime);
+    DateTimeOffset ServerTime,
+    SyncV1ConflictReview? ConflictReview = null);
+
+public sealed record SyncV1ConflictLocalSnapshot(
+    string? ActionCode,
+    string? EntityType,
+    Guid? EntityId,
+    long? RequestedBaseVersion);
+
+public sealed record SyncV1ConflictServerSnapshot(
+    string? EntityType,
+    Guid? EntityId,
+    bool? Exists,
+    long? CurrentVersion);
+
+public sealed record SyncV1ConflictReview(
+    long? BaseVersion,
+    string? ConflictReason,
+    SyncV1ConflictLocalSnapshot? LocalSnapshot,
+    SyncV1ConflictServerSnapshot? ServerSnapshot,
+    string? Status,
+    string? Resolution,
+    bool ResolvedByAuthorizedUser,
+    DateTimeOffset? ResolvedAt,
+    Guid? ReplacedByOperationId);
 
 public sealed record SyncV1BatchResponse(
     string ProtocolVersion,

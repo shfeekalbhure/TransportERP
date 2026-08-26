@@ -78,15 +78,27 @@ public sealed class OfflineSyncConflictClient
         var nonce = await AcquireNonceAsync(endpoint, body, bearer, cancellationToken);
         var signed = await SendSignedAsync(endpoint, htu, body, bearer, nonce, cancellationToken);
         var response = signed.Response;
-        if (response.ConflictCaseId != conflictCaseId || response.CorrelationId != signed.CorrelationId ||
+        if (response.ConflictCaseId != conflictCaseId ||
+            response.OriginalOperationId != operation.ServerOperationId ||
+            response.CorrelationId != signed.CorrelationId ||
             !string.Equals(response.ConflictStatus, "RESOLVED", StringComparison.Ordinal) ||
             !string.Equals(response.Decision,
                 decision == OfflineConflictDecision.KeepServer ? KeepServerDecision : ReapplyDecision,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal) || response.ResolvedAt == default ||
+            (decision == OfflineConflictDecision.KeepServer &&
+                (response.OriginalOperationStatus != "REJECTED" || response.ReplacedByOperationId.HasValue)) ||
+            (decision == OfflineConflictDecision.Reapply &&
+                (response.OriginalOperationStatus != "RESOLVED" ||
+                 response.ReplacedByOperationId is not { } replacement || replacement == Guid.Empty)))
             throw new SyncTransportException("CONFLICT_RESPONSE_INVALID", retryable: true);
 
+        var scope = new OfflineOperationScope(_options.CompanyId, _options.BranchId, _options.UserId,
+            _options.RegisteredDeviceId);
         await _store.MarkResolvedAsync(localOperationId,
             decision == OfflineConflictDecision.KeepServer ? "KEEP_SERVER" : "REAPPLY_AS_NEW",
+            new OfflineConflictResolutionOutcome(response.Decision, response.ConflictStatus, true,
+                response.ResolvedAt, response.ReplacedByOperationId),
+            scope,
             cancellationToken);
     }
 
@@ -188,7 +200,8 @@ public sealed class OfflineSyncConflictClient
     private void Validate(OfflineOperation operation, OfflineConflictDecision decision, long? baseVersion)
     {
         if (operation.Status != OfflineOperationStatus.Conflict || operation.ConflictCaseId is null ||
-            operation.ConflictCaseId == Guid.Empty)
+            operation.ConflictCaseId == Guid.Empty || operation.ServerOperationId is null ||
+            operation.ServerOperationId == Guid.Empty || operation.ConflictReview is not { IsDecisionReady: true })
             throw new OfflineStoreException("LOCAL_STATE_CONFLICT", "Only a server-bound conflict can be resolved.");
         if (operation.CompanyId != _options.CompanyId || operation.BranchId != _options.BranchId ||
             operation.UserId != _options.UserId || operation.RegisteredDeviceId != _options.RegisteredDeviceId)

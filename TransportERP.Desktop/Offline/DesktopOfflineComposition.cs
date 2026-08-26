@@ -140,7 +140,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
         var scope = Scope(_options);
         return new SyncOperationsForm(new SyncOperationsController(
             new StoreOperationsQuery(outbox, scope),
-            new StoreManualRetryService(outbox),
+            new StoreManualRetryService(outbox, scope),
             new StoreConflictActionService(
                 _conflictClient ?? throw Unavailable(), _dependencies.ReapplyVersions),
             _dependencies.UiPermissions));
@@ -165,10 +165,12 @@ public sealed class DesktopOfflineRuntime : IDisposable
             store.ListAsync(scope, cancellationToken);
     }
 
-    private sealed class StoreManualRetryService(OfflineOperationStore store) : ISyncManualRetryService
+    private sealed class StoreManualRetryService(
+        OfflineOperationStore store,
+        OfflineOperationScope scope) : ISyncManualRetryService
     {
         public Task RetryAsync(Guid localOperationId, CancellationToken cancellationToken = default) =>
-            store.RequeueFailedAsync(localOperationId, cancellationToken);
+            store.RequeueFailedAsync(localOperationId, scope, cancellationToken);
     }
 
     private sealed class StoreConflictActionService(

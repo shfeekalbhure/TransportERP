@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using TransportERP.Offline.Transport;
 
 namespace TransportERP.Offline.Tests;
@@ -22,7 +23,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var nonce = Base64Url(RandomNumberGenerator.GetBytes(32));
         const string bearer = "volatile-session-token";
         byte[]? challengeBody = null;
@@ -67,7 +68,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        await store.EnqueueAsync(Request());
+        await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var firstNonce = Base64Url(RandomNumberGenerator.GetBytes(32));
         var refreshedNonce = Base64Url(RandomNumberGenerator.GetBytes(32));
@@ -102,7 +103,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var signedRequests = new List<CapturedRequest>();
         var call = 0;
@@ -163,7 +164,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var signed = new List<CapturedRequest>();
         var call = 0;
@@ -211,7 +212,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var path = Path.Combine(_directory, "supervised-outbox.db");
         var firstStore = new OfflineOperationStore(path, new FixedKeyProvider(_outboxKey, _cacheKey));
         await firstStore.InitializeAsync();
-        var queued = await firstStore.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(firstStore, Request());
 
         var reopened = new OfflineOperationStore(path, new FixedKeyProvider(_outboxKey, _cacheKey));
         await reopened.InitializeAsync();
@@ -255,7 +256,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     public async Task A_second_supervisor_cannot_drain_the_same_local_outbox()
     {
         var store = await CreateStoreAsync(TimeProvider.System);
-        await store.EnqueueAsync(Request());
+        await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var signedEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseSigned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -288,7 +289,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkSucceededAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
             Guid.NewGuid(), 1);
@@ -313,7 +314,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     public async Task Supervisor_recovers_after_unexpected_transport_failure_and_drains_the_leased_operation()
     {
         var store = await CreateStoreAsync(TimeProvider.System);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var calls = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
@@ -372,7 +373,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var call = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
@@ -401,7 +402,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         using var http = new HttpClient(new DelegateHandler((request, _) => Task.FromResult(
             statusCode == HttpStatusCode.InternalServerError
@@ -427,7 +428,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
             new FixedKeyProvider(_outboxKey, _cacheKey), clock,
             new OfflineRetryPolicy(0, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)));
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         using var http = new HttpClient(new DelegateHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))));
@@ -442,13 +443,71 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Malformed_business_success_without_result_entity_fails_closed_and_retries()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var call = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++call == 1) return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            var wire = Assert.Single(ReadBatch(captured.Body).Operations);
+            var malformed = OperationResult(wire, "SUCCEEDED", resultVersion: 2) with { ResultEntityId = null };
+            return Json(HttpStatusCode.OK, new SyncV1BatchResponse(
+                "sync-v1", [malformed], clock.GetUtcNow(), captured.AttemptCorrelationId));
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(0, outcome.Succeeded);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted.Status);
+        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Null(persisted.ResultEntityId);
+    }
+
+    [Fact]
+    public async Task Conflict_without_complete_redacted_review_fails_closed_and_retries()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var call = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++call == 1) return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            var wire = Assert.Single(ReadBatch(captured.Body).Operations);
+            var malformed = OperationResult(wire, "CONFLICT", "BASE_VERSION_CONFLICT") with
+                { ConflictReview = null };
+            return Json(HttpStatusCode.OK, new SyncV1BatchResponse(
+                "sync-v1", [malformed], clock.GetUtcNow(), captured.AttemptCorrelationId));
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(0, outcome.Conflicted);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted.Status);
+        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Null(persisted.ConflictCaseId);
+        Assert.Null(persisted.ConflictReview);
+    }
+
+    [Fact]
     public async Task Partial_batch_results_are_matched_by_both_stable_operation_identities()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var first = await store.EnqueueAsync(Request());
-        var second = await store.EnqueueAsync(Request(Guid.NewGuid()) with { PayloadJson = "{\"amount\":43}" });
-        var third = await store.EnqueueAsync(Request(Guid.NewGuid()) with { PayloadJson = "{\"amount\":44}" });
+        var first = await EnqueueRequestAsync(store, Request());
+        var second = await EnqueueRequestAsync(store, Request(Guid.NewGuid()) with { PayloadJson = "{\"amount\":43}" });
+        var third = await EnqueueRequestAsync(store, Request(Guid.NewGuid()) with { PayloadJson = "{\"amount\":44}" });
         using var key = new TestSigningKey();
         var call = 0;
         Guid? wireAttempt = null;
@@ -481,6 +540,9 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(OfflineOperationStatus.Succeeded, completedFirst.Status);
         Assert.Equal(OfflineOperationStatus.Conflict, completedSecond.Status);
         Assert.NotNull(completedSecond.ConflictCaseId);
+        Assert.True(completedSecond.ConflictReview?.IsDecisionReady == true);
+        Assert.Equal(second.Operation.BaseVersion, completedSecond.ConflictReview!.BaseVersion);
+        Assert.Equal(second.Operation.EntityId, completedSecond.ConflictReview.ServerSnapshot.EntityId);
         Assert.Equal(OfflineOperationStatus.Rejected, completedThird.Status);
         var localAttempts = new[]
         {
@@ -495,7 +557,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request() with { BranchId = Guid.NewGuid() });
+        var queued = await EnqueueRequestAsync(store, Request() with { BranchId = Guid.NewGuid() });
         using var key = new TestSigningKey();
         var calls = 0;
         using var http = new HttpClient(new DelegateHandler((_, _) =>
@@ -532,7 +594,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var call = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
@@ -565,7 +627,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         var call = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
@@ -590,7 +652,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
         const string bearer = "high-entropy-volatile-bearer-marker";
         var nonce = Base64Url(RandomNumberGenerator.GetBytes(32));
@@ -624,11 +686,12 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         var conflictCaseId = Guid.NewGuid();
         await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
-            conflictCaseId, "BASE_VERSION_CONFLICT");
+            conflictCaseId, "BASE_VERSION_CONFLICT", ConflictReview(claimed),
+            StableServerOperationId(queued.Operation.ClientOperationId));
         using var key = new TestSigningKey();
         var signed = new List<CapturedRequest>();
         var wireCorrelations = new List<Guid>();
@@ -645,7 +708,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
             var resolution = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(captured.Body,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             return Json(HttpStatusCode.OK, new SyncV1ConflictResolutionResponse(
-                conflictCaseId, Guid.NewGuid(), resolution.Decision, "RESOLVED", "RESOLVED",
+                conflictCaseId, StableServerOperationId(queued.Operation.ClientOperationId),
+                resolution.Decision, "RESOLVED", "RESOLVED",
                 null, Guid.NewGuid(), clock.GetUtcNow(), captured.AttemptCorrelationId));
         }));
         var options = new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
@@ -684,10 +748,10 @@ public sealed class OfflineSyncTransportTests : IDisposable
     public async Task Conflict_reason_must_be_explicit_bounded_safe_text(string reason)
     {
         var store = await CreateStoreAsync(TimeProvider.System);
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
-            Guid.NewGuid(), "BASE_VERSION_CONFLICT");
+            Guid.NewGuid(), "BASE_VERSION_CONFLICT", ConflictReview(claimed));
         using var key = new TestSigningKey();
         using var http = new HttpClient(new DelegateHandler((_, _) =>
             throw new InvalidOperationException("An invalid reason must fail before HTTP.")));
@@ -733,13 +797,39 @@ public sealed class OfflineSyncTransportTests : IDisposable
         BranchId,
         UserId,
         RegisteredDeviceId,
-        "CreateWaybillDraft",
-        "CREATE",
+        "UpdateWaybillDraft",
+        "UPDATE",
         "Waybill",
-        null,
-        null,
+        Guid.Parse("55555555-5555-5555-5555-555555555555"),
+        1,
         new DateTimeOffset(2026, 8, 26, 9, 30, 0, TimeSpan.Zero),
         "{\"amount\":42}");
+
+    private static Task<OfflineEnqueueResult> EnqueueRequestAsync(
+        OfflineOperationStore store,
+        OfflineOperationEnqueueRequest request) =>
+        store.EnqueueAsync(new OfflineOperationEnqueueTemplate(
+                request.LocalIntentId, request.CompanyId, request.BranchId, request.UserId,
+                request.RegisteredDeviceId, request.ActionCode, request.OperationType, request.EntityType,
+                request.EntityId, request.BaseVersion, request.ClientOccurredAt),
+            identity => BindPayloadIdentity(request.PayloadJson, identity.ClientOperationId));
+
+    private static string BindPayloadIdentity(string payloadJson, string clientOperationId)
+    {
+        var payload = JsonNode.Parse(payloadJson)?.AsObject()
+            ?? throw new InvalidOperationException("The test payload must be an object.");
+        payload["clientOperationId"] = clientOperationId;
+        return payload.ToJsonString();
+    }
+
+    private static OfflineConflictReview ConflictReview(OfflineOperation operation) => new(
+        operation.BaseVersion ?? 1,
+        "BASE_VERSION_CONFLICT",
+        new OfflineConflictLocalSnapshot(operation.ActionCode, operation.EntityType, operation.EntityId,
+            operation.BaseVersion ?? 1),
+        new OfflineConflictServerSnapshot(operation.EntityType, operation.EntityId, true,
+            (operation.BaseVersion ?? 1) + 1),
+        "OPEN");
 
     private static OfflineOperationScope Scope() => new(CompanyId, BranchId, UserId, RegisteredDeviceId);
 
@@ -779,16 +869,30 @@ public sealed class OfflineSyncTransportTests : IDisposable
         operation.OperationCorrelationId,
         StableServerOperationId(operation.ClientOperationId),
         operation.ActionCode,
-        resultEntityId,
+        resultEntityId ?? (status == "SUCCEEDED" ? StableResultEntityId(operation.ClientOperationId) : null),
         status,
         resultVersion,
         errorCode,
         status == "CONFLICT" ? Guid.NewGuid() : null,
-        DateTimeOffset.UtcNow);
+        DateTimeOffset.UtcNow,
+        status == "CONFLICT" ? new SyncV1ConflictReview(
+            operation.BaseVersion,
+            errorCode ?? "BASE_VERSION_CONFLICT",
+            new SyncV1ConflictLocalSnapshot(operation.ActionCode, operation.EntityType, operation.EntityId,
+                operation.BaseVersion),
+            new SyncV1ConflictServerSnapshot(operation.EntityType, operation.EntityId, true,
+                operation.BaseVersion + 1),
+            "OPEN", null, false, null, null) : null);
 
     private static Guid StableServerOperationId(string clientOperationId)
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes("server-operation|" + clientOperationId));
+        return new Guid(hash.AsSpan(0, 16));
+    }
+
+    private static Guid StableResultEntityId(string clientOperationId)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("result-entity|" + clientOperationId));
         return new Guid(hash.AsSpan(0, 16));
     }
 

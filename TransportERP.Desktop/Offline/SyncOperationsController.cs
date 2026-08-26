@@ -29,8 +29,10 @@ public sealed class SyncOperationsController
             x => x.LocalOperationId,
             x => new AllowedUiActions(
                 x.Status == OfflineOperationStatus.Failed && _permissions.CanRetry(x),
-                x.Status == OfflineOperationStatus.Conflict && _permissions.CanResolveConflict(x, SyncConflictDecision.KeepServer),
-                x.Status == OfflineOperationStatus.Conflict && _permissions.CanResolveConflict(x, SyncConflictDecision.Reapply)));
+                x.Status == OfflineOperationStatus.Conflict && x.ConflictReview?.IsDecisionReady == true &&
+                    _permissions.CanResolveConflict(x, SyncConflictDecision.KeepServer),
+                x.Status == OfflineOperationStatus.Conflict && x.ConflictReview?.IsDecisionReady == true &&
+                    _permissions.CanResolveConflict(x, SyncConflictDecision.Reapply)));
 
         return operations
             .OrderByDescending(x => x.UpdatedAt)
@@ -79,6 +81,8 @@ public sealed class SyncOperationsController
             return SyncUiActionResult.InvalidState();
         if (!_permissions.CanResolveConflict(operation, decision))
             return SyncUiActionResult.Denied();
+        if (operation.ConflictReview?.IsDecisionReady != true)
+            return SyncUiActionResult.ReviewRequired();
 
         if (string.IsNullOrWhiteSpace(reason))
             return new SyncUiActionResult(false, "CONFLICT_REASON_REQUIRED", "أدخل سببًا واضحًا ومراجعًا للقرار.");

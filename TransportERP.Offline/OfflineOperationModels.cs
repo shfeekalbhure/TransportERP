@@ -73,6 +73,7 @@ public sealed record OfflineOperation(
     DateTimeOffset? LeaseExpiresAt,
     string? ResultCode,
     Guid? ConflictCaseId,
+    OfflineConflictReview? ConflictReview,
     Guid? ServerOperationId,
     Guid? ResultEntityId,
     long? ResultVersion,
@@ -80,6 +81,46 @@ public sealed record OfflineOperation(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? AcknowledgedAt,
     DateTimeOffset? RedactedAt);
+
+public sealed record OfflineConflictLocalSnapshot(
+    string ActionCode,
+    string EntityType,
+    Guid? EntityId,
+    long BaseVersion);
+
+public sealed record OfflineConflictServerSnapshot(
+    string EntityType,
+    Guid? EntityId,
+    bool Exists,
+    long? CurrentVersion);
+
+/// <summary>
+/// Metadata-only review material persisted inside the encrypted write-outbox database. It never
+/// carries the original business payload, bearer/proof material, or an identifiable resolver id.
+/// </summary>
+public sealed record OfflineConflictReview(
+    long BaseVersion,
+    string ConflictReason,
+    OfflineConflictLocalSnapshot LocalSnapshot,
+    OfflineConflictServerSnapshot ServerSnapshot,
+    string Status,
+    string? Resolution = null,
+    bool ResolvedByAuthorizedUser = false,
+    DateTimeOffset? ResolvedAt = null,
+    Guid? ReplacedByOperationId = null)
+{
+    public bool IsDecisionReady => BaseVersion > 0 &&
+        !string.IsNullOrWhiteSpace(ConflictReason) &&
+        Status == "OPEN" && Resolution is null && !ResolvedAt.HasValue &&
+        LocalSnapshot is not null && ServerSnapshot is not null;
+}
+
+public sealed record OfflineConflictResolutionOutcome(
+    string Resolution,
+    string ConflictStatus,
+    bool ResolvedByAuthorizedUser,
+    DateTimeOffset ResolvedAt,
+    Guid? ReplacedByOperationId);
 
 public sealed record OfflineEnqueueResult(OfflineOperation Operation, bool Created);
 
@@ -112,7 +153,7 @@ public sealed record OfflineRetryPolicy(
 
     internal void Validate()
     {
-        if (MaxRetryCount < 0 || MaxRetryCount > 100)
+        if (MaxRetryCount < 0 || MaxRetryCount > 5)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxRetryCount));
         }

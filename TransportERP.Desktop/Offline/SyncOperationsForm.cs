@@ -15,6 +15,14 @@ public sealed class SyncOperationsForm : Form
     private readonly Button _keepServer = new() { Text = "الاحتفاظ بنسخة الخادم", AutoSize = true };
     private readonly Button _reapply = new() { Text = "إعادة التطبيق", AutoSize = true };
     private readonly TextBox _reason = new() { Width = 280, PlaceholderText = "سبب قرار التعارض (مطلوب)" };
+    private readonly CheckBox _reviewConfirmed = new() { Text = "راجعت بيانات التعارض المعروضة", AutoSize = true };
+    private readonly Label _baseVersion = new() { AutoSize = true };
+    private readonly Label _conflictReason = new() { AutoSize = true };
+    private readonly Label _localSnapshot = new() { AutoSize = true, MaximumSize = new Size(900, 0) };
+    private readonly Label _serverSnapshot = new() { AutoSize = true, MaximumSize = new Size(900, 0) };
+    private readonly Label _decision = new() { AutoSize = true };
+    private readonly Label _resolver = new() { AutoSize = true };
+    private readonly Label _conflictResult = new() { AutoSize = true };
     private readonly Label _message = new() { AutoSize = true };
     private readonly CancellationTokenSource _lifetime = new();
     private bool _busy;
@@ -36,18 +44,21 @@ public sealed class SyncOperationsForm : Form
             FlowDirection = FlowDirection.RightToLeft,
             Padding = new Padding(8)
         };
-        actions.Controls.AddRange([_refresh, _retry, _keepServer, _reapply, _reason, _message]);
+        actions.Controls.AddRange([_refresh, _retry, _keepServer, _reapply, _reason, _reviewConfirmed, _message]);
 
         _refresh.Click += async (_, _) => await RefreshRowsAsync();
         _retry.Click += async (_, _) => await RunSelectedAsync(_controller.RetryAsync);
         _keepServer.Click += async (_, _) => await RunConflictAsync(_controller.KeepServerAsync);
         _reapply.Click += async (_, _) => await RunConflictAsync(_controller.ReapplyAsync);
-        _operations.SelectionChanged += (_, _) => UpdateActions();
+        _operations.SelectionChanged += (_, _) => UpdateConflictReview();
+        _reason.TextChanged += (_, _) => UpdateActions();
+        _reviewConfirmed.CheckedChanged += (_, _) => UpdateActions();
         Shown += async (_, _) => await RefreshRowsAsync();
 
         Controls.Add(_operations);
+        Controls.Add(CreateConflictReviewPanel());
         Controls.Add(actions);
-        UpdateActions();
+        UpdateConflictReview();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -107,7 +118,8 @@ public sealed class SyncOperationsForm : Form
     private async Task RunConflictAsync(
         Func<Guid, string, CancellationToken, Task<SyncUiActionResult>> action)
     {
-        if (_busy || Selected is not { } selected)
+        if (_busy || Selected is not { HasCompleteConflictReview: true } selected ||
+            !_reviewConfirmed.Checked || string.IsNullOrWhiteSpace(_reason.Text))
             return;
 
         await RunBusyAsync(async () =>
@@ -117,6 +129,7 @@ public sealed class SyncOperationsForm : Form
             if (result.Succeeded)
             {
                 _reason.Clear();
+                _reviewConfirmed.Checked = false;
                 _operations.DataSource = (await _controller.RefreshAsync(_lifetime.Token)).ToList();
             }
         });
@@ -152,10 +165,66 @@ public sealed class SyncOperationsForm : Form
     private void UpdateActions()
     {
         var selected = Selected;
+        var reviewed = selected?.HasCompleteConflictReview == true && _reviewConfirmed.Checked &&
+            !string.IsNullOrWhiteSpace(_reason.Text);
         _refresh.Enabled = !_busy;
         _retry.Enabled = !_busy && _controller.CanRetry(selected);
-        _keepServer.Enabled = !_busy && _controller.CanResolve(selected, SyncConflictDecision.KeepServer);
-        _reapply.Enabled = !_busy && _controller.CanResolve(selected, SyncConflictDecision.Reapply);
+        _keepServer.Enabled = !_busy && reviewed &&
+            _controller.CanResolve(selected, SyncConflictDecision.KeepServer);
+        _reapply.Enabled = !_busy && reviewed &&
+            _controller.CanResolve(selected, SyncConflictDecision.Reapply);
+        _reason.Enabled = !_busy && selected?.HasCompleteConflictReview == true;
+        _reviewConfirmed.Enabled = !_busy && selected?.HasCompleteConflictReview == true;
+    }
+
+    private void UpdateConflictReview()
+    {
+        _reviewConfirmed.Checked = false;
+        var review = Selected?.ConflictReview;
+        _baseVersion.Text = review is null ? "—" : review.BaseVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _conflictReason.Text = review?.ConflictReason ?? "—";
+        _localSnapshot.Text = review?.LocalSnapshot ?? "—";
+        _serverSnapshot.Text = review?.ServerSnapshot ?? "—";
+        _decision.Text = review?.Resolution ?? "—";
+        _resolver.Text = review?.Resolver ?? "—";
+        _conflictResult.Text = review?.Result ?? "—";
+        UpdateActions();
+    }
+
+    private Control CreateConflictReviewPanel()
+    {
+        var table = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ColumnCount = 2,
+            RightToLeft = RightToLeft.Yes
+        };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        AddReviewRow(table, "الإصدار الأساسي", _baseVersion);
+        AddReviewRow(table, "سبب التعارض", _conflictReason);
+        AddReviewRow(table, "لقطة العميل المنقّحة", _localSnapshot);
+        AddReviewRow(table, "لقطة الخادم المنقّحة", _serverSnapshot);
+        AddReviewRow(table, "القرار", _decision);
+        AddReviewRow(table, "المقرّر", _resolver);
+        AddReviewRow(table, "نتيجة الحل", _conflictResult);
+        return new GroupBox
+        {
+            Text = "مراجعة التعارض (بيانات منقّحة فقط)",
+            Dock = DockStyle.Bottom,
+            Height = 220,
+            Padding = new Padding(8),
+            Controls = { table }
+        };
+    }
+
+    private static void AddReviewRow(TableLayoutPanel table, string title, Control value)
+    {
+        var row = table.RowCount++;
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) }, 0, row);
+        table.Controls.Add(value, 1, row);
     }
 
     private static DataGridViewTextBoxColumn Column(string property, string title) => new()

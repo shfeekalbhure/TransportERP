@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using TransportERP.Offline;
 
 namespace TransportERP.Offline.Tests;
@@ -18,8 +19,8 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var firstStore = Store(path);
         await firstStore.InitializeAsync();
 
-        var first = await firstStore.EnqueueAsync(request);
-        var duplicate = await firstStore.EnqueueAsync(request);
+        var first = await EnqueueRequestAsync(firstStore, request);
+        var duplicate = await EnqueueRequestAsync(firstStore, request);
         var reopened = Store(path);
         await reopened.InitializeAsync();
         var afterRestart = await reopened.GetAsync(first.Operation.LocalOperationId, Scope());
@@ -32,8 +33,10 @@ public sealed class OfflineOperationStoreTests : IDisposable
         Assert.Equal(OfflineOperationStatus.Queued, afterRestart.Status);
 
         var changed = request with { PayloadJson = "{\"amount\":43}" };
-        var error = await Assert.ThrowsAsync<OfflineStoreException>(() => reopened.EnqueueAsync(changed));
-        Assert.Equal("LOCAL_IDEMPOTENCY_MISMATCH", error.Code);
+        var payloadReplay = await EnqueueRequestAsync(reopened, changed);
+        Assert.False(payloadReplay.Created);
+        Assert.Equal(first.Operation.LocalOperationId, payloadReplay.Operation.LocalOperationId);
+        Assert.Equal(first.Operation.PayloadHash, payloadReplay.Operation.PayloadHash);
     }
 
     [Fact]
@@ -43,7 +46,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         await store.InitializeAsync();
         var request = Request();
 
-        var results = await Task.WhenAll(store.EnqueueAsync(request), store.EnqueueAsync(request));
+        var results = await Task.WhenAll(EnqueueRequestAsync(store, request), EnqueueRequestAsync(store, request));
 
         Assert.Single(results, result => result.Created);
         Assert.Single(results, result => !result.Created);
@@ -88,15 +91,15 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
         var store = Store(OutboxPath(), clock);
         await store.InitializeAsync();
-        var oldest = await store.EnqueueAsync(Request());
+        var oldest = await EnqueueRequestAsync(store, Request());
 
         clock.Advance(TimeSpan.FromDays(7) - TimeSpan.FromTicks(1));
-        var beforeBoundary = await store.EnqueueAsync(Request(Guid.NewGuid()));
+        var beforeBoundary = await EnqueueRequestAsync(store, Request(Guid.NewGuid()));
         Assert.True(beforeBoundary.Created);
 
         clock.Advance(TimeSpan.FromTicks(1));
         var blocked = await Assert.ThrowsAsync<OfflineStoreException>(() =>
-            store.EnqueueAsync(Request(Guid.NewGuid())));
+            EnqueueRequestAsync(store, Request(Guid.NewGuid())));
 
         Assert.Equal("OFFLINE_QUEUE_ESCALATION_REQUIRED", blocked.Code);
         Assert.Equal(OfflineOperationStatus.Queued,
@@ -111,9 +114,9 @@ public sealed class OfflineOperationStoreTests : IDisposable
         await store.InitializeAsync();
 
         var unknown = await Assert.ThrowsAsync<OfflineStoreException>(() =>
-            store.EnqueueAsync(Request() with { ActionCode = "UnknownAction" }));
+            EnqueueRequestAsync(store, Request() with { ActionCode = "UnknownAction" }));
         var delete = await Assert.ThrowsAsync<OfflineStoreException>(() =>
-            store.EnqueueAsync(Request(Guid.NewGuid()) with { OperationType = "DELETE" }));
+            EnqueueRequestAsync(store, Request(Guid.NewGuid()) with { OperationType = "DELETE" }));
 
         Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", unknown.Code);
         Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", delete.Code);
@@ -127,7 +130,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var path = OutboxPath();
         var store = Store(path, clock);
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var firstAttempt = await store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1), Scope());
 
         clock.Advance(TimeSpan.FromMinutes(2));
@@ -148,7 +151,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
     {
         var store = Store(OutboxPath());
         await store.InitializeAsync();
-        await store.EnqueueAsync(Request());
+        await EnqueueRequestAsync(store, Request());
 
         var claims = await Task.WhenAll(
             store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1), Scope()),
@@ -164,7 +167,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 26, 8, 0, 0, TimeSpan.Zero));
         var store = Store(OutboxPath(), clock);
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var first = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkTransportFailureAsync(first!.LocalOperationId, first.AttemptCorrelationId!.Value, true, "TIMEOUT");
 
@@ -185,7 +188,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var policy = new OfflineRetryPolicy(2, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(4));
         var store = Store(OutboxPath(), clock, policy);
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
 
         for (var attemptNumber = 0; attemptNumber < 3; attemptNumber++)
         {
@@ -214,22 +217,56 @@ public sealed class OfflineOperationStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Conflict_can_be_resolved_but_stale_attempt_cannot_complete_it()
+    public void Client_retry_configuration_can_only_tighten_the_global_ceiling()
+    {
+        _ = Store(OutboxPath(), retryPolicy: new OfflineRetryPolicy(5));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Store(OutboxPath(), retryPolicy: new OfflineRetryPolicy(6)));
+    }
+
+    [Fact]
+    public async Task Legacy_payload_enqueue_fails_closed_before_persistence()
     {
         var store = Store(OutboxPath());
         await store.InitializeAsync();
-        await store.EnqueueAsync(Request());
+#pragma warning disable CS0618
+        var denied = await Assert.ThrowsAsync<OfflineStoreException>(() => store.EnqueueAsync(Request()));
+#pragma warning restore CS0618
+        Assert.Equal("OFFLINE_IDENTITY_FACTORY_REQUIRED", denied.Code);
+        Assert.Empty(await store.ListAsync(Scope()));
+    }
+
+    [Fact]
+    public async Task Conflict_can_be_resolved_but_stale_attempt_cannot_complete_it()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 26, 8, 0, 0, TimeSpan.Zero));
+        var store = Store(OutboxPath(), clock);
+        await store.InitializeAsync();
+        await EnqueueRequestAsync(store, Request());
         var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         var conflictCaseId = Guid.NewGuid();
         await store.MarkConflictAsync(attempt!.LocalOperationId, attempt.AttemptCorrelationId!.Value,
-            conflictCaseId, "BASE_VERSION_CONFLICT");
-        await store.MarkResolvedAsync(attempt.LocalOperationId, "KEEP_SERVER");
+            conflictCaseId, "BASE_VERSION_CONFLICT", ConflictReview(attempt));
+        var encryptedBytes = Directory.EnumerateFiles(_directory).SelectMany(File.ReadAllBytes).ToArray();
+        Assert.DoesNotContain("BASE_VERSION_CONFLICT", Encoding.UTF8.GetString(encryptedBytes),
+            StringComparison.Ordinal);
+        await store.MarkResolvedAsync(attempt.LocalOperationId, "KEEP_SERVER",
+            new OfflineConflictResolutionOutcome("KEEP_SERVER_AND_REJECT_LOCAL", "RESOLVED", true,
+                clock.GetUtcNow(), null), Scope());
 
         var operation = await store.GetAsync(attempt.LocalOperationId, Scope());
         Assert.Equal(OfflineOperationStatus.Resolved, operation!.Status);
         Assert.Equal(conflictCaseId, operation.ConflictCaseId);
         await Assert.ThrowsAsync<OfflineStoreException>(() =>
             store.MarkSucceededAsync(attempt.LocalOperationId, attempt.AttemptCorrelationId.Value, null, null));
+
+        clock.Advance(TimeSpan.FromHours(24));
+        Assert.Equal(1, await store.RedactExpiredPayloadsAsync());
+        var redacted = (await store.GetAsync(attempt.LocalOperationId, Scope()))!;
+        Assert.Null(redacted.PayloadJson);
+        Assert.Null(redacted.ConflictReview);
+        Assert.Equal(conflictCaseId, redacted.ConflictCaseId);
+        Assert.Equal("KEEP_SERVER", redacted.ResultCode);
     }
 
     [Fact]
@@ -237,12 +274,12 @@ public sealed class OfflineOperationStoreTests : IDisposable
     {
         var store = Store(OutboxPath());
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkTransportFailureAsync(attempt!.LocalOperationId,
             attempt.AttemptCorrelationId!.Value, true, "TIMEOUT");
 
-        await store.RequeueFailedAsync(queued.Operation.LocalOperationId);
+        await store.RequeueFailedAsync(queued.Operation.LocalOperationId, Scope());
         var listed = Assert.Single(await store.ListAsync(Scope()));
 
         Assert.Equal(OfflineOperationStatus.Queued, listed.Status);
@@ -251,8 +288,51 @@ public sealed class OfflineOperationStoreTests : IDisposable
         Assert.Null(listed.AttemptCorrelationId);
         Assert.Null(listed.ResultCode);
         var error = await Assert.ThrowsAsync<OfflineStoreException>(() =>
-            store.RequeueFailedAsync(listed.LocalOperationId));
+            store.RequeueFailedAsync(listed.LocalOperationId, Scope()));
         Assert.Equal("LOCAL_STATE_CONFLICT", error.Code);
+    }
+
+    [Fact]
+    public async Task Manual_retry_and_resolution_are_denied_for_every_cross_scope_identity()
+    {
+        var store = Store(OutboxPath());
+        await store.InitializeAsync();
+        var failed = await EnqueueRequestAsync(store, Request());
+        var failedAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
+        await store.MarkTransportFailureAsync(failedAttempt!.LocalOperationId,
+            failedAttempt.AttemptCorrelationId!.Value, true, "TIMEOUT");
+
+        var wrongScopes = new[]
+        {
+            Scope() with { CompanyId = Guid.NewGuid() },
+            Scope() with { BranchId = Guid.NewGuid() },
+            Scope() with { UserId = Guid.NewGuid() },
+            Scope() with { RegisteredDeviceId = Guid.NewGuid() }
+        };
+        foreach (var wrongScope in wrongScopes)
+        {
+            var retryDenied = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+                store.RequeueFailedAsync(failed.Operation.LocalOperationId, wrongScope));
+            Assert.Equal("LOCAL_STATE_CONFLICT", retryDenied.Code);
+        }
+        Assert.Equal(OfflineOperationStatus.Failed,
+            (await store.GetAsync(failed.Operation.LocalOperationId, Scope()))!.Status);
+
+        var conflict = await EnqueueRequestAsync(store, Request(Guid.NewGuid()));
+        var conflictAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
+        await store.MarkConflictAsync(conflictAttempt!.LocalOperationId,
+            conflictAttempt.AttemptCorrelationId!.Value, Guid.NewGuid(), "BASE_VERSION_CONFLICT",
+            ConflictReview(conflictAttempt));
+        var resolution = new OfflineConflictResolutionOutcome("KEEP_SERVER_AND_REJECT_LOCAL", "RESOLVED",
+            true, DateTimeOffset.UtcNow, null);
+        foreach (var wrongScope in wrongScopes)
+        {
+            var resolveDenied = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+                store.MarkResolvedAsync(conflict.Operation.LocalOperationId, "KEEP_SERVER", resolution, wrongScope));
+            Assert.Equal("LOCAL_STATE_CONFLICT", resolveDenied.Code);
+        }
+        Assert.Equal(OfflineOperationStatus.Conflict,
+            (await store.GetAsync(conflict.Operation.LocalOperationId, Scope()))!.Status);
     }
 
     [Fact]
@@ -260,7 +340,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
     {
         var store = Store(OutboxPath());
         await store.InitializeAsync();
-        var queued = await store.EnqueueAsync(Request());
+        var queued = await EnqueueRequestAsync(store, Request());
         var other = Scope() with { UserId = Guid.NewGuid() };
 
         Assert.Null(await store.GetAsync(queued.Operation.LocalOperationId, other));
@@ -277,13 +357,13 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 26, 8, 0, 0, TimeSpan.Zero));
         var store = Store(OutboxPath(), clock);
         await store.InitializeAsync();
-        var succeeded = await store.EnqueueAsync(Request());
+        var succeeded = await EnqueueRequestAsync(store, Request());
         var succeededAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkSucceededAsync(succeededAttempt!.LocalOperationId, succeededAttempt.AttemptCorrelationId!.Value, Guid.NewGuid(), 1);
-        var rejected = await store.EnqueueAsync(Request(Guid.NewGuid()));
+        var rejected = await EnqueueRequestAsync(store, Request(Guid.NewGuid()));
         var rejectedAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkRejectedAsync(rejectedAttempt!.LocalOperationId, rejectedAttempt.AttemptCorrelationId!.Value, "SCOPE_DENIED");
-        var pending = await store.EnqueueAsync(Request(Guid.NewGuid()));
+        var pending = await EnqueueRequestAsync(store, Request(Guid.NewGuid()));
 
         clock.Advance(TimeSpan.FromHours(24));
         var concurrentCleanup = await Task.WhenAll(store.RedactExpiredPayloadsAsync(), store.RedactExpiredPayloadsAsync());
@@ -305,7 +385,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var path = OutboxPath();
         var store = Store(path);
         await store.InitializeAsync();
-        await store.EnqueueAsync(Request());
+        await EnqueueRequestAsync(store, Request());
         var originalLength = new FileInfo(path).Length;
 
         var wrongKeyStore = new OfflineOperationStore(path, new FixedKeyProvider(RandomNumberGenerator.GetBytes(32), _cacheKey));
@@ -329,11 +409,11 @@ public sealed class OfflineOperationStoreTests : IDisposable
         await store.InitializeAsync();
         var rawSecret = "secret-material-that-must-never-be-persisted";
         var secretRequest = Request() with { PayloadJson = $"{{\"accessToken\":\"{rawSecret}\"}}" };
-        var denied = await Assert.ThrowsAsync<OfflineStoreException>(() => store.EnqueueAsync(secretRequest));
+        var denied = await Assert.ThrowsAsync<OfflineStoreException>(() => EnqueueRequestAsync(store, secretRequest));
         Assert.Equal("TRANSPORT_SECRET_PERSISTENCE_DENIED", denied.Code);
 
         var businessMarker = "business-payload-plaintext-marker";
-        await store.EnqueueAsync(Request(Guid.NewGuid()) with { PayloadJson = $"{{\"note\":\"{businessMarker}\"}}" });
+        await EnqueueRequestAsync(store, Request(Guid.NewGuid()) with { PayloadJson = $"{{\"note\":\"{businessMarker}\"}}" });
         var bytes = Directory.EnumerateFiles(directory).SelectMany(File.ReadAllBytes).ToArray();
         var fileText = Encoding.UTF8.GetString(bytes);
         Assert.DoesNotContain(rawSecret, fileText, StringComparison.Ordinal);
@@ -406,13 +486,39 @@ public sealed class OfflineOperationStoreTests : IDisposable
         Guid.Parse("22222222-2222-2222-2222-222222222222"),
         Guid.Parse("33333333-3333-3333-3333-333333333333"),
         Guid.Parse("44444444-4444-4444-4444-444444444444"),
-        "CreateWaybillDraft",
-        "CREATE",
+        "UpdateWaybillDraft",
+        "UPDATE",
         "Waybill",
-        null,
-        null,
+        Guid.Parse("55555555-5555-5555-5555-555555555555"),
+        1,
         new DateTimeOffset(2026, 8, 26, 7, 0, 0, TimeSpan.Zero),
         "{\"amount\":42}");
+
+    private static Task<OfflineEnqueueResult> EnqueueRequestAsync(
+        OfflineOperationStore store,
+        OfflineOperationEnqueueRequest request) =>
+        store.EnqueueAsync(new OfflineOperationEnqueueTemplate(
+                request.LocalIntentId, request.CompanyId, request.BranchId, request.UserId,
+                request.RegisteredDeviceId, request.ActionCode, request.OperationType, request.EntityType,
+                request.EntityId, request.BaseVersion, request.ClientOccurredAt),
+            identity => BindPayloadIdentity(request.PayloadJson, identity.ClientOperationId));
+
+    private static string BindPayloadIdentity(string payloadJson, string clientOperationId)
+    {
+        var payload = JsonNode.Parse(payloadJson)?.AsObject()
+            ?? throw new InvalidOperationException("The test payload must be an object.");
+        payload["clientOperationId"] = clientOperationId;
+        return payload.ToJsonString();
+    }
+
+    private static OfflineConflictReview ConflictReview(OfflineOperation operation) => new(
+        operation.BaseVersion ?? 1,
+        "BASE_VERSION_CONFLICT",
+        new OfflineConflictLocalSnapshot(operation.ActionCode, operation.EntityType, operation.EntityId,
+            operation.BaseVersion ?? 1),
+        new OfflineConflictServerSnapshot(operation.EntityType, operation.EntityId, true,
+            (operation.BaseVersion ?? 1) + 1),
+        "OPEN");
 
     private static OfflineOperationEnqueueTemplate Template(Guid? localIntentId = null) => new(
         localIntentId ?? Guid.NewGuid(),

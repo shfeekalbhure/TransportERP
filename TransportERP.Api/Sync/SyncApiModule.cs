@@ -367,17 +367,138 @@ public sealed record SyncBatchOperationResult(
     long? ResultVersion,
     string? ErrorCode,
     Guid? ConflictCaseId,
-    DateTimeOffset ServerTime)
+    DateTimeOffset ServerTime,
+    SyncConflictReviewResult? ConflictReview = null)
 {
     public static SyncBatchOperationResult From(SyncOperation operation, DateTimeOffset serverTime)
         => new(operation.ClientOperationId, operation.OperationCorrelationId, operation.Id, operation.ActionCode,
             operation.ResultEntityId, operation.Status, operation.ResultVersion, operation.ErrorCode,
-            operation.ConflictCase?.Id, serverTime);
+            operation.ConflictCase?.Id, serverTime, SyncConflictReviewResult.From(operation.ConflictCase));
 
     public static SyncBatchOperationResult Rejected(SyncBatchOperationRequest? item, string code,
         DateTimeOffset serverTime, string status = "REJECTED")
         => new(item?.ClientOperationId, item?.OperationCorrelationId, null, item?.ActionCode, null,
             status, null, code, null, serverTime);
+}
+
+public sealed record SyncConflictLocalSnapshotResult(
+    string? ActionCode,
+    string? EntityType,
+    Guid? EntityId,
+    long? RequestedBaseVersion);
+
+public sealed record SyncConflictServerSnapshotResult(
+    string? EntityType,
+    Guid? EntityId,
+    bool? Exists,
+    long? CurrentVersion);
+
+/// <summary>
+/// Allowlisted conflict-review metadata. Raw conflict snapshots and resolver identities never
+/// cross the HTTP boundary, even if an old database row contains more fields than the current
+/// metadata-only conflict writer.
+/// </summary>
+public sealed record SyncConflictReviewResult(
+    long? BaseVersion,
+    string ConflictReason,
+    SyncConflictLocalSnapshotResult? LocalSnapshot,
+    SyncConflictServerSnapshotResult? ServerSnapshot,
+    string Status,
+    string? Resolution,
+    bool ResolvedByAuthorizedUser,
+    DateTimeOffset? ResolvedAt,
+    Guid? ReplacedByOperationId)
+{
+    public static SyncConflictReviewResult? From(ConflictCase? conflict)
+    {
+        if (conflict is null) return null;
+        return new SyncConflictReviewResult(
+            conflict.BaseVersion,
+            SafeCode(conflict.ConflictReason, "CONFLICT"),
+            ReadLocal(conflict.DeviceSnapshot),
+            ReadServer(conflict.ServerSnapshot),
+            conflict.Status is "OPEN" or "RESOLVED" ? conflict.Status : "UNKNOWN",
+            conflict.Resolution is SyncConflictResolutionDecisions.KeepServerAndRejectLocal or
+                SyncConflictResolutionDecisions.ReapplyAsNew ? conflict.Resolution : null,
+            !string.IsNullOrWhiteSpace(conflict.ResolvedBy),
+            conflict.ResolvedAt,
+            conflict.ReplacedByOperationId);
+    }
+
+    private static SyncConflictLocalSnapshotResult? ReadLocal(string? json)
+    {
+        if (!TryObject(json, out var document)) return null;
+        using (document)
+        {
+            var root = document.RootElement;
+            var result = new SyncConflictLocalSnapshotResult(
+                OptionalCode(root, "ActionCode"), OptionalCode(root, "EntityType"),
+                OptionalGuid(root, "EntityId"), OptionalInt64(root, "RequestedBaseVersion"));
+            return result.ActionCode is not null && result.EntityType is not null &&
+                   result.RequestedBaseVersion is > 0 ? result : null;
+        }
+    }
+
+    private static SyncConflictServerSnapshotResult? ReadServer(string? json)
+    {
+        if (!TryObject(json, out var document)) return null;
+        using (document)
+        {
+            var root = document.RootElement;
+            var result = new SyncConflictServerSnapshotResult(
+                OptionalCode(root, "EntityType"), OptionalGuid(root, "EntityId"),
+                OptionalBoolean(root, "Exists"), OptionalInt64(root, "CurrentVersion"));
+            return result.EntityType is not null && result.Exists.HasValue ? result : null;
+        }
+    }
+
+    private static bool TryObject(string? json, out JsonDocument document)
+    {
+        document = null!;
+        if (string.IsNullOrWhiteSpace(json) || Encoding.UTF8.GetByteCount(json) > 4096) return false;
+        try
+        {
+            document = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 8
+            });
+            if (document.RootElement.ValueKind == JsonValueKind.Object) return true;
+            document.Dispose();
+            document = null!;
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string? OptionalCode(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? SafeCode(value.GetString(), null)
+            : null;
+
+    private static Guid? OptionalGuid(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String &&
+           Guid.TryParseExact(value.GetString(), "D", out var parsed) ? parsed : null;
+
+    private static long? OptionalInt64(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.TryGetInt64(out var parsed) ? parsed : null;
+
+    private static bool? OptionalBoolean(JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : null;
+
+    private static string? SafeCode(string? value, string? fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 120) return fallback;
+        return value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.')
+            ? value
+            : fallback;
+    }
 }
 
 public sealed record SyncBatchResponse(
