@@ -70,8 +70,11 @@ public sealed class SyncConflictResolutionService(
     TransportErpDbContext db,
     AuditEventService audit,
     IEffectivePermissionResolver permissions,
-    SyncOperationService syncOperations) : ISyncConflictResolutionService
+    SyncOperationService syncOperations,
+    TimeProvider? timeProvider = null) : ISyncConflictResolutionService
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
     public async Task<SyncConflictResolutionResult> ResolveAsync(
         Guid conflictCaseId,
         ResolveSyncConflictRequest request,
@@ -168,7 +171,7 @@ public sealed class SyncConflictResolutionService(
                     replacement.EntityId != operation.EntityId || replacement.Status != "QUEUED")
                     throw new SyncRuleException("REAPPLY_SCOPE_MISMATCH", conflictCaseId.ToString());
 
-                var reapplyNow = NormalizeTimestamp(DateTimeOffset.UtcNow);
+                var reapplyNow = NormalizeTimestamp(clock.GetUtcNow());
                 conflict.Status = "RESOLVED";
                 conflict.Resolution = SyncConflictResolutionDecisions.ReapplyAsNew;
                 conflict.ResolvedBy = context.UserId.ToString();
@@ -194,7 +197,7 @@ public sealed class SyncConflictResolutionService(
                 return Result(conflict, operation, context.CorrelationId, reapplyNow);
             }
 
-            var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
+            var now = NormalizeTimestamp(clock.GetUtcNow());
             conflict.Status = "RESOLVED";
             conflict.Resolution = SyncConflictResolutionDecisions.KeepServerAndRejectLocal;
             conflict.ResolvedBy = context.UserId.ToString();
@@ -237,7 +240,7 @@ public sealed class SyncConflictResolutionService(
             conflict.CompanyId != context.CompanyId || conflict.BranchId != context.BranchId)
             throw new SyncRuleException("SCOPE_DENIED", conflict.Id.ToString());
 
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var inactivityCutoff = now - TimeSpan.FromDays(90);
         var activeBinding = await (
             from device in db.RegisteredDevices.AsNoTracking()
@@ -274,7 +277,7 @@ public sealed class SyncConflictResolutionService(
         AcceptedSyncProofContext proof,
         CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var exists = await db.SyncProofReplays.AsNoTracking().AnyAsync(x =>
             x.Id == proof.ReplayId && x.UserId == proof.UserId && x.CompanyId == proof.CompanyId &&
             x.BranchId == proof.BranchId && x.RegisteredDeviceId == proof.RegisteredDeviceId &&

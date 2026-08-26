@@ -99,12 +99,12 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
         var oldContext = Context(scope);
         var oldProofError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest("old proof must not resolve"), oldContext,
+            scope.ConflictId, KeepRequest("old request must not resolve"), oldContext,
             Proof(scope, oldContext) with { ReplayId = scope.OriginalReplayId }));
         Assert.Equal("invalid_dpop_proof", oldProofError.Code);
 
         var forgedProofError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest("unpersisted proof must not resolve"), oldContext,
+            scope.ConflictId, KeepRequest("unpersisted request must not resolve"), oldContext,
             Proof(scope, oldContext) with { ReplayId = Guid.NewGuid() }));
         Assert.Equal("invalid_dpop_proof", forgedProofError.Code);
 
@@ -251,14 +251,9 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
                 $"replacement-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE", "Waybill",
                 scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
 
-        var resolved = await ResolveAsync(Service(db), scope, request);
         var cutoff = DateTimeOffset.UtcNow.AddDays(-91);
-        var conflict = await db.ConflictCases.SingleAsync(x => x.Id == scope.ConflictId);
-        var original = await db.SyncOperations.SingleAsync(x => x.Id == scope.OperationId);
+        var resolved = await ResolveAsync(Service(db, timeProvider: new FixedTimeProvider(cutoff)), scope, request);
         var replacement = await db.SyncOperations.SingleAsync(x => x.Id == resolved.ReplacedByOperationId);
-        conflict.ResolvedAt = cutoff;
-        conflict.UpdatedAt = cutoff;
-        original.UpdatedAt = cutoff;
         replacement.Status = "SUCCEEDED";
         replacement.ResultEntityId = scope.EntityId;
         replacement.ResultVersion = 3;
@@ -476,9 +471,12 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         return service.ResolveAsync(scope.ConflictId, request, actualContext, Proof(scope, actualContext));
     }
 
-    private static SyncConflictResolutionService Service(TransportErpDbContext db, bool allowOriginal = true)
+    private static SyncConflictResolutionService Service(
+        TransportErpDbContext db,
+        bool allowOriginal = true,
+        TimeProvider? timeProvider = null)
         => new(db, new AuditEventService(db), new TestPermissionResolver(allowOriginal),
-            OperationService(db));
+            OperationService(db), timeProvider);
 
     private static SyncOperationService OperationService(TransportErpDbContext db)
         => new(db, new AuditEventService(db), new SyncRetryPolicy(5,
@@ -720,4 +718,9 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
     private sealed record ResolverFixture(
         SyncConflictResolutionContext Context,
         AcceptedSyncProofContext Proof);
+
+    private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+    }
 }
