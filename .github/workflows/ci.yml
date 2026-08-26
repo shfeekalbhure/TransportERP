@@ -278,7 +278,7 @@ jobs:
           retention-days: 30
 
   mobile-contract:
-    name: Required CI / Mobile offline contract surfaces
+    name: Required CI / Android Driver executable + mobile contracts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact PR head
@@ -301,19 +301,26 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore Mobile contract surfaces
+      - name: Install .NET MAUI Android workload
+        run: dotnet workload install maui-android --skip-sign-check
+
+      - name: Restore Mobile projects
         shell: bash
         run: |
           dotnet restore TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj
           dotnet restore TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj
           dotnet restore TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj
 
-      - name: Build Mobile contract surfaces
+      - name: Build Mobile projects and Android Driver APK
         shell: bash
         run: |
           dotnet build TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj --configuration Release --no-restore
           dotnet build TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj --configuration Release --no-restore
-          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore
+          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk
+          find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*.apk' -print -quit | grep -q . || {
+            echo 'Android Driver APK artifact was not produced.'
+            exit 1
+          }
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -344,6 +351,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-mobile-evidence-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ci-evidence/mobile/exact-head-manifest.txt
+          path: |
+            ci-evidence/mobile/exact-head-manifest.txt
+            TransportERP.Mobile.Driver/bin/Release/net10.0-android/**/*.apk
           if-no-files-found: warn
           retention-days: 30
