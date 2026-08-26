@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
 using TransportERP.Application.Sync;
@@ -158,9 +159,87 @@ public static class SyncApiModule
 
     public static IEndpointRouteBuilder MapTransportSync(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/v1/sync/activation", HandleActivationAsync)
+            .RequireAuthorization(SecurityPolicies.Authenticated);
         endpoints.MapPost("/api/v1/sync/operations:batch", HandleBatchAsync)
             .RequireAuthorization(SecurityPolicies.Permission("sync.operations.execute"));
         return endpoints;
+    }
+
+    public static async Task<IResult> HandleActivationAsync(
+        HttpContext http,
+        ICurrentSecurityContext security,
+        IEffectiveSyncPolicyProvider policyProvider,
+        TransportErpDbContext db,
+        SyncPopDeploymentProfile deployment,
+        ProofKeyChangeProofValidator proofKeyValidator,
+        CancellationToken cancellationToken)
+    {
+        var current = await security.ResolveAsync(http.User, cancellationToken);
+        if (current is null) return Results.Unauthorized();
+        var correlationId = CorrelationId(http);
+        if (!current.IsLocalSession || current.BranchId is null || current.SessionId is null ||
+            current.RegisteredDeviceId is null || current.DeviceCredentialVersion is null ||
+            string.IsNullOrEmpty(current.DeviceId))
+            return ScopeDenied(correlationId);
+        if (!deployment.IsValid || deployment.CanonicalHtu is null)
+            return Results.Json(new { ErrorCode = "SYNC_DEPLOYMENT_INVALID", CorrelationId = correlationId },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        var now = DateTimeOffset.UtcNow;
+        var device = await (from candidate in db.RegisteredDevices.AsNoTracking()
+            join assignment in db.RegisteredDeviceAssignments.AsNoTracking()
+                on candidate.Id equals assignment.RegisteredDeviceId
+            where candidate.Id == current.RegisteredDeviceId && candidate.CompanyId == current.CompanyId &&
+                  candidate.DeviceId == current.DeviceId && candidate.Status == "ACTIVE" &&
+                  candidate.CredentialVersion == current.DeviceCredentialVersion &&
+                  (candidate.ExpiresAt == null || candidate.ExpiresAt > now) &&
+                  (candidate.LastSeenAt ?? candidate.ApprovedAt ?? candidate.CreatedAt) >
+                      now - RegisteredDeviceService.InactivityLimit &&
+                  assignment.CompanyId == current.CompanyId && assignment.UserId == current.UserId &&
+                  assignment.BranchId == current.BranchId && assignment.Status == "ACTIVE"
+            select candidate).SingleOrDefaultAsync(cancellationToken);
+        if (device is null) return ScopeDenied(correlationId);
+
+        var policy = await policyProvider.ResolveAsync(current, cancellationToken);
+        var canManageKeys = await security.HasPermissionAsync(
+            current, RegisteredDevicePermissionCodes.Manage, cancellationToken);
+        var hasExecutePermission = await security.HasPermissionAsync(
+            current, "sync.operations.execute", cancellationToken);
+        var hasResolvePermission = await security.HasPermissionAsync(
+            current, SyncConflictPermissionCodes.Resolve, cancellationToken);
+        var proofKey = ReadBoundProofKey(device, proofKeyValidator);
+        var availableActions = SyncActionCatalog.Definitions
+            .Where(definition => definition.RuntimeAvailability == SyncActionRuntimeAvailability.Available &&
+                                 policy.AllowedActions.Contains(definition.ActionCodeValue))
+            .Select(definition => new SyncActivationAction(
+                definition.ActionCodeValue, definition.OperationTypeValue, definition.EntityTypeValue))
+            .ToArray();
+        var enabled = policy.Enabled && proofKey is not null && availableActions.Length > 0 && hasExecutePermission;
+        var closedReason = enabled ? null : proofKey is null
+            ? "PROOF_KEY_BINDING_REQUIRED"
+            : policy.ClosedReason ?? "OFFLINE_DISABLED";
+
+        return Results.Ok(new SyncActivationResponse(
+            enabled,
+            current.CompanyId,
+            current.BranchId.Value,
+            current.UserId,
+            current.RegisteredDeviceId.Value,
+            current.SessionId.Value,
+            current.DeviceId,
+            deployment.CanonicalHtu,
+            enabled ? availableActions : Array.Empty<SyncActivationAction>(),
+            enabled,
+            enabled && hasResolvePermission,
+            device.ProofKeyVersion,
+            device.ProofKeyThumbprint,
+            proofKey,
+            canManageKeys && device.ProofKeyVersion is null,
+            canManageKeys && device.ProofKeyVersion is not null,
+            policy.SourceVersion,
+            policy.SourceFingerprint,
+            closedReason));
     }
 
     public static async Task<IResult> HandleBatchAsync(
@@ -301,7 +380,63 @@ public static class SyncApiModule
 
     private static bool TryReadEnvelopeDeviceId(byte[] rawBody, out string? deviceId)
         => SyncBatchJsonContract.TryReadDeviceId(rawBody, out deviceId);
+
+    private static SyncActivationProofPublicJwk? ReadBoundProofKey(
+        RegisteredDevice device,
+        ProofKeyChangeProofValidator validator)
+    {
+        if (device.ProofKeyVersion is null || device.ProofKeyVersion < 1 ||
+            string.IsNullOrEmpty(device.ProofKeyThumbprint) ||
+            string.IsNullOrEmpty(device.ProofPublicJwkCanonicalJson)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(device.ProofPublicJwkCanonicalJson);
+            var material = validator.ReadPublicKey(document.RootElement);
+            if (!string.Equals(material.Thumbprint, device.ProofKeyThumbprint, StringComparison.Ordinal))
+                return null;
+            var key = document.RootElement;
+            return new SyncActivationProofPublicJwk(
+                key.GetProperty("kty").GetString()!, key.GetProperty("crv").GetString()!,
+                key.GetProperty("x").GetString()!, key.GetProperty("y").GetString()!);
+        }
+        catch (JsonException) { return null; }
+        catch (ProofKeyLifecycleException) { return null; }
+    }
+
+    private static Guid CorrelationId(HttpContext context)
+        => Guid.TryParse(context.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var id)
+            ? id
+            : Guid.NewGuid();
+
+    private static IResult ScopeDenied(Guid correlationId)
+        => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = correlationId },
+            statusCode: StatusCodes.Status403Forbidden);
 }
+
+public sealed record SyncActivationAction(string ActionCode, string OperationType, string EntityType);
+
+public sealed record SyncActivationProofPublicJwk(string Kty, string Crv, string X, string Y);
+
+public sealed record SyncActivationResponse(
+    bool Enabled,
+    Guid CompanyId,
+    Guid BranchId,
+    Guid UserId,
+    Guid RegisteredDeviceId,
+    Guid SessionId,
+    string DeviceId,
+    string BatchEndpoint,
+    IReadOnlyList<SyncActivationAction> AllowedActions,
+    bool CanRetryFailedOperations,
+    bool CanResolveConflicts,
+    int? ProofKeyVersion,
+    string? ProofKeyThumbprint,
+    SyncActivationProofPublicJwk? ProofPublicJwk,
+    bool KeyEnrollmentAllowed,
+    bool KeyRecoveryAllowed,
+    string? PolicySourceVersion,
+    string? PolicySourceFingerprint,
+    string? ClosedReason);
 
 /// <summary>
 /// The single wire codec for the sync-v1 envelope. It intentionally uses the

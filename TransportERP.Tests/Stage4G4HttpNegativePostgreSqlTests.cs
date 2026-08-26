@@ -320,6 +320,52 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.DoesNotContain(binary, persisted, StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    [Trait("Acceptance", "G4-END-TO-END")]
+    public async Task Authenticated_sync_activation_returns_only_scoped_policy_and_public_key_binding()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var scope = await SeedAsync(seedDb, proofKey, "ACTIVATION");
+        using var factory = CreateFactory(connection);
+        using var client = CreateClient(factory, scope.Bearer);
+
+        using var response = await client.GetAsync("/api/v1/sync/activation");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        Assert.True(root.GetProperty("enabled").GetBoolean());
+        Assert.Equal(scope.CompanyId, root.GetProperty("companyId").GetGuid());
+        Assert.Equal(scope.BranchId, root.GetProperty("branchId").GetGuid());
+        Assert.Equal(scope.UserId, root.GetProperty("userId").GetGuid());
+        Assert.Equal(scope.RegisteredDeviceId, root.GetProperty("registeredDeviceId").GetGuid());
+        Assert.Equal(scope.SessionId, root.GetProperty("sessionId").GetGuid());
+        Assert.Equal(scope.DeviceId, root.GetProperty("deviceId").GetString());
+        Assert.Equal(BatchHtu, root.GetProperty("batchEndpoint").GetString());
+        Assert.Equal(1, root.GetProperty("proofKeyVersion").GetInt32());
+        Assert.Equal("EC", root.GetProperty("proofPublicJwk").GetProperty("kty").GetString());
+        Assert.True(root.GetProperty("canRetryFailedOperations").GetBoolean());
+        Assert.True(root.GetProperty("canResolveConflicts").GetBoolean());
+        Assert.False(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
+        Assert.True(root.GetProperty("keyRecoveryAllowed").GetBoolean());
+        Assert.True(root.GetProperty("allowedActions").GetArrayLength() > 0);
+        Assert.DoesNotContain("credentialHash", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rawBearer", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("nonce", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("jti", body, StringComparison.OrdinalIgnoreCase);
+
+        using var anonymousClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = PublicOrigin });
+        using var anonymous = await anonymousClient.GetAsync("/api/v1/sync/activation");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+    }
+
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, string bearer)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = PublicOrigin });
@@ -343,6 +389,8 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
             {
                 services.RemoveAll<ISyncRuntimeGate>();
                 services.AddScoped<ISyncRuntimeGate, IsolatedOpenSyncRuntimeGate>();
+                services.RemoveAll<IEffectiveSyncPolicyProvider>();
+                services.AddScoped<IEffectiveSyncPolicyProvider, IsolatedOpenEffectivePolicyProvider>();
                 services.RemoveAll<ISyncRetryPolicyResolver>();
                 services.AddSingleton<ISyncRetryPolicyResolver>(new FixedSyncRetryPolicyResolver(
                     new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(30))));
@@ -551,7 +599,8 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         foreach (var code in new[]
                  {
                      "sync.operations.execute", "party.create", "waybill.create", "waybill.edit",
-                     "accounting.journal.create", "waybill.attachment.add", "waybill.pod.capture"
+                     "accounting.journal.create", "waybill.attachment.add", "waybill.pod.capture",
+                     "sync.conflicts.resolve", "devices.manage"
                  })
         {
             var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == code);
@@ -724,6 +773,21 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         string DeviceId,
         Guid CurrencyId,
         string Bearer);
+
+    private sealed class IsolatedOpenEffectivePolicyProvider : IEffectiveSyncPolicyProvider
+    {
+        public Task<EffectiveSyncPolicy> ResolveAsync(
+            CurrentSecurityContext current,
+            CancellationToken cancellationToken = default)
+        {
+            var actions = SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue)
+                .ToHashSet(StringComparer.Ordinal);
+            return Task.FromResult(new EffectiveSyncPolicy(
+                true, actions, new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
+                100, 2_097_152, 16_384, 5, 5, 5, 5, 30, 30, 24, 7, 90, 24,
+                null, "test-policy-open-v1", new string('a', 64)));
+        }
+    }
 
     private sealed record CrossScopeTargets(
         Guid LocalWaybillId,
