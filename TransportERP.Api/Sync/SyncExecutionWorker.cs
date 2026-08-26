@@ -32,7 +32,9 @@ public sealed class SyncExecutionWorker(
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Stage 4 sync execution worker iteration failed.");
+                logger.LogError(
+                    "Stage 4 sync execution worker iteration failed; FailureType={FailureType}.",
+                    exception.GetType().FullName);
                 await Task.Delay(IdleDelay, stoppingToken);
             }
         }

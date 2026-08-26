@@ -35,7 +35,9 @@ public sealed class SyncProofCleanupWorker(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Sync proof retention cleanup failed.");
+            logger.LogError(
+                "Sync proof retention cleanup failed; FailureType={FailureType}.",
+                exception.GetType().FullName);
         }
     }
 }
