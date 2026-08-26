@@ -2,7 +2,9 @@
 
 **Release:** `P2-C01-WAYBILL-SHIPPING-2026-08`  
 **Baseline dependency:** P1 SyncOperation / ConflictCase / ClientOperationId contracts on `master`  
-**Status:** `G3_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`
+**Status:** `G3_POLICY_ACCEPTED — STAGE5_IMPLEMENTATION_AUTHORIZED_WITH_OFFLINE_CLOSED — RUNTIME_CONFORMANCE_PENDING_G4/G5`
+
+**Latest owner decision — 2026-08-26 / `PR69_FULL_EXECUTION`:** server and client implementation on PR #69 is authorized in safe development/test environments while production remains `sync.offline.enabled=false`. This supersedes earlier no-client-runtime authority statements for implementation only; it does not grant G4/G5 PASS, Ready, Merge, production deployment, production migration or production-secret authority.
 **Decision ID:** `DEC-G3-SYNC-20260825-01`
 
 **Exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`

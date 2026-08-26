@@ -2,7 +2,9 @@
 
 **الإصدار:** P1-SYNC-CONTRACT-2026-08  
 **المعرف الحاكم:** `W1-P1-017` / `W2-P1-015` / `W3-P1-012`  
-**الحالة:** `G3_POLICY_ACCEPTED — STAGE4_SYNC_POP_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`؛ لا يمثل اعتماد السياسة تفويضًا لتفعيل Offline أو ادعاء اكتمال التنفيذ.
+**الحالة:** `G3_POLICY_ACCEPTED — STAGE4_SYNC_POP_POLICY_ACCEPTED — SERVER_AND_CLIENT_IMPLEMENTATION_AUTHORIZED_WITH_OFFLINE_CLOSED — RUNTIME_CONFORMANCE_PENDING_G4/G5`؛ لا يمثل اعتماد السياسة أو تفويض البناء إذنًا لتفعيل Offline أو ادعاء اكتمال التنفيذ.
+
+**قرار المالك الأحدث — 2026-08-26 / `PR69_FULL_EXECUTION`:** فُوض استكمال Stage 4 الخادمية والتجارية وبناء Stage 5 على فرع PR #69 مع بقاء الإنتاج `OFFLINE_DISABLED`. عبارات هذا الملف الأقدم التي تقول إن عميل Stage 5 أو runtime غير مفوض أصبحت تاريخًا متجاوزًا من ناحية التنفيذ فقط. تظل `G4 PASS` و`G5 PASS` وReady وMerge وauto-merge والنشر وmigrations/الأسرار الإنتاجية محجوبة لقرار المالك.
 **Decision ID:** `DEC-G3-SYNC-20260825-01`
 
 **G3 exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
@@ -141,7 +143,7 @@
 
 ## 10. بوابة الاعتماد
 
-اعتمدت قرارات G3 في 2026-08-25، فأصبحت حالة السياسة `G3_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`. يظل التفعيل محظورًا بواسطة `sync.offline.enabled=false` حتى يثبت G4 مطابقة التطبيق والعميل وقاعدة البيانات والاختبارات لكل قرار أدناه، ثم يعتمد المالك G5. لا يجوز اعتبار اعتماد السياسة دليل تنفيذ أو تفويض Migration أو API أو عميل Offline أو تشغيل إنتاجي.
+اعتمدت قرارات G3 في 2026-08-25، ثم فوض أمر المالك `PR69_FULL_EXECUTION` بتاريخ 2026-08-26 تنفيذ Migration وAPI وعميل Offline على فرع PR #69 وبيئات الاختبار الآمنة. يظل التفعيل الإنتاجي محظورًا بواسطة `sync.offline.enabled=false` حتى تكتمل مطابقة الخادم والعميل وقاعدة البيانات والاختبارات ويصدر قرار G5 من المالك. لا يجوز اعتبار اعتماد السياسة أو تفويض البناء دليل تنفيذ أو إذن تشغيل إنتاجي.
 
 ## 11. قائمة Offline الحصرية
 

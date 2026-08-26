@@ -1,9 +1,11 @@
 # TransportERP — سجل اختبارات القبول وحوكمة P1
 **دور الملف:** المرجع التشغيلي الموحد للحالة والبوابات والأدلة الخاصة بـ`PR #69`، مع إبقاء تفاصيل العقود في ملفاتها الأصلية وعدم نسخها هنا.
 
-**آخر تحديث جوهري:** `2026-08-26 14:20 Asia/Riyadh`
+**آخر تحديث جوهري:** `2026-08-26 — PR69 full-execution owner order`
 
-**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_RUNTIME_CANDIDATE_WIP — G4_OPEN — G5_CLOSED — OFFLINE_CLOSED`.
+**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_SERVER_AND_BUSINESS_RUNTIME_WIP — G4_OPEN — STAGE5_IMPLEMENTATION_AUTHORIZED_WITH_OFFLINE_CLOSED — G5_OWNER_DECISION_REQUIRED`.
+
+**قرار المالك الأحدث — 2026-08-26:** يفوض أمر `PR69_FULL_EXECUTION` تنفيذ Stage 4 كاملًا ثم بناء Stage 5 واختبارها مع بقاء `sync.offline.enabled=false` في الإنتاج. يحل هذا القرار محل عبارات `STAGE5 NOT AUTHORIZED` و«لا يبدأ Phase 5» السابقة من ناحية **التنفيذ على فرع PR #69 فقط**. لا يمنح القرار `G4 PASS` أو `G5 PASS`، ولا يجيز Ready أو Merge أو auto-merge أو نشرًا أو migration إنتاجية أو استخدام أسرار إنتاجية.
 
 **حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على S4-B، أو `204` اختبارًا على الرأس البعيد بعد S4-C، أو `291` اختبارًا على مرشح Runtime تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203. نجح مرشح Runtime على exact SHA `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في CI run `32992686767`؛ يبقى `G4 OPEN` إلى حين اكتمال أدلة القبول والمراجعة المستقلة.
 
@@ -37,7 +39,7 @@
 | المرحلة 2 — العزل والتدقيق والمعاملات الذرية | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 3 — حدود ثقة الجهاز المسجل | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 4 — `TransportERP Sync-PoP v1` | مرشح Runtime على `1acddb3...` ويضم proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف وأدلة السباقات والحالات الإلزامية | نعم للمرشح نفسه: run `32992686767`، Core=`291/291` وDesktop=`SUCCESS`، مع نجاح build وEF model وPostgreSQL migration | مراجعة ضمان ساكنة بلا علة Critical/High مثبتة؛ المراجعة المستقلة الكاملة ومصفوفة قبول G4 لم تكتمل | تفويض تنفيذ Stage 4 فقط؛ `G4 OPEN`, `G5 CLOSED`, وOffline مغلق |
-| المرحلة 5 | `NOT AUTHORIZED` | لا | لا | لا |
+| المرحلة 5 — عميل Offline | مصرح بتنفيذها بعد استقرار Stage 4 الخادمية، مع بقاء الإنتاج مغلقًا؛ لا يوجد عميل فعلي على هذا الرأس | لا | لا | لا؛ التفعيل والإصدار G5 بقرار المالك فقط |
 
 لا تستبدل حالةٌ حالةً أخرى. نجاح CI لا يعني مراجعة مستقلة، والمراجعة المستقلة لا تعني اعتماد المالك، واعتماد القرار التعاقدي لا يعني وجود runtime.
 
@@ -97,7 +99,7 @@
 
 **Findings المغلقة:** stale audit head/context reuse (`da0e482c`)، batch rollback و403 contract (`cfb75c13`)، device lifecycle/session/provenance/migration/offline boundary (`3cd32ce2`)، currency seed collision (`90cc841f`)، واستدعاء advisory lock (`5ca9a86`).
 
-**Findings/بوابات مفتوحة:** لا توجد علة Critical/High تنفيذية معروفة في مرشح المراحل 1–3 بعد CI النهائي؛ تبقى المراجعة المستقلة واعتماد المالك والدمج حالات غير منجزة. أعمال المرحلة الرابعة منفصلة أدناه، وOffline وG4/G5 مغلقة.
+**Findings/بوابات مفتوحة:** لا توجد علة Critical/High تنفيذية معروفة في مرشح المراحل 1–3 بعد CI النهائي؛ تبقى المراجعة المستقلة واعتماد المالك والدمج حالات غير منجزة. أعمال المرحلة الرابعة منفصلة أدناه. G4 مفتوحة، وتنفيذ Stage 5 مفوض مع Offline مغلق، بينما تفعيل G5 وReady/Merge محجوبة لقرار المالك.
 
 ### 0.6 معيار تسليم المراجع المستقل
 
@@ -113,7 +115,7 @@
 
 ### 0.7 الحد الفاصل مع المرحلة الرابعة
 
-`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 RUNTIME CANDIDATE CI VERIFIED — G4 OPEN` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. ثبتت S4-A وS4-B وأساس S4-C على الرؤوس البعيدة المذكورة، ونجح مرشح proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف واختبارات PostgreSQL/HTTP على `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في run `32992686767` بنتيجة `291/291`. لا يمنح ذلك `G4 PASS` قبل اكتمال مصفوفة القبول والمراجعة المستقلة. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G5، ولا يتحول PR إلى Ready ولا يدمج بهذا السجل.
+`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 TRANSPORT/POP CANDIDATE CI VERIFIED — BUSINESS RUNTIME WIP — G4 OPEN` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. ثبتت S4-A وS4-B وأساس S4-C على الرؤوس البعيدة المذكورة، ونجح مرشح proof-key lifecycle وPoP/nonce/replay/batch enqueue والتنظيف واختبارات PostgreSQL/HTTP على `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في run `32992686767` بنتيجة `291/291`. لا يمنح ذلك `G4 PASS`: الـBusiness Dispatcher وexecution worker وruntime التعارض والاحتفاظ التجاري وعميل Stage 5 ما تزال غير منفذة. يسمح أمر المالك الأحدث ببدء Stage 5 بعد استقرار الخادم مع بقاء `sync.offline.enabled=false`؛ ولا تُفتح G5 أو Ready/Merge بهذا السجل.
 
 **حالة البوابة:** `STAGE4_CONTRACT_FIXED_AND_CI_VERIFIED — BOUNDED SERVER IMPLEMENTATION AUTHORIZED — OFFLINE CLOSED`. ثبت القرار المعدل `DEC-P1-SYNC-POP-AMEND-20260826-02` في remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`. حسم مفاتيح idempotency المعزولة بالشركة، وDown غير المدمر، وbind/rotate/recovery، ونقطة linearization وترتيب الأقفال، وschema والقيود والفهارس والمحفزات الدقيقة، وفصل operation/attempt correlation، و`fp-v1` byte layout، وحدود body/payload. طابقت ثلاثة مراجعات داخلية مستقلة النص مع EF/PostgreSQL والكود الحالي، وحُسب متجها `fp-v1` بأداتين مستقلتين وتطابقا. نجحت [CI #16](https://github.com/shfeekalbhure/TransportERP/actions/runs/32920027662) على العقد المثبت: Core=`185/185` وDesktop/Foundation/W0-3 ناجحة. يجوز بدء دفعة server-side مستقلة وآمنة وفق العقد، لكن هذا لا يدعي runtime مكتملًا أو `INDEPENDENTLY REVIEWED` من فريق الضمان المستقل، ولا يفتح Offline أو G4/G5.
 
