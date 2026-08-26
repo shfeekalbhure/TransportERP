@@ -577,10 +577,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p ci-evidence/android-runtime
-          adb logcat -d -v brief AndroidRuntime:E '*:S' \
-            | tail -n 400 \
+          adb logcat -d -v brief \
+            | { grep -E 'AndroidRuntime|monodroid|DOTNET|libc|com\.transporterp\.mobile\.driver' || true; } \
+            | tail -n 600 \
             > ci-evidence/android-runtime/android-runtime-errors.txt
           cat ci-evidence/android-runtime/android-runtime-errors.txt
+          adb shell dumpsys activity exit-info "$ANDROID_TEST_PACKAGE" \
+            > ci-evidence/android-runtime/android-process-exit-info.txt
+          sed -n '1,240p' ci-evidence/android-runtime/android-process-exit-info.txt
 
       - name: Write Android exact-head evidence manifest
         if: ${{ always() }}
@@ -628,5 +632,6 @@ jobs:
             ci-evidence/android-runtime/loss.json
             ci-evidence/android-runtime/restart-evidence.txt
             ci-evidence/android-runtime/android-runtime-errors.txt
+            ci-evidence/android-runtime/android-process-exit-info.txt
           if-no-files-found: warn
           retention-days: 30
