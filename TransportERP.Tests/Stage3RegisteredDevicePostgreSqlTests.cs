@@ -888,7 +888,7 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
         var timeout = Stopwatch.StartNew();
         while (timeout.Elapsed < TimeSpan.FromSeconds(10))
         {
-            var waiting = await monitorDb.Database.SqlQueryInterpolated<bool>($"""
+            var waiting = await monitorDb.Database.SqlQuery<bool>($"""
                 SELECT EXISTS (
                     SELECT 1 FROM pg_stat_activity
                     WHERE pid={backendPid} AND wait_event_type='Lock'
