@@ -207,7 +207,9 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.Equal(attemptCorrelationId,
             responseJson.RootElement.GetProperty("attemptCorrelationId").GetGuid());
         var result = Assert.Single(responseJson.RootElement.GetProperty("results").EnumerateArray());
-        Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", result.GetProperty("errorCode").GetString());
+        // Item-level permission is evaluated before runtime availability so an unauthorized
+        // caller cannot use the batch response as an action-availability oracle.
+        Assert.Equal("SCOPE_DENIED", result.GetProperty("errorCode").GetString());
         var replayRows = await db.SyncProofReplays.Where(x => x.RegisteredDeviceId == binding.RegisteredDeviceId)
             .AsNoTracking().ToListAsync();
         Assert.Single(replayRows.Where(x => x.AttemptCorrelationId == attemptCorrelationId));
