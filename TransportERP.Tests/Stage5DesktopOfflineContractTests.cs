@@ -41,6 +41,8 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("DSASignatureFormat.IeeeP1363FixedFieldConcatenation", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ExportParameters(includePrivateParameters: true)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GetPrivateKey", source, StringComparison.Ordinal);
+        Assert.Contains("TransportERP.Offline.Transport.IDeviceProofSigningKey", source, StringComparison.Ordinal);
+        Assert.Contains("SignEs256Async", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -82,6 +84,24 @@ public sealed class Stage5DesktopOfflineContractTests
             controller.IndexOf("_conflicts.ResolveAsync", StringComparison.Ordinal));
         Assert.Contains("SyncConflictDecision.KeepServer", controller, StringComparison.Ordinal);
         Assert.Contains("SyncConflictDecision.Reapply", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Desktop_composition_is_explicitly_closed_and_connects_encrypted_store_transport_and_ui()
+    {
+        var source = Read("TransportERP.Desktop", "Offline", "DesktopOfflineComposition.cs");
+
+        Assert.Contains("bool OfflineRuntimeAuthorized = false", source, StringComparison.Ordinal);
+        Assert.Contains("if (!options.OfflineRuntimeAuthorized)", source, StringComparison.Ordinal);
+        Assert.Contains("WindowsDpapiLocalEncryptionKeyProvider", source, StringComparison.Ordinal);
+        Assert.Contains("WindowsCertificateDeviceProofSigningKeyStore", source, StringComparison.Ordinal);
+        Assert.Contains("new OfflineOperationStore", source, StringComparison.Ordinal);
+        Assert.Contains("new OfflineReadCacheStore", source, StringComparison.Ordinal);
+        Assert.Contains("new OfflineSyncTransportClient", source, StringComparison.Ordinal);
+        Assert.Contains("new OfflineSyncConflictClient", source, StringComparison.Ordinal);
+        Assert.Contains("new SyncOperationsController", source, StringComparison.Ordinal);
+        Assert.Contains("request.CompanyId != _options.CompanyId", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("OfflineRuntimeAuthorized = true", source, StringComparison.Ordinal);
     }
 
     private static string Read(params string[] path) =>

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using TransportERP.Offline.Transport;
 
 namespace TransportERP.Desktop.Offline;
 
@@ -9,7 +10,7 @@ public sealed record DeviceProofPublicKey(string Curve, string X, string Y);
 /// A signing handle that never exposes device private-key material.
 /// Signatures use the JOSE-required fixed-width R || S representation.
 /// </summary>
-public interface IDeviceProofSigningKey : IDisposable
+public interface IDeviceProofSigningKey : TransportERP.Offline.Transport.IDeviceProofSigningKey, IDisposable
 {
     DeviceProofPublicKey PublicKey { get; }
     ValueTask<byte[]> SignHashAsync(ReadOnlyMemory<byte> hash, CancellationToken cancellationToken = default);
@@ -113,6 +114,22 @@ public sealed class WindowsCertificateDeviceProofSigningKeyStore : IDeviceProofS
             return ValueTask.FromResult(_signer.SignHash(
                 hash.Span,
                 DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+        }
+
+        public ValueTask<DevicePublicP256Jwk> GetPublicJwkAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(new DevicePublicP256Jwk(PublicKey.X, PublicKey.Y));
+        }
+
+        public ValueTask<byte[]> SignEs256Async(
+            ReadOnlyMemory<byte> signingInput,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var hash = SHA256.HashData(signingInput.Span);
+            try { return SignHashAsync(hash, cancellationToken); }
+            finally { CryptographicOperations.ZeroMemory(hash); }
         }
 
         public void Dispose()
