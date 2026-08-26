@@ -572,6 +572,16 @@ jobs:
           adb shell am force-stop "$ANDROID_TEST_PACKAGE"
           adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
 
+      - name: Capture sanitized Android crash diagnostics
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          mkdir -p ci-evidence/android-runtime
+          adb logcat -d -v brief AndroidRuntime:E '*:S' \
+            | tail -n 400 \
+            > ci-evidence/android-runtime/android-runtime-errors.txt
+          cat ci-evidence/android-runtime/android-runtime-errors.txt
+
       - name: Write Android exact-head evidence manifest
         if: ${{ always() }}
         shell: bash
@@ -617,5 +627,6 @@ jobs:
             ci-evidence/android-runtime/verify.json
             ci-evidence/android-runtime/loss.json
             ci-evidence/android-runtime/restart-evidence.txt
+            ci-evidence/android-runtime/android-runtime-errors.txt
           if-no-files-found: warn
           retention-days: 30
