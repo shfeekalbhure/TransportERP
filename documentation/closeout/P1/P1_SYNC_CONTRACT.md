@@ -2,7 +2,7 @@
 
 **الإصدار:** P1-SYNC-CONTRACT-2026-08  
 **المعرف الحاكم:** `W1-P1-017` / `W2-P1-015` / `W3-P1-012`  
-**الحالة:** `G3_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`؛ لا يمثل اعتماد السياسة تفويضًا لتفعيل Offline أو تنفيذًا إضافيًا.
+**الحالة:** `G3_POLICY_ACCEPTED — STAGE4_SYNC_POP_POLICY_ACCEPTED — RUNTIME_CONFORMANCE_PENDING_G4`؛ لا يمثل اعتماد السياسة تفويضًا لتفعيل Offline أو ادعاء اكتمال التنفيذ.
 **Decision ID:** `DEC-G3-SYNC-20260825-01`
 
 **Exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
@@ -11,6 +11,8 @@
 **تثبيت حوكمي — 2026-08-25:** اعتمد القرار المفوض أعمدة وسياسات Offline/Sync فقط في عقود W2 المشار إليها، ولا يقبل بقية حقول W2 أو يغير حالة مراجعتها أو يفوض runtime أو مرحلة P2 لاحقة. يغطي القرار allowlist Payload Actions، وإعادة المحاولة وBackoff، وسياسة التعارض، والاحتفاظ، وحجم الدفعة وذريتها، وصلاحيات حل التعارض، وتسلسل الإعدادات. يبقى `sync.offline.enabled=false` حتى تثبت مطابقة التنفيذ واجتياز G4 ثم يصدر تفويض G5.
 
 **قيد Stage 3 للأجهزة:** credential التثبيت العشوائي per-install ليس request-bound ولا replay-resistant؛ لا يعد وحده تفويضًا للمزامنة. يحفظ العميل السر في OS secure storage ولا يخزن الخادم إلا SHA-256، ولا ينقل السر إلا عبر TLS بوصفها قاعدة نشر/بوابة موثوقة لا ادعاء enforcement داخل التطبيق الحالي. يعيد Runtime في Stage 3 `OFFLINE_DISABLED` دائمًا، حتى لو كانت قيمة الإعداد `true`. لا يفتح المسار قبل Stage 4 الذي يثبت freshness/nonce وrequest-level proof-of-possession أو sender constraint مكافئًا واختبارات replay. لا يغير Stage 3 مفتاح idempotency التاريخي `(DeviceId, ClientOperationId)`؛ المرشح المستقبلي المرتبط بالطلب يحتاج قرار عقد ومهاجرة مستقلة ولا يستنتج هنا.
+
+**قرار Stage 4 الحاكم — 2026-08-26:** اعتمد المشروع `TransportERP Sync-PoP v1` وفق القسم 19، بوصفه profile خاصًا بمسار دفعة المزامنة ومشتقًا من قواعد DPoP في RFC 9449. القرار لا يدعي أن Access Token الحالي أصبح OAuth DPoP-bound token؛ يبقى `Authorization: Bearer` في هذه المرحلة، ويضاف إثبات حيازة غير متماثل ومربوط بالجهاز والطلب والـBearer token. لا يُرسل `DeviceCredential` داخل دفعة المزامنة بعد تفعيل هذا profile. ويبقى `sync.offline.enabled=false` حتى اكتمال تنفيذ الخادم والعميل واختبارات G4 ثم تفويض G5.
 
 المصادر الأولية لهذا الحد: [RFC 8252 §8.5](https://www.rfc-editor.org/rfc/rfc8252.html#section-8.5) عن عدم صلاحية static secret الموزع داخل native app كإثبات هوية (بينما سرنا per-install وليس app-wide)، و[RFC 9449](https://www.rfc-editor.org/rfc/rfc9449.html) عن sender-constrained DPoP وتخفيف replay. لا تدعي هذه المرحلة تطبيق DPoP.
 
@@ -26,6 +28,7 @@
 |---|---|---|
 | `Id` | UUID | معرف العملية على الخادم. |
 | `DeviceId` | نص مطلوب | هوية الجهاز المسجل، لا يعتمد على اسم المستخدم وحده. |
+| `RegisteredDeviceId` | UUID مطلوب للصفوف الجديدة في Stage 4 | الهوية الخادمية الثابتة للجهاز؛ تدخل في مفتاح idempotency ولا تستنتج من claim منفردة. |
 | `UserId` | UUID مطلوب | صاحب العملية المحلي. |
 | `CompanyId` | UUID مطلوب | نطاق الشركة الذي ستطبّق عليه العملية. |
 | `BranchId` | UUID اختياري | الفرع، مع إعادة التحقق على الخادم. |
@@ -35,6 +38,7 @@
 | `EntityType` | نص مطلوب | نوع الكيان المستهدف وفق ActionCode. |
 | `EntityId` | UUID مشروط | مطلوب للكيان/aggregate الموجود؛ اختياري فقط في `CREATE` الذي يولد الخادم هويته. |
 | `ClientOperationId` | نص مطلوب وفريد لكل جهاز | مفتاح idempotency الأساسي. |
+| `RequestFingerprintHash` | SHA-256 مطلوب للصفوف الجديدة في Stage 4 | بصمة canonical للحقول التجارية الثابتة المحددة في 19.9؛ لا تتضمن proof أو nonce أو token. |
 | `RequestCorrelationId` | UUID مطلوب | ترابط طلب العميل والدفعة والتدقيق، ويحفظ مع النتيجة ولا يستبدل ClientOperationId. |
 | `PayloadJson` و`PayloadHash` | JSON + SHA-256 أو مكافئ | الحمولة وسلامتها أثناء النقل. |
 | `ClientOccurredAt` | وقت الجهاز | وقت الإنشاء المحلي، لا يُستخدم وحده للحسم المالي. |
@@ -48,7 +52,7 @@
 | `ConflictCaseId` | UUID اختياري | ربط العملية بملف تعارض. |
 | `RowVersion` | إصدار تنافسي | منع الكتابة المتزامنة على سجل العملية. |
 
-خريطة الهوية الحاكمة هي `(DeviceId, ClientOperationId, ActionCode) → ResultEntityId`. في CREATE ذي الهوية الخادمية يجوز أن يكون `EntityId` فارغًا، لكن يجب على نتيجة `SUCCEEDED` إعادة `ResultEntityId` وحفظ الخريطة؛ يعيد replay الخريطة نفسها. لا يجوز للعميل إنشاء سجل ثانٍ لتعويض نتيجة ضائعة.
+خريطة الهوية الحاكمة للصفوف الجديدة هي `(RegisteredDeviceId, ClientOperationId) → ActionCode + ResultEntityId + outcome`. يدخل `ActionCode` في البصمة الثابتة ولا يوسع مفتاح uniqueness؛ لذلك فإن إعادة استخدام `ClientOperationId` نفسه مع Action مختلف هي `IDEMPOTENCY_MISMATCH` وليست عملية جديدة. في CREATE ذي الهوية الخادمية يجوز أن يكون `EntityId` فارغًا، لكن يجب على نتيجة `SUCCEEDED` إعادة `ResultEntityId` وحفظ الخريطة؛ يعيد business replay الخريطة والنتيجة نفسيهما. لا يجوز للعميل إنشاء سجل ثانٍ لتعويض نتيجة ضائعة.
 
 ## 3. الحالات والانتقالات
 
@@ -62,11 +66,11 @@
 | `REJECTED` | العملية غير صالحة أو غير مسموحة | حالة نهائية، مع سبب قابل للعرض |
 | `RESOLVED` | عولج التعارض بقرار صريح | حالة نهائية مع رابط العملية/الإصدار البديل |
 
-لا يجوز الانتقال إلى `SUCCEEDED` إذا فشل فحص الصلاحية أو النطاق أو Hash أو idempotency أو حالة الكيان. ولا يجوز اعتبار timeout سببًا لقبول العملية؛ يجب الاستعلام بمفتاح `DeviceId + ClientOperationId` قبل إعادة إنشاء العملية.
+لا يجوز الانتقال إلى `SUCCEEDED` إذا فشل فحص الصلاحية أو النطاق أو Hash أو idempotency أو حالة الكيان. ولا يجوز اعتبار timeout سببًا لقبول العملية؛ ينشئ العميل proof جديدًا ويحافظ على `ClientOperationId` نفسه، ثم يستعلم الخادم بمفتاح `RegisteredDeviceId + ClientOperationId` قبل أي أثر تجاري جديد.
 
 ## 4. سياسة Idempotency وإعادة المحاولة
 
-يولد العميل `ClientOperationId` مرة واحدة ولا يغيره عند إعادة الإرسال. يبحث الخادم أولًا عن الزوج الفريد `DeviceId + ClientOperationId`. إذا وجد عملية ناجحة يعيد النتيجة نفسها، وإذا وجد عملية قيد المعالجة يعيد حالة المعالجة، وإذا وجد عملية مرفوضة يعيد سبب الرفض، ولا ينشئ أثرًا ثانيًا.
+يولد العميل `ClientOperationId` مرة واحدة ولا يغيره عند إعادة الإرسال. للصفوف الجديدة في Stage 4 يبحث الخادم أولًا عن الزوج الفريد `RegisteredDeviceId + ClientOperationId`. إذا وجد fingerprint مطابقًا يعيد النتيجة/الحالة نفسها، وإذا اختلف أي حقل داخل fingerprint يرفض بـ`IDEMPOTENCY_MISMATCH` دون كشف القيمة المختلفة ودون إنشاء أثر ثانٍ. أما `(DeviceId, ClientOperationId)` فيبقى مفتاحًا تاريخيًا للصفوف legacy فقط وفق 19.10.
 
 تستخدم الأخطاء التقنية المؤقتة Backoff تصاعديًا مع حد أقصى وعدد محاولات يحدد في إعداد المنصة. لا تعاد محاولة أخطاء التحقق أو نقص الصلاحية أو Hash غير المطابق. وتظهر العملية في شاشة المزامنة بعدد المحاولات والسبب والوقت القادم، مع إمكانية إعادة المحاولة اليدوية لمن يملك الصلاحية.
 
@@ -269,3 +273,129 @@ Global platform policy هو السقف. يجوز لـCompany ثم Branch الت�
 8. اختبار allowlist مستقل table-driven **لكل Action** في 11.1، واختبار `ACTION_RUNTIME_UNAVAILABLE` لكل Action غير متاح في الإصدار، وعدم خلط read-cache بالwrite queue.
 9. اختبارات `T-SYNC-001..010` كاملة، وbatch `0/1/100/101` والنجاح الجزئي، وجدولي retry الافتراضيين والاستنفاد وعدم زيادة server counter بالreplay، وصلاحيات التعارض، وحدود `24h/7d/90d` وتسلسل الإعدادات وinvalid fail-closed.
 10. إثبات أن Attachment/POD queue metadata-only وأن binary يرفض قبل عقد resumable/hash، واختبار أن PayloadJson وconflict snapshots تصبح NULL/redacted بعد retention ولا تسرب عبر API/audit/logs.
+11. إثبات مطابقة `TransportERP Sync-PoP v1` في القسم 19: lifecycle المفتاح العام، وnonce/freshness، و`jti` single-use على PostgreSQL مشترك، وربط `ath` و`tbh`، وحدود trusted proxy، وفصل HTTP proof replay عن business idempotency.
+
+## 19. قرار Stage 4 الحاكم — TransportERP Sync-PoP v1
+
+**Decision ID:** `DEC-P1-SYNC-POP-20260826-01`
+
+**Decision basis:** مراجعة عقد P1 وتنفيذ Stage 3 وسجل الجهاز على exact commit `d0860d70d808374bd5582d2e71c14afa5429f8cd`، مع RFC 9449 وRFC 7638 وRFC 8725 بوصفها مصادر معيارية. القيم الرقمية والـbody-hash والـproxy profile أدناه **قرارات خاصة بالمشروع** وليست أرقامًا مفروضة من RFC.
+
+**Authority:** قرار مفوض من المالك داخل المحادثة بتاريخ 2026-08-26 لصياغة قرارات Stage 4 واعتمادها، من دون تفويض الدمج أو تشغيل Offline أو الادعاء باجتياز G4/G5.
+
+### 19.1 النطاق وعدم الادعاء
+
+- يطبق profile أولًا على `POST /api/v1/sync/operations:batch` فقط، وعلى الجلسات المحلية المرتبطة بـ`RegisteredDeviceId` وCompany/Branch assignment فعالين.
+- لا يثق في `device_id` أو public JWK أو Company/Branch قادمة من الطلب منفردة؛ يجب مطابقتها بالسجل الحي والجلسة والتعيين والصلاحية `sync.operations.execute`.
+- يبقى Access Token في Stage 4 من نوع Bearer. لا يوصف بأنه `DPoP-bound` ولا يستخدم `Authorization: DPoP` ما لم يصدر عقد هوية مستقل يربط token عند الإصدار بـ`cnf.jkt` ويغطي refresh.
+- إثبات PoP لا يستبدل المصادقة أو التفويض أو قواعد النطاق والحالة. وهو لا يفتح Offline؛ production يعيد `OFFLINE_DISABLED` ما دام gate مغلقًا، ولا يصدر nonce ولا يستهلك `jti` في هذا المسار المغلق. تختبر مكونات Stage 4 عبر policy override معزول في الاختبار فقط.
+- External Authority يبقى fail-closed للمزامنة لأن Stage 3 لا ينشئ منه trusted local registered-device binding؛ لا يعتمد claim جهاز خارجي لإكمال PoP.
+
+### 19.2 مفتاح الجهاز
+
+- يولد العميل لكل تثبيت key pair مستقلًا من نوع `EC P-256` ويوقع بـ`ES256`. يحفظ private key في OS secure/non-exportable storage حيث تدعمه المنصة، ولا يرسله أو يسجله أو يدخله في backup عام.
+- لا يقبل الخادم `none` أو MAC/symmetric algorithms أو RSA أو curve أخرى في `sync-pop-v1`. هذه algorithm allowlist قرار profile أولي، وأي توسعة تحتاج قرارًا واختبارات algorithm-confusion مستقلة.
+- يحفظ الخادم public JWK فقط بالشكل canonical ذي الأعضاء المطلوبة `crv`, `kty`, `x`, `y`، ويحفظ `ProofKeyThumbprint=BASE64URL(SHA256(RFC7638-canonical-public-JWK))` و`ProofKeyVersion` يبدأ من `1`.
+- يرفض JWK يحوي private members أو `jku`/`x5u` أو key غير P-256 أو نقاطًا غير صالحة. لا يجلب الخادم key material من URL.
+- public JWK مطلوب لأهلية المزامنة، لا لمجرد وجود سجل جهاز. الجهاز legacy بلا مفتاح يبقى صالحًا للوظائف Online المسموحة لكنه يرفض للمزامنة بـ`DEVICE_PROOF_KEY_REQUIRED`.
+- يصبح المفتاح authoritative عند اعتماد الجهاز. ربط مفتاح بجهاز legacy أو تدويره عملية Online-only بصلاحية `devices.manage` و`ExpectedProofKeyVersion`؛ التدوير ذري، يزيد النسخة، يبطل كل nonce غير منتهٍ للمفتاح السابق، ويجعل كل proof بالنسخة السابقة غير صالح، مع AuditEvent لا يحتوي JWK الخام أو nonce أو proof.
+
+### 19.3 بنية proof الإلزامية
+
+يرسل العميل header واحدًا فقط باسم `DPoP`. القيمة compact signed JWT لا يتجاوز طولها `4096 bytes`. يرفض تعدد header أو طيه إلى قائمة. JOSE header والclaims الإلزامية هي:
+
+| العنصر | قرار `sync-pop-v1` |
+|---|---|
+| `typ` | القيمة الدقيقة `dpop+jwt`. |
+| `alg` | القيمة الدقيقة `ES256`. |
+| `jwk` | public P-256 JWK فقط؛ thumbprint مطابق لسجل الجهاز ونسخته الحية. |
+| `jti` | UUIDv4 أو Base64url لناتج CSPRNG لا يقل عن 96 bit؛ طول النص `16..128`؛ single-use وفق 19.6. |
+| `htm` | القيمة الدقيقة `POST`. |
+| `htu` | URI canonical المحدد في 19.7، بلا query أو fragment. |
+| `iat` | NumericDate بالثواني ويجتاز نافذة 19.5. |
+| `ath` | `BASE64URL(SHA256(ASCII(raw bearer access token)))`. |
+| `nonce` | nonce خادمي حي مطابق للجهاز ونسخة المفتاح وفق 19.4. |
+| `tbh` | claim خاص بهذا المشروع: `BASE64URL(SHA256(raw HTTP request-body octets))` وفق 19.8. |
+
+أي `crit` غير معروف أو duplicate JOSE/claim name أو private JWK member أو claim مطلوب من نوع غير صحيح يجعل proof غير صالح. لا تحفظ JWT الخام ولا public JWK القادم من كل طلب في logs/audit.
+
+### 19.4 سياسة nonce الخادمي
+
+- يولد الخادم nonce من `32 random bytes CSPRNG` ويعرضه Base64url بلا padding. لا يخزن الخام؛ يخزن SHA-256 مع `RegisteredDeviceId`, `ProofKeyVersion`, `IssuedAt`, `ExpiresAt`.
+- **قرار المشروع:** صلاحية nonce هي `5 minutes` من وقت الخادم. يقبل أي nonce غير منتهٍ أصدره الخادم لنفس الجهاز ونسخة المفتاح؛ إصدار nonce أحدث لا يبطل السابق قبل انتهاء مدته، حتى لا تكسر الدفعات المتوازية.
+- يجوز استخدام nonce نفسه في أكثر من proof خلال صلاحيته، لكن يجب أن يكون لكل proof `jti` جديدًا؛ nonce وحده ليس replay key.
+- لا يقبل المسار أي proof بلا nonce. لطلب ذي Bearer context صحيح وجهاز مربوط لكنه بلا nonce حي، يرد الخادم `401` مع `WWW-Authenticate: DPoP error="use_dpop_nonce"` و`DPoP-Nonce` و`Cache-Control: no-store`.
+- يجوز أن يرسل الرد الناجح `DPoP-Nonce` جديدًا للاستعمال اللاحق. لا يصدر nonce لمستخدم غير مصادق أو جلسة غير مرتبطة أو جهاز خارج النطاق، ولا يظهر nonce في JSON أو audit أو logs.
+- التدوير أو التعليق أو الإلغاء أو انتهاء الجهاز/التعيين يبطل nonces المرتبطة فورًا. يمنع nonce downgrade: بعد إصدار nonce لا يقبل proof بلا claim مطابق.
+
+### 19.5 freshness والانحراف الزمني
+
+- **قرار المشروع:** يقبل proof عندما `serverNow - 120 seconds <= iat <= serverNow + 30 seconds` وعندما يكون nonce حيًا. `120s` تحد exposure بعد التسريب، و`30s` يسمح بانحراف محدود دون فتح pre-generation طويل؛ nonce الخادمي ذو `5m` يعالج retry والتوازي لكنه لا يوسع عمر proof.
+- لا يستخدم `ClientOccurredAt` بدل `iat`، ولا يثق بساعة الجهاز لاتخاذ قرار مالي. كل المقارنات الأمنية تستخدم وقت خادم UTC.
+- حدود `120/30/300 seconds` إعدادات Platform-only ثابتة لهذا الإصدار، validated at startup، ولا تخففها Company/Branch/Device overrides. القيمة الغائبة أو غير المطابقة تعطل Sync-PoP fail-closed ولا تعود إلى default صامت.
+
+### 19.6 منع proof replay
+
+- بعد نجاح signature/key/claims/nonce/freshness/token/body checks وقبل enqueue، يحجز الخادم proof ذريًا في PostgreSQL مشترك بين جميع instances.
+- يثبت claim في معاملة قصيرة مستقلة قبل معاملات عناصر الدفعة، ولا يُعاد أو يحذف عند فشل parsing اللاحق أو عنصر تجاري أو ضياع الاستجابة؛ الاسترداد يكون دائمًا بـproof جديد وbusiness IDs نفسها.
+- يخزن فقط `JtiHash=SHA256(UTF8(jti))` مع `RegisteredDeviceId`, `ProofKeyVersion`, `HtuHash`, `HttpMethod`, `NonceRecordId`, `IssuedAt`, `FirstSeenAt`, `ExpiresAt`, وCorrelationId. لا يخزن raw jti أو raw proof أو token.
+- **قرار المشروع:** uniqueness أقوى من حد target URI في RFC: `(RegisteredDeviceId, ProofKeyVersion, JtiHash)` فريد خلال مدة الاحتفاظ؛ لا يجوز إعادة jti على URI آخر أو دفعة أخرى.
+- **قرار المشروع:** يحتفظ replay record مدة `10 minutes` من `FirstSeenAt`. هذه المدة تتجاوز نافذة proof (`120s + 30s`) وعمر nonce (`5m`) وتوفر هامش cleanup/cluster دون قبول replay متأخر. cleanup لا يحذف سجلًا قبل `ExpiresAt`.
+- duplicate sequential أو concurrent يرفض `401 invalid_dpop_proof` ولا يصل إلى enqueue. unique constraint هو الحاكم، لا check-then-insert في الذاكرة.
+- إذا استُهلك proof ثم ضاع الرد أو فشل النقل، ينشئ العميل proof و`jti` جديدين ويعيد **نفس** `ClientOperationId` والحمولة؛ business idempotency يعيد النتيجة ولا ينشئ أثرًا ثانيًا.
+
+### 19.7 `htu` وحدود reverse proxy
+
+- `sync.proof.public_origin` إعداد نشر إلزامي عند تشغيل Stage 4، absolute HTTPS origin بلا path/query/fragment. expected `htu` هو هذا origin زائد المسار الثابت `/api/v1/sync/operations:batch` بعد RFC 3986 syntax/scheme normalization. لا يقبل `http` أو query على `sync-v1`.
+- لا يبنى expected `htu` من Host أو `X-Forwarded-*` غير موثوق. يضبط ASP.NET Core Forwarded Headers قبل auth باستخدام `KnownProxies`/`KnownNetworks` صريحة و`ForwardLimit` و`AllowedHosts`; لا يسمح مسح قوائم trust لقبول جميع المصادر.
+- يجب أن يرى التطبيق scheme خارجيًا `https` بعد trusted proxy processing. فشل topology أو public origin أو host/scheme comparison يعطل المسار fail-closed؛ لا يستبدل `htu` بعنوان backend الداخلي.
+
+### 19.8 سلامة جسم دفعة المزامنة
+
+- RFC 9449 القياسي يغطي method وURI ولا يضمن body integrity؛ لذلك يعتمد المشروع claim إضافيًا `tbh` لطلب الكتابة.
+- `sync-v1` يقبل `Content-Type: application/json` و`Content-Encoding` غائبًا أو `identity` فقط. يحسب العميل والخادم SHA-256 على **نفس raw body octets كما أرسلت قبل JSON deserialization**؛ ثم Base64url بلا padding.
+- يفشل اختلاف `tbh` قبل parsing/enqueue بـ`invalid_dpop_proof`. لا يستخدم re-serialization أو ترتيب JSON properties لحساب hash، ولا تسجل body أو hash input في رسالة الخطأ.
+- يبقى `PayloadHash` لكل عنصر تحققًا مستقلًا بعد parsing؛ `tbh` يحمي envelope والmetadata والترتيب والعمليات مجتمعة، ولا يحل مكان PayloadHash.
+
+### 19.9 business idempotency والبصمة الكاملة
+
+- للصفوف الجديدة المفتاح الفريد هو `(RegisteredDeviceId, ClientOperationId)`. لا يدخل `jti`, `nonce`, `iat`, `ath`, `tbh`, Bearer token، HTTP CorrelationId، retry counters أو أوقات الخادم في المفتاح أو fingerprint.
+- يبني الخادم canonical fingerprint ثابتًا ثم SHA-256 من: `RegisteredDeviceId`, `UserId`, `CompanyId`, `BranchId`, `ProtocolVersion`, `ActionCode`, `OperationType`, `EntityType`, nullable `EntityId`, `ClientOperationId`, `PayloadHash`, `ClientOccurredAt` بعد UTC/microsecond normalization، وnullable `BaseVersion`. تمثل null بعلامة typed ثابتة وتستخدم length-prefix UTF-8 fields، لا string concatenation ملتبسة ولا JSON property order.
+- `RequestCorrelationId` المنطقي يحفظ من أول قبول ويعاد في النتيجة لكنه لا يدخل fingerprint كي يمكن لHTTP attempt جديد أن يحمل CorrelationId تدقيق جديدًا. Audit يربط attempt correlation بالعملية الأصلية دون تغييرها.
+- replay ببصمة مطابقة يعيد نفس `ServerOperationId`, `ActionCode`, `ResultEntityId`, `Status`, `ResultVersion`, `ErrorCode`, `ConflictCaseId` والـoutcome المحفوظ، ولا يزيد server execution retry counter ولا يكرر Audit قبول/أثر تجاري.
+- اختلاف أي حقل في fingerprint تحت المفتاح نفسه يرفض `IDEMPOTENCY_MISMATCH` بلا بيان الحقل المختلف. `ActionCode` جزء من fingerprint لا من uniqueness، وبذلك يظل `ClientOperationId` فريدًا فعلًا لكل جهاز.
+- PoP replay وbusiness replay طبقتان مستقلتان: proof نفسه single-use، أما العملية التجارية فتعاد بproof جديد ومفتاحها الثابت.
+
+### 19.10 سياسة migration وlegacy
+
+- تنفذ Stage 4 بمهاجرة additive مستقلة مع preflight و`Up -> Down -> Up` PostgreSQL test؛ لا تعدل migration Stage 3.
+- تضاف حقول proof key إلى `RegisteredDevice` nullable للسجلات التاريخية، وتضاف `ActionCode`, `ProtocolVersion`, `RequestCorrelationId`, `ResultEntityId`, `RequestFingerprintHash` وحقول proof provenance اللازمة إلى `SyncOperation` بطريقة تسمح ببقاء legacy rows قابلة للقراءة والتدقيق.
+- يجعل `EntityId` nullable لأن CREATE الخادمي قد لا يملك ID قبل النجاح. يفرض trigger/check على **كل INSERT جديد بعد migration** وجود registered-device/proof provenance والحقول الحاكمة؛ لا يستخدم nullable schema كمسار downgrade.
+- يسقط unique index التاريخي العام `(DeviceId, ClientOperationId)` فقط بعد preflight، ثم ينشئ: unique partial `(RegisteredDeviceId, ClientOperationId) WHERE RegisteredDeviceId IS NOT NULL`، وunique partial legacy `(DeviceId, ClientOperationId) WHERE RegisteredDeviceId IS NULL`.
+- لا backfill تخميني لـRegisteredDeviceId أو ActionCode أو fingerprint من النصوص التاريخية. legacy rows تبقى immutable وغير مؤهلة لتنفيذ Stage 4. إذا اصطدم طلب جديد بـlegacy `(CompanyId, DeviceId, ClientOperationId)` يرفض `LEGACY_IDEMPOTENCY_CONFLICT` ولا ينشئ صفًا موازيًا.
+- تحفظ proof provenance (`RegisteredDeviceId`, `ProofKeyVersion`, thumbprint/hash reference وaccepted proof record ID) immutable بعد INSERT، مع بقاء تحديث status/result التاريخي ممكنًا حتى لو عُلّق أو دُوّر الجهاز لاحقًا.
+
+### 19.11 ترتيب التحقق والأخطاء والتدقيق
+
+بعد فتح G5 فقط يكون الترتيب: valid Bearer/session → local registered-device binding/assignment → permission/scope → proof syntax/algorithm/key/signature → `htm/htu/iat/ath/nonce/tbh` → atomic jti claim → batch/protocol/action validation → per-operation idempotency/enqueue. لا يؤدي فشل عنصر تجاري إلى إلغاء proof claim أو نجاح عناصر أخرى وفق ذرية القسم 13.
+
+- missing/expired nonce: `401 use_dpop_nonce` مع nonce جديد عند أهلية السياق.
+- malformed/signature/key/freshness/ath/tbh/replay failure: `401 invalid_dpop_proof` ورسالة عامة مع CorrelationId فقط.
+- device/session/assignment/permission/scope: `401/403` الحالي العام دون كشف وجود جهاز أو صف خارج النطاق.
+- Offline gate المغلق: `403 OFFLINE_DISABLED` قبل nonce/proof state mutation.
+- لا تتضمن الاستجابة أو AuditEvent أو logs raw credential/private key/public JWK/raw proof/raw nonce/raw jti/Bearer token أو body. يسجل التدقيق hashes/IDs/versions والنتيجة وCorrelationId فقط.
+
+### 19.12 اختبارات القبول الإلزامية لقرار Stage 4
+
+1. table-driven رفض missing/multiple/oversized/malformed proof، و`typ`/`alg`/curve/private-JWK/unknown-critical/duplicate-claim/signature/thumbprint failures.
+2. حدود `iat` عند `-121/-120/+30/+31 seconds`، وnonce missing/wrong/expired/downgrade، وقبول current وrecent unexpired nonces للتوازي.
+3. `htm` وcanonical `htu`، ورفض query/http/backend URI وHost أو `X-Forwarded-*` spoof من مصدر غير موثوق.
+4. `ath` لBearer token الدقيق، و`tbh` للraw body، وتغيير whitespace/order/metadata/body بعد التوقيع يرفض قبل enqueue.
+5. نفس `jti` sequential/concurrent وعبر أكثر من app instance يعطي قبول proof واحدًا، مع cleanup لا يحذف قبل 10 دقائق وعدم تخزين raw artifacts.
+6. تعليق/إلغاء/انتهاء الجهاز أو التعيين، وتدوير proof key أثناء الطلب، يمنع المفتاح القديم ولا يترك عملية جديدة بلا provenance.
+7. proof جديد مع نفس business operation يعيد النتيجة نفسها؛ وتغيير كل fingerprint field منفردًا يعطي `IDEMPOTENCY_MISMATCH`; ولا يزيد replay server retry counter.
+8. تزامن عمليتين بنفس `(RegisteredDeviceId, ClientOperationId)` ينتج صفًا وأثرًا تجاريًا واحدًا، ولا يحدث deadlock بين key rotation وproof claim وenqueue.
+9. migration preflight وlegacy collision والـpartial indexes وقيود INSERT وimmutable provenance و`Up -> Down -> Up` على PostgreSQL الحقيقي.
+10. يبقى production `sync.offline.enabled=false` و`OFFLINE_DISABLED` حتى يثبت exact SHA في G4 ويصدر G5؛ test override لا يدخل إعداد إنتاج ولا يفتح External Authority.
+
+المراجع المعيارية: [RFC 9449 §§4.2–4.3, 7, 9, 11.1–11.7](https://www.rfc-editor.org/rfc/rfc9449.html)، [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638.html)، [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html). أما أرقام `120s/30s/5m/10m` وclaim `tbh` ومصدر `public_origin` فهي قرارات TransportERP الموثقة أعلاه.
