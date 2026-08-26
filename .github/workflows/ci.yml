@@ -375,7 +375,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
+      # Job-level env is evaluated before the runner context exists. Use an explicit ephemeral
+      # path on the isolated hosted runner so workflow validation remains fail-closed.
+      ANDROID_AVD_HOME: /tmp/transporterp-android-avd
       ANDROID_TEST_PACKAGE: com.transporterp.mobile.driver
       ANDROID_TEST_COMPONENT: com.transporterp.mobile.driver/com.transporterp.mobile.driver.DriverDeviceTestActivity
     steps:
