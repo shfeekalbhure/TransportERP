@@ -123,6 +123,17 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         var reasonError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
             Service(db), scope, KeepRequest(" ")));
         Assert.Equal("REASON_REQUIRED", reasonError.Code);
+        foreach (var unsafeReason in new[]
+                 {
+                     "Bearer eyJhbGciOiJFUzI1NiJ9.payload.signature",
+                     "credential=QWxhZGRpbjpvcGVuIHNlc2FtZQ==",
+                     "proof\u0001control"
+                 })
+        {
+            var unsafeReasonError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+                Service(db), scope, KeepRequest(unsafeReason)));
+            Assert.Equal("REASON_INVALID", unsafeReasonError.Code);
+        }
 
         _ = await ResolveAsync(Service(db), scope, KeepRequest("final reason"));
         db.ChangeTracker.Clear();
@@ -220,6 +231,55 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         var replay = await Service(db).ResolveAsync(
             scope.ConflictId, request, replayProof.Context, replayProof.Proof);
         Assert.Equal(result.ReplacedByOperationId, replay.ReplacedByOperationId);
+        Assert.Equal(2, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
+        Assert.Single(await db.AuditEvents.Where(x =>
+            x.Action == "SyncConflictResolutionReplayed" && x.EntityId == scope.ConflictId).ToListAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Exact_reapply_replay_remains_idempotent_after_retention_redacts_raw_payload()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedConflictAsync(db, "REAPPLY-REDACTED-REPLAY");
+        var request = new ResolveSyncConflictRequest(
+            SyncConflictResolutionDecisions.ReapplyAsNew,
+            "reviewed reapply retained by fingerprint",
+            new SyncReapplyAsNewRequest(
+                $"replacement-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE", "Waybill",
+                scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
+
+        var resolved = await ResolveAsync(Service(db), scope, request);
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-91);
+        var conflict = await db.ConflictCases.SingleAsync(x => x.Id == scope.ConflictId);
+        var original = await db.SyncOperations.SingleAsync(x => x.Id == scope.OperationId);
+        var replacement = await db.SyncOperations.SingleAsync(x => x.Id == resolved.ReplacedByOperationId);
+        conflict.ResolvedAt = cutoff;
+        conflict.UpdatedAt = cutoff;
+        original.UpdatedAt = cutoff;
+        replacement.Status = "SUCCEEDED";
+        replacement.ResultEntityId = scope.EntityId;
+        replacement.ResultVersion = 3;
+        replacement.UpdatedAt = cutoff;
+        await db.SaveChangesAsync();
+
+        var cleanup = await new SyncRetentionCleanupService(db, new AuditEventService(db))
+            .CleanupBatchAsync();
+        Assert.True(cleanup.RedactedOperations >= 2);
+        db.ChangeTracker.Clear();
+        var redactedReplacement = await db.SyncOperations.AsNoTracking()
+            .SingleAsync(x => x.Id == resolved.ReplacedByOperationId);
+        Assert.Equal("{}", redactedReplacement.PayloadJson);
+        Assert.NotNull(redactedReplacement.RedactedAt);
+
+        var replayProof = await SeedFreshProofAsync(db, scope);
+        db.ChangeTracker.Clear();
+        var replay = await Service(db).ResolveAsync(
+            scope.ConflictId, request, replayProof.Context, replayProof.Proof);
+
+        Assert.Equal(resolved.ReplacedByOperationId, replay.ReplacedByOperationId);
         Assert.Equal(2, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
         Assert.Single(await db.AuditEvents.Where(x =>
             x.Action == "SyncConflictResolutionReplayed" && x.EntityId == scope.ConflictId).ToListAsync());

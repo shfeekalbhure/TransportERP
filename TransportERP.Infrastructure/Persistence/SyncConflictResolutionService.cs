@@ -381,7 +381,8 @@ public sealed class SyncConflictResolutionService(
                replacement.EntityId == reapply.EntityId && replacement.BaseVersion == reapply.BaseVersion &&
                replacement.ClientOccurredAt == NormalizeTimestamp(reapply.ClientOccurredAt) &&
                string.Equals(replacement.PayloadHash, reapply.PayloadHash.ToLowerInvariant(), StringComparison.Ordinal) &&
-               string.Equals(replacement.PayloadJson, reapply.PayloadJson, StringComparison.Ordinal);
+               (replacement.RedactedAt.HasValue ||
+                string.Equals(replacement.PayloadJson, reapply.PayloadJson, StringComparison.Ordinal));
     }
 
     private static void ValidateRequest(
@@ -408,10 +409,35 @@ public sealed class SyncConflictResolutionService(
             throw new SyncRuleException("RESOLUTION_INVALID", conflictCaseId.ToString());
         if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length > 500)
             throw new SyncRuleException("REASON_REQUIRED", conflictCaseId.ToString());
+        if (IsUnsafeAuditReason(request.Reason))
+            throw new SyncRuleException("REASON_INVALID", conflictCaseId.ToString());
         if (request.Decision == SyncConflictResolutionDecisions.KeepServerAndRejectLocal && request.Reapply is not null)
             throw new SyncRuleException("RESOLUTION_INVALID", conflictCaseId.ToString());
         if (request.Decision == SyncConflictResolutionDecisions.ReapplyAsNew && request.Reapply is null)
             throw new SyncRuleException("REAPPLY_REQUEST_INVALID", conflictCaseId.ToString());
+    }
+
+    private static bool IsUnsafeAuditReason(string reason)
+    {
+        var value = reason.Trim();
+        if (value.Any(char.IsControl))
+            return true;
+
+        string[] prohibitedTerms =
+        [
+            "authorization", "bearer", "token", "credential", "password", "secret",
+            "proof", "nonce", "jti", "private key", "private_key"
+        ];
+        if (prohibitedTerms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        // Reject pasted JWTs, credentials and other long ASCII base64/base64url-shaped material
+        // even when the operator omits a label. Human Arabic text and ordinary ticket references
+        // do not match this shape.
+        return value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Any(part => part.Length >= 32 && part.All(character =>
+                character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or
+                    '-' or '_' or '+' or '/' or '=' or '.'));
     }
 
     private static DateTimeOffset NormalizeTimestamp(DateTimeOffset value)
