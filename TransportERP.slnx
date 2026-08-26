@@ -7,6 +7,8 @@
   <Project Path="TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj" />
   <Project Path="TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj" />
   <Project Path="TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj" />
+  <Project Path="TransportERP.Offline/TransportERP.Offline.csproj" />
+  <Project Path="TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj" />
   <Project Path="TransportERP.Tests/TransportERP.Tests.csproj" />
   <Project Path="TransportERP/TransportERP.Domain.csproj" />
 </Solution>

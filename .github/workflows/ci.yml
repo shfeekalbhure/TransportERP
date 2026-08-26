@@ -194,3 +194,75 @@ jobs:
           path: ci-evidence/desktop/exact-head-manifest.txt
           if-no-files-found: warn
           retention-days: 30
+
+  offline-client-core:
+    name: Required CI / Encrypted offline client core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact PR head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected="${{ github.event.pull_request.head.sha }}"
+          else
+            expected="${{ github.sha }}"
+          fi
+          echo "actual=$actual"
+          echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Offline client job is not running on the exact PR head.'; exit 1; }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore encrypted offline client tests
+        run: dotnet restore TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj
+
+      - name: Build encrypted offline client core
+        run: dotnet build TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-restore
+
+      - name: Run encrypted offline client tests
+        run: dotnet test TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-offline-client-tests.trx"
+
+      - name: Write exact-head evidence manifest
+        if: ${{ always() }}
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p ci-evidence/offline-client
+          actual=$(git rev-parse HEAD 2>/dev/null || echo unavailable)
+          tree=$(git rev-parse HEAD^{tree} 2>/dev/null || echo unavailable)
+          {
+            echo "workflow=$GITHUB_WORKFLOW"
+            echo "job=offline-client-core"
+            echo "event=$GITHUB_EVENT_NAME"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "job_status=$JOB_STATUS"
+            echo "ref=$GITHUB_REF"
+            echo "expected_sha=$EXPECTED_SHA"
+            echo "actual_sha=$actual"
+            echo "tree_sha=$tree"
+          } > ci-evidence/offline-client/exact-head-manifest.txt
+          test "$actual" = "$EXPECTED_SHA"
+
+      - name: Upload offline client CI evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-offline-client-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ci-evidence/offline-client/exact-head-manifest.txt
+            TransportERP.Offline.Tests/TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 30
