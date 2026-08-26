@@ -10,7 +10,7 @@ public sealed class SyncOperationPersistenceTests
 {
     [Fact]
     [Trait("Category", "PostgreSQL")]
-    public async Task Enqueue_is_idempotent_and_rejects_payload_hash_reuse()
+    public async Task Legacy_enqueue_is_fail_closed_until_the_stage4_proof_path_is_used()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
 
@@ -18,21 +18,14 @@ public sealed class SyncOperationPersistenceTests
         await db.Database.MigrateAsync();
         var scope = await SeedScopeAsync(db, "IDEMP");
         var service = CreateService(db);
-        var security = scope.Security;
         var payload = "{\"amount\":10}";
         var command = CreateCommand(scope, payload);
 
-        var first = await service.EnqueueSyncOperationAsync(command, security);
-        var replay = await service.EnqueueSyncOperationAsync(command, security);
-
-        Assert.Equal(first.Id, replay.Id);
-        Assert.Equal(scope.Security.RegisteredDeviceId, first.RegisteredDeviceId);
-        Assert.Equal(scope.Security.RegisteredDeviceCredentialVersion, first.RegisteredDeviceCredentialVersion);
-        Assert.Equal(1, await db.SyncOperations.CountAsync(x => x.Id == first.Id));
-        Assert.Equal(1, await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued" && x.EntityId == first.Id));
-
-        var mismatch = command with { PayloadJson = "{\"amount\":11}" };
-        await Assert.ThrowsAsync<SyncRuleException>(() => service.EnqueueSyncOperationAsync(mismatch, security));
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            service.EnqueueSyncOperationAsync(command, scope.Security));
+        Assert.Contains("new sync operation requires accepted Stage4 proof replay",
+            error.GetBaseException().Message, StringComparison.Ordinal);
+        Assert.False(await db.SyncOperations.AnyAsync(x => x.ClientOperationId == command.ClientOperationId));
     }
 
     [Fact]
@@ -76,7 +69,7 @@ public sealed class SyncOperationPersistenceTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
-    public async Task Enqueue_rolls_back_the_operation_when_audit_insert_fails()
+    public async Task Legacy_enqueue_rejection_is_atomic_when_the_audit_path_is_unavailable()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
         await using var db = CreateDb(connection);
@@ -156,23 +149,21 @@ public sealed class SyncOperationPersistenceTests
                 """);
         }
 
-        var succeeded = await service.EnqueueSyncOperationAsync(succeedingCommand, scope.Security);
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            service.EnqueueSyncOperationAsync(succeedingCommand, scope.Security));
+        Assert.Empty(db.ChangeTracker.Entries());
 
         await using var verify = CreateDb(connection);
         Assert.False(await verify.SyncOperations.AnyAsync(x =>
             x.DeviceId == failedCommand.DeviceId && x.ClientOperationId == failedCommand.ClientOperationId));
+        Assert.False(await verify.SyncOperations.AnyAsync(x =>
+            x.DeviceId == succeedingCommand.DeviceId && x.ClientOperationId == succeedingCommand.ClientOperationId));
         Assert.False(await verify.AuditEvents.AnyAsync(x =>
-            x.Action == "SyncOperationQueued" && x.EntityId != succeeded.Id && x.DeviceId == scope.Security.DeviceId));
-        Assert.Equal(succeeded.Id, await verify.SyncOperations
-            .Where(x => x.DeviceId == succeedingCommand.DeviceId &&
-                        x.ClientOperationId == succeedingCommand.ClientOperationId)
-            .Select(x => x.Id).SingleAsync());
-        Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
-            x.Action == "SyncOperationQueued" && x.EntityId == succeeded.Id));
+            x.Action == "SyncOperationQueued" && x.DeviceId == scope.Security.DeviceId));
         var chain = await new AuditEventService(verify).VerifyHashChainAsync(
             scope.CompanyId, scope.BranchId, scope.Security.DeviceId);
         Assert.True(chain.IsValid, chain.FailureReason);
-        Assert.Equal(1, chain.EventCount);
+        Assert.Equal(0, chain.EventCount);
     }
 
     [Fact]
@@ -185,7 +176,7 @@ public sealed class SyncOperationPersistenceTests
         await db.Database.MigrateAsync();
         var scope = await SeedScopeAsync(db, "LIFE");
         var service = CreateService(db, new SyncRetryPolicy(3, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(20)));
-        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{\"lifecycle\":true}"), scope.Security);
+        var operation = await InsertAcceptedOperationAsync(db, scope, "{\"lifecycle\":true}");
 
         operation = await service.TransitionSyncOperationAsync(
             new TransitionSyncOperationCommand(operation.Id, "SENDING"), scope.Security);
@@ -238,7 +229,7 @@ public sealed class SyncOperationPersistenceTests
         await db.Database.MigrateAsync();
         var scope = await SeedScopeAsync(db, "NRT");
         var service = CreateService(db);
-        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{\"nonRetryable\":true}"), scope.Security);
+        var operation = await InsertAcceptedOperationAsync(db, scope, "{\"nonRetryable\":true}");
         operation = await service.TransitionSyncOperationAsync(
             new TransitionSyncOperationCommand(operation.Id, "SENDING"), scope.Security);
         operation = await service.TransitionSyncOperationAsync(
@@ -261,7 +252,7 @@ public sealed class SyncOperationPersistenceTests
         await db.Database.MigrateAsync();
         var scope = await SeedScopeAsync(db, "PROVENANCE");
         var service = CreateService(db);
-        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{\"provenance\":true}"), scope.Security);
+        var operation = await InsertAcceptedOperationAsync(db, scope, "{\"provenance\":true}");
         var originalDevice = operation.RegisteredDeviceId;
         var originalVersion = operation.RegisteredDeviceCredentialVersion;
         var device = await db.RegisteredDevices.SingleAsync(x => x.Id == originalDevice);
@@ -300,6 +291,51 @@ public sealed class SyncOperationPersistenceTests
         => new(scope.Security.DeviceId, scope.Security.UserId, scope.Security.CompanyId, scope.Security.BranchId,
             "UPDATE", "TestEntity", Guid.NewGuid(), $"client-{Guid.NewGuid():N}", payload,
             Hash(payload), DateTimeOffset.UtcNow, 1);
+
+    private static async Task<SyncOperation> InsertAcceptedOperationAsync(
+        TransportErpDbContext db, TestScope scope, string payload)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var assignmentId = await db.RegisteredDeviceAssignments
+            .Where(x => x.RegisteredDeviceId == scope.Security.RegisteredDeviceId &&
+                        x.UserId == scope.Security.UserId && x.Status == "ACTIVE")
+            .Select(x => x.Id).SingleAsync();
+        var nonce = new SyncProofNonce
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId,
+            RegisteredDeviceId = scope.Security.RegisteredDeviceId!.Value,
+            DeviceId = scope.Security.DeviceId, ProofKeyVersion = 1,
+            NonceHash = RandomNumberGenerator.GetBytes(32), IssuedAt = now, ExpiresAt = now.AddMinutes(5)
+        };
+        var replay = new SyncProofReplay
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId,
+            RegisteredDeviceId = scope.Security.RegisteredDeviceId.Value,
+            DeviceId = scope.Security.DeviceId, DeviceAssignmentId = assignmentId,
+            UserId = scope.Security.UserId, BranchId = scope.BranchId, ProofKeyVersion = 1,
+            ProofKeyThumbprint = new string('t', 43), JtiHash = RandomNumberGenerator.GetBytes(32),
+            HtuHash = RandomNumberGenerator.GetBytes(32), HttpMethod = "POST", NonceRecordId = nonce.Id,
+            IssuedAt = now, FirstSeenAt = now.AddSeconds(1), ExpiresAt = now.AddMinutes(4),
+            AttemptCorrelationId = Guid.NewGuid()
+        };
+        var operation = new SyncOperation
+        {
+            Id = Guid.NewGuid(), DeviceId = scope.Security.DeviceId, UserId = scope.Security.UserId,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, OperationType = "UPDATE",
+            EntityType = "TestEntity", EntityId = Guid.NewGuid(), ClientOperationId = $"client-{Guid.NewGuid():N}",
+            PayloadJson = payload, PayloadHash = Hash(payload), ClientOccurredAt = now, ServerReceivedAt = now,
+            BaseVersion = 1, Status = "QUEUED", RetryCount = 0,
+            RegisteredDeviceId = scope.Security.RegisteredDeviceId,
+            RegisteredDeviceCredentialVersion = scope.Security.RegisteredDeviceCredentialVersion,
+            ActionCode = "test.update", ProtocolVersion = "sync-v1", OperationCorrelationId = Guid.NewGuid(),
+            RequestFingerprintVersion = "fp-v1", RequestFingerprintHash = RandomNumberGenerator.GetBytes(32),
+            ProofKeyVersion = 1, ProofKeyThumbprint = new string('t', 43), AcceptedProofReplayId = replay.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        db.AddRange(nonce, replay, operation);
+        await db.SaveChangesAsync();
+        return operation;
+    }
 
     private static string Hash(string payload)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();

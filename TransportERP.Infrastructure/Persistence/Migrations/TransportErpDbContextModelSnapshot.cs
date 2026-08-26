@@ -52,6 +52,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CorrelationId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OperationCorrelationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("DeviceId")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -101,6 +104,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId");
 
                     b.HasIndex("CorrelationId");
+
+                    b.HasIndex("OperationCorrelationId")
+                        .HasDatabaseName("ix_audit_event_operation_correlation");
 
                     b.HasIndex("Hash")
                         .IsUnique();
@@ -2029,6 +2035,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamptz");
                     b.Property<Guid>("UserId").HasColumnType("uuid");
                     b.HasKey("Id");
+                    b.HasAlternateKey("Id", "RegisteredDeviceId", "CompanyId", "UserId", "BranchId")
+                        .HasName("ux_device_assignment_proof_scope");
                     b.HasIndex("AssignedByUserId");
                     b.HasIndex("BranchId", "CompanyId");
                     b.HasIndex("RegisteredDeviceId", "CompanyId");
@@ -2152,6 +2160,13 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AcceptedProofReplayId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<long?>("BaseVersion")
                         .HasColumnType("bigint");
 
@@ -2177,7 +2192,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<Guid>("EntityId")
+                    b.Property<Guid?>("EntityId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("EntityType")
@@ -2197,6 +2212,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("OperationCorrelationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PayloadHash")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -2206,11 +2224,32 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("ProofKeyVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProofKeyThumbprint")
+                        .HasMaxLength(43)
+                        .HasColumnType("character varying(43)");
+
+                    b.Property<string>("ProtocolVersion")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid?>("RegisteredDeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<int?>("RegisteredDeviceCredentialVersion")
                         .HasColumnType("integer");
+
+                    b.Property<byte[]>("RequestFingerprintHash")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("RequestFingerprintVersion")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("ResultEntityId")
+                        .HasColumnType("uuid");
 
                     b.Property<long?>("ResultVersion")
                         .HasColumnType("bigint");
@@ -2245,12 +2284,22 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("DeviceId", "ClientOperationId")
-                        .IsUnique();
+                    b.HasIndex("AcceptedProofReplayId")
+                        .HasDatabaseName("ix_sync_op_accepted_proof");
 
                     b.HasIndex("DeviceId", "CreatedAt");
 
                     b.HasIndex("CompanyId", "Status", "NextRetryAt");
+
+                    b.HasIndex("CompanyId", "DeviceId", "ClientOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sync_op_legacy_company_device_client")
+                        .HasFilter("\"RequestFingerprintVersion\" IS NULL");
+
+                    b.HasIndex("CompanyId", "RegisteredDeviceId", "ClientOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sync_op_registered_device_client")
+                        .HasFilter("\"RegisteredDeviceId\" IS NOT NULL AND \"RequestFingerprintVersion\" = 'fp-v1'");
 
                     b.HasIndex("EntityType", "EntityId", "CreatedAt");
 
@@ -2265,6 +2314,70 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
 
                             t.HasCheckConstraint("ck_sync_registered_device_binding", "(\"RegisteredDeviceId\" IS NULL AND \"RegisteredDeviceCredentialVersion\" IS NULL) OR (\"RegisteredDeviceId\" IS NOT NULL AND \"RegisteredDeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_sync_stage4_contract_bundle", "(\"ActionCode\" IS NULL AND \"ProtocolVersion\" IS NULL AND \"OperationCorrelationId\" IS NULL AND \"RequestFingerprintVersion\" IS NULL AND \"RequestFingerprintHash\" IS NULL AND \"ProofKeyVersion\" IS NULL AND \"ProofKeyThumbprint\" IS NULL AND \"AcceptedProofReplayId\" IS NULL) OR (\"RequestFingerprintVersion\" = 'fp-v1' AND \"ProtocolVersion\" = 'sync-v1' AND \"RegisteredDeviceId\" IS NOT NULL AND \"BranchId\" IS NOT NULL AND \"ActionCode\" IS NOT NULL AND \"OperationCorrelationId\" IS NOT NULL AND \"OperationCorrelationId\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"RequestFingerprintHash\" IS NOT NULL AND octet_length(\"RequestFingerprintHash\") = 32 AND \"ProofKeyVersion\" IS NOT NULL AND \"ProofKeyVersion\" >= 1 AND \"ProofKeyThumbprint\" IS NOT NULL AND length(\"ProofKeyThumbprint\") = 43 AND \"AcceptedProofReplayId\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncProofNonce", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<DateTimeOffset>("ExpiresAt").HasColumnType("timestamptz");
+                    b.Property<DateTimeOffset>("IssuedAt").HasColumnType("timestamptz");
+                    b.Property<byte[]>("NonceHash").IsRequired().HasColumnType("bytea");
+                    b.Property<int>("ProofKeyVersion").HasColumnType("integer");
+                    b.Property<Guid>("RegisteredDeviceId").HasColumnType("uuid");
+                    b.HasKey("Id").HasName("pk_sync_proof_nonces");
+                    b.HasAlternateKey("Id", "CompanyId", "RegisteredDeviceId", "DeviceId", "ProofKeyVersion")
+                        .HasName("ux_sync_nonce_scope");
+                    b.HasIndex("ExpiresAt").HasDatabaseName("ix_sync_nonce_expiry");
+                    b.HasIndex("NonceHash").IsUnique().HasDatabaseName("ux_sync_nonce_hash");
+                    b.HasIndex("RegisteredDeviceId", "ProofKeyVersion", "ExpiresAt")
+                        .HasDatabaseName("ix_sync_nonce_device_key_expiry");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
+                    b.ToTable("sync_proof_nonces", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_sync_nonce_hash_len", "octet_length(\"NonceHash\") = 32");
+                            t.HasCheckConstraint("ck_sync_nonce_key_version", "\"ProofKeyVersion\" >= 1");
+                            t.HasCheckConstraint("ck_sync_nonce_window", "\"ExpiresAt\" > \"IssuedAt\"");
+                        });
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncProofReplay", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid>("AttemptCorrelationId").HasColumnType("uuid");
+                    b.Property<Guid>("BranchId").HasColumnType("uuid");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<Guid>("DeviceAssignmentId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset>("ExpiresAt").HasColumnType("timestamptz");
+                    b.Property<DateTimeOffset>("FirstSeenAt").HasColumnType("timestamptz");
+                    b.Property<string>("HttpMethod").IsRequired().HasMaxLength(8).HasColumnType("character varying(8)");
+                    b.Property<byte[]>("HtuHash").IsRequired().HasColumnType("bytea");
+                    b.Property<DateTimeOffset>("IssuedAt").HasColumnType("timestamptz");
+                    b.Property<byte[]>("JtiHash").IsRequired().HasColumnType("bytea");
+                    b.Property<Guid>("NonceRecordId").HasColumnType("uuid");
+                    b.Property<string>("ProofKeyThumbprint").IsRequired().HasMaxLength(43).HasColumnType("character varying(43)");
+                    b.Property<int>("ProofKeyVersion").HasColumnType("integer");
+                    b.Property<Guid>("RegisteredDeviceId").HasColumnType("uuid");
+                    b.Property<Guid>("UserId").HasColumnType("uuid");
+                    b.HasKey("Id").HasName("pk_sync_proof_replays");
+                    b.HasIndex("ExpiresAt").HasDatabaseName("ix_sync_replay_expiry");
+                    b.HasIndex("NonceRecordId").HasDatabaseName("ix_sync_replay_nonce");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
+                    b.HasIndex("DeviceAssignmentId", "RegisteredDeviceId", "CompanyId", "UserId", "BranchId");
+                    b.HasIndex("NonceRecordId", "CompanyId", "RegisteredDeviceId", "DeviceId", "ProofKeyVersion");
+                    b.HasIndex("RegisteredDeviceId", "ProofKeyVersion", "JtiHash")
+                        .IsUnique().HasDatabaseName("ux_sync_replay_device_key_jti");
+                    b.ToTable("sync_proof_replays", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_sync_replay_hash_len", "octet_length(\"JtiHash\") = 32 AND octet_length(\"HtuHash\") = 32 AND char_length(\"ProofKeyThumbprint\") = 43");
+                            t.HasCheckConstraint("ck_sync_replay_key_version", "\"ProofKeyVersion\" >= 1");
+                            t.HasCheckConstraint("ck_sync_replay_method", "\"HttpMethod\" = 'POST'");
+                            t.HasCheckConstraint("ck_sync_replay_window", "\"ExpiresAt\" > \"FirstSeenAt\" AND \"FirstSeenAt\" >= \"IssuedAt\"");
                         });
                 });
 
@@ -3515,6 +3628,44 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
                         .HasPrincipalKey("Id", "CompanyId", "DeviceId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncProofNonce", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sync_nonce_registered_device");
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncProofReplay", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDeviceAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceAssignmentId", "RegisteredDeviceId", "CompanyId", "UserId", "BranchId")
+                        .HasPrincipalKey("Id", "RegisteredDeviceId", "CompanyId", "UserId", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sync_replay_assignment_scope");
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.SyncProofNonce", null)
+                        .WithMany()
+                        .HasForeignKey("NonceRecordId", "CompanyId", "RegisteredDeviceId", "DeviceId", "ProofKeyVersion")
+                        .HasPrincipalKey("Id", "CompanyId", "RegisteredDeviceId", "DeviceId", "ProofKeyVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sync_replay_nonce_scope");
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sync_replay_registered_device");
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripAllocationEntity", b =>

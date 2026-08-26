@@ -344,6 +344,7 @@ public sealed class AuditEvent
     public string EntityType { get; set; } = string.Empty;
     public Guid? EntityId { get; set; }
     public Guid CorrelationId { get; set; }
+    public Guid? OperationCorrelationId { get; set; }
     public string? DeviceId { get; set; }
     public string? BeforeJson { get; set; }
     public string? AfterJson { get; set; }
@@ -385,7 +386,8 @@ public sealed class SyncOperation : P1Entity
     public Guid? BranchId { get; set; }
     public string OperationType { get; set; } = string.Empty;
     public string EntityType { get; set; } = string.Empty;
-    public Guid EntityId { get; set; }
+    public Guid? EntityId { get; set; }
+    public Guid? ResultEntityId { get; set; }
     public string ClientOperationId { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
@@ -399,5 +401,46 @@ public sealed class SyncOperation : P1Entity
     public string? ErrorCode { get; set; }
     public Guid? RegisteredDeviceId { get; set; }
     public int? RegisteredDeviceCredentialVersion { get; set; }
+    public string? ActionCode { get; set; }
+    public string? ProtocolVersion { get; set; }
+    public Guid? OperationCorrelationId { get; set; }
+    public string? RequestFingerprintVersion { get; set; }
+    public byte[]? RequestFingerprintHash { get; set; }
+    public int? ProofKeyVersion { get; set; }
+    public string? ProofKeyThumbprint { get; set; }
+    public Guid? AcceptedProofReplayId { get; set; }
     public ConflictCase? ConflictCase { get; set; }
+}
+
+public sealed class SyncProofNonce
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public int ProofKeyVersion { get; set; }
+    public byte[] NonceHash { get; set; } = [];
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+public sealed class SyncProofReplay
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid DeviceAssignmentId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid BranchId { get; set; }
+    public int ProofKeyVersion { get; set; }
+    public string ProofKeyThumbprint { get; set; } = string.Empty;
+    public byte[] JtiHash { get; set; } = [];
+    public byte[] HtuHash { get; set; } = [];
+    public string HttpMethod { get; set; } = string.Empty;
+    public Guid NonceRecordId { get; set; }
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset FirstSeenAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public Guid AttemptCorrelationId { get; set; }
 }

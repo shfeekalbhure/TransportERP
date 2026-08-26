@@ -29,6 +29,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<AuditStreamHead> AuditStreamHeads => Set<AuditStreamHead>();
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
+    public DbSet<SyncProofNonce> SyncProofNonces => Set<SyncProofNonce>();
+    public DbSet<SyncProofReplay> SyncProofReplays => Set<SyncProofReplay>();
     public DbSet<ConflictCase> ConflictCases => Set<ConflictCase>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -221,6 +223,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         deviceAssignment.ToTable("registered_device_assignments", t =>
             t.HasCheckConstraint("ck_registered_device_assignments_status", "\"Status\" IN ('ACTIVE','REVOKED')"));
         deviceAssignment.HasKey(x => x.Id);
+        deviceAssignment.HasAlternateKey(x => new { x.Id, x.RegisteredDeviceId, x.CompanyId, x.UserId, x.BranchId })
+            .HasName("ux_device_assignment_proof_scope");
         deviceAssignment.Property(x => x.Status).HasMaxLength(20).IsRequired();
         deviceAssignment.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId });
         deviceAssignment.HasIndex(x => new { x.UserId, x.CompanyId, x.BranchId, x.Status });
@@ -460,6 +464,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         audit.HasIndex(x => new { x.CompanyId, x.OccurredAt });
         audit.HasIndex(x => new { x.EntityType, x.EntityId, x.OccurredAt });
         audit.HasIndex(x => x.CorrelationId);
+        audit.HasIndex(x => x.OperationCorrelationId)
+            .HasDatabaseName("ix_audit_event_operation_correlation");
         audit.HasIndex(x => x.Hash).IsUnique();
         audit.HasIndex(x => x.SequenceNo).IsUnique();
         audit.HasOne<User>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
@@ -482,6 +488,16 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_registered_device_binding",
                 "(\"RegisteredDeviceId\" IS NULL AND \"RegisteredDeviceCredentialVersion\" IS NULL) OR " +
                 "(\"RegisteredDeviceId\" IS NOT NULL AND \"RegisteredDeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
+            t.HasCheckConstraint("ck_sync_stage4_contract_bundle",
+                "(\"ActionCode\" IS NULL AND \"ProtocolVersion\" IS NULL AND \"OperationCorrelationId\" IS NULL AND " +
+                "\"RequestFingerprintVersion\" IS NULL AND \"RequestFingerprintHash\" IS NULL AND \"ProofKeyVersion\" IS NULL AND " +
+                "\"ProofKeyThumbprint\" IS NULL AND \"AcceptedProofReplayId\" IS NULL) OR " +
+                "(\"RequestFingerprintVersion\" = 'fp-v1' AND \"ProtocolVersion\" = 'sync-v1' AND " +
+                "\"RegisteredDeviceId\" IS NOT NULL AND \"BranchId\" IS NOT NULL AND \"ActionCode\" IS NOT NULL AND " +
+                "\"OperationCorrelationId\" IS NOT NULL AND \"OperationCorrelationId\" <> '00000000-0000-0000-0000-000000000000'::uuid AND " +
+                "\"RequestFingerprintHash\" IS NOT NULL AND octet_length(\"RequestFingerprintHash\") = 32 AND " +
+                "\"ProofKeyVersion\" IS NOT NULL AND \"ProofKeyVersion\" >= 1 AND " +
+                "\"ProofKeyThumbprint\" IS NOT NULL AND length(\"ProofKeyThumbprint\") = 43 AND \"AcceptedProofReplayId\" IS NOT NULL)");
         });
         sync.HasKey(x => x.Id);
         sync.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
@@ -492,7 +508,19 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.Property(x => x.PayloadHash).HasMaxLength(128).IsRequired();
         sync.Property(x => x.Status).HasMaxLength(20).IsRequired();
         sync.Property(x => x.ErrorCode).HasMaxLength(80);
-        sync.HasIndex(x => new { x.DeviceId, x.ClientOperationId }).IsUnique();
+        sync.Property(x => x.ActionCode).HasMaxLength(120);
+        sync.Property(x => x.ProtocolVersion).HasMaxLength(20);
+        sync.Property(x => x.RequestFingerprintVersion).HasMaxLength(16);
+        sync.Property(x => x.RequestFingerprintHash).HasColumnType("bytea");
+        sync.Property(x => x.ProofKeyThumbprint).HasMaxLength(43);
+        sync.HasIndex(x => new { x.CompanyId, x.RegisteredDeviceId, x.ClientOperationId }).IsUnique()
+            .HasFilter("\"RegisteredDeviceId\" IS NOT NULL AND \"RequestFingerprintVersion\" = 'fp-v1'")
+            .HasDatabaseName("ux_sync_op_registered_device_client");
+        sync.HasIndex(x => new { x.CompanyId, x.DeviceId, x.ClientOperationId }).IsUnique()
+            .HasFilter("\"RequestFingerprintVersion\" IS NULL")
+            .HasDatabaseName("ux_sync_op_legacy_company_device_client");
+        sync.HasIndex(x => x.AcceptedProofReplayId)
+            .HasDatabaseName("ix_sync_op_accepted_proof");
         sync.HasIndex(x => new { x.CompanyId, x.Status, x.NextRetryAt });
         sync.HasIndex(x => new { x.EntityType, x.EntityId, x.CreatedAt });
         sync.HasIndex(x => new { x.DeviceId, x.CreatedAt });
@@ -505,6 +533,65 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.HasOne<RegisteredDevice>().WithMany()
             .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
             .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId }).OnDelete(DeleteBehavior.Restrict);
+
+        var nonce = mb.Entity<SyncProofNonce>();
+        nonce.ToTable("sync_proof_nonces", t =>
+        {
+            t.HasCheckConstraint("ck_sync_nonce_key_version", "\"ProofKeyVersion\" >= 1");
+            t.HasCheckConstraint("ck_sync_nonce_hash_len", "octet_length(\"NonceHash\") = 32");
+            t.HasCheckConstraint("ck_sync_nonce_window", "\"ExpiresAt\" > \"IssuedAt\"");
+        });
+        nonce.HasKey(x => x.Id).HasName("pk_sync_proof_nonces");
+        nonce.HasAlternateKey(x => new { x.Id, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ProofKeyVersion })
+            .HasName("ux_sync_nonce_scope");
+        nonce.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        nonce.Property(x => x.NonceHash).HasColumnType("bytea").IsRequired();
+        nonce.Property(x => x.IssuedAt).HasColumnType("timestamptz");
+        nonce.Property(x => x.ExpiresAt).HasColumnType("timestamptz");
+        nonce.HasIndex(x => x.NonceHash).IsUnique().HasDatabaseName("ux_sync_nonce_hash");
+        nonce.HasIndex(x => new { x.RegisteredDeviceId, x.ProofKeyVersion, x.ExpiresAt })
+            .HasDatabaseName("ix_sync_nonce_device_key_expiry");
+        nonce.HasIndex(x => x.ExpiresAt).HasDatabaseName("ix_sync_nonce_expiry");
+        nonce.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_sync_nonce_registered_device");
+
+        var replay = mb.Entity<SyncProofReplay>();
+        replay.ToTable("sync_proof_replays", t =>
+        {
+            t.HasCheckConstraint("ck_sync_replay_key_version", "\"ProofKeyVersion\" >= 1");
+            t.HasCheckConstraint("ck_sync_replay_hash_len",
+                "octet_length(\"JtiHash\") = 32 AND octet_length(\"HtuHash\") = 32 AND char_length(\"ProofKeyThumbprint\") = 43");
+            t.HasCheckConstraint("ck_sync_replay_method", "\"HttpMethod\" = 'POST'");
+            t.HasCheckConstraint("ck_sync_replay_window",
+                "\"ExpiresAt\" > \"FirstSeenAt\" AND \"FirstSeenAt\" >= \"IssuedAt\"");
+        });
+        replay.HasKey(x => x.Id).HasName("pk_sync_proof_replays");
+        replay.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        replay.Property(x => x.ProofKeyThumbprint).HasMaxLength(43).IsRequired();
+        replay.Property(x => x.JtiHash).HasColumnType("bytea").IsRequired();
+        replay.Property(x => x.HtuHash).HasColumnType("bytea").IsRequired();
+        replay.Property(x => x.HttpMethod).HasMaxLength(8).IsRequired();
+        replay.Property(x => x.IssuedAt).HasColumnType("timestamptz");
+        replay.Property(x => x.FirstSeenAt).HasColumnType("timestamptz");
+        replay.Property(x => x.ExpiresAt).HasColumnType("timestamptz");
+        replay.HasIndex(x => new { x.RegisteredDeviceId, x.ProofKeyVersion, x.JtiHash }).IsUnique()
+            .HasDatabaseName("ux_sync_replay_device_key_jti");
+        replay.HasIndex(x => x.ExpiresAt).HasDatabaseName("ix_sync_replay_expiry");
+        replay.HasIndex(x => x.NonceRecordId).HasDatabaseName("ix_sync_replay_nonce");
+        replay.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_sync_replay_registered_device");
+        replay.HasOne<RegisteredDeviceAssignment>().WithMany()
+            .HasForeignKey(x => new { x.DeviceAssignmentId, x.RegisteredDeviceId, x.CompanyId, x.UserId, x.BranchId })
+            .HasPrincipalKey(x => new { x.Id, x.RegisteredDeviceId, x.CompanyId, x.UserId, x.BranchId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_sync_replay_assignment_scope");
+        replay.HasOne<SyncProofNonce>().WithMany()
+            .HasForeignKey(x => new { x.NonceRecordId, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ProofKeyVersion })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ProofKeyVersion })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_sync_replay_nonce_scope");
 
         var conflict = mb.Entity<ConflictCase>();
         conflict.ToTable("conflict_cases", t => t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')"));

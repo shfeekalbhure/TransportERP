@@ -552,7 +552,9 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
     {
         const string Previous = "20260825220000_P1SecurityIdentity";
         const string Current = "20260826010000_P1RegisteredDevices";
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        const string Latest = "20260826030000_P1Stage4SyncIdempotencyFoundation";
+        await WithFreshDatabaseAsync(async connection =>
+        {
         await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
         await db.Database.MigrateAsync();
         var migrator = db.GetService<IMigrator>();
@@ -612,24 +614,26 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
         await migrator.MigrateAsync(Current);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: true);
 
-        db.ChangeTracker.Clear();
-        var historical = await db.SyncOperations.SingleAsync(x => x.Id == historicalId);
-        Assert.Null(historical.RegisteredDeviceId);
-        Assert.Null(historical.RegisteredDeviceCredentialVersion);
-        historical.Status = "REJECTED";
-        historical.ErrorCode = "LEGACY_TERMINAL";
-        historical.UpdatedAt = DateTimeOffset.UtcNow;
-        historical.RowVersion = RandomNumberGenerator.GetBytes(16);
-        await db.SaveChangesAsync();
-        db.ChangeTracker.Clear();
-        Assert.Equal("REJECTED", await db.SyncOperations.Where(x => x.Id == historicalId)
-            .Select(x => x.Status).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations
+            WHERE "Id"={historicalId} AND "RegisteredDeviceId" IS NULL
+              AND "RegisteredDeviceCredentialVersion" IS NULL
+            """).SingleAsync());
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.sync_operations SET "Status"='REJECTED', "ErrorCode"='LEGACY_TERMINAL',
+              "UpdatedAt"={DateTimeOffset.UtcNow}, "RowVersion"={RandomNumberGenerator.GetBytes(16)}
+            WHERE "Id"={historicalId}
+            """);
+        Assert.Equal("REJECTED", await db.Database.SqlQuery<string>($"""
+            SELECT "Status" AS "Value" FROM transport_erp.sync_operations WHERE "Id"={historicalId}
+            """).SingleAsync());
 
-        var unbound = NewDirectSync(user.Id, company.Id, branch.Id, "new-unbound", now);
-        db.SyncOperations.Add(unbound);
-        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
-        db.ChangeTracker.Clear();
-        Assert.False(await db.SyncOperations.AsNoTracking().AnyAsync(x => x.Id == unbound.Id));
+        var unboundId = Guid.NewGuid();
+        await Assert.ThrowsAsync<Npgsql.PostgresException>(() => InsertStage3SyncAsync(db, unboundId,
+            user.Id, company.Id, branch.Id, "new-unbound", null, null, now));
+        Assert.Equal(0, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations WHERE "Id"={unboundId}
+            """).SingleAsync());
 
         var registered = new RegisteredDevice
         {
@@ -648,33 +652,70 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
         };
         db.AddRange(registered, assignment);
         await db.SaveChangesAsync();
-        var bound = NewDirectSync(user.Id, company.Id, branch.Id, registered.DeviceId, now);
-        bound.RegisteredDeviceId = registered.Id;
-        bound.RegisteredDeviceCredentialVersion = registered.CredentialVersion;
-        db.SyncOperations.Add(bound);
-        await db.SaveChangesAsync();
-        Assert.True(await db.SyncOperations.AsNoTracking().AnyAsync(x => x.Id == bound.Id));
+        var boundId = Guid.NewGuid();
+        await InsertStage3SyncAsync(db, boundId, user.Id, company.Id, branch.Id, registered.DeviceId,
+            registered.Id, registered.CredentialVersion, now);
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations WHERE "Id"={boundId}
+            """).SingleAsync());
 
         await migrator.MigrateAsync(Previous);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: false);
         await migrator.MigrateAsync(Current);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: true);
+        await migrator.MigrateAsync(Latest);
+        });
     }
 
-    private static SyncOperation NewDirectSync(Guid userId, Guid companyId, Guid branchId,
-        string deviceId, DateTimeOffset now)
+    private static Task<int> InsertStage3SyncAsync(TransportErpDbContext db, Guid id, Guid userId,
+        Guid companyId, Guid branchId, string deviceId, Guid? registeredDeviceId,
+        int? credentialVersion, DateTimeOffset now)
     {
         var payload = "{\"direct\":true}";
-        return new SyncOperation
+        var hash = Convert.ToHexString(SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+        return db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO transport_erp.sync_operations
+              ("Id","DeviceId","UserId","CompanyId","BranchId","OperationType","EntityType","EntityId",
+               "ClientOperationId","PayloadJson","PayloadHash","ClientOccurredAt","ServerReceivedAt","Status",
+               "RetryCount","RegisteredDeviceId","RegisteredDeviceCredentialVersion","CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({id},{deviceId},{userId},{companyId},{branchId},'UPDATE','Direct',{Guid.NewGuid()},
+                    {$"direct-{Guid.NewGuid():N}"},{payload},{hash},{now},{now},'QUEUED',0,
+                    {registeredDeviceId},{credentialVersion},{now},{now},{RandomNumberGenerator.GetBytes(16)})
+            """);
+    }
+
+    private static async Task WithFreshDatabaseAsync(Func<string, Task> test)
+    {
+        var baseConnection = PostgreSqlTestEnvironment.RequireConnection();
+        var database = $"transporterp_stage3_migration_{Guid.NewGuid():N}";
+        var adminBuilder = new Npgsql.NpgsqlConnectionStringBuilder(baseConnection)
         {
-            Id = Guid.NewGuid(), DeviceId = deviceId, UserId = userId, CompanyId = companyId,
-            BranchId = branchId, OperationType = "UPDATE", EntityType = "Direct",
-            EntityId = Guid.NewGuid(), ClientOperationId = $"direct-{Guid.NewGuid():N}",
-            PayloadJson = payload, PayloadHash = Convert.ToHexString(SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant(),
-            ClientOccurredAt = now, ServerReceivedAt = now, Status = "QUEUED", RetryCount = 0,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+            Database = "postgres", Pooling = false
         };
+        await using (var admin = new Npgsql.NpgsqlConnection(adminBuilder.ConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var create = new Npgsql.NpgsqlCommand($"CREATE DATABASE \"{database}\"", admin);
+            await create.ExecuteNonQueryAsync();
+        }
+        var testBuilder = new Npgsql.NpgsqlConnectionStringBuilder(baseConnection)
+        {
+            Database = database, Pooling = false
+        };
+        try
+        {
+            await test(testBuilder.ConnectionString);
+        }
+        finally
+        {
+            Npgsql.NpgsqlConnection.ClearAllPools();
+            await using var admin = new Npgsql.NpgsqlConnection(adminBuilder.ConnectionString);
+            await admin.OpenAsync();
+            await using var drop = new Npgsql.NpgsqlCommand(
+                $"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)", admin);
+            await drop.ExecuteNonQueryAsync();
+        }
     }
 
     private static async Task AssertDeviceMigrationStateAsync(TransportErpDbContext db, Guid adminRoleId,
