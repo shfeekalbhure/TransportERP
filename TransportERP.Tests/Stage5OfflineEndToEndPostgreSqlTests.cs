@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
+using TransportERP.Contracts.Geo;
+using TransportERP.Contracts.Waybills;
 using TransportERP.Infrastructure.Persistence;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
@@ -206,22 +208,14 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         var template = new OfflineOperationEnqueueTemplate(
             Guid.NewGuid(), scope.CompanyId, scope.BranchId, scope.UserId, scope.RegisteredDeviceId,
             "CreateOperationalParty", "CREATE", "OperationalParty", null, null, occurredAt);
-        return store.EnqueueAsync(template, identity => JsonSerializer.Serialize(new
-        {
-            name = $"Offline E2E {suffix}",
-            mobile = "700000000",
-            identityType = (string?)null,
-            identityNo = (string?)null,
-            address = new
-            {
-                countryId = (Guid?)null,
-                governorateId = (Guid?)null,
-                cityId = (Guid?)null,
-                areaId = (Guid?)null,
-                addressLine = "Encrypted offline E2E"
-            },
-            clientOperationId = identity.ClientOperationId
-        }));
+        return store.EnqueueAsync(template, identity => JsonSerializer.Serialize(
+            new OperationalPartyCreateRequest(
+                $"Offline E2E {suffix}",
+                "700000000",
+                null,
+                null,
+                new GeoAddressSnapshot(null, null, null, null, "Encrypted offline E2E"),
+                identity.ClientOperationId)));
     }
 
     private static async Task<bool> ExecuteOneServerOperationAsync(WebApplicationFactory<Program> factory)
@@ -243,7 +237,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             x.CompanyId == scope.CompanyId &&
             x.RegisteredDeviceId == scope.RegisteredDeviceId &&
             x.ClientOperationId == local.ClientOperationId);
-        Assert.Equal(status, operation.Status);
+        Assert.True(string.Equals(status, operation.Status, StringComparison.Ordinal),
+            $"Expected server status {status}; actual={operation.Status}; error={operation.ErrorCode ?? "<none>"}.");
         Assert.Equal(local.OperationCorrelationId, operation.OperationCorrelationId);
         Assert.Equal(partyCount, await db.Set<OperationalPartyEntity>().AsNoTracking().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.ClientOperationId == local.ClientOperationId));
