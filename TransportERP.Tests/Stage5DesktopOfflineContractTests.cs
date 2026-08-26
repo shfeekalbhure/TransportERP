@@ -106,7 +106,7 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("store.ListAsync(scope", source, StringComparison.Ordinal);
         Assert.Contains("keys, scope, timeProvider", source, StringComparison.Ordinal);
         Assert.Contains("new SyncOperationsController", source, StringComparison.Ordinal);
-        Assert.Contains("request.CompanyId != _options.CompanyId", source, StringComparison.Ordinal);
+        Assert.Contains("template.CompanyId != _options.CompanyId", source, StringComparison.Ordinal);
         Assert.DoesNotContain("OfflineRuntimeAuthorized = true", source, StringComparison.Ordinal);
     }
 

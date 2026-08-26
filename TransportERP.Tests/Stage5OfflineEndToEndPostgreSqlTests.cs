@@ -68,10 +68,11 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
 
             var transport = CreateTransport(http, reopenedStore, proofKey, scope, time, "reopen-worker");
             var accepted = await transport.ProcessNextBatchAsync();
-            Assert.Equal(1, accepted.Claimed);
-            Assert.Equal(1, accepted.AcceptedPending);
             var pendingLocal = await reopenedStore.GetAsync(
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
+            Assert.True(accepted.Claimed == 1 && accepted.AcceptedPending == 1,
+                $"Expected one accepted pending operation; result={accepted}; " +
+                $"local={pendingLocal?.Status}/{pendingLocal?.ResultCode}.");
             Assert.Equal(OfflineOperationStatus.Queued, pendingLocal!.Status);
             Assert.Equal("QUEUED", pendingLocal.ResultCode);
             Assert.NotNull(pendingLocal.ServerOperationId);
@@ -124,10 +125,11 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             // drops it before the client can observe it, exactly modelling timeout-after-accept.
             var lost = await CreateTransport(http, store, proofKey, scope, time, "lost-worker")
                 .ProcessNextBatchAsync();
-            Assert.Equal(1, lost.RetryScheduled);
-            Assert.Equal(1, dropping.DroppedResponses);
             var failedLocal = await store.GetAsync(
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
+            Assert.True(lost.RetryScheduled == 1 && dropping.DroppedResponses == 1,
+                $"Expected one retry after a dropped signed response; result={lost}; " +
+                $"dropped={dropping.DroppedResponses}; local={failedLocal?.Status}/{failedLocal?.ResultCode}.");
             Assert.Equal(OfflineOperationStatus.Failed, failedLocal!.Status);
             Assert.Equal(1, failedLocal.ClientTransportRetryCount);
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "QUEUED", partyCount: 0);
