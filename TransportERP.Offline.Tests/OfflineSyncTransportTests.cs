@@ -310,6 +310,64 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Supervisor_recovers_after_unexpected_transport_failure_and_drains_the_leased_operation()
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        var queued = await store.EnqueueAsync(Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            if (calls == 1)
+                throw new InvalidOperationException("simulated one-shot transport infrastructure failure");
+
+            var captured = await CaptureAsync(request, cancellationToken);
+            return captured.Proof is null
+                ? Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId)
+                : Success(captured, "SUCCEEDED", resultEntityId: Guid.NewGuid(), resultVersion: 1);
+        }));
+        var transport = new OfflineSyncTransportClient(
+            http,
+            store,
+            new FixedBearerProvider("token"),
+            key,
+            new OfflineSyncTransportOptions(
+                Endpoint,
+                "desktop-device-1",
+                RegisteredDeviceId,
+                CompanyId,
+                BranchId,
+                UserId,
+                "resilient-worker",
+                LeaseDuration: TimeSpan.FromMilliseconds(20)),
+            TimeProvider.System);
+        var supervisor = new OfflineSyncSupervisor(
+            store,
+            transport,
+            new AlwaysOnlineSyncConnectivity(),
+            new OfflineSyncSupervisorOptions(
+                IdleWakeInterval: TimeSpan.FromMilliseconds(20),
+                FailureRecoveryBaseDelay: TimeSpan.FromMilliseconds(30),
+                FailureRecoveryMaxDelay: TimeSpan.FromMilliseconds(30)));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+
+        await WaitUntilAsync(async () =>
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))?.Status ==
+                OfflineOperationStatus.Succeeded,
+            stop.Token);
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        var completed = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+        Assert.Equal(3, calls);
+        Assert.Equal(0, completed.ClientTransportRetryCount);
+        Assert.Equal("SUPERVISOR_ITERATION_FAILED", supervisor.LastObservedFailure?.Code);
+        Assert.Equal(1, supervisor.LastObservedFailure?.ConsecutiveFailureCount);
+    }
+
+    [Fact]
     public async Task No_http_response_is_retryable_and_does_not_become_a_business_rejection()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));

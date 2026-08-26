@@ -24,10 +24,14 @@ public sealed record OfflineSyncSupervisorOptions(
     int MaximumBatchOperations = 100,
     TimeSpan? IdleWakeInterval = null,
     TimeSpan? RetentionSweepInterval = null,
-    OfflineRetentionPolicy? RetentionPolicy = null)
+    OfflineRetentionPolicy? RetentionPolicy = null,
+    TimeSpan? FailureRecoveryBaseDelay = null,
+    TimeSpan? FailureRecoveryMaxDelay = null)
 {
     public TimeSpan EffectiveIdleWakeInterval => IdleWakeInterval ?? TimeSpan.FromSeconds(30);
     public TimeSpan EffectiveRetentionSweepInterval => RetentionSweepInterval ?? TimeSpan.FromHours(1);
+    public TimeSpan EffectiveFailureRecoveryBaseDelay => FailureRecoveryBaseDelay ?? TimeSpan.FromSeconds(1);
+    public TimeSpan EffectiveFailureRecoveryMaxDelay => FailureRecoveryMaxDelay ?? TimeSpan.FromSeconds(30);
 
     internal void Validate()
     {
@@ -37,8 +41,29 @@ public sealed record OfflineSyncSupervisorOptions(
             throw new ArgumentOutOfRangeException(nameof(IdleWakeInterval));
         if (EffectiveRetentionSweepInterval <= TimeSpan.Zero || EffectiveRetentionSweepInterval > TimeSpan.FromDays(1))
             throw new ArgumentOutOfRangeException(nameof(RetentionSweepInterval));
+        if (EffectiveFailureRecoveryBaseDelay <= TimeSpan.Zero ||
+            EffectiveFailureRecoveryBaseDelay > TimeSpan.FromMinutes(1))
+            throw new ArgumentOutOfRangeException(nameof(FailureRecoveryBaseDelay));
+        if (EffectiveFailureRecoveryMaxDelay < EffectiveFailureRecoveryBaseDelay ||
+            EffectiveFailureRecoveryMaxDelay > TimeSpan.FromMinutes(5))
+            throw new ArgumentOutOfRangeException(nameof(FailureRecoveryMaxDelay));
+    }
+
+    internal TimeSpan DelayForFailure(int consecutiveFailureCount)
+    {
+        var exponent = Math.Clamp(consecutiveFailureCount - 1, 0, 30);
+        var multiplier = 1L << exponent;
+        var ticks = EffectiveFailureRecoveryBaseDelay.Ticks > long.MaxValue / multiplier
+            ? long.MaxValue
+            : EffectiveFailureRecoveryBaseDelay.Ticks * multiplier;
+        return TimeSpan.FromTicks(Math.Min(ticks, EffectiveFailureRecoveryMaxDelay.Ticks));
     }
 }
+
+public sealed record OfflineSyncSupervisorFailure(
+    string Code,
+    int ConsecutiveFailureCount,
+    DateTimeOffset ObservedAt);
 
 /// <summary>
 /// Cancellable local drain supervisor. A process-wide path gate prevents two supervisors from
@@ -57,6 +82,14 @@ public sealed class OfflineSyncSupervisor
     private readonly OfflineSyncSupervisorOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _wake = new(0, 1);
+    private OfflineSyncSupervisorFailure? _lastObservedFailure;
+
+    /// <summary>
+    /// Sanitized diagnostic for the most recent recovered loop failure. Exception messages are
+    /// deliberately excluded because they may contain local paths or transport data.
+    /// </summary>
+    public OfflineSyncSupervisorFailure? LastObservedFailure =>
+        Volatile.Read(ref _lastObservedFailure);
 
     public OfflineSyncSupervisor(
         OfflineOperationStore store,
@@ -91,33 +124,56 @@ public sealed class OfflineSyncSupervisor
         try
         {
             var nextRetentionSweepAt = _timeProvider.GetUtcNow();
+            var consecutiveFailureCount = 0;
             while (true)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var now = _timeProvider.GetUtcNow();
-                if (now >= nextRetentionSweepAt)
+                try
                 {
-                    await _store.RedactExpiredPayloadsAsync(_options.RetentionPolicy, cancellationToken);
-                    nextRetentionSweepAt = _timeProvider.GetUtcNow() + _options.EffectiveRetentionSweepInterval;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var now = _timeProvider.GetUtcNow();
+                    if (now >= nextRetentionSweepAt)
+                    {
+                        await _store.RedactExpiredPayloadsAsync(_options.RetentionPolicy, cancellationToken);
+                        nextRetentionSweepAt = _timeProvider.GetUtcNow() + _options.EffectiveRetentionSweepInterval;
+                    }
 
-                if (!await _connectivity.IsOnlineAsync(cancellationToken))
+                    if (!await _connectivity.IsOnlineAsync(cancellationToken))
+                    {
+                        await WaitForConnectivityOrRetentionAsync(nextRetentionSweepAt, cancellationToken);
+                        consecutiveFailureCount = 0;
+                        continue;
+                    }
+
+                    await _transport.ProcessNextBatchAsync(_options.MaximumBatchOperations, cancellationToken);
+                    var nextWorkAt = await _store.GetNextWorkAtAsync(_transport.Scope, cancellationToken);
+                    if (nextWorkAt is { } due && due <= _timeProvider.GetUtcNow())
+                    {
+                        consecutiveFailureCount = 0;
+                        continue;
+                    }
+
+                    var workDelay = nextWorkAt is null
+                        ? _options.EffectiveIdleWakeInterval
+                        : Min(nextWorkAt.Value - _timeProvider.GetUtcNow(), _options.EffectiveIdleWakeInterval);
+                    var retentionDelay = nextRetentionSweepAt - _timeProvider.GetUtcNow();
+                    var delay = Min(workDelay, retentionDelay);
+                    consecutiveFailureCount = 0;
+                    await WaitForWakeOrDelayAsync(delay, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    await WaitForConnectivityOrRetentionAsync(nextRetentionSweepAt, cancellationToken);
-                    continue;
+                    throw;
                 }
-
-                await _transport.ProcessNextBatchAsync(_options.MaximumBatchOperations, cancellationToken);
-                var nextWorkAt = await _store.GetNextWorkAtAsync(_transport.Scope, cancellationToken);
-                if (nextWorkAt is { } due && due <= _timeProvider.GetUtcNow())
-                    continue;
-
-                var workDelay = nextWorkAt is null
-                    ? _options.EffectiveIdleWakeInterval
-                    : Min(nextWorkAt.Value - _timeProvider.GetUtcNow(), _options.EffectiveIdleWakeInterval);
-                var retentionDelay = nextRetentionSweepAt - _timeProvider.GetUtcNow();
-                var delay = Min(workDelay, retentionDelay);
-                await WaitForWakeOrDelayAsync(delay, cancellationToken);
+                catch (Exception)
+                {
+                    consecutiveFailureCount++;
+                    Volatile.Write(ref _lastObservedFailure, new OfflineSyncSupervisorFailure(
+                        "SUPERVISOR_ITERATION_FAILED",
+                        consecutiveFailureCount,
+                        _timeProvider.GetUtcNow()));
+                    await WaitForWakeOrDelayAsync(
+                        _options.DelayForFailure(consecutiveFailureCount), cancellationToken);
+                }
             }
         }
         finally
