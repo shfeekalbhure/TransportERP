@@ -371,6 +371,116 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         }));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Waybill_party_reference_and_waybill_scope_drift_are_serialized_in_both_directions(
+        bool referenceStartsFirst)
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope local;
+        FinanceScope secondBranch;
+        Guid partyId;
+        await using (var seedDb = CreateP2Db(connection))
+        {
+            local = await SeedApprovedWaybillAsync(seedDb, "BSCOPERACE");
+            secondBranch = await SeedSecondBranchWaybillAsync(seedDb, local, "BSCOPERACE2");
+            partyId = await SeedPartyAsync(seedDb, local, "SCOPERACE");
+        }
+
+        var referenceId = Guid.NewGuid();
+        if (referenceStartsFirst)
+        {
+            await using var referenceDb = CreateP2Db(connection);
+            await using var referenceTransaction = await referenceDb.Database.BeginTransactionAsync();
+            referenceDb.Set<WaybillPartyEntity>().Add(NewPartyReference(referenceId, local.WaybillId, partyId));
+            await referenceDb.SaveChangesAsync();
+
+            var updateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var updateTask = Task.Run(async () =>
+            {
+                await using var updateDb = CreateP2Db(connection);
+                await using var updateTransaction = await updateDb.Database.BeginTransactionAsync();
+                await updateDb.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='5s'");
+                updateStarted.SetResult();
+                try
+                {
+                    await updateDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                        UPDATE transport_erp.waybills SET "BranchId"={{secondBranch.BranchId}}
+                        WHERE "Id"={{local.WaybillId}}
+                        """);
+                    await updateTransaction.CommitAsync();
+                    return (Exception?)null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+
+            await updateStarted.Task;
+            await Task.Delay(100);
+            Assert.False(updateTask.IsCompleted);
+            await referenceTransaction.CommitAsync();
+            var updateError = await updateTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotNull(updateError);
+            Assert.Contains("waybill scope change would strand", updateError.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        else
+        {
+            await using var updateDb = CreateP2Db(connection);
+            await using var updateTransaction = await updateDb.Database.BeginTransactionAsync();
+            await updateDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.waybills SET "BranchId"={{secondBranch.BranchId}}
+                WHERE "Id"={{local.WaybillId}}
+                """);
+
+            var insertStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var insertTask = Task.Run(async () =>
+            {
+                await using var referenceDb = CreateP2Db(connection);
+                await using var referenceTransaction = await referenceDb.Database.BeginTransactionAsync();
+                await referenceDb.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='5s'");
+                referenceDb.Set<WaybillPartyEntity>().Add(NewPartyReference(referenceId, local.WaybillId, partyId));
+                insertStarted.SetResult();
+                try
+                {
+                    await referenceDb.SaveChangesAsync();
+                    await referenceTransaction.CommitAsync();
+                    return (Exception?)null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+
+            await insertStarted.Task;
+            await Task.Delay(100);
+            Assert.False(insertTask.IsCompleted);
+            await updateTransaction.CommitAsync();
+            var insertError = await insertTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotNull(insertError);
+            Assert.Contains("operational party reference scope denied", insertError.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using var verifyDb = CreateP2Db(connection);
+        var invalidReferences = await verifyDb.Database.SqlQuery<int>($$"""
+            SELECT count(*)::int AS "Value"
+            FROM transport_erp.waybill_parties r
+            JOIN transport_erp.waybills w ON w."Id"=r."WaybillId"
+            JOIN transport_erp.operational_parties p ON p."Id"=r."OperationalPartyId"
+            WHERE r."Id"={{referenceId}}
+              AND (p."CompanyId"<>w."CompanyId" OR
+                   (p."BranchId" IS NOT NULL AND p."BranchId"<>w."BranchId"))
+            """).SingleAsync();
+        Assert.Equal(0, invalidReferences);
+    }
+
     [Fact]
     [Trait("Category", "P2PostgreSQL")]
     public async Task Concurrent_collection_retry_produces_one_accepted_transaction()
@@ -678,6 +788,17 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
         Assert.Contains("operational party reference scope denied", ex.ToString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    private static WaybillPartyEntity NewPartyReference(Guid id, Guid waybillId, Guid partyId) => new()
+    {
+        Id = id,
+        WaybillId = waybillId,
+        Sequence = 99,
+        Role = "SENDER",
+        OperationalPartyId = partyId,
+        NameSnapshot = "masked",
+        MobileSnapshot = "masked"
+    };
 
     private static WaybillEntity NewApprovedWaybill(Guid companyId, Guid branchId, Guid currencyId, string suffix, DateTimeOffset now)
         => new()

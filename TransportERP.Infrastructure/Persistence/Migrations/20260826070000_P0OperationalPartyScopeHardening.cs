@@ -63,6 +63,10 @@ public partial class P0OperationalPartyScopeHardening : Migration
             party_id := NEW."PartyId";
           END IF;
 
+          -- Reference creation and waybill scope drift must serialize on the same
+          -- transaction-scoped key. Row-level KEY SHARE does not conflict with a
+          -- non-key CompanyId/BranchId update and is therefore insufficient here.
+          PERFORM pg_advisory_xact_lock(hashtextextended('waybill-operational-scope|' || NEW."WaybillId"::text, 0));
           SELECT w."CompanyId", w."BranchId" INTO scope_company, scope_branch
             FROM transport_erp.waybills w WHERE w."Id"=NEW."WaybillId" FOR KEY SHARE;
           IF NOT FOUND THEN RAISE EXCEPTION 'operational party reference scope denied'; END IF;
@@ -126,6 +130,7 @@ public partial class P0OperationalPartyScopeHardening : Migration
         CREATE FUNCTION transport_erp.prevent_waybill_scope_drift()
         RETURNS trigger LANGUAGE plpgsql AS $body$
         BEGIN
+          PERFORM pg_advisory_xact_lock(hashtextextended('waybill-operational-scope|' || NEW."Id"::text, 0));
           IF EXISTS (
               SELECT 1 FROM transport_erp.waybill_parties r JOIN transport_erp.operational_parties p ON p."Id"=r."OperationalPartyId"
               WHERE r."WaybillId"=NEW."Id" AND
