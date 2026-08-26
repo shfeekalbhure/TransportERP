@@ -44,7 +44,7 @@ public sealed class ApiAuthenticationAndAuditTests
 
     [Fact]
     [Trait("Category", "HTTP")]
-    public async Task Sync_batch_is_hard_disabled_in_stage3_even_for_authenticated_scope()
+    public async Task Sync_batch_stays_hard_disabled_for_a_stage4_shaped_authenticated_request()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
 
@@ -56,23 +56,28 @@ public sealed class ApiAuthenticationAndAuditTests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(
             scope.UserId, scope.CompanyId, scope.BranchId, scope.DeviceId,
             "sync.operations.execute"));
+        var correlationId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", correlationId.ToString());
+        client.DefaultRequestHeaders.Add("DPoP", "not-evaluated-while-offline-is-disabled");
 
         const string payload = "{\"http\":true}";
         var response = await client.PostAsJsonAsync("/api/v1/sync/operations:batch", new
         {
             DeviceId = scope.DeviceId,
-            ProtocolVersion = "P1",
+            ProtocolVersion = "sync-v1",
             Operations = new[]
             {
                 new
                 {
                     OperationType = "UPDATE",
-                    EntityType = "TestEntity",
+                    ActionCode = "UpdateWaybillDraft",
+                    EntityType = "Waybill",
                     EntityId = Guid.NewGuid().ToString(),
                     ClientOperationId = $"http-{Guid.NewGuid():N}",
+                    OperationCorrelationId = Guid.NewGuid(),
                     PayloadJson = payload,
                     PayloadHash = Sha256(payload),
-                    ClientOccurredAt = DateTimeOffset.UtcNow,
+                    ClientOccurredAt = "2026-08-26T00:00:00.123456Z",
                     BaseVersion = 1L
                 }
             }
@@ -81,7 +86,9 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiError>();
         Assert.Equal("OFFLINE_DISABLED", error!.ErrorCode);
+        Assert.Equal(correlationId, error.CorrelationId);
         Assert.Empty(await db.SyncOperations.Where(x => x.DeviceId == scope.DeviceId).ToListAsync());
+        Assert.False(await db.AuditEvents.AnyAsync(x => x.CorrelationId == correlationId));
     }
 
     [Fact]
