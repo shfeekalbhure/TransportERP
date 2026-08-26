@@ -38,6 +38,7 @@ public sealed class Stage4ProofKeyLifecycleRuntimePostgreSqlTests
         Assert.Null(bindChallengeReplay.Challenge);
         var bindReplay = await service.ChangeAsync(scope.DeviceId, "BIND", current, bind.ChangeRequest,
             null, bind.NewProof, token, bind.RawBody, bind.Htu, Guid.NewGuid(), default);
+        Assert.Equal(0, bind.Result.ChangedAt.UtcDateTime.Ticks % TimeSpan.TicksPerMicrosecond);
         Assert.Equal(bind.Result, bindReplay);
 
         var rotate = await ExecuteAsync(service, validator, scope, current, "ROTATE", 1,

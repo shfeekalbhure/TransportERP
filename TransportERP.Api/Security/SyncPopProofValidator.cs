@@ -49,6 +49,7 @@ public sealed class SyncPopProofValidator
         var signature = DecodeBase64Url(segments[2]);
         if (signature.Length != 64) throw Invalid();
 
+        RequireRawProtectedTyp(protectedBytes);
         using var protectedJson = ParseUniqueObject(protectedBytes);
         var header = protectedJson.RootElement;
         RequireExactString(header, "typ", "dpop+jwt");
@@ -160,6 +161,33 @@ public sealed class SyncPopProofValidator
             return document;
         }
         catch (JsonException) { throw Invalid(); }
+    }
+
+    private static void RequireRawProtectedTyp(ReadOnlySpan<byte> utf8)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(utf8, new JsonReaderOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 16
+            });
+            while (reader.Read())
+            {
+                if (reader.TokenType != JsonTokenType.PropertyName || reader.CurrentDepth != 1 ||
+                    reader.HasValueSequence || !reader.ValueSpan.SequenceEqual("typ"u8)) continue;
+                if (!reader.Read() || reader.TokenType != JsonTokenType.String || reader.HasValueSequence ||
+                    !reader.ValueSpan.SequenceEqual("dpop+jwt"u8))
+                    throw Invalid();
+                return;
+            }
+        }
+        catch (JsonException)
+        {
+            throw Invalid();
+        }
+        throw Invalid();
     }
 
     private static void EnsureUniqueObject(JsonElement value)

@@ -48,6 +48,17 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
             Assert.Equal("ck_sync_stage4_contract_bundle", partialBundleDetail.ConstraintName);
             db.ChangeTracker.Clear();
 
+            var missingFingerprintVersion = NewAcceptedOperation(first,
+                firstOperation.AcceptedProofReplayId!.Value, $"partial-fp-{Guid.NewGuid():N}");
+            missingFingerprintVersion.RequestFingerprintVersion = null;
+            db.SyncOperations.Add(missingFingerprintVersion);
+            var missingFingerprintError = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            var missingFingerprintDetail = Assert.IsType<Npgsql.PostgresException>(
+                missingFingerprintError.GetBaseException());
+            Assert.Equal("23514", missingFingerprintDetail.SqlState);
+            Assert.Equal("ck_sync_stage4_contract_bundle", missingFingerprintDetail.ConstraintName);
+            db.ChangeTracker.Clear();
+
             db.SyncOperations.Add(NewAcceptedOperation(first, Guid.NewGuid(), $"fake-{Guid.NewGuid():N}"));
             var fakeReplay = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             Assert.Contains("accepted proof replay scope mismatch",

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using TransportERP.Api.Security;
@@ -135,6 +136,19 @@ public sealed class Stage4SyncPopProofValidatorTests
             proof, Bearer, body, Htu, correlation, Now)));
     }
 
+    [Fact]
+    public void Protected_typ_must_be_literal_and_not_a_normalized_json_escape()
+    {
+        var body = Encoding.UTF8.GetBytes("{}");
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var correlation = Guid.NewGuid();
+        var escapedHeader = PublicHeader(key).Replace("dpop+jwt", "dpop\\u002Bjwt", StringComparison.Ordinal);
+        var proof = CreateProofFromJson(key, escapedHeader, BasePayload(body, correlation, Now));
+
+        Assert.Throws<SyncPopProofValidationException>(() => new SyncPopProofValidator().Validate(new(
+            proof, Bearer, body, Htu, correlation, Now)));
+    }
+
     [Theory]
     [InlineData("crit", "[\"exp\"]")]
     [InlineData("jku", "\"https://attacker.invalid/jwks.json\"")]
@@ -214,7 +228,7 @@ public sealed class Stage4SyncPopProofValidatorTests
         {
             typ = "dpop+jwt", alg = "ES256",
             jwk = new { kty = "EC", crv = "P-256", x = Base64Url(parameters.Q.X!), y = Base64Url(parameters.Q.Y!) }
-        });
+        }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
 
     private static string BasePayload(byte[] body, Guid correlation, DateTimeOffset issuedAt)

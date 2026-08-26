@@ -145,7 +145,7 @@ public sealed class ProofKeyChangeProofValidator
                 }
             });
         }
-        catch (Exception exception) when (exception is CryptographicException or ArgumentException)
+        catch (Exception exception) when (exception is CryptographicException or ArgumentException or PlatformNotSupportedException)
         {
             throw Invalid();
         }

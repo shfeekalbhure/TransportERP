@@ -650,8 +650,29 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
             CompanyId = company.Id, BranchId = branch.Id, Status = "ACTIVE", AssignedByUserId = user.Id,
             AssignedAt = now, CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
         };
-        db.AddRange(registered, assignment);
-        await db.SaveChangesAsync();
+        // This test deliberately holds the database at the Stage-3 boundary while the compiled
+        // DbContext model is newer. Use the Stage-3 physical columns explicitly so EF does not
+        // project nullable Stage-4 proof-key columns into the historical INSERT.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO transport_erp.registered_devices
+              ("Id","CompanyId","DeviceId","DisplayName","Platform","AppVersion","DeviceModel","OsVersion",
+               "RegistrationRequestId","CredentialHash","CredentialVersion","Status","RegisteredByUserId",
+               "ApprovedByUserId","ApprovedAt","SuspendedAt","RevokedAt","ExpiresAt","LastSeenAt",
+               "CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({registered.Id},{registered.CompanyId},{registered.DeviceId},{registered.DisplayName},
+                    {registered.Platform},{registered.AppVersion},{registered.DeviceModel},{registered.OsVersion},
+                    {registered.RegistrationRequestId},{registered.CredentialHash},{registered.CredentialVersion},
+                    {registered.Status},{registered.RegisteredByUserId},{registered.ApprovedByUserId},
+                    {registered.ApprovedAt},{registered.SuspendedAt},{registered.RevokedAt},{registered.ExpiresAt},
+                    {registered.LastSeenAt},{registered.CreatedAt},{registered.UpdatedAt},{registered.RowVersion});
+            INSERT INTO transport_erp.registered_device_assignments
+              ("Id","RegisteredDeviceId","UserId","CompanyId","BranchId","Status","AssignedByUserId",
+               "RemovedByUserId","AssignedAt","RemovedAt","CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({assignment.Id},{assignment.RegisteredDeviceId},{assignment.UserId},{assignment.CompanyId},
+                    {assignment.BranchId},{assignment.Status},{assignment.AssignedByUserId},
+                    {assignment.RemovedByUserId},{assignment.AssignedAt},{assignment.RemovedAt},
+                    {assignment.CreatedAt},{assignment.UpdatedAt},{assignment.RowVersion})
+            """);
         var boundId = Guid.NewGuid();
         await InsertStage3SyncAsync(db, boundId, user.Id, company.Id, branch.Id, registered.DeviceId,
             registered.Id, registered.CredentialVersion, now);

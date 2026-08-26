@@ -586,7 +586,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "(\"ActionCode\" IS NULL AND \"ProtocolVersion\" IS NULL AND \"OperationCorrelationId\" IS NULL AND " +
                 "\"RequestFingerprintVersion\" IS NULL AND \"RequestFingerprintHash\" IS NULL AND \"ProofKeyVersion\" IS NULL AND " +
                 "\"ProofKeyThumbprint\" IS NULL AND \"AcceptedProofReplayId\" IS NULL) OR " +
-                "(\"RequestFingerprintVersion\" = 'fp-v1' AND \"ProtocolVersion\" = 'sync-v1' AND " +
+                "(\"RequestFingerprintVersion\" IS NOT NULL AND \"RequestFingerprintVersion\" = 'fp-v1' AND " +
+                "\"ProtocolVersion\" IS NOT NULL AND \"ProtocolVersion\" = 'sync-v1' AND " +
                 "\"RegisteredDeviceId\" IS NOT NULL AND \"BranchId\" IS NOT NULL AND \"ActionCode\" IS NOT NULL AND " +
                 "\"OperationCorrelationId\" IS NOT NULL AND \"OperationCorrelationId\" <> '00000000-0000-0000-0000-000000000000'::uuid AND " +
                 "\"RequestFingerprintHash\" IS NOT NULL AND octet_length(\"RequestFingerprintHash\") = 32 AND " +

@@ -51,7 +51,7 @@ public sealed class ProofKeyLifecycleService(
             ValidateDeviceState(device, changeType, request.ExpectedProofKeyVersion);
 
             var rawChallenge = RandomNumberGenerator.GetBytes(32);
-            var now = DateTimeOffset.UtcNow;
+            var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
             var challenge = new RegisteredDeviceProofKeyChallenge
             {
                 Id = Guid.NewGuid(),
@@ -157,7 +157,7 @@ public sealed class ProofKeyLifecycleService(
                 ProofKeyChangeProofValidator.RequireMatchingPayloads(currentProof, nextProof);
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
             var previousThumbprint = device.ProofKeyThumbprint;
             var resultVersion = changeType == "BIND" ? 1 : request.ExpectedProofKeyVersion!.Value + 1;
             var change = new RegisteredDeviceProofKeyChange
@@ -401,4 +401,11 @@ public sealed class ProofKeyLifecycleService(
 
     private static string Base64Url(byte[] value)
         => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static DateTimeOffset NormalizeTimestamp(DateTimeOffset value)
+    {
+        var ticks = value.UtcDateTime.Ticks;
+        return new DateTimeOffset(new DateTime(
+            ticks - ticks % TimeSpan.TicksPerMicrosecond, DateTimeKind.Utc));
+    }
 }

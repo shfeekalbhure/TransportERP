@@ -350,6 +350,10 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         await db.Database.MigrateAsync();
         var scope = await SeedAsync(db, "CLEANUP");
         var now = Normalize(DateTimeOffset.UtcNow);
+        var cleanup = new SyncProofCleanupService(db);
+        // Cleanup is intentionally global. Remove expired evidence left by earlier
+        // PostgreSQL fixtures before asserting exact counts for this arrangement.
+        _ = await cleanup.CleanupExpiredAsync(now);
         var assignmentId = await db.RegisteredDeviceAssignments
             .Where(x => x.RegisteredDeviceId == scope.DeviceId && x.Status == "ACTIVE")
             .Select(x => x.Id).SingleAsync();
@@ -370,7 +374,6 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         db.SyncProofReplays.AddRange(boundaryReplay, futureReplay, malformedShortReplay);
         await db.SaveChangesAsync();
 
-        var cleanup = new SyncProofCleanupService(db);
         var first = await cleanup.CleanupExpiredAsync(now);
 
         Assert.Equal(1, first.DeletedReplays);
