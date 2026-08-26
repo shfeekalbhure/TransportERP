@@ -159,11 +159,32 @@ public sealed class OfflineOperationStore
         return new OfflineEnqueueResult(operation, true);
     }
 
-    public async Task<OfflineOperation?> ClaimNextAsync(
+    public Task<OfflineOperation?> ClaimNextAsync(
         string workerId,
         TimeSpan leaseDuration,
         OfflineOperationScope scope,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ClaimNextCoreAsync(workerId, leaseDuration, scope, null, cancellationToken);
+
+    internal Task<OfflineOperation?> ClaimNextExcludingAsync(
+        string workerId,
+        TimeSpan leaseDuration,
+        OfflineOperationScope scope,
+        IReadOnlyCollection<Guid> excludedLocalOperationIds,
+        CancellationToken cancellationToken = default) =>
+        ClaimNextCoreAsync(
+            workerId,
+            leaseDuration,
+            scope,
+            excludedLocalOperationIds,
+            cancellationToken);
+
+    private async Task<OfflineOperation?> ClaimNextCoreAsync(
+        string workerId,
+        TimeSpan leaseDuration,
+        OfflineOperationScope scope,
+        IReadOnlyCollection<Guid>? excludedLocalOperationIds,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(workerId) || leaseDuration <= TimeSpan.Zero)
         {
@@ -178,7 +199,17 @@ public sealed class OfflineOperationStore
         await using var transaction = connection.BeginTransaction(deferred: false);
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        var excluded = excludedLocalOperationIds?
+            .Where(localOperationId => localOperationId != Guid.Empty)
+            .Distinct()
+            .ToArray() ?? [];
+        if (excluded.Length > 100)
+            throw new ArgumentOutOfRangeException(nameof(excludedLocalOperationIds));
+        var exclusionClause = excluded.Length == 0
+            ? string.Empty
+            : $"AND LocalOperationId NOT IN ({string.Join(", ",
+                Enumerable.Range(0, excluded.Length).Select(index => $"$excluded{index}"))})";
+        command.CommandText = $"""
             UPDATE offline_operations
             SET Status = 'SENDING',
                 AttemptCorrelationId = $attemptId,
@@ -190,6 +221,7 @@ public sealed class OfflineOperationStore
                 FROM offline_operations
                 WHERE CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
                   AND RegisteredDeviceId = $registeredDeviceId
+                  {exclusionClause}
                   AND ((Status = 'QUEUED' AND (NextRetryAt IS NULL OR NextRetryAt <= $now))
                     OR (Status = 'FAILED' AND NextRetryAt IS NOT NULL AND NextRetryAt <= $now)
                     OR (Status = 'SENDING' AND LeaseExpiresAt IS NOT NULL AND LeaseExpiresAt <= $now))
@@ -206,6 +238,8 @@ public sealed class OfflineOperationStore
         Add(command, "$branchId", scope.BranchId);
         Add(command, "$userId", scope.UserId);
         Add(command, "$registeredDeviceId", scope.RegisteredDeviceId);
+        for (var index = 0; index < excluded.Length; index++)
+            Add(command, $"$excluded{index}", excluded[index]);
         var operation = await ReadSingleAsync(command, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return operation;

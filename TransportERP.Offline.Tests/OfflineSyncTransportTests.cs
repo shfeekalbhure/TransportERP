@@ -341,13 +341,16 @@ public sealed class OfflineSyncTransportTests : IDisposable
                 BranchId,
                 UserId,
                 "resilient-worker",
-                LeaseDuration: TimeSpan.FromMilliseconds(20)),
+                // The lease is certainly expired before the supervisor's delayed recovery.
+                // A fresh attempt must recover the same durable operation exactly once.
+                LeaseDuration: TimeSpan.FromTicks(1)),
             TimeProvider.System);
         var supervisor = new OfflineSyncSupervisor(
             store,
             transport,
             new AlwaysOnlineSyncConnectivity(),
             new OfflineSyncSupervisorOptions(
+                MaximumBatchOperations: 1,
                 IdleWakeInterval: TimeSpan.FromMilliseconds(20),
                 FailureRecoveryBaseDelay: TimeSpan.FromMilliseconds(30),
                 FailureRecoveryMaxDelay: TimeSpan.FromMilliseconds(30)));
@@ -366,6 +369,49 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(0, completed.ClientTransportRetryCount);
         Assert.Equal("SUPERVISOR_ITERATION_FAILED", supervisor.LastObservedFailure?.Code);
         Assert.Equal(1, supervisor.LastObservedFailure?.ConsecutiveFailureCount);
+    }
+
+    [Fact]
+    public async Task Batch_claim_never_reclaims_the_same_operation_after_its_lease_expires()
+    {
+        var clock = new AdvancingTimeProvider(
+            new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero),
+            TimeSpan.FromSeconds(2));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            return captured.Proof is null
+                ? Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId)
+                : Success(captured, "SUCCEEDED", resultEntityId: Guid.NewGuid(), resultVersion: 1);
+        }));
+        var transport = new OfflineSyncTransportClient(
+            http,
+            store,
+            new FixedBearerProvider("token"),
+            key,
+            new OfflineSyncTransportOptions(
+                Endpoint,
+                "desktop-device-1",
+                RegisteredDeviceId,
+                CompanyId,
+                BranchId,
+                UserId,
+                "short-lease-worker",
+                LeaseDuration: TimeSpan.FromSeconds(1)),
+            clock);
+
+        var result = await transport.ProcessNextBatchAsync();
+        var completed = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, result.Claimed);
+        Assert.Equal(1, result.Succeeded);
+        Assert.Equal(2, calls);
+        Assert.Equal(OfflineOperationStatus.Succeeded, completed?.Status);
     }
 
     [Fact]
@@ -1071,5 +1117,13 @@ public sealed class OfflineSyncTransportTests : IDisposable
         private DateTimeOffset _current = initial;
         public override DateTimeOffset GetUtcNow() => _current;
         public void Advance(TimeSpan duration) => _current += duration;
+    }
+
+    private sealed class AdvancingTimeProvider(DateTimeOffset initial, TimeSpan step) : TimeProvider
+    {
+        private long _utcTicks = initial.UtcDateTime.Ticks - step.Ticks;
+
+        public override DateTimeOffset GetUtcNow() =>
+            new(Interlocked.Add(ref _utcTicks, step.Ticks), TimeSpan.Zero);
     }
 }

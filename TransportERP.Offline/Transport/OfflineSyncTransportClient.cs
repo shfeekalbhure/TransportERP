@@ -89,12 +89,18 @@ public sealed class OfflineSyncTransportClient
             throw new ArgumentOutOfRangeException(nameof(maximumOperations));
 
         var claimed = new List<OfflineOperation>(limit);
+        var claimedLocalOperationIds = new HashSet<Guid>();
         for (var index = 0; index < limit; index++)
         {
-            var operation = await _store.ClaimNextAsync(
-                _options.WorkerId, _options.EffectiveLeaseDuration, Scope, cancellationToken);
+            var operation = await _store.ClaimNextExcludingAsync(
+                _options.WorkerId,
+                _options.EffectiveLeaseDuration,
+                Scope,
+                claimedLocalOperationIds,
+                cancellationToken);
             if (operation is null) break;
             claimed.Add(operation);
+            claimedLocalOperationIds.Add(operation.LocalOperationId);
         }
 
         if (claimed.Count == 0) return new(0, 0, 0, 0, 0);
