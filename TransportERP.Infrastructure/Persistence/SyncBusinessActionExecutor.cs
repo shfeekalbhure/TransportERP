@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 using TransportERP.Application.Sync;
 
 namespace TransportERP.Infrastructure.Persistence;
@@ -97,12 +98,18 @@ public sealed class SyncBusinessActionExecutor(
                 return new SyncActionExecutionOutcome.Conflict(exception.Code);
             return new SyncActionExecutionOutcome.Failed(exception.Code);
         }
+        catch (Exception exception) when (IsCommitOutcomeAmbiguous(exception))
+        {
+            // Only failures whose position relative to a database/transport commit is genuinely
+            // unknowable use completion recovery. Replaying the same governed business key is
+            // idempotent, and the processor applies a bounded server-side recovery budget.
+            return new SyncActionExecutionOutcome.CompletionPending();
+        }
         catch
         {
-            // An infrastructure fault may have happened after an idempotent business effect
-            // committed but before its result reached this process. Leave completion pending;
-            // lease recovery replays the same business key and obtains the persisted result.
-            return new SyncActionExecutionOutcome.CompletionPending();
+            // Programming and other deterministic failures are known before a successful result
+            // was returned. They must not enter lease recovery indefinitely.
+            return new SyncActionExecutionOutcome.Failed("ACTION_EXECUTION_FAILED");
         }
 
         if (result.IsConflict)
@@ -144,6 +151,9 @@ public sealed class SyncBusinessActionExecutor(
             null,
             null,
             errorCode), cancellationToken);
+
+    private static bool IsCommitOutcomeAmbiguous(Exception exception)
+        => exception is DbException or DbUpdateException or TimeoutException or IOException;
 }
 
 /// <summary>

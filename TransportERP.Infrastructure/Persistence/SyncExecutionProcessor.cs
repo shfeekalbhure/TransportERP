@@ -83,9 +83,15 @@ public sealed class SyncExecutionProcessor(
                     cancellationToken: cancellationToken);
                 break;
             case SyncActionExecutionOutcome.CompletionPending:
-                // The business adapter may already have committed its idempotent effect. Keep the
-                // operation SENDING so lease recovery can replay the same business key, recover the
-                // same result, and finish audit/status without producing a duplicate effect.
+                // The business adapter may already have committed its idempotent effect. Schedule
+                // a bounded replay of the same business key. This uses the same original+5 server
+                // retry budget and terminates as an explicit ambiguous FAILED state if recovery
+                // cannot observe the persisted result; it never reports a false business rejection.
+                await operations.CompleteExecutionPendingAsync(
+                    claim.OperationId,
+                    claim.ClaimToken,
+                    now: now,
+                    cancellationToken: cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException("Unsupported sync execution outcome.");

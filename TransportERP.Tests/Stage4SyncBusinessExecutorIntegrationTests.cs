@@ -140,6 +140,42 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
     }
 
     [Fact]
+    public async Task Unclassified_deterministic_adapter_failure_is_terminal_not_completion_pending()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedDeviceAsync(db);
+        var adapters = new FakeBusinessAdapters
+        {
+            Failure = new InvalidOperationException("deterministic injected defect")
+        };
+        var executor = Executor(db, new FakePermissionResolver { Allowed = true },
+            adapters, new CapturingAuditSink());
+
+        var failed = Assert.IsType<SyncActionExecutionOutcome.Failed>(
+            await executor.ExecuteAsync(Claim(fixture)));
+
+        Assert.Equal("ACTION_EXECUTION_FAILED", failed.ErrorCode);
+        Assert.Equal(0, adapters.EffectCount);
+    }
+
+    [Fact]
+    public async Task Commit_outcome_timeout_is_classified_for_bounded_completion_recovery()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedDeviceAsync(db);
+        var adapters = new FakeBusinessAdapters
+        {
+            Failure = new TimeoutException("commit acknowledgement was not observed")
+        };
+        var executor = Executor(db, new FakePermissionResolver { Allowed = true },
+            adapters, new CapturingAuditSink());
+
+        Assert.IsType<SyncActionExecutionOutcome.CompletionPending>(
+            await executor.ExecuteAsync(Claim(fixture)));
+        Assert.Equal(0, adapters.EffectCount);
+    }
+
+    [Fact]
     public async Task Audit_sink_persists_metadata_only_with_operation_correlation()
     {
         await using var db = CreateDb();
@@ -295,6 +331,7 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
         public int EffectCount { get; private set; }
         public Guid? LastOperationCorrelationId { get; private set; }
         public Guid? LastOperationContextCorrelationId { get; private set; }
+        public Exception? Failure { get; init; }
 
         public Task<SyncBusinessActionResult> CreateDraftAsync(SyncBusinessExecutionContext context,
             CreateWaybillDraftRequest request, CancellationToken cancellationToken) => Execute(context, true);
@@ -310,6 +347,8 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
 
         private Task<SyncBusinessActionResult> Execute(SyncBusinessExecutionContext context, bool versioned)
         {
+            if (Failure is not null)
+                throw Failure;
             LastOperationCorrelationId = context.OperationCorrelationId;
             LastOperationContextCorrelationId = context.Operation.CorrelationId;
             if (!_results.TryGetValue(context.ClientOperationId, out var result))

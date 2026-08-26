@@ -32,6 +32,33 @@ public sealed record SyncRetryPolicy(
     }
 }
 
+/// <summary>
+/// Resolves the immutable effective server retry policy for an operation scope.
+/// A null result is fail-closed: the worker must not execute or schedule the row.
+/// </summary>
+public interface ISyncRetryPolicyResolver
+{
+    ValueTask<SyncRetryPolicy?> ResolveAsync(
+        Guid companyId,
+        Guid? branchId,
+        Guid? registeredDeviceId,
+        string? deviceId,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class FixedSyncRetryPolicyResolver(SyncRetryPolicy policy) : ISyncRetryPolicyResolver
+{
+    private readonly SyncRetryPolicy validated = policy.Validate();
+
+    public ValueTask<SyncRetryPolicy?> ResolveAsync(
+        Guid companyId,
+        Guid? branchId,
+        Guid? registeredDeviceId,
+        string? deviceId,
+        CancellationToken cancellationToken = default)
+        => ValueTask.FromResult<SyncRetryPolicy?>(validated);
+}
+
 public sealed record EnqueueSyncOperationCommand(
     string DeviceId,
     Guid UserId,
@@ -99,12 +126,32 @@ public sealed class SyncRuleException(string code, string detail) : InvalidOpera
     public string Code { get; } = code;
 }
 
-public sealed class SyncOperationService(
-    TransportErpDbContext db,
-    AuditEventService audit,
-    SyncRetryPolicy retryPolicy)
+public sealed class SyncOperationService
 {
-    private readonly SyncRetryPolicy _retryPolicy = retryPolicy.Validate();
+    private readonly TransportErpDbContext db;
+    private readonly AuditEventService audit;
+    private readonly SyncRetryPolicy _globalRetryPolicy;
+    private readonly ISyncRetryPolicyResolver _retryPolicies;
+
+    public SyncOperationService(
+        TransportErpDbContext db,
+        AuditEventService audit,
+        SyncRetryPolicy globalRetryPolicy)
+        : this(db, audit, globalRetryPolicy, new FixedSyncRetryPolicyResolver(globalRetryPolicy))
+    {
+    }
+
+    public SyncOperationService(
+        TransportErpDbContext db,
+        AuditEventService audit,
+        SyncRetryPolicy globalRetryPolicy,
+        ISyncRetryPolicyResolver retryPolicies)
+    {
+        this.db = db;
+        this.audit = audit;
+        _globalRetryPolicy = globalRetryPolicy.Validate();
+        _retryPolicies = retryPolicies ?? throw new ArgumentNullException(nameof(retryPolicies));
+    }
 
     /// <summary>
     /// Atomically claims one due Stage 4 operation. The database row lock is held only until the
@@ -138,7 +185,7 @@ public sealed class SyncOperationService(
                     OR (o."Status" = 'FAILED'
                         AND o."NextRetryAt" IS NOT NULL
                         AND o."NextRetryAt" <= {{claimedAt}}
-                        AND o."RetryCount" <= {{_retryPolicy.MaxRetryCount}})
+                        AND o."RetryCount" <= {{_globalRetryPolicy.MaxRetryCount}})
                     OR (o."Status" = 'SENDING'
                         AND o."ExecutionLeaseExpiresAt" IS NOT NULL
                         AND o."ExecutionLeaseExpiresAt" <= {{claimedAt}})
@@ -159,6 +206,49 @@ public sealed class SyncOperationService(
             {
                 await transaction.CommitAsync(cancellationToken);
                 return null;
+            }
+
+            var effectiveRetryPolicy = await ResolveRetryPolicyAsync(operation, cancellationToken);
+            if (effectiveRetryPolicy is null || operation.RetryCount > effectiveRetryPolicy.MaxRetryCount)
+            {
+                var missing = effectiveRetryPolicy is null;
+                operation.Status = missing ? "FAILED" : "REJECTED";
+                operation.ErrorCode = missing ? "SYNC_RUNTIME_POLICY_UNAVAILABLE" : "RETRY_EXHAUSTED";
+                operation.NextRetryAt = null;
+                ClearExecutionClaim(operation);
+                operation.UpdatedAt = claimedAt;
+                operation.RowVersion = Guid.NewGuid().ToByteArray();
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    missing ? "SyncOperationExecutionPolicyUnavailable" : "SyncOperationExecutionRetryExhausted",
+                    missing ? "FAILED" : "REJECTED", nameof(SyncOperation), operation.Id,
+                    operation.UserId, operation.CompanyId, operation.BranchId,
+                    Guid.NewGuid(), operation.DeviceId,
+                    Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
+                    OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+
+            if (operation.Status == "FAILED")
+            {
+                var retryNumber = Math.Max(1, operation.RetryCount);
+                var requiredNextRetryAt = NormalizePostgreSqlTimestamp(
+                    operation.UpdatedAt.Add(CalculateBackoff(effectiveRetryPolicy, retryNumber)));
+                if (operation.NextRetryAt < requiredNextRetryAt)
+                {
+                    operation.NextRetryAt = requiredNextRetryAt;
+                    operation.RowVersion = Guid.NewGuid().ToByteArray();
+                    await db.SaveChangesAsync(cancellationToken);
+                    await audit.AppendAuditEventAsync(new AuditEventDraft(
+                        "SyncOperationExecutionBackoffTightened", "SUCCESS", nameof(SyncOperation), operation.Id,
+                        operation.UserId, operation.CompanyId, operation.BranchId,
+                        Guid.NewGuid(), operation.DeviceId,
+                        Reason: $"RetryCount={operation.RetryCount};NextRetryAt={requiredNextRetryAt:O}",
+                        OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return null;
+                }
             }
 
             var recoveredStaleClaim = operation.Status == "SENDING";
@@ -242,11 +332,20 @@ public sealed class SyncOperationService(
         var failedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
         return await CompleteClaimAsync(operationId, claimToken, failedAt, async operation =>
         {
+            var retryPolicy = await ResolveRetryPolicyAsync(operation, cancellationToken);
             string auditAction;
             string auditOutcome;
-            if (string.Equals(normalizedError, "RATE_LIMITED", StringComparison.Ordinal))
+            if (retryPolicy is null)
             {
-                if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
+                operation.Status = "FAILED";
+                operation.ErrorCode = "SYNC_RUNTIME_POLICY_UNAVAILABLE";
+                operation.NextRetryAt = null;
+                auditAction = "SyncOperationExecutionPolicyUnavailable";
+                auditOutcome = "FAILED";
+            }
+            else if (string.Equals(normalizedError, "RATE_LIMITED", StringComparison.Ordinal))
+            {
+                if (operation.RetryCount >= retryPolicy.MaxRetryCount)
                 {
                     operation.Status = "REJECTED";
                     operation.ErrorCode = "RETRY_EXHAUSTED";
@@ -260,7 +359,7 @@ public sealed class SyncOperationService(
                     operation.Status = "FAILED";
                     operation.ErrorCode = normalizedError;
                     operation.NextRetryAt = NormalizePostgreSqlTimestamp(
-                        failedAt.Add(CalculateBackoff(operation.RetryCount)));
+                        failedAt.Add(CalculateBackoff(retryPolicy, operation.RetryCount)));
                     auditAction = "SyncOperationExecutionFailed";
                     auditOutcome = "FAILED";
                 }
@@ -277,6 +376,57 @@ public sealed class SyncOperationService(
             ClearExecutionClaim(operation);
             await audit.AppendAuditEventAsync(new AuditEventDraft(
                 auditAction, auditOutcome, nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                claimToken, operation.DeviceId,
+                Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Schedules bounded recovery when the business commit outcome is ambiguous. The replay uses
+    /// the same tenant-scoped business idempotency key, so it can recover a committed result without
+    /// repeating the effect. The shared server retry budget preserves the original + five retries
+    /// contract. Exhaustion remains FAILED (not REJECTED), because the business effect may exist.
+    /// </summary>
+    public async Task<SyncOperation> CompleteExecutionPendingAsync(
+        Guid operationId,
+        Guid claimToken,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        var pendingAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
+        return await CompleteClaimAsync(operationId, claimToken, pendingAt, async operation =>
+        {
+            var retryPolicy = await ResolveRetryPolicyAsync(operation, cancellationToken);
+            string auditAction;
+            if (retryPolicy is null)
+            {
+                operation.Status = "FAILED";
+                operation.ErrorCode = "SYNC_RUNTIME_POLICY_UNAVAILABLE";
+                operation.NextRetryAt = null;
+                auditAction = "SyncOperationExecutionPolicyUnavailable";
+            }
+            else if (operation.RetryCount >= retryPolicy.MaxRetryCount)
+            {
+                operation.Status = "FAILED";
+                operation.ErrorCode = "COMPLETION_RECOVERY_EXHAUSTED";
+                operation.NextRetryAt = null;
+                auditAction = "SyncOperationCompletionRecoveryExhausted";
+            }
+            else
+            {
+                operation.RetryCount++;
+                operation.Status = "FAILED";
+                operation.ErrorCode = "COMPLETION_PENDING";
+                operation.NextRetryAt = NormalizePostgreSqlTimestamp(
+                    pendingAt.Add(CalculateBackoff(retryPolicy, operation.RetryCount)));
+                auditAction = "SyncOperationCompletionRecoveryScheduled";
+            }
+
+            ClearExecutionClaim(operation);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                auditAction, "FAILED", nameof(SyncOperation), operation.Id,
                 operation.UserId, operation.CompanyId, operation.BranchId,
                 claimToken, operation.DeviceId,
                 Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
@@ -610,9 +760,11 @@ public sealed class SyncOperationService(
             operation.ErrorCode = command.ErrorCode.Trim().ToUpperInvariant();
             if (IsRetryableErrorCode(operation.ErrorCode))
             {
+                var retryPolicy = await ResolveRetryPolicyAsync(operation, cancellationToken)
+                    ?? throw new SyncRuleException("SYNC_RUNTIME_POLICY_UNAVAILABLE", operation.ClientOperationId);
                 // The legacy transition represents a completed SENDING attempt. It therefore
                 // follows the same actual-failure accounting as the claim-token completion path.
-                if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
+                if (operation.RetryCount >= retryPolicy.MaxRetryCount)
                 {
                     operation.Status = "REJECTED";
                     operation.ErrorCode = "RETRY_EXHAUSTED";
@@ -622,7 +774,7 @@ public sealed class SyncOperationService(
                 {
                     operation.RetryCount++;
                     operation.NextRetryAt = NormalizePostgreSqlTimestamp(
-                        transitionAt.Add(CalculateBackoff(operation.RetryCount)));
+                        transitionAt.Add(CalculateBackoff(retryPolicy, operation.RetryCount)));
                 }
             }
             else
@@ -678,7 +830,27 @@ public sealed class SyncOperationService(
             }, cancellationToken);
         }
 
-        if (operation.RetryCount > _retryPolicy.MaxRetryCount)
+        var retryPolicy = await ResolveRetryPolicyAsync(operation, cancellationToken);
+        if (retryPolicy is null)
+        {
+            operation.Status = "FAILED";
+            operation.ErrorCode = "SYNC_RUNTIME_POLICY_UNAVAILABLE";
+            operation.NextRetryAt = null;
+            operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
+            operation.RowVersion = Guid.NewGuid().ToByteArray();
+            return await ExecuteMutationAsync(async () =>
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncOperationRetryPolicyUnavailable", "FAILED", nameof(SyncOperation), operation.Id,
+                    security.UserId, operation.CompanyId, operation.BranchId,
+                    CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId,
+                    Reason: operation.ErrorCode), cancellationToken);
+                return operation;
+            }, cancellationToken);
+        }
+
+        if (operation.RetryCount > retryPolicy.MaxRetryCount)
         {
             operation.Status = "REJECTED";
             operation.ErrorCode = "RETRY_EXHAUSTED";
@@ -699,7 +871,7 @@ public sealed class SyncOperationService(
         // A manual retry request only schedules the next attempt. The counter is execution
         // evidence and is incremented exclusively by CompleteExecutionFailureAsync.
         var retryNumber = Math.Max(1, operation.RetryCount);
-        var delay = CalculateBackoff(retryNumber);
+        var delay = CalculateBackoff(retryPolicy, retryNumber);
         operation.NextRetryAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow.Add(delay));
         operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
         operation.RowVersion = Guid.NewGuid().ToByteArray();
@@ -723,11 +895,16 @@ public sealed class SyncOperationService(
     {
         if (take is < 1 or > 1000) throw new ArgumentOutOfRangeException(nameof(take));
         await EnsureSecurityAsync(security, security.CompanyId, security.BranchId, cancellationToken);
+        var retryPolicy = await _retryPolicies.ResolveAsync(
+            security.CompanyId, security.BranchId, security.RegisteredDeviceId,
+            security.DeviceId, cancellationToken);
+        if (retryPolicy is null) return [];
+        retryPolicy.Validate();
         var dueAt = now ?? DateTimeOffset.UtcNow;
         var query = db.SyncOperations.AsNoTracking()
             .Where(x => x.CompanyId == security.CompanyId && x.Status == "FAILED" &&
                         x.NextRetryAt != null && x.NextRetryAt <= dueAt &&
-                        x.RetryCount <= _retryPolicy.MaxRetryCount &&
+                        x.RetryCount <= retryPolicy.MaxRetryCount &&
                         (x.ErrorCode == null || x.ErrorCode == "RATE_LIMITED"));
         if (security.BranchId is not null)
             query = query.Where(x => x.BranchId == security.BranchId);
@@ -1011,11 +1188,21 @@ public sealed class SyncOperationService(
         => string.IsNullOrWhiteSpace(errorCode) ||
            string.Equals(errorCode.Trim(), "RATE_LIMITED", StringComparison.OrdinalIgnoreCase);
 
-    private TimeSpan CalculateBackoff(int retryNumber)
+    private async ValueTask<SyncRetryPolicy?> ResolveRetryPolicyAsync(
+        SyncOperation operation,
+        CancellationToken cancellationToken)
+    {
+        var policy = await _retryPolicies.ResolveAsync(
+            operation.CompanyId, operation.BranchId, operation.RegisteredDeviceId,
+            operation.DeviceId, cancellationToken);
+        return policy?.Validate();
+    }
+
+    private static TimeSpan CalculateBackoff(SyncRetryPolicy retryPolicy, int retryNumber)
     {
         var multiplier = Math.Pow(2, retryNumber - 1);
-        var milliseconds = Math.Min(_retryPolicy.MaxDelay.TotalMilliseconds,
-            _retryPolicy.BaseDelay.TotalMilliseconds * multiplier);
+        var milliseconds = Math.Min(retryPolicy.MaxDelay.TotalMilliseconds,
+            retryPolicy.BaseDelay.TotalMilliseconds * multiplier);
         return TimeSpan.FromMilliseconds(milliseconds);
     }
 

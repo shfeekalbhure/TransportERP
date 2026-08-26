@@ -10,7 +10,8 @@ public sealed record AcceptedSyncHttpRequest(
     SyncProofSecurityContext Security,
     AcceptedSyncProofContext Proof,
     byte[] RawBody,
-    Guid AttemptCorrelationId);
+    Guid AttemptCorrelationId,
+    EffectiveSyncPolicy? EffectivePolicy = null);
 
 public sealed record SyncHttpAuthenticationResult(AcceptedSyncHttpRequest? Accepted, IResult? Failure);
 
@@ -47,15 +48,20 @@ public sealed class SyncPopHttpRequestAuthenticator(
             return Failed(Results.BadRequest(new
                 { ErrorCode = "ATTEMPT_CORRELATION_REQUIRED", CorrelationId = Guid.Empty }));
 
-        if (!await runtimeGate.IsOpenAsync(current.CompanyId, cancellationToken))
+        var effectivePolicy = await runtimeGate.ResolveAsync(current, cancellationToken);
+        if (!effectivePolicy.Enabled)
             return Failed(Error(StatusCodes.Status403Forbidden, "OFFLINE_DISABLED", correlationId.Value));
         if (!TrySecurityContext(current, out var security))
             return Failed(Error(StatusCodes.Status403Forbidden, "DEVICE_NOT_REGISTERED", correlationId.Value));
 
-        var metadataError = ValidateRequestMetadata(http.Request);
+        var metadataError = ValidateRequestMetadata(http.Request, effectivePolicy.MaximumRequestBodyBytes);
         if (metadataError is not null) return Failed(RequestLevelError(metadataError, correlationId.Value));
         byte[] rawBody;
-        try { rawBody = await ReadBoundedBodyAsync(http.Request, cancellationToken); }
+        try
+        {
+            rawBody = await ReadBoundedBodyAsync(
+                http.Request, effectivePolicy.MaximumRequestBodyBytes, cancellationToken);
+        }
         catch (SyncRequestException exception)
         {
             return Failed(RequestLevelError(exception.Code, correlationId.Value));
@@ -95,7 +101,8 @@ public sealed class SyncPopHttpRequestAuthenticator(
         {
             var proof = await proofRuntime.ClaimAsync(security, verified, cancellationToken);
             return new SyncHttpAuthenticationResult(
-                new AcceptedSyncHttpRequest(current, security, proof, rawBody, correlationId.Value), null);
+                new AcceptedSyncHttpRequest(
+                    current, security, proof, rawBody, correlationId.Value, effectivePolicy), null);
         }
         catch (SyncProofRuntimeException exception) when (exception.Code == "use_dpop_nonce")
         {
@@ -140,9 +147,9 @@ public sealed class SyncPopHttpRequestAuthenticator(
         }
     }
 
-    private static string? ValidateRequestMetadata(HttpRequest request)
+    private static string? ValidateRequestMetadata(HttpRequest request, int maximumRequestBodyBytes)
     {
-        if (request.ContentLength > SyncApiModule.MaximumRequestBodyBytes) return "REQUEST_BODY_TOO_LARGE";
+        if (request.ContentLength > maximumRequestBodyBytes) return "REQUEST_BODY_TOO_LARGE";
         if (request.ContentType is null ||
             !request.ContentType.Split(';', 2)[0].Trim().Equals("application/json", StringComparison.OrdinalIgnoreCase))
             return "CONTENT_TYPE_UNSUPPORTED";
@@ -153,7 +160,10 @@ public sealed class SyncPopHttpRequestAuthenticator(
         return null;
     }
 
-    private static async Task<byte[]> ReadBoundedBodyAsync(HttpRequest request, CancellationToken cancellationToken)
+    private static async Task<byte[]> ReadBoundedBodyAsync(
+        HttpRequest request,
+        int maximumRequestBodyBytes,
+        CancellationToken cancellationToken)
     {
         await using var output = new MemoryStream();
         var buffer = new byte[16 * 1024];
@@ -161,7 +171,7 @@ public sealed class SyncPopHttpRequestAuthenticator(
         {
             var read = await request.Body.ReadAsync(buffer.AsMemory(), cancellationToken);
             if (read == 0) break;
-            if (output.Length + read > SyncApiModule.MaximumRequestBodyBytes)
+            if (output.Length + read > maximumRequestBodyBytes)
                 throw new SyncRequestException("REQUEST_BODY_TOO_LARGE");
             await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }

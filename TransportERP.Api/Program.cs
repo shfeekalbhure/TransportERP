@@ -27,6 +27,14 @@ var syncRuntimePolicyValidation = new SyncRuntimePolicyOptionsValidator().Valida
 if (syncRuntimePolicyValidation.Failed)
     throw new OptionsValidationException("Sync", typeof(SyncRuntimePolicyOptions),
         syncRuntimePolicyValidation.Failures);
+var syncRuntimePolicyOptions = Options.Create(syncRuntimePolicy);
+var effectivePolicyConfiguration = EffectivePolicyConfiguration.Load(builder.Configuration);
+var effectivePolicyValidation = new EffectivePolicyConfigurationValidator(
+        new SyncEffectivePolicyResolver(syncRuntimePolicyOptions), syncRuntimePolicyOptions)
+    .Validate(effectivePolicyConfiguration);
+if (effectivePolicyValidation.Failed)
+    throw new OptionsValidationException("Sync:EffectivePolicy", typeof(EffectivePolicyConfiguration),
+        effectivePolicyValidation.Failures);
 
 var connectionString = builder.Configuration.GetConnectionString("TransportErp")
     ?? Environment.GetEnvironmentVariable("TRANSPORTERP_CONNECTION_STRING")
@@ -52,8 +60,11 @@ builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
 builder.Services.AddScoped<BootstrapAdminService>();
 builder.Services.AddScoped<ISystemPermissionCatalogVerifier, SystemPermissionCatalogVerifier>();
-builder.Services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(syncRuntimePolicy));
+builder.Services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(syncRuntimePolicyOptions);
 builder.Services.AddSingleton<SyncEffectivePolicyResolver>();
+builder.Services.AddSingleton(effectivePolicyConfiguration);
+builder.Services.AddScoped<IEffectiveSyncPolicyProvider, EffectiveSyncPolicyProvider>();
+builder.Services.AddSingleton<ISyncRetryPolicyResolver, EffectiveSyncRetryPolicyResolver>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),
@@ -61,7 +72,8 @@ builder.Services.AddScoped<SyncOperationService>(services =>
         new SyncRetryPolicy(
             syncRuntimePolicy.ServerExecutionMaxRetryCount!.Value,
             TimeSpan.FromSeconds(syncRuntimePolicy.ServerExecutionBaseSeconds!.Value),
-            TimeSpan.FromMinutes(syncRuntimePolicy.ServerExecutionMaxDelayMinutes!.Value))));
+            TimeSpan.FromMinutes(syncRuntimePolicy.ServerExecutionMaxDelayMinutes!.Value)),
+        services.GetRequiredService<ISyncRetryPolicyResolver>()));
 builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();
@@ -104,7 +116,7 @@ builder.Services.AddSingleton<IdentityPasswordSentinel>();
 builder.Services.AddScoped<IdentitySessionService>();
 builder.Services.AddScoped<RegisteredDeviceService>();
 builder.Services.AddScoped<OfflineSyncPolicyService>();
-builder.Services.AddScoped<ISyncRuntimeGate, ClosedSyncRuntimeGate>();
+builder.Services.AddScoped<ISyncRuntimeGate, EffectivePolicySyncRuntimeGate>();
 builder.Services.AddScoped<SyncProofRuntimeService>();
 builder.Services.AddScoped<ISyncProofRuntime>(services =>
     services.GetRequiredService<SyncProofRuntimeService>());

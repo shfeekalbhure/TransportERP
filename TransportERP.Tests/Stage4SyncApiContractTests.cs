@@ -157,9 +157,19 @@ public sealed class Stage4SyncApiContractTests
 
     private sealed class StaticGate(bool open) : ISyncRuntimeGate
     {
-        public Task<bool> IsOpenAsync(Guid companyId, CancellationToken cancellationToken)
-            => Task.FromResult(open);
+        public Task<EffectiveSyncPolicy> ResolveAsync(
+            CurrentSecurityContext current,
+            CancellationToken cancellationToken)
+            => Task.FromResult(OpenPolicy(open));
     }
+
+    private static EffectiveSyncPolicy OpenPolicy(bool enabled) => new(
+        enabled,
+        new HashSet<string>(TransportERP.Application.Sync.SyncActionCatalog.Definitions
+            .Select(x => x.ActionCodeValue), StringComparer.Ordinal),
+        new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
+        100, 2_097_152, 16_384, 5, 5, 5, 5, 30, 30, 24, 7, 90, 24,
+        enabled ? null : "OFFLINE_DISABLED");
 
     private sealed class StaticSecurityContext(CurrentSecurityContext current) : ICurrentSecurityContext
     {

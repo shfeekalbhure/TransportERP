@@ -14,14 +14,9 @@ namespace TransportERP.Api.Sync;
 
 public interface ISyncRuntimeGate
 {
-    Task<bool> IsOpenAsync(Guid companyId, CancellationToken cancellationToken);
-}
-
-/// <summary>Production registration has no configuration path and is always closed before G5.</summary>
-public sealed class ClosedSyncRuntimeGate : ISyncRuntimeGate
-{
-    public Task<bool> IsOpenAsync(Guid companyId, CancellationToken cancellationToken)
-        => Task.FromResult(false);
+    Task<EffectiveSyncPolicy> ResolveAsync(
+        CurrentSecurityContext current,
+        CancellationToken cancellationToken);
 }
 
 public sealed record SyncPopDeploymentProfile(
@@ -148,11 +143,16 @@ public static class SyncApiModule
         var proofSecurity = acceptedRequest.Security;
         var acceptedProof = acceptedRequest.Proof;
         var rawBody = acceptedRequest.RawBody;
+        if (acceptedRequest.EffectivePolicy is not { Enabled: true } effectivePolicy)
+            return Results.Json(new { ErrorCode = "OFFLINE_DISABLED", CorrelationId = attemptCorrelationId },
+                statusCode: StatusCodes.Status403Forbidden);
 
         SyncBatchRequest? request;
         try { request = SyncBatchJsonContract.Deserialize(rawBody); }
         catch (JsonException) { return Results.BadRequest(new { ErrorCode = "REQUEST_SCHEMA_INVALID", CorrelationId = attemptCorrelationId }); }
-        var envelopeError = SyncBatchEnvelopeContract.Validate(request, proofSecurity.DeviceId, MaximumBatchOperations);
+        var envelopeError = SyncBatchEnvelopeContract.Validate(
+            request, proofSecurity.DeviceId, effectivePolicy.MaxBatchOperations,
+            effectivePolicy.AllowedProtocolVersions);
         if (envelopeError is not null)
             return Results.BadRequest(new { ErrorCode = envelopeError, CorrelationId = attemptCorrelationId });
 
@@ -162,7 +162,7 @@ public static class SyncApiModule
         foreach (var item in operations)
         {
             var serverTime = DateTimeOffset.UtcNow;
-            var validationCode = ValidateOperation(item);
+            var validationCode = ValidateOperation(item, effectivePolicy.MaximumPayloadBytes);
             if (validationCode is not null)
             {
                 results.Add(SyncBatchOperationResult.Rejected(item, validationCode, serverTime));
@@ -173,6 +173,11 @@ public static class SyncApiModule
                 var validItem = item!;
                 var definition = SyncActionCatalog.Definitions.Single(x =>
                     string.Equals(x.ActionCodeValue, validItem.ActionCode, StringComparison.Ordinal));
+                if (!effectivePolicy.AllowedActions.Contains(definition.ActionCodeValue))
+                {
+                    results.Add(SyncBatchOperationResult.Rejected(item, "SCOPE_DENIED", serverTime));
+                    continue;
+                }
                 if (!await permissions.HasPermissionAsync(
                         acceptedProof.UserId, acceptedProof.CompanyId, acceptedProof.BranchId,
                         definition.RequiredPermission, cancellationToken))
@@ -212,7 +217,7 @@ public static class SyncApiModule
             validRequest.ProtocolVersion, results, DateTimeOffset.UtcNow, attemptCorrelationId));
     }
 
-    private static string? ValidateOperation(SyncBatchOperationRequest? item)
+    private static string? ValidateOperation(SyncBatchOperationRequest? item, int maximumPayloadBytes)
     {
         if (item is null || item.OperationCorrelationId == Guid.Empty ||
             string.IsNullOrEmpty(item.ActionCode) || string.IsNullOrEmpty(item.OperationType) ||
@@ -221,7 +226,7 @@ public static class SyncApiModule
             !TryParseClientOccurredAt(item.ClientOccurredAt, out _))
             return "PAYLOAD_INVALID";
         var payloadBytes = Encoding.UTF8.GetByteCount(item.PayloadJson);
-        if (payloadBytes > MaximumPayloadBytes) return "PAYLOAD_TOO_LARGE";
+        if (payloadBytes > maximumPayloadBytes) return "PAYLOAD_TOO_LARGE";
         try
         {
             using var payload = JsonDocument.Parse(item.PayloadJson, new JsonDocumentOptions
@@ -334,7 +339,11 @@ public sealed record SyncBatchResponse(
 
 public static class SyncBatchEnvelopeContract
 {
-    public static string? Validate(SyncBatchRequest? request, string currentDeviceId, int maximumBatchOperations)
+    public static string? Validate(
+        SyncBatchRequest? request,
+        string currentDeviceId,
+        int maximumBatchOperations,
+        IReadOnlySet<string>? allowedProtocolVersions = null)
     {
         if (request is null || request.Operations is null ||
             string.IsNullOrEmpty(request.DeviceId) ||
@@ -342,7 +351,8 @@ public static class SyncBatchEnvelopeContract
             return "REQUEST_SCHEMA_INVALID";
         if (request.Operations.Count is < 1 || request.Operations.Count > maximumBatchOperations)
             return "BATCH_SIZE_INVALID";
-        if (!string.Equals(request.ProtocolVersion, "sync-v1", StringComparison.Ordinal))
+        if (!string.Equals(request.ProtocolVersion, "sync-v1", StringComparison.Ordinal) ||
+            (allowedProtocolVersions is not null && !allowedProtocolVersions.Contains(request.ProtocolVersion)))
             return "PROTOCOL_VERSION_UNSUPPORTED";
         return null;
     }

@@ -153,10 +153,9 @@ public sealed record EffectiveSyncPolicy(
     string? ClosedReason);
 
 /// <summary>
-/// Pure hierarchy resolver. Company and Branch restrictions are supplied by a
-/// future authoritative store; this class deliberately does not invent one.
-/// Device action policy and current permission-derived actions are mandatory
-/// final intersections.
+/// Resolves the fixed global ceiling through company and branch restrictions.
+/// The runtime provider supplies the immutable configured restrictions and the
+/// mandatory device and current-permission action intersections.
 /// </summary>
 public sealed class SyncEffectivePolicyResolver(IOptions<SyncRuntimePolicyOptions> configured)
 {
@@ -164,7 +163,8 @@ public sealed class SyncEffectivePolicyResolver(IOptions<SyncRuntimePolicyOption
         SyncPolicyRestriction? company,
         SyncPolicyRestriction? branch,
         IReadOnlyCollection<string>? deviceAllowedActions,
-        IReadOnlyCollection<string>? permissionAllowedActions)
+        IReadOnlyCollection<string>? permissionAllowedActions,
+        SyncPolicyRestriction? device = null)
     {
         var global = configured.Value;
         var effective = new MutablePolicy(
@@ -185,7 +185,8 @@ public sealed class SyncEffectivePolicyResolver(IOptions<SyncRuntimePolicyOption
             global.ServerPayloadDays ?? 0,
             global.CacheMaxAgeHours ?? 0);
 
-        if (!ApplyRestriction(effective, company) || !ApplyRestriction(effective, branch))
+        if (!ApplyRestriction(effective, company) || !ApplyRestriction(effective, branch) ||
+            !ApplyRestriction(effective, device))
             return Close(effective, "INVALID_SCOPE_OVERRIDE");
         if (deviceAllowedActions is null || permissionAllowedActions is null)
             return Close(effective, "DEVICE_OR_PERMISSION_POLICY_MISSING");
@@ -194,6 +195,30 @@ public sealed class SyncEffectivePolicyResolver(IOptions<SyncRuntimePolicyOption
         if (effective.AllowedActions.Count == 0 || effective.AllowedProtocolVersions.Count == 0)
             effective.Enabled = false;
         return Freeze(effective, effective.Enabled ? null : "OFFLINE_DISABLED");
+    }
+
+    public EffectiveSyncPolicy Close(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        var global = configured.Value;
+        return new EffectiveSyncPolicy(
+            false,
+            new HashSet<string>(StringComparer.Ordinal),
+            global.AllowedProtocolVersions.ToHashSet(StringComparer.Ordinal),
+            global.MaxBatchOperations ?? 0,
+            global.MaximumRequestBodyBytes ?? 0,
+            global.MaximumPayloadBytes ?? 0,
+            global.ClientTransportMaxRetryCount ?? 0,
+            global.ServerExecutionMaxRetryCount ?? 0,
+            global.ClientTransportBaseSeconds ?? 0,
+            global.ServerExecutionBaseSeconds ?? 0,
+            global.ClientTransportMaxDelayMinutes ?? 0,
+            global.ServerExecutionMaxDelayMinutes ?? 0,
+            global.LocalSuccessHours ?? 0,
+            global.LocalRejectedDays ?? 0,
+            global.ServerPayloadDays ?? 0,
+            global.CacheMaxAgeHours ?? 0,
+            reason);
     }
 
     private static bool ApplyRestriction(MutablePolicy policy, SyncPolicyRestriction? restriction)

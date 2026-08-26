@@ -410,8 +410,15 @@ public sealed class ApiAuthenticationAndAuditTests
 
     private sealed class OpenSyncRuntimeGateForTest : ISyncRuntimeGate
     {
-        public Task<bool> IsOpenAsync(Guid companyId, CancellationToken cancellationToken)
-            => Task.FromResult(true);
+        public Task<EffectiveSyncPolicy> ResolveAsync(
+            TransportERP.Api.Security.CurrentSecurityContext current,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new EffectiveSyncPolicy(
+                true,
+                new HashSet<string>(TransportERP.Application.Sync.SyncActionCatalog.Definitions
+                    .Select(x => x.ActionCodeValue), StringComparer.Ordinal),
+                new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
+                100, 2_097_152, 16_384, 5, 5, 5, 5, 30, 30, 24, 7, 90, 24, null));
     }
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string deviceId,
