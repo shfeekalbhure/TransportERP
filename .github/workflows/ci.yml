@@ -38,8 +38,24 @@ jobs:
       TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
       TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact PR head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected="${{ github.event.pull_request.head.sha }}"
+          else
+            expected="${{ github.sha }}"
+          fi
+          echo "actual=$actual"
+          echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Core job is not running on the exact PR head.'; exit 1; }
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -79,8 +95,24 @@ jobs:
     name: Required CI / Desktop RTL contract surface
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact PR head
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $expected = '${{ github.event.pull_request.head.sha }}'
+          } else {
+            $expected = '${{ github.sha }}'
+          }
+          Write-Host "actual=$actual"
+          Write-Host "expected=$expected"
+          if ($actual -ne $expected) { throw 'Desktop job is not running on the exact PR head.' }
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
