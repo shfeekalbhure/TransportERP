@@ -55,12 +55,12 @@ Every queueable write must carry a stable `ClientOperationId`. Retrying the same
 
 Server behavior:
 
-1. locate prior operation by company + device/user policy + ClientOperationId;
-2. if payload hash matches, return prior accepted/rejected outcome;
-3. if identifier matches but payload differs, reject with `IDEMPOTENCY_CONFLICT`;
-4. audit all retry outcomes.
+1. للصفوف الجديدة، locate prior operation بالمفتاح الدقيق `(CompanyId, RegisteredDeviceId, ClientOperationId)`؛ ولـlegacy فقط بالمفتاح `(CompanyId, DeviceId, ClientOperationId)` وفق preflight والفهارس الجزئية الحاكمة في `P1_SYNC_CONTRACT.md`؛
+2. إذا طابقت بصمة `fp-v1` الكاملة، أعد النتيجة المقبولة/المرفوضة المحفوظة؛ لا يكفي تطابق `PayloadHash` وحده؛
+3. إذا تطابق المفتاح واختلف أي حقل في البصمة، ارفض بـ`IDEMPOTENCY_MISMATCH`؛ وتصادم legacy يرفض بـ`LEGACY_IDEMPOTENCY_CONFLICT`؛
+4. يجوز تسجيل محاولة HTTP بهوية `AttemptCorrelationId`، لكن business replay لا يكرر Audit القبول أو الأثر التجاري.
 
-كل SyncOperation تحمل `ActionCode`, `ProtocolVersion`, `RequestCorrelationId` وconditional `EntityId`. القيمة الأولية الوحيدة المقبولة هي `ProtocolVersion=sync-v1` عبر `sync.protocol.allowed_versions=["sync-v1"]`. عند نجاح CREATE/append تعاد `ResultEntityId` وتحفظ الخريطة `(DeviceId, ClientOperationId, ActionCode) → ResultEntityId`; replay يعيد الخريطة نفسها.
+كل item جديد يحمل `ActionCode`, `ProtocolVersion`, `OperationCorrelationId` وconditional `EntityId`. القيمة الأولية الوحيدة المقبولة هي `ProtocolVersion=sync-v1` عبر `sync.protocol.allowed_versions=["sync-v1"]`. `OperationCorrelationId` UUID غير صفري ثابت للعملية، يخزن ويدخل `fp-v1`؛ أما `AttemptCorrelationId` فهو جديد لكل HTTP attempt ويأتي من header `X-Correlation-Id` المطابق لـproof claim `cid`، ولا يخزن في `SyncOperation` ولا يدخل البصمة. وجود `AttemptCorrelationId` أو الاسم القديم `RequestCorrelationId` داخل JSON لا يعمل كـalias ويعطي `REQUEST_SCHEMA_INVALID` عند إمكان parsing. عند نجاح CREATE/append تعاد `ResultEntityId` وتحفظ الخريطة `(CompanyId, RegisteredDeviceId, ClientOperationId) → ActionCode + ResultEntityId + outcome`؛ يدخل `ActionCode` في البصمة ولا يدخل مفتاح uniqueness، ويعيد business replay الخريطة والنتيجة نفسيهما.
 
 ## 4. Concurrency
 
@@ -100,7 +100,7 @@ Movement events are append-only. Offline retries must deduplicate by ClientOpera
 
 ## 10. Device and scope controls
 
-Every queued operation must carry registered DeviceId, UserId, CompanyId, BranchId, `ActionCode`, `ProtocolVersion`, `RequestCorrelationId`, operation type, payload hash, client time, conditional EntityId and BaseVersion according to table 2.1. Server re-evaluates current permission and scope on receipt; prior offline permission does not guarantee acceptance.
+Every queued item must carry registered DeviceId, UserId, CompanyId, BranchId, `ActionCode`, `ProtocolVersion`, `OperationCorrelationId`, operation type, payload hash, client time, conditional EntityId and BaseVersion according to table 2.1. Every HTTP attempt separately carries `AttemptCorrelationId` in `X-Correlation-Id`; `RequestCorrelationId` is not an accepted JSON field. Server re-evaluates current permission and scope on receipt; prior offline permission does not guarantee acceptance.
 
 لا تكفي claim `device_registered`; يجب أن يتحقق الخادم من سجل جهاز حقيقي ونشط وغير ملغى في كل قبول أو retry أو conflict resolution.
 
