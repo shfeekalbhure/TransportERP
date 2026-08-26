@@ -45,7 +45,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var scope = await SeedAsync(seedDb, proofKey, "REOPEN");
         using var factory = CreateFactory(connection);
-        using var http = new HttpClient(factory.Server.CreateHandler()) { BaseAddress = PublicOrigin };
+        using var inspection = new ProofInspectionHandler(factory.Server.CreateHandler());
+        using var http = new HttpClient(inspection) { BaseAddress = PublicOrigin };
         var time = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
         var directory = CreateTemporaryDirectory();
         try
@@ -72,7 +73,7 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
             Assert.True(accepted.Claimed == 1 && accepted.AcceptedPending == 1,
                 $"Expected one accepted pending operation; result={accepted}; " +
-                $"local={pendingLocal?.Status}/{pendingLocal?.ResultCode}.");
+                $"local={pendingLocal?.Status}/{pendingLocal?.ResultCode}; proofCheck={inspection.Result}.");
             Assert.Equal(OfflineOperationStatus.Queued, pendingLocal!.Status);
             Assert.Equal("QUEUED", pendingLocal.ResultCode);
             Assert.NotNull(pendingLocal.ServerOperationId);
@@ -110,7 +111,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var scope = await SeedAsync(seedDb, proofKey, "LOST");
         using var factory = CreateFactory(connection);
-        using var dropping = new DropFirstSignedSuccessHandler(factory.Server.CreateHandler());
+        using var inspection = new ProofInspectionHandler(factory.Server.CreateHandler());
+        using var dropping = new DropFirstSignedSuccessHandler(inspection);
         using var http = new HttpClient(dropping) { BaseAddress = PublicOrigin };
         var time = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
         var directory = CreateTemporaryDirectory();
@@ -129,7 +131,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 enqueued.Operation.LocalOperationId, LocalScope(scope));
             Assert.True(lost.RetryScheduled == 1 && dropping.DroppedResponses == 1,
                 $"Expected one retry after a dropped signed response; result={lost}; " +
-                $"dropped={dropping.DroppedResponses}; local={failedLocal?.Status}/{failedLocal?.ResultCode}.");
+                $"dropped={dropping.DroppedResponses}; local={failedLocal?.Status}/{failedLocal?.ResultCode}; " +
+                $"proofCheck={inspection.Result}.");
             Assert.Equal(OfflineOperationStatus.Failed, failedLocal!.Status);
             Assert.Equal(1, failedLocal.ClientTransportRetryCount);
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "QUEUED", partyCount: 0);
@@ -535,6 +538,36 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 throw new HttpRequestException("Injected response loss after the server committed acceptance.");
             }
             return response;
+        }
+    }
+
+    private sealed class ProofInspectionHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        public string Result { get; private set; } = "NOT_SEEN";
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.Headers.TryGetValues("DPoP", out var proofs))
+            {
+                try
+                {
+                    var proof = Assert.Single(proofs);
+                    var body = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+                    var bearer = request.Headers.Authorization?.Parameter ?? string.Empty;
+                    var correlation = Guid.ParseExact(
+                        Assert.Single(request.Headers.GetValues("X-Correlation-Id")), "D");
+                    var material = new SyncPopProofValidator().Validate(new SyncPopProofValidationInput(
+                        proof, bearer, body, BatchEndpoint.AbsoluteUri, correlation, DateTimeOffset.UtcNow));
+                    Result = $"PASS:{material.ProofKeyThumbprint}";
+                }
+                catch (Exception exception)
+                {
+                    Result = "FAIL:" + exception.GetType().Name;
+                }
+            }
+            return await base.SendAsync(request, cancellationToken);
         }
     }
 }
