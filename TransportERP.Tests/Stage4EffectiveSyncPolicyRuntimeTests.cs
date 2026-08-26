@@ -222,6 +222,36 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
     }
 
     [Fact]
+    public async Task Worker_reapplies_enabled_and_action_hierarchy_before_execution()
+    {
+        var scope = Scope();
+        var configuration = Configuration(
+            scope, includeCompany: true, includeBranch: true, includeDevice: true);
+        var closedOptions = Options.Create(Global(offlineEnabled: false));
+        var closed = new EffectiveSyncRetryPolicyResolver(
+            configuration, new SyncEffectivePolicyResolver(closedOptions), closedOptions);
+        var openOptions = Options.Create(Global(offlineEnabled: true));
+        var open = new EffectiveSyncRetryPolicyResolver(
+            configuration, new SyncEffectivePolicyResolver(openOptions), openOptions);
+
+        var disabled = await closed.AuthorizeExecutionAsync(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, scope.DeviceId,
+            "CreateWaybillDraft");
+        var allowed = await open.AuthorizeExecutionAsync(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, scope.DeviceId,
+            "CreateWaybillDraft");
+        var tightened = await open.AuthorizeExecutionAsync(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, scope.DeviceId,
+            "UpdateWaybillDraft");
+
+        Assert.False(disabled.IsAllowed);
+        Assert.Equal("OFFLINE_DISABLED", disabled.ErrorCode);
+        Assert.True(allowed.IsAllowed);
+        Assert.False(tightened.IsAllowed);
+        Assert.Equal("SCOPE_DENIED", tightened.ErrorCode);
+    }
+
+    [Fact]
     public async Task Runtime_batch_enforces_effective_batch_protocol_payload_and_action_limits()
     {
         var scope = Scope();

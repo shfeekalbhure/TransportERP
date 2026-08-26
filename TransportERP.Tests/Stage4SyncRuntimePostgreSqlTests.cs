@@ -513,6 +513,41 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Worker_rejects_action_tightened_after_enqueue_before_business_claim()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "WORKER-ACTION-TIGHTENED");
+        var runtime = new SyncProofRuntimeService(db, new AuditEventService(db));
+        var nonce = await runtime.IssueNonceAsync(scope.Security);
+        var proof = await runtime.ClaimAsync(scope.Security,
+            Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var service = new SyncOperationService(
+            db, new AuditEventService(db),
+            new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(30)),
+            new StaticRetryPolicyResolver(
+                new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(30)),
+                SyncExecutionPolicyDecision.Denied("SCOPE_DENIED")));
+        var operation = await service.EnqueueAcceptedSyncOperationAsync(
+            Command("worker-action-tightened-" + Guid.NewGuid().ToString("N"), "{}"), proof);
+        await RejectOtherExecutionCandidatesAsync(db, operation.Id);
+
+        var claim = await service.ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), Normalize(DateTimeOffset.UtcNow.AddMinutes(1)));
+        db.ChangeTracker.Clear();
+        operation = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
+
+        Assert.Null(claim);
+        Assert.Equal("REJECTED", operation.Status);
+        Assert.Equal("SCOPE_DENIED", operation.ErrorCode);
+        Assert.Null(operation.ExecutionClaimToken);
+        Assert.Single(await db.AuditEvents.Where(x => x.EntityId == operation.Id &&
+            x.Action == "SyncOperationExecutionPolicyDenied" && x.Outcome == "REJECTED").ToListAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Enqueue_proof_replay_does_not_consume_server_execution_retry_budget()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -928,7 +963,9 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
     private static SyncOperationService CreateOperationService(TransportErpDbContext db)
         => new(db, new AuditEventService(db), new SyncRetryPolicy(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30)));
 
-    private sealed class StaticRetryPolicyResolver(SyncRetryPolicy? policy) : ISyncRetryPolicyResolver
+    private sealed class StaticRetryPolicyResolver(
+        SyncRetryPolicy? policy,
+        SyncExecutionPolicyDecision? executionDecision = null) : ISyncRetryPolicyResolver
     {
         public ValueTask<SyncRetryPolicy?> ResolveAsync(
             Guid companyId,
@@ -937,6 +974,15 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
             string? deviceId,
             CancellationToken cancellationToken = default)
             => ValueTask.FromResult(policy);
+
+        public ValueTask<SyncExecutionPolicyDecision> AuthorizeExecutionAsync(
+            Guid companyId,
+            Guid? branchId,
+            Guid? registeredDeviceId,
+            string? deviceId,
+            string actionCode,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(executionDecision ?? SyncExecutionPolicyDecision.Allowed);
     }
 
     private static Task<int> RejectOtherExecutionCandidatesAsync(

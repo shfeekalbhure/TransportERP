@@ -44,6 +44,22 @@ public interface ISyncRetryPolicyResolver
         Guid? registeredDeviceId,
         string? deviceId,
         CancellationToken cancellationToken = default);
+
+    ValueTask<SyncExecutionPolicyDecision> AuthorizeExecutionAsync(
+        Guid companyId,
+        Guid? branchId,
+        Guid? registeredDeviceId,
+        string? deviceId,
+        string actionCode,
+        CancellationToken cancellationToken = default)
+        => ValueTask.FromResult(SyncExecutionPolicyDecision.Allowed);
+}
+
+public sealed record SyncExecutionPolicyDecision(bool IsAllowed, string? ErrorCode)
+{
+    public static SyncExecutionPolicyDecision Allowed { get; } = new(true, null);
+    public static SyncExecutionPolicyDecision Denied(string errorCode)
+        => new(false, string.IsNullOrWhiteSpace(errorCode) ? "SYNC_RUNTIME_POLICY_UNAVAILABLE" : errorCode);
 }
 
 public sealed class FixedSyncRetryPolicyResolver(SyncRetryPolicy policy) : ISyncRetryPolicyResolver
@@ -225,6 +241,28 @@ public sealed class SyncOperationService
                     operation.UserId, operation.CompanyId, operation.BranchId,
                     Guid.NewGuid(), operation.DeviceId,
                     Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
+                    OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+
+            var executionPolicy = await _retryPolicies.AuthorizeExecutionAsync(
+                operation.CompanyId, operation.BranchId, operation.RegisteredDeviceId,
+                operation.DeviceId, operation.ActionCode!, cancellationToken);
+            if (!executionPolicy.IsAllowed)
+            {
+                operation.Status = "REJECTED";
+                operation.ErrorCode = executionPolicy.ErrorCode ?? "SYNC_RUNTIME_POLICY_UNAVAILABLE";
+                operation.NextRetryAt = null;
+                ClearExecutionClaim(operation);
+                operation.UpdatedAt = claimedAt;
+                operation.RowVersion = Guid.NewGuid().ToByteArray();
+                await db.SaveChangesAsync(cancellationToken);
+                await audit.AppendAuditEventAsync(new AuditEventDraft(
+                    "SyncOperationExecutionPolicyDenied", "REJECTED", nameof(SyncOperation), operation.Id,
+                    operation.UserId, operation.CompanyId, operation.BranchId,
+                    Guid.NewGuid(), operation.DeviceId,
+                    Reason: operation.ErrorCode,
                     OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return null;

@@ -281,6 +281,38 @@ public sealed class EffectiveSyncRetryPolicyResolver(
             TimeSpan.FromSeconds(effective.ServerExecutionBaseSeconds),
             TimeSpan.FromMinutes(effective.ServerExecutionMaxDelayMinutes)).Validate());
     }
+
+    public ValueTask<SyncExecutionPolicyDecision> AuthorizeExecutionAsync(
+        Guid companyId,
+        Guid? branchId,
+        Guid? registeredDeviceId,
+        string? deviceId,
+        string actionCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(actionCode) || !branchId.HasValue || !registeredDeviceId.HasValue ||
+            string.IsNullOrEmpty(deviceId) ||
+            !configuration.TryGetCompany(companyId, out var company) ||
+            !configuration.TryGetBranch(companyId, branchId.Value, out var branch) ||
+            !configuration.TryGetDevice(registeredDeviceId.Value, out var device) ||
+            device.CompanyId != companyId || device.BranchId != branchId ||
+            !string.Equals(device.DeviceId, deviceId, StringComparison.Ordinal))
+            return ValueTask.FromResult(
+                SyncExecutionPolicyDecision.Denied("SYNC_RUNTIME_POLICY_UNAVAILABLE"));
+
+        // The business executor performs the final live permission check. This worker-side
+        // decision re-applies every immutable hierarchy restriction immediately before claim,
+        // so a restart or policy tightening cannot execute an action accepted under stale policy.
+        var globalActions = global.Value.AllowedActions;
+        var effective = resolver.Resolve(
+            company, branch, device.AllowedActions, globalActions, device.Restriction);
+        if (!effective.Enabled)
+            return ValueTask.FromResult(SyncExecutionPolicyDecision.Denied(
+                effective.ClosedReason ?? "OFFLINE_DISABLED"));
+        return ValueTask.FromResult(effective.AllowedActions.Contains(actionCode)
+            ? SyncExecutionPolicyDecision.Allowed
+            : SyncExecutionPolicyDecision.Denied("SCOPE_DENIED"));
+    }
 }
 
 public sealed class EffectivePolicySyncRuntimeGate(IEffectiveSyncPolicyProvider provider) : ISyncRuntimeGate
