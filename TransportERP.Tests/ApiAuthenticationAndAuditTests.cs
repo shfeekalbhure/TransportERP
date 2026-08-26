@@ -238,13 +238,15 @@ public sealed class ApiAuthenticationAndAuditTests
         var exactPayload = JsonPayload(SyncApiModule.MaximumPayloadBytes);
         var exactPayloadResponse = await SendClaimedAsync(client, proofKey, bearer, nonce,
             BatchBody(scope.DeviceId, 1, exactPayload));
-        Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", await FirstItemErrorAsync(exactPayloadResponse));
+        // A valid boundary payload reaches the permission-first gate. This keeps runtime
+        // availability opaque while the neighboring oversized assertion still proves the limit.
+        Assert.Equal("SCOPE_DENIED", await FirstItemErrorAsync(exactPayloadResponse));
         var oversizedPayloadResponse = await SendClaimedAsync(client, proofKey, bearer, nonce,
             BatchBody(scope.DeviceId, 1, JsonPayload(SyncApiModule.MaximumPayloadBytes + 1)));
         Assert.Equal("PAYLOAD_TOO_LARGE", await FirstItemErrorAsync(oversizedPayloadResponse));
         var depth32Response = await SendClaimedAsync(client, proofKey, bearer, nonce,
             BatchBody(scope.DeviceId, 1, NestedPayload(32)));
-        Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", await FirstItemErrorAsync(depth32Response));
+        Assert.Equal("SCOPE_DENIED", await FirstItemErrorAsync(depth32Response));
         var depth33Response = await SendClaimedAsync(client, proofKey, bearer, nonce,
             BatchBody(scope.DeviceId, 1, NestedPayload(33)));
         Assert.Equal("PAYLOAD_INVALID", await FirstItemErrorAsync(depth33Response));
