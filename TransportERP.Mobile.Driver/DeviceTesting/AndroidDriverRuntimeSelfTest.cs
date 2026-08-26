@@ -172,7 +172,7 @@ internal static class AndroidDriverRuntimeSelfTest
         }
         catch (DriverOfflineUnavailableException exception)
         {
-            return (null, exception.Code);
+            return DriverDeviceTestResult.Failure("seed", exception.Code);
         }
         catch
         {
@@ -214,6 +214,10 @@ internal static class AndroidDriverRuntimeSelfTest
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return DriverDeviceTestResult.Failure("loss", exception.Code);
         }
         catch
         {
@@ -488,6 +492,10 @@ internal static class AndroidDriverRuntimeSelfTest
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return (null, exception.Code);
         }
         catch
         {
