@@ -516,9 +516,15 @@ jobs:
               --es phase "$phase" >/dev/null
             complete=false
             for attempt in $(seq 1 60); do
-              if adb exec-out run-as "$ANDROID_TEST_PACKAGE" cat "files/$result_name" > "$temporary" 2>/dev/null && [ -s "$temporary" ]; then
-                complete=true
-                break
+              # Some adb versions return exit code 0 while forwarding the remote
+              # `cat: ... No such file` diagnostic on stdout.  Check existence in
+              # the app sandbox first, then accept only a complete JSON document.
+              if adb shell run-as "$ANDROID_TEST_PACKAGE" test -s "files/$result_name" >/dev/null 2>&1; then
+                adb exec-out run-as "$ANDROID_TEST_PACKAGE" cat "files/$result_name" > "$temporary"
+                if python3 -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$temporary"; then
+                  complete=true
+                  break
+                fi
               fi
               sleep 1
             done
