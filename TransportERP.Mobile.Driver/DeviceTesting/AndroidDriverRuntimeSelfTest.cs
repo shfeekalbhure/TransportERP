@@ -170,6 +170,10 @@ internal static class AndroidDriverRuntimeSelfTest
         {
             throw;
         }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return (null, exception.Code);
+        }
         catch
         {
             return DriverDeviceTestResult.Failure("seed", failureCode);

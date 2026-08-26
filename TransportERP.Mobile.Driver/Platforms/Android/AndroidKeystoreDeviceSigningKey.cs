@@ -91,21 +91,27 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
 
         var input = signingInput.ToArray();
         byte[]? derSignature = null;
+        var failureCode = "NATIVE_DEVICE_SIGNING_KEY_READ_FAILED";
         try
         {
             using var keyStore = LoadKeyStore();
             using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
-                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+                ?? throw new DriverOfflineUnavailableException(failureCode);
             // AndroidKeyStore providers are only required to implement the DER ECDSA form.
             // Do not infer that a 64-byte result from an optional provider alias is P1363:
             // a DER signature can also be 64 bytes.  Normalize the required DER form with the
             // strict parser below so the wire representation is always unambiguous JOSE P1363.
+            failureCode = "NATIVE_DEVICE_SIGNING_PROVIDER_UNAVAILABLE";
             using var derSigner = Java.Security.Signature.GetInstance("SHA256withECDSA")
-                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+                ?? throw new DriverOfflineUnavailableException(failureCode);
+            failureCode = "NATIVE_DEVICE_SIGNING_INITIALIZATION_FAILED";
             derSigner.InitSign(privateKey);
+            failureCode = "NATIVE_DEVICE_SIGNING_INPUT_FAILED";
             derSigner.Update(input);
+            failureCode = "NATIVE_DEVICE_SIGNING_OPERATION_FAILED";
             derSignature = derSigner.Sign();
             cancellationToken.ThrowIfCancellationRequested();
+            failureCode = "NATIVE_DEVICE_SIGNATURE_DER_INVALID";
             return DerToP1363(derSignature);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -118,7 +124,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         }
         catch (Exception exception)
         {
-            throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE", exception);
+            throw new DriverOfflineUnavailableException(failureCode, exception);
         }
         finally
         {
