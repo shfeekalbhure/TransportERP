@@ -34,7 +34,10 @@ public interface IOperationalPartyRepository
 {
     Task<(IReadOnlyList<OperationalPartyRecord> Items, long Total)> SearchAsync(
         Guid companyId, Guid branchId, string? query, int skip, int take, CancellationToken cancellationToken);
-    Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken);
+    Task<OperationalPartyRecord?> GetByClientOperationAsync(
+        Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken);
+    Task EnsureUsableAsync(
+        Guid companyId, Guid branchId, IReadOnlyCollection<Guid> operationalPartyIds, CancellationToken cancellationToken);
     Task<OperationalPartyRecord> CreateAsync(
         Guid companyId, Guid branchId, string partyNo, OperationalPartyCreateRequest request, CancellationToken cancellationToken);
 }
@@ -104,13 +107,21 @@ public sealed class WaybillApplicationService(
         return unitOfWork.ExecuteAsync(async ct =>
         {
             var aggregate = await RequireWaybill(context, waybillId, ct);
+            var domainParties = request.Parties.Select(ToDomainParty).ToList();
+            await parties.EnsureUsableAsync(context.CompanyId, context.BranchId,
+                domainParties.Where(x => x.OperationalPartyId.HasValue)
+                    .Select(x => x.OperationalPartyId!.Value).Distinct().ToArray(), ct);
             if (await IsReplay(context, aggregate, request.ExpectedVersion, operationId, ct))
+            {
+                if (!UpdateReplayMatches(aggregate, request, domainParties))
+                    throw new WaybillApplicationException("IDEMPOTENCY_CONFLICT");
                 return ToResponse(aggregate, context.CorrelationId);
+            }
             var before = Snapshot(aggregate);
             aggregate.UpdateDraft(
                 request.WaybillDateTime, request.OriginId, request.DestinationId, request.CurrencyId,
                 request.ExchangeRate, request.FreightTotal, request.DiscountTotal, request.ServiceType,
-                request.Priority, request.Parties.Select(ToDomainParty), request.Items.Select(ToDomainItem));
+                request.Priority, domainParties, request.Items.Select(ToDomainItem));
             await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, ct);
             await audit.WriteAsync(context, "WaybillDraftUpdate", "SUCCESS", "Waybill", aggregate.Id,
                 before, Snapshot(aggregate), null, ct);
@@ -264,9 +275,14 @@ public sealed class WaybillApplicationService(
 
         return unitOfWork.ExecuteAsync(async ct =>
         {
-            var existing = await parties.GetByClientOperationAsync(context.CompanyId, request.ClientOperationId.Trim(), ct);
+            var existing = await parties.GetByClientOperationAsync(
+                context.CompanyId, context.BranchId, request.ClientOperationId.Trim(), ct);
             if (existing is not null)
+            {
+                if (!PartyCreateReplayMatches(existing, request, context.BranchId))
+                    throw new WaybillApplicationException("IDEMPOTENCY_CONFLICT");
                 return ToPartyResponse(existing);
+            }
             var created = await parties.CreateAsync(context.CompanyId, context.BranchId, NewPartyNo(), request, ct);
             await audit.WriteAsync(context, "OperationalPartyCreate", "SUCCESS", "OperationalParty", created.Id,
                 null, JsonSerializer.Serialize(new { created.PartyNo, created.Name, created.Mobile }), null, ct);
@@ -323,6 +339,66 @@ public sealed class WaybillApplicationService(
             input.Quantity, input.Pieces, input.Weight, input.Length, input.Width, input.Height,
             input.DeclaredValue, input.OriginCountryId,
             JsonSerializer.Serialize(input.RiskFlags ?? Array.Empty<string>()), input.Notes, input.Volume);
+
+    private static bool UpdateReplayMatches(
+        WaybillAggregate aggregate,
+        UpdateWaybillDraftRequest request,
+        IReadOnlyList<WaybillPartyValue> parties)
+    {
+        if (!SameInstant(aggregate.WaybillDateTime, request.WaybillDateTime) ||
+            aggregate.OriginId != request.OriginId || aggregate.DestinationId != request.DestinationId ||
+            aggregate.CurrencyId != request.CurrencyId || aggregate.ExchangeRate != request.ExchangeRate ||
+            aggregate.FreightTotal != request.FreightTotal || aggregate.DiscountTotal != request.DiscountTotal ||
+            !string.Equals(aggregate.ServiceType, NormalizeDefault(request.ServiceType, "STANDARD"), StringComparison.Ordinal) ||
+            !string.Equals(aggregate.Priority, NormalizeDefault(request.Priority, "NORMAL"), StringComparison.Ordinal) ||
+            aggregate.Parties.Count != parties.Count || aggregate.Items.Count != request.Items.Count)
+            return false;
+
+        for (var index = 0; index < parties.Count; index++)
+            if (aggregate.Parties[index] != parties[index]) return false;
+
+        var persistedItems = aggregate.Items.OrderBy(x => x.LineNo).ToArray();
+        var requestedItems = request.Items.OrderBy(x => x.LineNo).ToArray();
+        for (var index = 0; index < requestedItems.Length; index++)
+        {
+            var persisted = persistedItems[index];
+            var requested = requestedItems[index];
+            if ((requested.Id.HasValue && requested.Id.Value != persisted.Id) ||
+                persisted.LineNo != requested.LineNo ||
+                !string.Equals(persisted.ItemType, requested.ItemType, StringComparison.Ordinal) ||
+                !string.Equals(persisted.Contents, requested.Contents, StringComparison.Ordinal) ||
+                persisted.Quantity != requested.Quantity || persisted.Pieces != requested.Pieces ||
+                persisted.Weight != requested.Weight || persisted.Length != requested.Length ||
+                persisted.Width != requested.Width || persisted.Height != requested.Height ||
+                persisted.Volume != requested.Volume || persisted.DeclaredValue != requested.DeclaredValue ||
+                persisted.OriginCountryId != requested.OriginCountryId ||
+                !string.Equals(persisted.RiskFlagsJson,
+                    JsonSerializer.Serialize(requested.RiskFlags ?? Array.Empty<string>()), StringComparison.Ordinal) ||
+                !string.Equals(persisted.Notes, requested.Notes, StringComparison.Ordinal))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool PartyCreateReplayMatches(
+        OperationalPartyRecord existing,
+        OperationalPartyCreateRequest request,
+        Guid branchId)
+        => existing.BranchId == branchId && existing.Status == "ACTIVE" &&
+           string.Equals(existing.Name, request.Name.Trim(), StringComparison.Ordinal) &&
+           string.Equals(existing.Mobile, request.Mobile.Trim(), StringComparison.Ordinal) &&
+           string.Equals(existing.IdentityType, NullIfWhite(request.IdentityType), StringComparison.Ordinal) &&
+           string.Equals(existing.IdentityNo, NullIfWhite(request.IdentityNo), StringComparison.Ordinal) &&
+           existing.Address == request.Address;
+
+    private static string NormalizeDefault(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static string? NullIfWhite(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool SameInstant(DateTimeOffset left, DateTimeOffset right)
+        => Math.Abs((left.ToUniversalTime() - right.ToUniversalTime()).Ticks) <= 10;
 
     public static WaybillResponse ToResponse(WaybillAggregate aggregate, Guid correlationId)
         => new(

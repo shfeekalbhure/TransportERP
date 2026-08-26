@@ -1617,15 +1617,15 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.HasIndex("CompanyId", "ClientOperationId")
-                        .IsUnique();
-
                     b.HasIndex("CompanyId", "IdentityNo")
                         .HasFilter("\"IdentityNo\" IS NOT NULL");
 
                     b.HasIndex("CompanyId", "Mobile");
 
                     b.HasIndex("CompanyId", "PartyNo")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "BranchId", "ClientOperationId")
                         .IsUnique();
 
                     b.HasIndex("CompanyId", "BranchId", "Status");

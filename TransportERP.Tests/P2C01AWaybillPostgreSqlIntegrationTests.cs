@@ -205,6 +205,65 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
 
     [Fact]
     [Trait("Category", "P2PostgreSQL")]
+    public async Task Draft_update_rejects_cross_company_party_before_replay_and_replay_requires_full_payload_match()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope local;
+        TestScope foreign;
+        Guid localPartyId;
+        Guid foreignPartyId;
+        await using (var db = CreateP2Db(connection))
+        {
+            local = await SeedScopeAsync(db, "P2SCOPELOCAL", withSequence: false);
+            foreign = await SeedScopeAsync(db, "P2SCOPEFOREIGN", withSequence: false);
+            localPartyId = await SeedPartyAsync(db, local, "LOCAL");
+            foreignPartyId = await SeedPartyAsync(db, foreign, "FOREIGN");
+        }
+
+        var context = new OperationContext(local.UserId, local.CompanyId, local.BranchId, Guid.NewGuid());
+        WaybillResponse draft;
+        await using (var db = CreateP2Db(connection))
+            draft = await CreateService(db).CreateDraftAsync(context, new CreateWaybillDraftRequest(
+                local.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), local.CurrencyId,
+                1m, "STANDARD", "NORMAL", $"scope-create-{Guid.NewGuid():N}"));
+
+        var operationId = $"scope-update-{Guid.NewGuid():N}";
+        var address = new GeoAddressSnapshot(null, null, null, null, "scope address");
+        var request = new UpdateWaybillDraftRequest(
+            draft.Version, draft.WaybillDateTime, draft.OriginId, draft.DestinationId, draft.CurrencyId,
+            1m, 10m, 0m, "STANDARD", "NORMAL",
+            [new WaybillPartyInput("SENDER", localPartyId, "local party", "700000001", null, null, address)],
+            [new WaybillItemInput(null, 1, "GENERAL", "scope item", 1m, 1, null, null, null, null, null, null, [], null)],
+            operationId);
+        await using (var db = CreateP2Db(connection))
+            _ = await CreateService(db).UpdateDraftAsync(context, draft.Id, request);
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var altered = request with
+            {
+                Parties = [request.Parties[0] with { Name = "altered snapshot" }]
+            };
+            var ex = await Assert.ThrowsAsync<WaybillApplicationException>(() =>
+                CreateService(db).UpdateDraftAsync(context, draft.Id, altered));
+            Assert.Equal("IDEMPOTENCY_CONFLICT", ex.Code);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var foreignReference = request with
+            {
+                Parties = [request.Parties[0] with { OperationalPartyId = foreignPartyId }]
+            };
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).UpdateDraftAsync(context, draft.Id, foreignReference));
+            Assert.Equal("SCOPE_DENIED", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Waybill_create_rolls_back_when_audit_insert_fails()
     {
         var connection = RequireConnection();
@@ -343,6 +402,21 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" }, SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
+    }
+
+    private static async Task<Guid> SeedPartyAsync(TransportErpDbContext db, TestScope scope, string suffix)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var party = new OperationalPartyEntity
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            PartyNo = $"P-{suffix}-{Guid.NewGuid():N}"[..30], Name = $"Party {suffix}", Mobile = "700000001",
+            Status = "ACTIVE", ClientOperationId = $"party-{suffix}-{Guid.NewGuid():N}",
+            CreatedAt = now, UpdatedAt = now, Version = 1
+        };
+        db.Set<OperationalPartyEntity>().Add(party);
+        await db.SaveChangesAsync();
+        return party.Id;
     }
 
     private static async Task<TestScope> SeedScopeAsync(TransportErpDbContext db, string suffix, bool withSequence)

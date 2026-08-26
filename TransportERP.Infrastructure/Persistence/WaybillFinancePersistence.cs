@@ -37,6 +37,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             if (waybill.LastClientOperationId == operationId)
             {
                 var replay = await ActivePlan(waybillId, cancellationToken);
+                EnsurePlanReplayMatches(replay, request.Lines);
                 await tx.CommitAsync(cancellationToken);
                 return PlanResponse(context, waybill, replay);
             }
@@ -105,7 +106,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         var operationId = request.ClientOperationId.Trim();
         var replay = await FindScopedOperation(context, operationId, cancellationToken);
         if (replay is not null)
-            return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
+            return await ReplayOrConflictAsync(context, replay, waybillId, request, cancellationToken);
 
         try
         {
@@ -149,7 +150,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             db.ChangeTracker.Clear();
             replay = await FindScopedOperation(context, operationId, cancellationToken);
             if (replay is not null)
-                return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
+                return await ReplayOrConflictAsync(context, replay, waybillId, request, cancellationToken);
             throw new WaybillPersistenceException("DUPLICATE_OPERATION", ex);
         }
         catch (Exception ex) when (IsSerializationFailure(ex))
@@ -157,7 +158,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             db.ChangeTracker.Clear();
             replay = await FindScopedOperation(context, operationId, cancellationToken);
             if (replay is not null)
-                return ReplayOrConflict(context, replay, waybillId, request.Amount.CurrencyId, request.Amount.Amount, request.ExchangeRate);
+                return await ReplayOrConflictAsync(context, replay, waybillId, request, cancellationToken);
             throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
         }
     }
@@ -168,11 +169,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         var operationId = request.ClientOperationId.Trim();
         var replay = await FindScopedOperation(context, operationId, cancellationToken);
         if (replay is not null)
-        {
-            if (replay.ReversalOfId != collectionId)
-                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
-            return CollectionResponseOf(context, replay);
-        }
+            return await ReplayReverseOrConflictAsync(context, replay, collectionId, request, cancellationToken);
 
         try
         {
@@ -228,11 +225,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             db.ChangeTracker.Clear();
             replay = await FindScopedOperation(context, operationId, cancellationToken);
             if (replay is not null)
-            {
-                if (replay.ReversalOfId != collectionId)
-                    throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
-                return CollectionResponseOf(context, replay);
-            }
+                return await ReplayReverseOrConflictAsync(context, replay, collectionId, request, cancellationToken);
             if (await Collections.AsNoTracking().AnyAsync(x =>
                     x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == collectionId,
                     cancellationToken))
@@ -243,8 +236,8 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
         {
             db.ChangeTracker.Clear();
             replay = await FindScopedOperation(context, operationId, cancellationToken);
-            if (replay is not null && replay.ReversalOfId == collectionId)
-                return CollectionResponseOf(context, replay);
+            if (replay is not null)
+                return await ReplayReverseOrConflictAsync(context, replay, collectionId, request, cancellationToken);
             if (await Collections.AsNoTracking().AnyAsync(x =>
                     x.CompanyId == context.CompanyId && x.BranchId == context.BranchId && x.ReversalOfId == collectionId,
                     cancellationToken))
@@ -340,15 +333,91 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             new MoneyAmount(waybill.CurrencyId, calc.RemainingEquivalent),
             calc.Status, waybill.Version, context.CorrelationId);
 
-    private static CollectionResponse ReplayOrConflict(
-        OperationContext context, CollectionTransactionEntity replay, Guid waybillId, Guid currencyId, decimal amount, decimal rate)
+    private static void EnsurePlanReplayMatches(
+        IReadOnlyList<PaymentPlanLineEntity> replay,
+        IReadOnlyList<PaymentPlanLineInput> request)
+    {
+        var ordered = request.OrderBy(x => x.LineNo).ToArray();
+        if (replay.Count != ordered.Length)
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+
+        for (var index = 0; index < ordered.Length; index++)
+        {
+            var actual = replay[index];
+            var expected = ordered[index];
+            if (actual.LineNo != expected.LineNo ||
+                !string.Equals(actual.PayerRole, expected.PayerRole.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+                actual.PartyId != expected.PartyId ||
+                !string.Equals(actual.PaymentMethodCode, expected.PaymentMethodCode.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+                actual.AmountCurrencyId != expected.Amount?.CurrencyId || actual.Amount != expected.Amount?.Amount ||
+                actual.Percent != expected.Percent ||
+                !string.Equals(actual.DueTrigger, expected.DueTrigger.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+                !SameInstant(actual.DueAt, expected.DueAt))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+        }
+    }
+
+    private async Task<CollectionResponse> ReplayOrConflictAsync(
+        OperationContext context,
+        CollectionTransactionEntity replay,
+        Guid waybillId,
+        RecordCollectionRequest request,
+        CancellationToken cancellationToken)
     {
         if (replay.CompanyId != context.CompanyId || replay.BranchId != context.BranchId ||
-            replay.WaybillId != waybillId || replay.CurrencyId != currencyId ||
-            replay.Amount != amount || replay.ExchangeRate != rate)
+            replay.WaybillId != waybillId ||
+            !string.Equals(replay.PayerRole, request.PayerRole.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+            replay.PartyId != request.PartyId ||
+            !string.Equals(replay.PaymentMethodCode, request.PaymentMethodCode.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+            replay.CurrencyId != request.Amount.CurrencyId || replay.Amount != request.Amount.Amount ||
+            replay.ExchangeRate != request.ExchangeRate ||
+            !string.Equals(replay.CollectedByType, request.CollectedByType.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
+            replay.CollectedById != request.CollectedById || !SameInstant(replay.CollectedAt, request.CollectedAt) ||
+            replay.AccountingReferenceId != request.AccountingReferenceId)
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+
+        if (request.AccountingReferenceId.HasValue)
+        {
+            var documentType = request.AccountingDocumentType?.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(documentType) || !await FinancialLinks.AsNoTracking().AnyAsync(x =>
+                    x.WaybillId == waybillId && x.LinkType == "COLLECTION" && x.Status == "ACTIVE" &&
+                    x.DocumentId == request.AccountingReferenceId.Value && x.DocumentType == documentType,
+                    cancellationToken))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+        }
+
         return CollectionResponseOf(context, replay);
     }
+
+    private async Task<CollectionResponse> ReplayReverseOrConflictAsync(
+        OperationContext context,
+        CollectionTransactionEntity replay,
+        Guid collectionId,
+        ReverseCollectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (replay.CompanyId != context.CompanyId || replay.BranchId != context.BranchId ||
+            replay.ReversalOfId != collectionId ||
+            !string.Equals(replay.ReversalReason, request.Reason.Trim(), StringComparison.Ordinal) ||
+            replay.AccountingReferenceId != request.AccountingReferenceId)
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+
+        if (request.AccountingReferenceId.HasValue)
+        {
+            var documentType = request.AccountingDocumentType?.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(documentType) || !await FinancialLinks.AsNoTracking().AnyAsync(x =>
+                    x.WaybillId == replay.WaybillId && x.LinkType == "COLLECTION_REVERSAL" && x.Status == "ACTIVE" &&
+                    x.DocumentId == request.AccountingReferenceId.Value && x.DocumentType == documentType,
+                    cancellationToken))
+                throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
+        }
+
+        return CollectionResponseOf(context, replay);
+    }
+
+    private static bool SameInstant(DateTimeOffset? left, DateTimeOffset? right)
+        => left.HasValue == right.HasValue &&
+           (!left.HasValue || Math.Abs((left.Value.ToUniversalTime() - right!.Value.ToUniversalTime()).Ticks) <= 10);
 
     private void AddFinancialLink(WaybillEntity waybill, string documentType, Guid documentId, decimal amount, Guid currencyId, string linkType)
         => FinancialLinks.Add(new FinancialLinkEntity

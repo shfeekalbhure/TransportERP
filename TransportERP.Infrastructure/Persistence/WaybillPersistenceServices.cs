@@ -275,17 +275,37 @@ public sealed class EfOperationalPartyRepository(TransportErpDbContext db) : IOp
         return (rows.Select(ToRecord).ToList(), total);
     }
 
-    public async Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken)
+    public async Task<OperationalPartyRecord?> GetByClientOperationAsync(
+        Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken)
     {
         if (db.Database.CurrentTransaction is not null && db.Database.IsNpgsql())
         {
-            var key = $"party|{companyId}|{clientOperationId.Trim()}";
+            var key = $"party|{companyId}|{branchId}|{clientOperationId.Trim()}";
             var lockKey = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
         }
         var entity = await OperationalParties.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.ClientOperationId == clientOperationId, cancellationToken);
+            .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.BranchId == branchId &&
+                x.ClientOperationId == clientOperationId, cancellationToken);
         return entity is null ? null : ToRecord(entity);
+    }
+
+    public async Task EnsureUsableAsync(
+        Guid companyId,
+        Guid branchId,
+        IReadOnlyCollection<Guid> operationalPartyIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = operationalPartyIds.Where(x => x != Guid.Empty).Distinct().ToArray();
+        if (ids.Length != operationalPartyIds.Distinct().Count())
+            throw new WaybillPersistenceException("SCOPE_DENIED");
+        if (ids.Length == 0) return;
+
+        var usable = await OperationalParties.AsNoTracking().CountAsync(x =>
+            ids.Contains(x.Id) && x.CompanyId == companyId && x.Status == "ACTIVE" &&
+            (x.BranchId == null || x.BranchId == branchId), cancellationToken);
+        if (usable != ids.Length)
+            throw new WaybillPersistenceException("SCOPE_DENIED");
     }
 
     public async Task<OperationalPartyRecord> CreateAsync(

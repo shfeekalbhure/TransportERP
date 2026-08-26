@@ -37,7 +37,7 @@ public sealed class TransportErpP2ModelCustomizer(ModelCustomizerDependencies de
         party.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
         party.Property(x => x.Version).IsConcurrencyToken();
         party.HasIndex(x => new { x.CompanyId, x.PartyNo }).IsUnique();
-        party.HasIndex(x => new { x.CompanyId, x.ClientOperationId }).IsUnique();
+        party.HasIndex(x => new { x.CompanyId, x.BranchId, x.ClientOperationId }).IsUnique();
         party.HasIndex(x => new { x.CompanyId, x.Mobile });
         party.HasIndex(x => new { x.CompanyId, x.IdentityNo }).HasFilter("\"IdentityNo\" IS NOT NULL");
         party.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status });
