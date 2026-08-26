@@ -5,7 +5,7 @@
 
 **الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_RUNTIME_CANDIDATE_WIP — G4_OPEN — G5_CLOSED — OFFLINE_CLOSED`.
 
-**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على S4-B، أو `204` اختبارًا على الرأس البعيد بعد S4-C تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203. رُفع مرشح Runtime إلى `afc2902dc12a1c5545b6908dbec22f4228a02439`، ولم يظهر له تشغيل CI بعد.
+**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على S4-B، أو `204` اختبارًا على الرأس البعيد بعد S4-C، أو `291` اختبارًا على مرشح Runtime تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203. نجح مرشح Runtime على exact SHA `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في CI run `32992686767`؛ يبقى `G4 OPEN` إلى حين اكتمال أدلة القبول والمراجعة المستقلة.
 
 ## 0. مركز قيادة PR #69 وحزمة إغلاق المراحل 1–3
 
@@ -21,7 +21,7 @@
 | مرشح تنفيذ المراحل 1–3 | [`5ca9a86acef4053cf731fb896ca0c77b17a575ae`](https://github.com/shfeekalbhure/TransportERP/commit/5ca9a86acef4053cf731fb896ca0c77b17a575ae) |
 | أول HEAD توثيقي للمرجع الموحد | `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`؛ tree=`5c15cd219d55752eb78cf233f87cbcf3ff1b7df2`؛ CI أخضر |
 | HEAD البعيد الحالي | `bf10d2529b5f644f6f694140ca417413bcf8a5ec`؛ يتضمن S4-A وS4-B وأساس S4-C للمخطط/idempotency؛ CI أخضر `204/204` في run `32935705567` |
-| مرشح Runtime المرفوع | `REMOTE_COMMIT_CI_PENDING` على `afc2902dc12a1c5545b6908dbec22f4228a02439`؛ Proof-key lifecycle وSync-PoP/nonce/replay/batch runtime والتنظيف وأدلة السباقات والحالات الإلزامية مثبتة؛ لا توجد نتيجة CI أو PASS تنفيذية بعد |
+| مرشح Runtime المرفوع | `CI_VERIFIED_RUNTIME_CANDIDATE` على `1acddb3384fc6f61fed24444a8bc54cd23fe212d`؛ run `32992686767` وCore job `98253937329` بنتيجة `291/291` وDesktop job `98253936950` ناجحان؛ هذا لا يساوي G4 PASS أو مراجعة مستقلة أو اعتماد مالك |
 | النظير المحلي لمرشح المراحل 1–3 | `d0860d70d808374bd5582d2e71c14afa5429f8cd` |
 | tree المشترك | `9ce37459c22c6f4c47beee203af0fa9d0a167080`؛ تطابق remote/local حرفيًا |
 | نطاق التغيير | `6` commits بعيدة، `48` ملفًا؛ يعاد إنتاج manifest بالأمر `git diff --name-status 2ec6ccc..5ca9a86` |
@@ -36,7 +36,7 @@
 | المرحلة 1 — الهوية والتفويض والتدقيق الأساسي | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 2 — العزل والتدقيق والمعاملات الذرية | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 3 — حدود ثقة الجهاز المسجل | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
-| المرحلة 4 — `TransportERP Sync-PoP v1` | مرشح Runtime مرفوع على `afc2902...` ويضم proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف وأدلة السباقات والحالات الإلزامية؛ CI ما يزال معلقًا | نعم فقط للنطاق السابق حتى `bf10d25...` بنتيجة `204/204`؛ لا اعتماد تنفيذي للمرشح الجديد بعد | مراجعة ضمان ساكنة PASS بلا علة Critical/High مثبتة؛ لا حكم CI/PostgreSQL أو G4 | تفويض تنفيذ Stage 4 فقط؛ `G4 OPEN`, `G5 CLOSED`, وOffline مغلق |
+| المرحلة 4 — `TransportERP Sync-PoP v1` | مرشح Runtime على `1acddb3...` ويضم proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف وأدلة السباقات والحالات الإلزامية | نعم للمرشح نفسه: run `32992686767`، Core=`291/291` وDesktop=`SUCCESS`، مع نجاح build وEF model وPostgreSQL migration | مراجعة ضمان ساكنة بلا علة Critical/High مثبتة؛ المراجعة المستقلة الكاملة ومصفوفة قبول G4 لم تكتمل | تفويض تنفيذ Stage 4 فقط؛ `G4 OPEN`, `G5 CLOSED`, وOffline مغلق |
 | المرحلة 5 | `NOT AUTHORIZED` | لا | لا | لا |
 
 لا تستبدل حالةٌ حالةً أخرى. نجاح CI لا يعني مراجعة مستقلة، والمراجعة المستقلة لا تعني اعتماد المالك، واعتماد القرار التعاقدي لا يعني وجود runtime.
@@ -55,7 +55,7 @@
 | 4/S4-A | `e84486a1e350057e2c9ff4c54588dfe05cbb0181` | `0d98b15`: primitive `fp-v1` داخلي حتمي + اختبارات golden/حدود + regression لبقاء Offline مغلقًا | CI أخضر `196/196`؛ لا DB/API/DI/migration/settings أو Offline enablement |
 | 4/S4-B | `86475a1b54dc593e2057c4fa0e7789a224154914` | `b1c9dc5` ثم إصلاح EF scalar API في `86475a1`: ترتيب أقفال الجهاز/عائلة الجلسات/التدقيق وذرية `LastSeenAt` + اختبار PostgreSQL حتمي | CI أخضر `197/197`؛ لا schema/API أو Offline enablement |
 | 4/S4-C foundation | `bf10d2529b5f644f6f694140ca417413bcf8a5ec` | `229eedd` ثم `a80718b` و`bf10d25`: مخطط nonce/replay وحقول provenance/idempotency وإصلاح fixtures | CI أخضر `204/204` في run `32935705567`؛ أساس مخطط فقط، ولا يثبت اكتمال Runtime أو G4 |
-| 4/Runtime candidate | `afc2902dc12a1c5545b6908dbec22f4228a02439` (بعيد) | proof-key lifecycle، Sync-PoP validator، nonce/proof claim، batch/idempotency، cleanup واختبارات الحدود وrotation/claim وحالات device/assignment | CI/PostgreSQL لم يظهرا بعد؛ ممنوع تسجيل G4 PASS قبل نجاح الأدلة التنفيذية على exact-SHA |
+| 4/Runtime candidate | `1acddb3384fc6f61fed24444a8bc54cd23fe212d` (بعيد) | proof-key lifecycle، Sync-PoP validator، nonce/proof claim، batch/idempotency، cleanup واختبارات الحدود وrotation/claim وحالات device/assignment | CI run `32992686767`: Core=`291 passed / 0 failed / 0 skipped` وDesktop=`SUCCESS`؛ يبقى G4 مفتوحًا حتى اكتمال أدلة القبول والمراجعة المستقلة |
 
 ### 0.4 سجل CI — النجاح والفشل محفوظان
 
@@ -74,6 +74,8 @@
 **أول شريحة تنفيذية محدودة من Stage 4:** [CI run 32924353724](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724) على exact SHA `e84486a1...` انتهى `SUCCESS`. [Core + PostgreSQL + HTTP job 98044081433](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724/job/98044081433)=`196 passed / 0 failed / 0 skipped` في 37s، و[Desktop RTL job 98044081285](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724/job/98044081285)=`SUCCESS`، و[P2 foundation 32924353757](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353757) و[W0-3 32924353818](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353818)=`SUCCESS`. كانت A/B/C/W0-5 `SKIPPED` بمرشحات المسارات وليست إخفاقات. يثبت هذا S4-A فقط ولا يثبت migration أو PoP أو replay أو batch runtime ولا يفتح G4/G5.
 
 **شريحة S4-B المحدودة — ترتيب أقفال الجهاز والجلسة والتدقيق:** المرشح الأخضر هو exact SHA `86475a1b54dc593e2057c4fa0e7789a224154914` / tree `44c03399b3de426db3e38757aef51812fdd2c8a3`. حُفظ أثر [run 32929051030](https://github.com/shfeekalbhure/TransportERP/actions/runs/32929051030) الفاشل؛ توقف البناء بخطأ المترجم `CS1061` بسبب استخدام اسم API غير موجود لاستعلام EF scalar، ولم تُنسب إليه نتيجة اختبار ناجحة. أصلح SHA المرشح الاستدعاء إلى API المتوافق مع EF Core 10، ثم نجح [run 32930275141](https://github.com/shfeekalbhure/TransportERP/actions/runs/32930275141)، وفيه [Core + PostgreSQL + HTTP job 98061049661](https://github.com/shfeekalbhure/TransportERP/actions/runs/32930275141/job/98061049661)=`197 passed / 0 failed / 0 skipped`. يثبت هذا `IMPLEMENTED + VERIFIED BY CI` لنطاق S4-B فقط على الـSHA نفسه؛ لا يعني `INDEPENDENTLY REVIEWED` أو `OWNER APPROVED`، ولا يثبت بقية Runtime المرحلة الرابعة أو يفتح Offline أو G4/G5.
+
+**مرشح Stage 4 Runtime الحالي:** حُفظ أثر الفشل في [CI run 32991151870](https://github.com/shfeekalbhure/TransportERP/actions/runs/32991151870) على `b7a15e619c3913d4e97e463b8c7c12be4616f3c6` بنتيجة `288/291`، ثم نجح [CI run 32992686767](https://github.com/shfeekalbhure/TransportERP/actions/runs/32992686767) على exact SHA `1acddb3384fc6f61fed24444a8bc54cd23fe212d`: [Core + PostgreSQL + HTTP job 98253937329](https://github.com/shfeekalbhure/TransportERP/actions/runs/32992686767/job/98253937329)=`291 passed / 0 failed / 0 skipped`، و[Desktop RTL job 98253936950](https://github.com/shfeekalbhure/TransportERP/actions/runs/32992686767/job/98253936950)=`SUCCESS`. نجحت ضمن Core فحوص العقود والبناء وتطابق EF model وتطبيق migrations على PostgreSQL. يثبت هذا `IMPLEMENTED + VERIFIED BY CI` لمرشح Runtime المحدد فقط؛ لا يسجل `G4 PASS`، ولا يفتح G5 أو Offline، ولا يحول PR #69 إلى Ready، ولا يفوض الدمج.
 
 الأثر التاريخي غير مطموس:
 
@@ -111,7 +113,7 @@
 
 ### 0.7 الحد الفاصل مع المرحلة الرابعة
 
-`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. ثبتت S4-A وS4-B وأساس S4-C على الرؤوس البعيدة المذكورة، ورُفع مرشح proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف واختبارات PostgreSQL/HTTP إلى `afc2902dc12a1c5545b6908dbec22f4228a02439`. لم يظهر له تشغيل CI بعد، ولا يمنح `G4 PASS`. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G5، ولا يتحول PR إلى Ready ولا يدمج بهذا السجل.
+`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 RUNTIME CANDIDATE CI VERIFIED — G4 OPEN` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. ثبتت S4-A وS4-B وأساس S4-C على الرؤوس البعيدة المذكورة، ونجح مرشح proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف واختبارات PostgreSQL/HTTP على `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في run `32992686767` بنتيجة `291/291`. لا يمنح ذلك `G4 PASS` قبل اكتمال مصفوفة القبول والمراجعة المستقلة. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G5، ولا يتحول PR إلى Ready ولا يدمج بهذا السجل.
 
 **حالة البوابة:** `STAGE4_CONTRACT_FIXED_AND_CI_VERIFIED — BOUNDED SERVER IMPLEMENTATION AUTHORIZED — OFFLINE CLOSED`. ثبت القرار المعدل `DEC-P1-SYNC-POP-AMEND-20260826-02` في remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`. حسم مفاتيح idempotency المعزولة بالشركة، وDown غير المدمر، وbind/rotate/recovery، ونقطة linearization وترتيب الأقفال، وschema والقيود والفهارس والمحفزات الدقيقة، وفصل operation/attempt correlation، و`fp-v1` byte layout، وحدود body/payload. طابقت ثلاثة مراجعات داخلية مستقلة النص مع EF/PostgreSQL والكود الحالي، وحُسب متجها `fp-v1` بأداتين مستقلتين وتطابقا. نجحت [CI #16](https://github.com/shfeekalbhure/TransportERP/actions/runs/32920027662) على العقد المثبت: Core=`185/185` وDesktop/Foundation/W0-3 ناجحة. يجوز بدء دفعة server-side مستقلة وآمنة وفق العقد، لكن هذا لا يدعي runtime مكتملًا أو `INDEPENDENTLY REVIEWED` من فريق الضمان المستقل، ولا يفتح Offline أو G4/G5.
 
