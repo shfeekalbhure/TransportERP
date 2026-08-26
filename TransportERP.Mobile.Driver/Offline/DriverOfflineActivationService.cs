@@ -24,6 +24,7 @@ public sealed class DriverOfflineActivationRequest
         string sessionBearer,
         Uri batchEndpoint,
         IReadOnlyCollection<DriverOfflineActionGrant> grantedActions,
+        DriverOfflineOperationPermissions operationPermissions,
         bool offlineRuntimeAuthorized = false)
     {
         CompanyId = companyId;
@@ -35,6 +36,7 @@ public sealed class DriverOfflineActivationRequest
         SessionBearer = sessionBearer;
         BatchEndpoint = batchEndpoint;
         GrantedActions = grantedActions;
+        OperationPermissions = operationPermissions;
         OfflineRuntimeAuthorized = offlineRuntimeAuthorized;
     }
 
@@ -47,6 +49,7 @@ public sealed class DriverOfflineActivationRequest
     internal string SessionBearer { get; }
     public Uri BatchEndpoint { get; }
     public IReadOnlyCollection<DriverOfflineActionGrant> GrantedActions { get; }
+    public DriverOfflineOperationPermissions OperationPermissions { get; }
     public bool OfflineRuntimeAuthorized { get; }
 }
 
@@ -83,6 +86,7 @@ public sealed class DriverOfflineActivationService(
     private Task? _supervisorTask;
 
     public DriverOfflineActivationResult? Active => Volatile.Read(ref _active);
+    public event EventHandler? StateChanged;
 
     public async Task<DriverOfflineActivationResult> ActivateAsync(
         DriverOfflineActivationRequest request,
@@ -99,7 +103,7 @@ public sealed class DriverOfflineActivationService(
             if (_active is not null)
                 throw new DriverOfflineUnavailableException("DRIVER_OFFLINE_ALREADY_ACTIVE");
 
-            await DriverDeviceKeyBindingGuard.RequireMatchAsync(
+            var verifiedDeviceKeyBinding = await DriverDeviceKeyBindingGuard.RequireMatchAsync(
                 new(
                     request.CompanyId,
                     request.BranchId,
@@ -142,7 +146,9 @@ public sealed class DriverOfflineActivationService(
                     signingKey,
                     volatileSession,
                     network,
-                    new ExactDriverOfflineActionAllowlist(request.GrantedActions));
+                    new ExactDriverOfflineActionAllowlist(request.GrantedActions),
+                    request.OperationPermissions,
+                    verifiedDeviceKeyBinding);
                 var runtime = await DriverOfflineComposition.CreateAsync(
                     options,
                     dependencies,
@@ -156,6 +162,7 @@ public sealed class DriverOfflineActivationService(
                 _supervisorCancellation = supervisorCancellation;
                 _supervisorTask = supervisorTask;
                 Volatile.Write(ref _active, activated);
+                NotifyStateChanged();
                 return activated;
             }
             catch
@@ -176,6 +183,7 @@ public sealed class DriverOfflineActivationService(
         try
         {
             Volatile.Write(ref _active, null);
+            NotifyStateChanged();
             _supervisorCancellation?.Cancel();
             if (_supervisorTask is not null)
             {
@@ -227,9 +235,28 @@ public sealed class DriverOfflineActivationService(
             string.IsNullOrEmpty(request.SessionBearer) ||
             request.SessionBearer.Any(character => character > 0x7f || char.IsWhiteSpace(character)) ||
             !request.BatchEndpoint.IsAbsoluteUri || request.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
-            request.GrantedActions is null || request.GrantedActions.Count == 0)
+            request.GrantedActions is null || request.GrantedActions.Count == 0 ||
+            request.OperationPermissions is null)
         {
             throw new ArgumentException("A complete HTTPS scope, session and grant set is required.", nameof(request));
+        }
+    }
+
+    private void NotifyStateChanged()
+    {
+        var handlers = StateChanged?.GetInvocationList();
+        if (handlers is null) return;
+        foreach (var subscriber in handlers)
+        {
+            if (subscriber is not EventHandler handler) continue;
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch
+            {
+                // UI notification cannot alter activation or expose runtime details.
+            }
         }
     }
 

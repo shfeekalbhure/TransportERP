@@ -29,14 +29,33 @@ public sealed record DriverOfflineOperationStatusView(
     string? ResultCode,
     DateTimeOffset UpdatedAt)
 {
+    public string SafeSummary =>
+        $"{LocalOperationId:D} | {ActionCode} | {Status} | retries={RetryCount} | " +
+        $"next={NextRetryAt?.ToString("O") ?? "NONE"} | result={ResultCode ?? "NONE"} | updated={UpdatedAt:O}";
+
     internal static DriverOfflineOperationStatusView From(OfflineOperation operation) => new(
         operation.LocalOperationId,
-        operation.ActionCode,
+        SanitizeActionCode(operation.ActionCode),
         operation.Status,
         operation.ClientTransportRetryCount,
         operation.NextRetryAt,
-        operation.ResultCode,
+        SanitizeResultCode(operation.ResultCode),
         operation.UpdatedAt);
+
+    private static string SanitizeActionCode(string? code) => code switch
+    {
+        { Length: > 0 and <= 96 } when code.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.') => code,
+        _ => "INVALID_ACTION_CODE"
+    };
+
+    private static string? SanitizeResultCode(string? code) => code switch
+    {
+        null => null,
+        { Length: > 0 and <= 64 } when code.All(character =>
+            character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_') => code,
+        _ => "INVALID_RESULT_CODE"
+    };
 }
 
 public sealed record DriverOfflineCompositionOptions(
@@ -83,12 +102,19 @@ public interface IDriverOfflineActionAllowlist
     bool Allows(string actionCode, string operationType, string entityType);
 }
 
+/// <summary>Server-derived user capabilities for interactive local operation management.</summary>
+public sealed record DriverOfflineOperationPermissions(
+    bool CanRetryFailedOperations,
+    bool CanResolveConflicts);
+
 public sealed record DriverOfflineDependencies(
     IDriverNativeEncryptionKeyProvider EncryptionKeys,
     IDriverNativeDeviceSigningKey DeviceSigningKey,
     IInMemoryBearerTokenProvider VolatileSession,
     IDriverSyncNetworkProvider Network,
-    IDriverOfflineActionAllowlist? ActionAllowlist);
+    IDriverOfflineActionAllowlist? ActionAllowlist,
+    DriverOfflineOperationPermissions OperationPermissions,
+    DriverVerifiedDeviceKeyBinding? VerifiedDeviceKeyBinding);
 
 /// <summary>A concrete fail-closed placeholder until the real native security adapter is supplied.</summary>
 public sealed class DriverUnavailableNativeSecurity : IDriverNativeEncryptionKeyProvider, IDriverNativeDeviceSigningKey
@@ -132,12 +158,14 @@ public sealed class DriverOfflineRuntime
     private readonly OfflineReadCacheStore? _readCache;
     private readonly OfflineOperationStore? _outbox;
     private readonly OfflineSyncTransportClient? _transport;
+    private readonly OfflineSyncConflictClient? _conflicts;
     private readonly OfflineSyncSupervisor? _supervisor;
 
     internal DriverOfflineRuntime(
         DriverOfflineCompositionOptions options,
         DriverOfflineDependencies dependencies,
-        MobileOfflineKernelResult result)
+        MobileOfflineKernelResult result,
+        TimeProvider? timeProvider)
     {
         _companyId = options.CompanyId;
         _branchId = options.BranchId;
@@ -150,6 +178,16 @@ public sealed class DriverOfflineRuntime
         _readCache = result.ReadCache;
         _outbox = result.Outbox;
         _transport = result.Transport;
+        OperationPermissions = dependencies.OperationPermissions;
+        _conflicts = result is { Outbox: not null, Transport: not null }
+            ? new OfflineSyncConflictClient(
+                dependencies.Network.SyncHttpClient,
+                result.Outbox,
+                dependencies.VolatileSession,
+                dependencies.DeviceSigningKey,
+                options.TransportOptions,
+                timeProvider)
+            : null;
         _supervisor = result is { Outbox: not null, Transport: not null }
             ? new OfflineSyncSupervisor(
                 result.Outbox, result.Transport, new DriverSyncConnectivity(dependencies.Network))
@@ -163,6 +201,7 @@ public sealed class DriverOfflineRuntime
     }
 
     public DriverOfflineRuntimeStatus Status { get; }
+    public DriverOfflineOperationPermissions OperationPermissions { get; }
 
     [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
     public Task<OfflineEnqueueResult> QueueAsync(
@@ -231,6 +270,38 @@ public sealed class DriverOfflineRuntime
         return operation is null ? null : DriverOfflineOperationStatusView.From(operation);
     }
 
+    public async Task<IReadOnlyList<DriverOfflineOperationStatusView>> ListOperationStatusesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var operations = await (_outbox ?? throw Unavailable()).ListAsync(_scope, cancellationToken);
+        return operations.Select(DriverOfflineOperationStatusView.From).ToArray();
+    }
+
+    public async Task RetryFailedOperationAsync(
+        Guid localOperationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!OperationPermissions.CanRetryFailedOperations)
+            throw new DriverOfflineUnavailableException("SYNC_OPERATION_RETRY_NOT_AUTHORIZED");
+
+        await (_outbox ?? throw Unavailable()).RequeueFailedAsync(localOperationId, _scope, cancellationToken);
+        _supervisor?.NotifyWorkAvailable();
+    }
+
+    public Task ResolveConflictAsync(
+        Guid localOperationId,
+        OfflineConflictDecision decision,
+        string reason,
+        long? reapplyBaseVersion = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!OperationPermissions.CanResolveConflicts)
+            throw new DriverOfflineUnavailableException("SYNC_CONFLICT_RESOLVE_NOT_AUTHORIZED");
+
+        return (_conflicts ?? throw Unavailable()).ResolveAsync(
+            localOperationId, decision, reason, reapplyBaseVersion, cancellationToken);
+    }
+
     public Task<int> RedactExpiredPayloadsAsync(CancellationToken cancellationToken = default) =>
         (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(cancellationToken: cancellationToken);
 
@@ -272,7 +343,15 @@ public static class DriverOfflineComposition
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(dependencies);
+        ArgumentNullException.ThrowIfNull(dependencies.OperationPermissions);
         ValidateScope(options);
+        if (dependencies.VerifiedDeviceKeyBinding is null)
+            throw new DriverOfflineUnavailableException("DEVICE_KEY_BINDING_VERIFICATION_REQUIRED");
+        await DriverDeviceKeyBindingGuard.RequireStillCurrentAsync(
+            dependencies.VerifiedDeviceKeyBinding,
+            options,
+            dependencies.DeviceSigningKey,
+            cancellationToken);
 
         var result = await MobileOfflineCompositionKernel.ComposeAsync(
             new(
@@ -291,7 +370,7 @@ public static class DriverOfflineComposition
             () => dependencies.Network.IsPlatformTransportAvailable,
             timeProvider,
             cancellationToken);
-        return new DriverOfflineRuntime(options, dependencies, result);
+        return new DriverOfflineRuntime(options, dependencies, result, timeProvider);
     }
 
     private static void ValidateScope(DriverOfflineCompositionOptions options)

@@ -66,6 +66,16 @@ internal sealed class DesktopShellForm : Form
         _operations.Enabled = false;
     }
 
+    internal void CloseForSessionEnd(string reasonCode)
+    {
+        if (IsDisposed)
+            return;
+        _runtime = null;
+        _operations.Enabled = false;
+        _offlineStatus.Text = $"انتهت الجلسة وأُغلق العمل دون اتصال ({reasonCode})";
+        Close();
+    }
+
     private void ShowOperations()
     {
         if (_runtime is null)

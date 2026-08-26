@@ -361,13 +361,17 @@ internal static class AndroidDriverRuntimeSelfTest
     private static string ComputePayloadHash(string payload)
     {
         var bytes = Encoding.UTF8.GetBytes(payload);
+        byte[]? hash = null;
         try
         {
-            return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            hash = SHA256.HashData(bytes);
+            return Convert.ToHexString(hash).ToLowerInvariant();
         }
         finally
         {
             CryptographicOperations.ZeroMemory(bytes);
+            if (hash is not null)
+                CryptographicOperations.ZeroMemory(hash);
         }
     }
 

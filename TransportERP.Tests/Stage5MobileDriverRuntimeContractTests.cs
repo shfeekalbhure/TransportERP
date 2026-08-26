@@ -163,6 +163,60 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Driver_operation_surface_is_scope_permission_and_activation_bound_with_conflict_runtime()
+    {
+        var app = Read("TransportERP.Mobile.Driver", "App.cs");
+        var page = Read("TransportERP.Mobile.Driver", "MainPage.cs");
+        var activation = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineActivationService.cs");
+        var composition = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineComposition.cs");
+
+        Assert.Contains("new MainPage(_activation)", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("ActivateAsync", app, StringComparison.Ordinal);
+        Assert.Contains("Offline runtime: CLOSED", page, StringComparison.Ordinal);
+        Assert.Contains("Reason: OFFLINE_CLOSED", page, StringComparison.Ordinal);
+        Assert.Contains("CollectionView", page, StringComparison.Ordinal);
+        Assert.Contains("Refresh operation status", page, StringComparison.Ordinal);
+        Assert.Contains("Manual retry", page, StringComparison.Ordinal);
+        Assert.Contains("KEEP_SERVER", page, StringComparison.Ordinal);
+        Assert.Contains("REAPPLY", page, StringComparison.Ordinal);
+        Assert.Contains("Resolution reason (required)", page, StringComparison.Ordinal);
+        Assert.Contains("CanRetryFailedOperations", page, StringComparison.Ordinal);
+        Assert.Contains("CanResolveConflicts", page, StringComparison.Ordinal);
+        Assert.Contains("SafeCode(exception)", page, StringComparison.Ordinal);
+        Assert.Contains("OPERATION_FAILED", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("PayloadJson", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("PayloadHash", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("ActivateAsync", page, StringComparison.Ordinal);
+
+        Assert.Contains("DriverOfflineOperationPermissions operationPermissions", activation,
+            StringComparison.Ordinal);
+        Assert.Contains("request.OperationPermissions", activation, StringComparison.Ordinal);
+        Assert.Contains("StateChanged", activation, StringComparison.Ordinal);
+        Assert.Contains("OFFLINE_CLOSED", activation, StringComparison.Ordinal);
+        Assert.True(
+            activation.IndexOf("!request.OfflineRuntimeAuthorized || !featureGate.IsOfflineRuntimeAuthorized",
+                StringComparison.Ordinal) <
+            activation.IndexOf("DriverDeviceKeyBindingGuard.RequireMatchAsync", StringComparison.Ordinal));
+
+        Assert.Contains("new OfflineSyncConflictClient", composition, StringComparison.Ordinal);
+        Assert.Contains("ListAsync(_scope", composition, StringComparison.Ordinal);
+        Assert.Contains("RequeueFailedAsync(localOperationId, _scope", composition,
+            StringComparison.Ordinal);
+        Assert.Contains("ResolveConflictAsync", composition, StringComparison.Ordinal);
+        Assert.Contains("SYNC_OPERATION_RETRY_NOT_AUTHORIZED", composition, StringComparison.Ordinal);
+        Assert.Contains("SYNC_CONFLICT_RESOLVE_NOT_AUTHORIZED", composition, StringComparison.Ordinal);
+        Assert.Contains("OperationPermissions.CanRetryFailedOperations", composition,
+            StringComparison.Ordinal);
+        Assert.Contains("OperationPermissions.CanResolveConflicts", composition,
+            StringComparison.Ordinal);
+        Assert.Contains("SanitizeResultCode(operation.ResultCode)", composition,
+            StringComparison.Ordinal);
+    }
+
     private static string Read(params string[] path) =>
         File.ReadAllText(Path.Combine([RepositoryRoot(), .. path]));
 

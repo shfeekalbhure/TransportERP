@@ -8,18 +8,65 @@ public sealed class Stage5DesktopOfflineContractTests
         var project = Read("TransportERP.Desktop", "TransportERP.Desktop.csproj");
         var program = Read("TransportERP.Desktop", "Program.cs");
         var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
+        var sessions = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
         Assert.Contains("TransportERP.Offline\\TransportERP.Offline.csproj", project, StringComparison.Ordinal);
         Assert.Contains("[STAThread]", program, StringComparison.Ordinal);
         Assert.Contains("--startup-smoke", program, StringComparison.Ordinal);
-        Assert.Contains("OfflineRuntimeAuthorizedByDefault ? 1 : 0", program, StringComparison.Ordinal);
+        Assert.Contains("DesktopStartupContractProbe.VerifyClosedDefault() ? 0 : 1", program, StringComparison.Ordinal);
         Assert.Contains("OfflineRuntimeAuthorizedByDefault = false", context, StringComparison.Ordinal);
-        Assert.Contains("ActivateAuthenticatedOfflineRuntime", context, StringComparison.Ordinal);
+        Assert.Contains("ActivateAuthenticatedOfflineRuntimeAsync", context, StringComparison.Ordinal);
+        Assert.Contains("new DesktopOnlineSignInSessionBridge()", program, StringComparison.Ordinal);
+        Assert.Contains("new DesktopApplicationContext(authenticatedSessions)", program, StringComparison.Ordinal);
+        Assert.Contains("_authenticatedSessions.SessionAuthenticated += OnSessionAuthenticated", context, StringComparison.Ordinal);
+        Assert.Contains("_authenticatedSessions.Start()", context, StringComparison.Ordinal);
+        Assert.Contains("_activationAttempted = true", context, StringComparison.Ordinal);
+        Assert.Contains("activation.CreateRuntimeAsync", context, StringComparison.Ordinal);
         Assert.Contains("RunSyncSupervisorAsync", context, StringComparison.Ordinal);
         Assert.Contains("Enabled = false", shell, StringComparison.Ordinal);
         Assert.Contains("AttachAuthenticatedRuntime", shell, StringComparison.Ordinal);
+        Assert.Contains("The bridge begins closed", sessions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Desktop_authenticated_activation_is_single_use_scope_bound_and_session_lifetime_bound()
+    {
+        var program = Read("TransportERP.Desktop", "Program.cs");
+        var bridge = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
+        var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
+        var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+
+        Assert.Contains("DesktopAuthenticatedSessionScope AuthenticatedScope", bridge, StringComparison.Ordinal);
+        Assert.Contains("DesktopAuthenticatedSessionScope AuthorizedOfflineScope", bridge, StringComparison.Ordinal);
+        Assert.Contains("bool OfflineRuntimeAuthorized", bridge, StringComparison.Ordinal);
+        Assert.Contains("Func<CancellationToken, Task<DesktopOfflineRuntime>> CreateRuntimeAsync", bridge, StringComparison.Ordinal);
+        Assert.Contains("if (_published || _ended)", bridge, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_SESSION_REPLAY_DENIED", bridge, StringComparison.Ordinal);
+        Assert.Contains("sessionId != _sessionId", bridge, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_SESSION_END_DENIED", bridge, StringComparison.Ordinal);
+
+        var governedGate = context.IndexOf("!IsGovernedActivation(activation)", StringComparison.Ordinal);
+        var factoryCall = context.IndexOf("await activation.CreateRuntimeAsync", StringComparison.Ordinal);
+        Assert.True(governedGate >= 0 && governedGate < factoryCall);
+        Assert.Contains("activation.AuthenticatedScope == activation.AuthorizedOfflineScope", context, StringComparison.Ordinal);
+        Assert.Contains("activation.OfflineRuntimeAuthorized", context, StringComparison.Ordinal);
+        Assert.Contains("if (_activationAttempted || !IsGovernedActivation(activation))", context, StringComparison.Ordinal);
+        Assert.Contains("_activeSessionId != sessionId", context, StringComparison.Ordinal);
+        Assert.Contains("_activationCancellation?.Cancel()", context, StringComparison.Ordinal);
+        Assert.Contains("_supervisorCancellation?.Cancel()", context, StringComparison.Ordinal);
+        Assert.Contains("_runtime?.Dispose()", context, StringComparison.Ordinal);
+        Assert.Contains("_shell.CloseForSessionEnd(reasonCode)", context, StringComparison.Ordinal);
+        Assert.Contains("Close();", shell, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("Environment.GetEnvironmentVariable", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("BearerToken", bridge, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DeviceCredential", bridge, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ProofJson", bridge, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ExportParameters", bridge, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("DesktopStartupContractProbe.VerifyClosedDefault", program, StringComparison.Ordinal);
+        Assert.Contains("return activationCount == 0", bridge, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,6 +118,13 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("OfflineOperationStatus.Conflict =>", contracts, StringComparison.Ordinal);
         Assert.Contains("OfflineOperationStatus.Rejected =>", contracts, StringComparison.Ordinal);
         Assert.Contains("OfflineOperationStatus.Resolved =>", contracts, StringComparison.Ordinal);
+        Assert.Contains("مراجعة التعارض (بيانات منقّحة فقط)", form, StringComparison.Ordinal);
+        Assert.Contains("الإصدار الأساسي", form, StringComparison.Ordinal);
+        Assert.Contains("لقطة العميل المنقّحة", form, StringComparison.Ordinal);
+        Assert.Contains("لقطة الخادم المنقّحة", form, StringComparison.Ordinal);
+        Assert.Contains("المقرّر", form, StringComparison.Ordinal);
+        Assert.Contains("نتيجة الحل", form, StringComparison.Ordinal);
+        Assert.Contains("SyncConflictReviewDisplay", contracts, StringComparison.Ordinal);
 
         foreach (var forbidden in new[] { "PayloadJson", "PayloadHash", "Proof", "Token", "Nonce", "Jti", "Credential" })
             Assert.DoesNotContain($"Column(nameof(SyncOperationDisplayRow.{forbidden})", form, StringComparison.OrdinalIgnoreCase);
@@ -85,6 +139,8 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("_permissions.CanRetry(operation)", controller, StringComparison.Ordinal);
         Assert.Contains("operation.Status != OfflineOperationStatus.Conflict", controller, StringComparison.Ordinal);
         Assert.Contains("_permissions.CanResolveConflict(operation, decision)", controller, StringComparison.Ordinal);
+        Assert.Contains("operation.ConflictReview?.IsDecisionReady != true", controller, StringComparison.Ordinal);
+        Assert.Contains("CONFLICT_REVIEW_REQUIRED", controller, StringComparison.Ordinal);
         Assert.True(
             controller.IndexOf("_permissions.CanRetry(operation)", StringComparison.Ordinal) <
             controller.IndexOf("_retry.RetryAsync", StringComparison.Ordinal));
@@ -127,9 +183,14 @@ public sealed class Stage5DesktopOfflineContractTests
         var composition = Read("TransportERP.Desktop", "Offline", "DesktopOfflineComposition.cs");
 
         Assert.Contains("سبب قرار التعارض (مطلوب)", form, StringComparison.Ordinal);
+        Assert.Contains("راجعت بيانات التعارض المعروضة", form, StringComparison.Ordinal);
+        Assert.Contains("_reviewConfirmed.Checked", form, StringComparison.Ordinal);
+        Assert.Contains("HasCompleteConflictReview", form, StringComparison.Ordinal);
         Assert.Contains("string.IsNullOrWhiteSpace(reason)", controller, StringComparison.Ordinal);
         Assert.Contains("CONFLICT_REASON_REQUIRED", controller, StringComparison.Ordinal);
         Assert.Contains("reason, baseVersion, cancellationToken", composition, StringComparison.Ordinal);
+        Assert.Contains("new StoreManualRetryService(outbox, scope)", composition, StringComparison.Ordinal);
+        Assert.Contains("store.RequeueFailedAsync(localOperationId, scope", composition, StringComparison.Ordinal);
     }
 
     private static string Read(params string[] path) =>

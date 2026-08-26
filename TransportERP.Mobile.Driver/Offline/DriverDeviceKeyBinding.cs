@@ -52,9 +52,27 @@ public sealed class DriverClosedDeviceKeyBindingVerifier : IDriverDeviceKeyBindi
     }
 }
 
+/// <summary>
+/// Opaque capability issued only after the governed verifier accepts the exact native public key.
+/// External composition callers cannot construct one and therefore cannot bypass activation.
+/// </summary>
+public sealed class DriverVerifiedDeviceKeyBinding
+{
+    internal DriverVerifiedDeviceKeyBinding(
+        DriverDeviceKeyBindingContext context,
+        DevicePublicP256Jwk publicKey)
+    {
+        Context = context;
+        PublicKey = publicKey;
+    }
+
+    internal DriverDeviceKeyBindingContext Context { get; }
+    internal DevicePublicP256Jwk PublicKey { get; }
+}
+
 internal static class DriverDeviceKeyBindingGuard
 {
-    internal static async ValueTask RequireMatchAsync(
+    internal static async ValueTask<DriverVerifiedDeviceKeyBinding> RequireMatchAsync(
         DriverDeviceKeyBindingContext context,
         IDriverNativeDeviceSigningKey signingKey,
         IDriverDeviceKeyBindingVerifier verifier,
@@ -92,6 +110,32 @@ internal static class DriverDeviceKeyBindingGuard
         };
         if (failureCode is not null)
             throw new DriverOfflineUnavailableException(failureCode);
+        return new DriverVerifiedDeviceKeyBinding(context, currentPublicKey);
+    }
+
+    internal static async ValueTask RequireStillCurrentAsync(
+        DriverVerifiedDeviceKeyBinding verifiedBinding,
+        DriverOfflineCompositionOptions options,
+        IDriverNativeDeviceSigningKey signingKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(verifiedBinding);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(signingKey);
+        var context = verifiedBinding.Context;
+        if (context.CompanyId != options.CompanyId || context.BranchId != options.BranchId ||
+            context.UserId != options.UserId ||
+            context.RegisteredDeviceId != options.RegisteredDeviceId)
+        {
+            throw new DriverOfflineUnavailableException("DEVICE_KEY_BINDING_SCOPE_INVALID");
+        }
+
+        var currentPublicKey = await signingKey.GetPublicJwkAsync(cancellationToken);
+        if (!string.Equals(currentPublicKey.X, verifiedBinding.PublicKey.X, StringComparison.Ordinal) ||
+            !string.Equals(currentPublicKey.Y, verifiedBinding.PublicKey.Y, StringComparison.Ordinal))
+        {
+            throw new DriverOfflineUnavailableException("DEVICE_KEY_ROTATION_REQUIRED");
+        }
     }
 
     private static void ValidateContext(DriverDeviceKeyBindingContext context)
