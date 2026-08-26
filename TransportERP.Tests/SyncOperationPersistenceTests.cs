@@ -332,7 +332,9 @@ public sealed class SyncOperationPersistenceTests
             ProofKeyVersion = 1, ProofKeyThumbprint = new string('t', 43), AcceptedProofReplayId = replay.Id,
             CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
         };
-        db.AddRange(nonce, replay, operation);
+        db.AddRange(nonce, replay);
+        await db.SaveChangesAsync();
+        db.Add(operation);
         await db.SaveChangesAsync();
         return operation;
     }
