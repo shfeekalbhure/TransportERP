@@ -9,6 +9,7 @@ public sealed class Stage5DesktopOfflineContractTests
         var program = Read("TransportERP.Desktop", "Program.cs");
         var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
         var sessions = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
+        var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
@@ -18,16 +19,19 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("DesktopStartupContractProbe.VerifyClosedDefault() ? 0 : 1", program, StringComparison.Ordinal);
         Assert.Contains("OfflineRuntimeAuthorizedByDefault = false", context, StringComparison.Ordinal);
         Assert.Contains("ActivateAuthenticatedOfflineRuntimeAsync", context, StringComparison.Ordinal);
-        Assert.Contains("new DesktopOnlineSignInSessionBridge()", program, StringComparison.Ordinal);
+        Assert.Contains("new DesktopOnlineSignInSessionBridge(", program, StringComparison.Ordinal);
+        Assert.Contains("new DesktopOnlineSessionAuthenticator()", program, StringComparison.Ordinal);
         Assert.Contains("new DesktopApplicationContext(authenticatedSessions)", program, StringComparison.Ordinal);
         Assert.Contains("_authenticatedSessions.SessionAuthenticated += OnSessionAuthenticated", context, StringComparison.Ordinal);
-        Assert.Contains("_authenticatedSessions.Start()", context, StringComparison.Ordinal);
+        Assert.Contains("_authenticatedSessions.Start(_shell)", context, StringComparison.Ordinal);
         Assert.Contains("_activationAttempted = true", context, StringComparison.Ordinal);
         Assert.Contains("activation.CreateRuntimeAsync", context, StringComparison.Ordinal);
         Assert.Contains("RunSyncSupervisorAsync", context, StringComparison.Ordinal);
         Assert.Contains("Enabled = false", shell, StringComparison.Ordinal);
         Assert.Contains("AttachAuthenticatedRuntime", shell, StringComparison.Ordinal);
         Assert.Contains("The bridge begins closed", sessions, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/auth/sessions", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/sync/activation", onlineAuth, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -36,10 +40,12 @@ public sealed class Stage5DesktopOfflineContractTests
         var program = Read("TransportERP.Desktop", "Program.cs");
         var bridge = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
+        var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
 
         Assert.Contains("DesktopAuthenticatedSessionScope AuthenticatedScope", bridge, StringComparison.Ordinal);
         Assert.Contains("DesktopAuthenticatedSessionScope AuthorizedOfflineScope", bridge, StringComparison.Ordinal);
+        Assert.Contains("DateTimeOffset SessionExpiresAt", bridge, StringComparison.Ordinal);
         Assert.Contains("bool OfflineRuntimeAuthorized", bridge, StringComparison.Ordinal);
         Assert.Contains("Func<CancellationToken, Task<DesktopOfflineRuntime>> CreateRuntimeAsync", bridge, StringComparison.Ordinal);
         Assert.Contains("if (_published || _ended)", bridge, StringComparison.Ordinal);
@@ -52,6 +58,7 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.True(governedGate >= 0 && governedGate < factoryCall);
         Assert.Contains("activation.AuthenticatedScope == activation.AuthorizedOfflineScope", context, StringComparison.Ordinal);
         Assert.Contains("activation.OfflineRuntimeAuthorized", context, StringComparison.Ordinal);
+        Assert.Contains("activation.SessionExpiresAt > DateTimeOffset.UtcNow", context, StringComparison.Ordinal);
         Assert.Contains("if (_activationAttempted || !IsGovernedActivation(activation))", context, StringComparison.Ordinal);
         Assert.Contains("_activeSessionId != sessionId", context, StringComparison.Ordinal);
         Assert.Contains("_activationCancellation?.Cancel()", context, StringComparison.Ordinal);
@@ -59,14 +66,64 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("_runtime?.Dispose()", context, StringComparison.Ordinal);
         Assert.Contains("_shell.CloseForSessionEnd(reasonCode)", context, StringComparison.Ordinal);
         Assert.Contains("Close();", shell, StringComparison.Ordinal);
+        Assert.Contains("LogoutRequested += OnLogoutRequested", bridge, StringComparison.Ordinal);
+        Assert.Contains("MonitorExpiryAsync", bridge, StringComparison.Ordinal);
+        Assert.Contains("EndSessionAsync", bridge, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/auth/sessions/{sessionId:D}:revoke", onlineAuth, StringComparison.Ordinal);
 
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("args[", program, StringComparison.Ordinal);
         Assert.DoesNotContain("BearerToken", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("DeviceCredential", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProofJson", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ExportParameters", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("DesktopStartupContractProbe.VerifyClosedDefault", program, StringComparison.Ordinal);
         Assert.Contains("return activationCount == 0", bridge, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Desktop_online_producer_authorizes_before_local_storage_or_signing_key_and_keeps_secrets_volatile()
+    {
+        var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
+        var bridge = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
+        var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+
+        var login = onlineAuth.IndexOf("await CreateSessionAsync", StringComparison.Ordinal);
+        var policy = onlineAuth.IndexOf("await GetSyncActivationAsync", StringComparison.Ordinal);
+        var composition = onlineAuth.IndexOf("DesktopOfflineComposition.CreateAsync", StringComparison.Ordinal);
+        Assert.True(login >= 0 && login < policy && policy < composition);
+
+        Assert.Contains("Uri.UriSchemeHttps", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("AllowAutoRedirect = false", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("UseCookies = false", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.Enabled", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.ClosedReason is not null", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.CompanyId != session.CompanyId", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.SessionId != session.SessionId", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.RegisteredDeviceId == Guid.Empty", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.AllowedActions.Count == 0", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("IsLowerHex64(activation.PolicySourceFingerprint)", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("value is { Length: 64 }", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("character is >= '0' and <= '9' or >= 'a' and <= 'f'", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("new ServerValidatedOfflineWritePolicy(allowedActions!)", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("new VolatileBearerTokenProvider(session.AccessToken)", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("private string? _token", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("public void Dispose() => _token = null", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("Environment.SpecialFolder.LocalApplicationData", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("WindowsDpapiLocalEncryptionKeyProvider", Read(
+            "TransportERP.Desktop", "Offline", "DesktopOfflineComposition.cs"), StringComparison.Ordinal);
+        Assert.Contains("SignInRequested += OnSignInRequested", bridge, StringComparison.Ordinal);
+        Assert.Contains("PublishAuthenticatedSession(result.Activation)", bridge, StringComparison.Ordinal);
+        Assert.Contains("UseSystemPasswordChar = password", shell, StringComparison.Ordinal);
+        Assert.Contains("_password.Clear()", shell, StringComparison.Ordinal);
+        Assert.Contains("_deviceCredential.Clear()", shell, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("File.WriteAllText", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProtectedData.Protect", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("WindowsCertificateDeviceProofSigningKeyStore", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProbeDpopNonceAsync", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("DeviceCredential =", onlineAuth, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -162,6 +219,12 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("if (!options.OfflineRuntimeAuthorized)", source, StringComparison.Ordinal);
         Assert.Contains("WindowsDpapiLocalEncryptionKeyProvider", source, StringComparison.Ordinal);
         Assert.Contains("WindowsCertificateDeviceProofSigningKeyStore", source, StringComparison.Ordinal);
+        Assert.Contains("VerifyProofBinding(options.ProofBinding, signingKey.PublicKey)", source, StringComparison.Ordinal);
+        Assert.True(
+            source.IndexOf("VerifyProofBinding(options.ProofBinding", StringComparison.Ordinal) <
+            source.IndexOf("new WindowsDpapiLocalEncryptionKeyProvider", StringComparison.Ordinal));
+        Assert.Contains("DEVICE_KEY_BINDING_MISMATCH", source, StringComparison.Ordinal);
+        Assert.Contains("CryptographicOperations.FixedTimeEquals", source, StringComparison.Ordinal);
         Assert.Contains("new OfflineOperationStore", source, StringComparison.Ordinal);
         Assert.Contains("new OfflineReadCacheStore", source, StringComparison.Ordinal);
         Assert.Contains("new OfflineSyncTransportClient", source, StringComparison.Ordinal);
@@ -173,6 +236,8 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("store.ListAsync(scope", source, StringComparison.Ordinal);
         Assert.Contains("keys, scope, timeProvider", source, StringComparison.Ordinal);
         Assert.Contains("new SyncOperationsController", source, StringComparison.Ordinal);
+        Assert.Contains("StoreConflictBaseVersionProvider(outbox, scope)", source, StringComparison.Ordinal);
+        Assert.Contains("ConflictReview?.ServerSnapshot?.CurrentVersion is not > 0", source, StringComparison.Ordinal);
         Assert.Contains("template.CompanyId != _options.CompanyId", source, StringComparison.Ordinal);
         Assert.DoesNotContain("OfflineRuntimeAuthorized = true", source, StringComparison.Ordinal);
     }

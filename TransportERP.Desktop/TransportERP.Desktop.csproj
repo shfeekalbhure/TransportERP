@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TransportERP.Application\TransportERP.Application.csproj" />
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
     <ProjectReference Include="..\TransportERP.Offline\TransportERP.Offline.csproj" />
   </ItemGroup>

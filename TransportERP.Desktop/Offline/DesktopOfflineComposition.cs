@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
 
@@ -21,9 +23,16 @@ public sealed record DesktopOfflineCompositionOptions(
     string ReadCacheDatabasePath,
     string ProtectedKeyDirectory,
     string DeviceSigningCertificateThumbprint,
+    DesktopDeviceProofBinding ProofBinding,
     OfflineSyncTransportOptions TransportOptions,
     OfflineRetryPolicy? RetryPolicy = null,
     bool OfflineRuntimeAuthorized = false);
+
+public sealed record DesktopDeviceProofBinding(
+    int Version,
+    string JwkThumbprint,
+    string X,
+    string Y);
 
 public interface IDesktopOfflineWritePolicy
 {
@@ -37,20 +46,15 @@ public interface IDesktopSyncNetworkProvider
     HttpClient SyncHttpClient { get; }
 }
 
-public interface IDesktopConflictBaseVersionProvider
-{
-    Task<long> GetCurrentServerVersionAsync(Guid localOperationId, CancellationToken cancellationToken = default);
-}
-
 public sealed record DesktopOfflineDependencies(
     IInMemoryBearerTokenProvider VolatileSession,
     IDesktopSyncNetworkProvider Network,
     IDesktopOfflineWritePolicy WritePolicy,
-    ISyncOperationsPermissionPolicy UiPermissions,
-    IDesktopConflictBaseVersionProvider ReapplyVersions);
+    ISyncOperationsPermissionPolicy UiPermissions);
 
 /// <summary>
-/// Desktop composition remains inert until the host passes explicit development/test authority.
+/// Desktop composition remains inert until the host passes exact server-issued session, policy and
+/// device-key authority.
 /// It creates no plaintext fallback and owns the opaque device signing handle for its lifetime.
 /// </summary>
 public sealed class DesktopOfflineRuntime : IDisposable
@@ -142,7 +146,8 @@ public sealed class DesktopOfflineRuntime : IDisposable
             new StoreOperationsQuery(outbox, scope),
             new StoreManualRetryService(outbox, scope),
             new StoreConflictActionService(
-                _conflictClient ?? throw Unavailable(), _dependencies.ReapplyVersions),
+                _conflictClient ?? throw Unavailable(),
+                new StoreConflictBaseVersionProvider(outbox, scope)),
             _dependencies.UiPermissions));
     }
 
@@ -175,7 +180,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
 
     private sealed class StoreConflictActionService(
         OfflineSyncConflictClient conflicts,
-        IDesktopConflictBaseVersionProvider versions) : ISyncConflictActionService
+        StoreConflictBaseVersionProvider versions) : ISyncConflictActionService
     {
         public async Task ResolveAsync(Guid localOperationId, SyncConflictDecision decision, string reason,
             CancellationToken cancellationToken = default)
@@ -188,6 +193,25 @@ public sealed class DesktopOfflineRuntime : IDisposable
                     ? OfflineConflictDecision.KeepServer
                     : OfflineConflictDecision.Reapply,
                 reason, baseVersion, cancellationToken);
+        }
+    }
+
+    private sealed class StoreConflictBaseVersionProvider(
+        OfflineOperationStore store,
+        OfflineOperationScope scope)
+    {
+        public async Task<long> GetCurrentServerVersionAsync(
+            Guid localOperationId,
+            CancellationToken cancellationToken = default)
+        {
+            var operation = (await store.ListAsync(scope, cancellationToken))
+                .SingleOrDefault(item => item.LocalOperationId == localOperationId);
+            if (operation?.Status != OfflineOperationStatus.Conflict ||
+                operation.ConflictReview?.ServerSnapshot?.CurrentVersion is not > 0)
+                throw new OfflineStoreException(
+                    "CONFLICT_REVIEW_REQUIRED",
+                    "A redacted server version must be reviewed before reapply.");
+            return operation.ConflictReview.ServerSnapshot.CurrentVersion.Value;
         }
     }
 }
@@ -211,6 +235,11 @@ public static class DesktopOfflineComposition
         IDeviceProofSigningKey? signingKey = null;
         try
         {
+            // The OS handle is opened and bound to the exact server-authorized JWK before DPAPI,
+            // SQLCipher files or any local offline state can be created.
+            signingKey = await new WindowsCertificateDeviceProofSigningKeyStore()
+                .OpenAsync(options.DeviceSigningCertificateThumbprint, cancellationToken);
+            VerifyProofBinding(options.ProofBinding, signingKey.PublicKey);
             var keys = new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory);
             var outbox = new OfflineOperationStore(options.OutboxDatabasePath, keys, timeProvider, options.RetryPolicy);
             var scope = new OfflineOperationScope(
@@ -218,8 +247,6 @@ public static class DesktopOfflineComposition
             var readCache = new OfflineReadCacheStore(options.ReadCacheDatabasePath, keys, scope, timeProvider);
             await outbox.InitializeAsync(cancellationToken);
             await readCache.InitializeAsync(cancellationToken);
-            signingKey = await new WindowsCertificateDeviceProofSigningKeyStore()
-                .OpenAsync(options.DeviceSigningCertificateThumbprint, cancellationToken);
             var transport = new OfflineSyncTransportClient(
                 dependencies.Network.SyncHttpClient, outbox, dependencies.VolatileSession,
                 signingKey, options.TransportOptions, timeProvider);
@@ -275,10 +302,55 @@ public static class DesktopOfflineComposition
             options.TransportOptions.BranchId != options.BranchId ||
             options.TransportOptions.UserId != options.UserId ||
             options.TransportOptions.RegisteredDeviceId != options.RegisteredDeviceId ||
+            options.ProofBinding is null || options.ProofBinding.Version < 1 ||
+            string.IsNullOrEmpty(options.ProofBinding.JwkThumbprint) ||
+            options.ProofBinding.JwkThumbprint.Length != 43 ||
+            string.IsNullOrEmpty(options.ProofBinding.X) || string.IsNullOrEmpty(options.ProofBinding.Y) ||
             string.IsNullOrWhiteSpace(options.OutboxDatabasePath) ||
             string.IsNullOrWhiteSpace(options.ReadCacheDatabasePath) ||
             string.Equals(Path.GetFullPath(options.OutboxDatabasePath), Path.GetFullPath(options.ReadCacheDatabasePath),
                 StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("The desktop offline scope and storage configuration are invalid.", nameof(options));
+    }
+
+    private static void VerifyProofBinding(DesktopDeviceProofBinding expected, DeviceProofPublicKey actual)
+    {
+        if (!string.Equals(actual.Curve, "P-256", StringComparison.Ordinal) ||
+            !FixedAscii(actual.X, expected.X) || !FixedAscii(actual.Y, expected.Y))
+            throw new DeviceProofKeyStoreException(
+                "DEVICE_KEY_BINDING_MISMATCH",
+                "The selected Windows signing key is not the server-bound device proof key.");
+
+        var canonicalJwk = Encoding.UTF8.GetBytes(
+            $"{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{actual.X}\",\"y\":\"{actual.Y}\"}}");
+        var hash = SHA256.HashData(canonicalJwk);
+        try
+        {
+            var thumbprint = Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            if (!FixedAscii(thumbprint, expected.JwkThumbprint))
+                throw new DeviceProofKeyStoreException(
+                    "DEVICE_KEY_BINDING_MISMATCH",
+                    "The selected Windows signing key thumbprint does not match the server binding.");
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(canonicalJwk);
+            CryptographicOperations.ZeroMemory(hash);
+        }
+    }
+
+    private static bool FixedAscii(string left, string right)
+    {
+        if (left.Length != right.Length || left.Any(character => character > 0x7f) ||
+            right.Any(character => character > 0x7f))
+            return false;
+        var leftBytes = Encoding.ASCII.GetBytes(left);
+        var rightBytes = Encoding.ASCII.GetBytes(right);
+        try { return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes); }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(leftBytes);
+            CryptographicOperations.ZeroMemory(rightBytes);
+        }
     }
 }

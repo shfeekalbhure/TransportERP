@@ -4,7 +4,7 @@ namespace TransportERP.Desktop.Application;
 
 internal static class DesktopStartupPolicy
 {
-    // Owner authority is required before a host can supply an authorized runtime.
+    // Startup is closed; only an exact server-issued session/policy/device grant may activate it.
     internal const bool OfflineRuntimeAuthorizedByDefault = false;
 }
 
@@ -35,7 +35,7 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
         _authenticatedSessions.SessionEnded += OnSessionEnded;
         MainForm = _shell;
         _shell.Show();
-        _authenticatedSessions.Start();
+        _authenticatedSessions.Start(_shell);
     }
 
     private void OnSessionAuthenticated(object? sender, DesktopAuthenticatedOfflineActivation activation) =>
@@ -145,6 +145,7 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
 
     private bool IsGovernedActivation(DesktopAuthenticatedOfflineActivation activation) =>
         activation.SessionId != Guid.Empty &&
+        activation.SessionExpiresAt > DateTimeOffset.UtcNow &&
         activation.OfflineRuntimeAuthorized &&
         activation.AuthenticatedScope.IsComplete &&
         activation.AuthorizedOfflineScope.IsComplete &&

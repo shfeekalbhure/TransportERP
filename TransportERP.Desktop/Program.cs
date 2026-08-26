@@ -11,9 +11,10 @@ internal static class Program
             return DesktopStartupContractProbe.VerifyClosedDefault() ? 0 : 1;
 
         ApplicationConfiguration.Initialize();
-        // This bridge is the secret-free, typed handoff used by the online sign-in host. It starts
-        // closed: no runtime factory is invoked until that host publishes an authenticated grant.
-        using var authenticatedSessions = new DesktopOnlineSignInSessionBridge();
+        // The producer calls the governed HTTPS sign-in/device/sync authorization APIs. It starts
+        // closed: no network, local database, DPAPI material or signing key is opened by startup.
+        using var authenticatedSessions = new DesktopOnlineSignInSessionBridge(
+            new DesktopOnlineSessionAuthenticator());
         using var context = new DesktopApplicationContext(authenticatedSessions);
         System.Windows.Forms.Application.Run(context);
         return 0;
