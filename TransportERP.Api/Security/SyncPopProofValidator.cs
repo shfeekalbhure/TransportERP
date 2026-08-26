@@ -230,9 +230,23 @@ public sealed class SyncPopProofValidator
     }
 
     private static bool IsCanonicalHtu(string value)
-        => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps &&
-           string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment) &&
-           string.Equals(uri.AbsolutePath, "/api/v1/sync/operations:batch", StringComparison.Ordinal);
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
+            string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+            return false;
+        if (string.Equals(uri.AbsolutePath, "/api/v1/sync/operations:batch", StringComparison.Ordinal))
+            return true;
+
+        const string prefix = "/api/v1/sync/conflicts/";
+        const string suffix = ":resolve";
+        if (!uri.AbsolutePath.StartsWith(prefix, StringComparison.Ordinal) ||
+            !uri.AbsolutePath.EndsWith(suffix, StringComparison.Ordinal))
+            return false;
+        var idText = uri.AbsolutePath[prefix.Length..^suffix.Length];
+        return Guid.TryParseExact(idText, "D", out var conflictId) &&
+               string.Equals(idText, conflictId.ToString("D"), StringComparison.Ordinal);
+    }
 
     private static bool FixedEqualsAscii(string left, string right)
         => IsAscii(left) && IsAscii(right) && CryptographicOperations.FixedTimeEquals(

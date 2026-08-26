@@ -65,6 +65,39 @@ public sealed class Stage4SyncPopProofValidatorTests
     }
 
     [Fact]
+    public void Exact_conflict_resolution_htu_is_accepted_by_the_real_validator()
+    {
+        var body = Encoding.UTF8.GetBytes(
+            "{\"decision\":\"KEEP_SERVER_AND_REJECT_LOCAL\",\"reason\":\"reviewed\"}");
+        var conflictId = Guid.Parse("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+        var conflictHtu = $"https://sync.example.test/api/v1/sync/conflicts/{conflictId:D}:resolve";
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var correlation = Guid.NewGuid();
+        var proof = CreateProof(key, body, correlation, Now, conflictHtu);
+
+        var verified = new SyncPopProofValidator().Validate(new SyncPopProofValidationInput(
+            proof, Bearer, body, conflictHtu, correlation, Now));
+
+        Assert.Equal(conflictHtu, verified.CanonicalHtu);
+    }
+
+    [Theory]
+    [InlineData("https://sync.example.test/api/v1/sync/conflicts/not-a-guid:resolve")]
+    [InlineData("https://sync.example.test/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve/extra")]
+    [InlineData("https://sync.example.test/api/v1/sync/conflicts/AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE:resolve")]
+    [InlineData("https://sync.example.test/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:delete")]
+    public void Noncanonical_or_unapproved_sync_paths_are_rejected(string unapprovedHtu)
+    {
+        var body = Encoding.UTF8.GetBytes("{}");
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var correlation = Guid.NewGuid();
+        var proof = CreateProof(key, body, correlation, Now, unapprovedHtu);
+
+        Assert.Throws<SyncPopProofValidationException>(() => new SyncPopProofValidator().Validate(new(
+            proof, Bearer, body, unapprovedHtu, correlation, Now)));
+    }
+
+    [Fact]
     public void Duplicate_claims_and_private_jwk_members_are_rejected()
     {
         var body = Encoding.UTF8.GetBytes("{}");
@@ -208,8 +241,13 @@ public sealed class Stage4SyncPopProofValidatorTests
             proof, Bearer, body, Htu, correlation, Now)));
     }
 
-    private static string CreateProof(ECDsa key, byte[] body, Guid correlation, DateTimeOffset issuedAt)
-        => CreateProofFromJson(key, PublicHeader(key), BasePayload(body, correlation, issuedAt));
+    private static string CreateProof(
+        ECDsa key,
+        byte[] body,
+        Guid correlation,
+        DateTimeOffset issuedAt,
+        string htu = Htu)
+        => CreateProofFromJson(key, PublicHeader(key), BasePayload(body, correlation, issuedAt, htu));
 
     private static string CreateProofFromJson(ECDsa key, string headerJson, string payloadJson)
     {
@@ -231,12 +269,16 @@ public sealed class Stage4SyncPopProofValidatorTests
         }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
 
-    private static string BasePayload(byte[] body, Guid correlation, DateTimeOffset issuedAt)
+    private static string BasePayload(
+        byte[] body,
+        Guid correlation,
+        DateTimeOffset issuedAt,
+        string htu = Htu)
         => JsonSerializer.Serialize(new
         {
             jti = Guid.NewGuid().ToString("D"),
             htm = "POST",
-            htu = Htu,
+            htu,
             iat = issuedAt.ToUnixTimeSeconds(),
             ath = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(Bearer))),
             nonce = Base64Url(RandomNumberGenerator.GetBytes(32)),
