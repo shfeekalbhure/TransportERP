@@ -55,6 +55,7 @@ public sealed record OfflineOperation(
     string? LeaseOwner,
     DateTimeOffset? LeaseExpiresAt,
     string? ResultCode,
+    Guid? ConflictCaseId,
     Guid? ResultEntityId,
     long? ResultVersion,
     DateTimeOffset CreatedAt,

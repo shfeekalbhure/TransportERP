@@ -168,13 +168,39 @@ public sealed class OfflineOperationStoreTests : IDisposable
         await store.InitializeAsync();
         await store.EnqueueAsync(Request());
         var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
-        await store.MarkConflictAsync(attempt!.LocalOperationId, attempt.AttemptCorrelationId!.Value, "BASE_VERSION_CONFLICT");
+        var conflictCaseId = Guid.NewGuid();
+        await store.MarkConflictAsync(attempt!.LocalOperationId, attempt.AttemptCorrelationId!.Value,
+            conflictCaseId, "BASE_VERSION_CONFLICT");
         await store.MarkResolvedAsync(attempt.LocalOperationId, "KEEP_SERVER");
 
         var operation = await store.GetAsync(attempt.LocalOperationId);
         Assert.Equal(OfflineOperationStatus.Resolved, operation!.Status);
+        Assert.Equal(conflictCaseId, operation.ConflictCaseId);
         await Assert.ThrowsAsync<OfflineStoreException>(() =>
             store.MarkSucceededAsync(attempt.LocalOperationId, attempt.AttemptCorrelationId.Value, null, null));
+    }
+
+    [Fact]
+    public async Task List_and_manual_retry_preserve_identity_and_only_requeue_failed_rows()
+    {
+        var store = Store(OutboxPath());
+        await store.InitializeAsync();
+        var queued = await store.EnqueueAsync(Request());
+        var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        await store.MarkTransportFailureAsync(attempt!.LocalOperationId,
+            attempt.AttemptCorrelationId!.Value, true, "TIMEOUT");
+
+        await store.RequeueFailedAsync(queued.Operation.LocalOperationId);
+        var listed = Assert.Single(await store.ListAsync());
+
+        Assert.Equal(OfflineOperationStatus.Queued, listed.Status);
+        Assert.Equal(queued.Operation.ClientOperationId, listed.ClientOperationId);
+        Assert.Equal(queued.Operation.OperationCorrelationId, listed.OperationCorrelationId);
+        Assert.Null(listed.AttemptCorrelationId);
+        Assert.Null(listed.ResultCode);
+        var error = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+            store.RequeueFailedAsync(listed.LocalOperationId));
+        Assert.Equal("LOCAL_STATE_CONFLICT", error.Code);
     }
 
     [Fact]

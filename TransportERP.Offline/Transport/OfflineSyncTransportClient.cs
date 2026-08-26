@@ -336,11 +336,17 @@ public sealed class OfflineSyncTransportClient
                         cancellationToken);
                     succeeded++;
                     break;
-                case "CONFLICT":
+                case "CONFLICT" when result.ConflictCaseId is { } conflictCaseId && conflictCaseId != Guid.Empty:
                     await _store.MarkConflictAsync(operation.LocalOperationId,
-                        operation.AttemptCorrelationId!.Value, result.ErrorCode ?? "BASE_VERSION_CONFLICT",
+                        operation.AttemptCorrelationId!.Value, conflictCaseId,
+                        result.ErrorCode ?? "BASE_VERSION_CONFLICT",
                         cancellationToken);
                     conflicted++;
+                    break;
+                case "CONFLICT":
+                    await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                        operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                    retryScheduled++;
                     break;
                 case "FAILED" when IsRetryableCode(result.ErrorCode):
                 case "REJECTED" when IsRetryableCode(result.ErrorCode):

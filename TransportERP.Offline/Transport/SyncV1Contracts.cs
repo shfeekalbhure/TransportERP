@@ -40,6 +40,34 @@ public sealed record SyncV1BatchResponse(
 
 public sealed record SyncV1ErrorResponse(string? ErrorCode, Guid? CorrelationId);
 
+public sealed record SyncV1ConflictReapplyRequest(
+    string ClientOperationId,
+    Guid OperationCorrelationId,
+    string ActionCode,
+    string OperationType,
+    string EntityType,
+    Guid? EntityId,
+    long? BaseVersion,
+    DateTimeOffset ClientOccurredAt,
+    string PayloadJson,
+    string PayloadHash);
+
+public sealed record SyncV1ConflictResolutionRequest(
+    string Decision,
+    string Reason,
+    SyncV1ConflictReapplyRequest? Reapply = null);
+
+public sealed record SyncV1ConflictResolutionResponse(
+    Guid ConflictCaseId,
+    Guid OriginalOperationId,
+    string Decision,
+    string ConflictStatus,
+    string OriginalOperationStatus,
+    string? OriginalOperationErrorCode,
+    Guid? ReplacedByOperationId,
+    DateTimeOffset ResolvedAt,
+    Guid CorrelationId);
+
 internal static class SyncV1Json
 {
     internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
@@ -50,6 +78,9 @@ internal static class SyncV1Json
     };
 
     internal static byte[] Serialize(SyncV1BatchRequest request) =>
+        JsonSerializer.SerializeToUtf8Bytes(request, Options);
+
+    internal static byte[] Serialize<T>(T request) =>
         JsonSerializer.SerializeToUtf8Bytes(request, Options);
 
     internal static T? Deserialize<T>(ReadOnlySpan<byte> utf8Json) =>

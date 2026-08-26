@@ -201,6 +201,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var completedThird = (await store.GetAsync(third.Operation.LocalOperationId))!;
         Assert.Equal(OfflineOperationStatus.Succeeded, completedFirst.Status);
         Assert.Equal(OfflineOperationStatus.Conflict, completedSecond.Status);
+        Assert.NotNull(completedSecond.ConflictCaseId);
         Assert.Equal(OfflineOperationStatus.Rejected, completedThird.Status);
         var localAttempts = new[]
         {
@@ -329,6 +330,55 @@ public sealed class OfflineSyncTransportTests : IDisposable
             Assert.DoesNotContain(secret, fileText, StringComparison.Ordinal);
             Assert.DoesNotContain(secret, persistedJson, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task Conflict_reapply_survives_timeout_with_stable_replacement_identity_and_fresh_proof()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await store.EnqueueAsync(Request());
+        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var conflictCaseId = Guid.NewGuid();
+        await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
+            conflictCaseId, "BASE_VERSION_CONFLICT");
+        using var key = new TestSigningKey();
+        var signed = new List<CapturedRequest>();
+        var call = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            call++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (call is 1 or 3)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            signed.Add(captured);
+            if (call == 2) throw new TaskCanceledException("server committed but response was lost");
+            var resolution = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(captured.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            return Json(HttpStatusCode.OK, new SyncV1ConflictResolutionResponse(
+                conflictCaseId, Guid.NewGuid(), resolution.Decision, "RESOLVED", "RESOLVED",
+                null, Guid.NewGuid(), clock.GetUtcNow(), captured.AttemptCorrelationId));
+        }));
+        var options = new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
+            queued.Operation.CompanyId, queued.Operation.BranchId, queued.Operation.UserId, "test-worker");
+        var client = new OfflineSyncConflictClient(http, store, new FixedBearerProvider("token"), key, options, clock);
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply, 12));
+        Assert.Equal(OfflineOperationStatus.Conflict,
+            (await store.GetAsync(queued.Operation.LocalOperationId))!.Status);
+        await client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply, 12);
+
+        Assert.Equal(signed[0].Body, signed[1].Body);
+        Assert.NotEqual(signed[0].Proof, signed[1].Proof);
+        var first = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(signed[0].Body,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var second = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(signed[1].Body,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.Equal(first.Reapply!.ClientOperationId, second.Reapply!.ClientOperationId);
+        Assert.Equal(first.Reapply.OperationCorrelationId, second.Reapply.OperationCorrelationId);
+        Assert.Equal(OfflineOperationStatus.Resolved,
+            (await store.GetAsync(queued.Operation.LocalOperationId))!.Status);
     }
 
     public void Dispose()

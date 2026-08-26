@@ -56,6 +56,7 @@ public sealed class OfflineOperationStore
                 LeaseOwner TEXT NULL,
                 LeaseExpiresAt TEXT NULL,
                 ResultCode TEXT NULL,
+                ConflictCaseId TEXT NULL,
                 ResultEntityId TEXT NULL,
                 ResultVersion INTEGER NULL,
                 CreatedAt TEXT NOT NULL,
@@ -70,6 +71,10 @@ public sealed class OfflineOperationStore
                 ON offline_operations (Status, NextRetryAt, LeaseExpiresAt, CreatedAt);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        // Existing encrypted stores predate conflict resolution. Upgrade them in place without
+        // recreating or decrypting into a plaintext staging database.
+        await EnsureColumnAsync(connection, "offline_operations", "ConflictCaseId", "TEXT NULL", cancellationToken);
     }
 
     public async Task<OfflineEnqueueResult> EnqueueAsync(
@@ -179,13 +184,21 @@ public sealed class OfflineOperationStore
     }
 
     public Task MarkSucceededAsync(Guid localOperationId, Guid attemptCorrelationId, Guid? resultEntityId, long? resultVersion, CancellationToken cancellationToken = default) =>
-        CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Succeeded, "SUCCEEDED", resultEntityId, resultVersion, cancellationToken);
+        CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Succeeded,
+            "SUCCEEDED", null, resultEntityId, resultVersion, cancellationToken);
 
-    public Task MarkConflictAsync(Guid localOperationId, Guid attemptCorrelationId, string resultCode, CancellationToken cancellationToken = default) =>
-        CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Conflict, resultCode, null, null, cancellationToken);
+    public Task MarkConflictAsync(Guid localOperationId, Guid attemptCorrelationId, Guid conflictCaseId,
+        string resultCode, CancellationToken cancellationToken = default)
+    {
+        if (conflictCaseId == Guid.Empty)
+            throw new ArgumentException("A server conflict identity is required.", nameof(conflictCaseId));
+        return CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Conflict,
+            resultCode, conflictCaseId, null, null, cancellationToken);
+    }
 
     public Task MarkRejectedAsync(Guid localOperationId, Guid attemptCorrelationId, string resultCode, CancellationToken cancellationToken = default) =>
-        CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected, resultCode, null, null, cancellationToken);
+        CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected,
+            resultCode, null, null, null, cancellationToken);
 
     public async Task MarkResolvedAsync(Guid localOperationId, string resultCode, CancellationToken cancellationToken = default)
     {
@@ -216,7 +229,8 @@ public sealed class OfflineOperationStore
     {
         if (!retryable)
         {
-            await CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected, resultCode, null, null, cancellationToken);
+            await CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected,
+                resultCode, null, null, null, cancellationToken);
             return;
         }
 
@@ -290,11 +304,40 @@ public sealed class OfflineOperationStore
         return await ReadSingleAsync(command, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<OfflineOperation>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connections.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM offline_operations ORDER BY UpdatedAt DESC, LocalOperationId;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var operations = new List<OfflineOperation>();
+        while (await reader.ReadAsync(cancellationToken)) operations.Add(Read(reader));
+        return operations;
+    }
+
+    public async Task RequeueFailedAsync(Guid localOperationId, CancellationToken cancellationToken = default)
+    {
+        var now = _timeProvider.GetUtcNow();
+        await using var connection = await _connections.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE offline_operations
+            SET Status = 'QUEUED', NextRetryAt = NULL, LeaseOwner = NULL, LeaseExpiresAt = NULL,
+                AttemptCorrelationId = NULL, ResultCode = NULL, UpdatedAt = $now
+            WHERE LocalOperationId = $id AND Status = 'FAILED';
+            """;
+        Add(command, "$id", localOperationId);
+        command.Parameters.AddWithValue("$now", Format(now));
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new OfflineStoreException("LOCAL_STATE_CONFLICT", "Only a failed operation can be retried manually.");
+    }
+
     private async Task CompleteAttemptAsync(
         Guid localOperationId,
         Guid attemptCorrelationId,
         OfflineOperationStatus status,
         string resultCode,
+        Guid? conflictCaseId,
         Guid? resultEntityId,
         long? resultVersion,
         CancellationToken cancellationToken)
@@ -309,13 +352,15 @@ public sealed class OfflineOperationStore
         await using var command = connection.CreateCommand();
         command.CommandText = """
             UPDATE offline_operations
-            SET Status = $status, ResultCode = $resultCode, ResultEntityId = $resultEntityId,
+            SET Status = $status, ResultCode = $resultCode, ConflictCaseId = $conflictCaseId,
+                ResultEntityId = $resultEntityId,
                 ResultVersion = $resultVersion, AcknowledgedAt = $now, UpdatedAt = $now,
                 LeaseOwner = NULL, LeaseExpiresAt = NULL, NextRetryAt = NULL
             WHERE LocalOperationId = $id AND Status = 'SENDING' AND AttemptCorrelationId = $attemptId;
             """;
         command.Parameters.AddWithValue("$status", ToDatabase(status));
         command.Parameters.AddWithValue("$resultCode", RequireResultCode(resultCode));
+        AddNullable(command, "$conflictCaseId", conflictCaseId?.ToString("D"));
         AddNullable(command, "$resultEntityId", resultEntityId);
         AddNullable(command, "$resultVersion", resultVersion);
         command.Parameters.AddWithValue("$now", Format(now));
@@ -393,6 +438,7 @@ public sealed class OfflineOperationStore
         NullableString(reader, "LeaseOwner"),
         NullableDateTimeOffset(reader, "LeaseExpiresAt"),
         NullableString(reader, "ResultCode"),
+        NullableGuid(reader, "ConflictCaseId"),
         NullableGuid(reader, "ResultEntityId"),
         NullableInt64(reader, "ResultVersion"),
         DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("CreatedAt")), System.Globalization.CultureInfo.InvariantCulture),
@@ -434,4 +480,23 @@ public sealed class OfflineOperationStore
     private static Guid? NullableGuid(SqliteDataReader reader, string name) { var value = NullableString(reader, name); return value is null ? null : Guid.Parse(value); }
     private static long? NullableInt64(SqliteDataReader reader, string name) { var i = reader.GetOrdinal(name); return reader.IsDBNull(i) ? null : reader.GetInt64(i); }
     private static DateTimeOffset? NullableDateTimeOffset(SqliteDataReader reader, string name) { var value = NullableString(reader, name); return value is null ? null : DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture); }
+
+    private static async Task EnsureColumnAsync(SqliteConnection connection, string table, string column,
+        string definition, CancellationToken cancellationToken)
+    {
+        await using var inspect = connection.CreateCommand();
+        inspect.CommandText = $"PRAGMA table_info({table});";
+        await using var reader = await inspect.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        await reader.DisposeAsync();
+        await using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+        try { await alter.ExecuteNonQueryAsync(cancellationToken); }
+        catch (SqliteException exception) when (exception.SqliteErrorCode == 1 &&
+            exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+            // A second process completed the same monotonic encrypted-store upgrade first.
+        }
+    }
 }
