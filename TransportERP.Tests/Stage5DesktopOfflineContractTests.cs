@@ -134,13 +134,15 @@ public sealed class Stage5DesktopOfflineContractTests
     public void Retry_and_conflict_actions_enforce_state_and_injected_permission_before_side_effect()
     {
         var controller = Read("TransportERP.Desktop", "Offline", "SyncOperationsController.cs");
+        var contracts = Read("TransportERP.Desktop", "Offline", "SyncOperationsContracts.cs");
 
         Assert.Contains("operation.Status != OfflineOperationStatus.Failed", controller, StringComparison.Ordinal);
         Assert.Contains("_permissions.CanRetry(operation)", controller, StringComparison.Ordinal);
         Assert.Contains("operation.Status != OfflineOperationStatus.Conflict", controller, StringComparison.Ordinal);
         Assert.Contains("_permissions.CanResolveConflict(operation, decision)", controller, StringComparison.Ordinal);
         Assert.Contains("operation.ConflictReview?.IsDecisionReady != true", controller, StringComparison.Ordinal);
-        Assert.Contains("CONFLICT_REVIEW_REQUIRED", controller, StringComparison.Ordinal);
+        Assert.Contains("SyncUiActionResult.ReviewRequired()", controller, StringComparison.Ordinal);
+        Assert.Contains("CONFLICT_REVIEW_REQUIRED", contracts, StringComparison.Ordinal);
         Assert.True(
             controller.IndexOf("_permissions.CanRetry(operation)", StringComparison.Ordinal) <
             controller.IndexOf("_retry.RetryAsync", StringComparison.Ordinal));
