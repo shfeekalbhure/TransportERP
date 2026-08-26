@@ -109,9 +109,15 @@ public sealed class DriverUnavailableNativeSecurity : IDriverNativeEncryptionKey
         ValueTask.FromException<byte[]>(new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE"));
 }
 
-public sealed class DriverOfflineUnavailableException(string code) : InvalidOperationException(code)
+public sealed class DriverOfflineUnavailableException : InvalidOperationException
 {
-    public string Code { get; } = code;
+    public DriverOfflineUnavailableException(string code, Exception? innerException = null)
+        : base(code, innerException)
+    {
+        Code = code;
+    }
+
+    public string Code { get; }
 }
 
 public sealed class DriverOfflineRuntime
