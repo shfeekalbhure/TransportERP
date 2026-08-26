@@ -228,7 +228,7 @@ public sealed class OfflineOperationStore
 
         var exhausted = current.ClientTransportRetryCount >= _retryPolicy.MaxRetryCount;
         var retryCount = exhausted ? current.ClientTransportRetryCount : current.ClientTransportRetryCount + 1;
-        var nextRetryAt = exhausted ? null : now + _retryPolicy.DelayForRetry(retryCount);
+        DateTimeOffset? nextRetryAt = exhausted ? null : now + _retryPolicy.DelayForRetry(retryCount);
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
