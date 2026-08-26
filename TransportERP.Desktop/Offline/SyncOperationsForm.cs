@@ -14,6 +14,7 @@ public sealed class SyncOperationsForm : Form
     private readonly Button _retry = new() { Text = "إعادة المحاولة", AutoSize = true };
     private readonly Button _keepServer = new() { Text = "الاحتفاظ بنسخة الخادم", AutoSize = true };
     private readonly Button _reapply = new() { Text = "إعادة التطبيق", AutoSize = true };
+    private readonly TextBox _reason = new() { Width = 280, PlaceholderText = "سبب قرار التعارض (مطلوب)" };
     private readonly Label _message = new() { AutoSize = true };
     private readonly CancellationTokenSource _lifetime = new();
     private bool _busy;
@@ -35,12 +36,12 @@ public sealed class SyncOperationsForm : Form
             FlowDirection = FlowDirection.RightToLeft,
             Padding = new Padding(8)
         };
-        actions.Controls.AddRange([_refresh, _retry, _keepServer, _reapply, _message]);
+        actions.Controls.AddRange([_refresh, _retry, _keepServer, _reapply, _reason, _message]);
 
         _refresh.Click += async (_, _) => await RefreshRowsAsync();
         _retry.Click += async (_, _) => await RunSelectedAsync(_controller.RetryAsync);
-        _keepServer.Click += async (_, _) => await RunSelectedAsync(_controller.KeepServerAsync);
-        _reapply.Click += async (_, _) => await RunSelectedAsync(_controller.ReapplyAsync);
+        _keepServer.Click += async (_, _) => await RunConflictAsync(_controller.KeepServerAsync);
+        _reapply.Click += async (_, _) => await RunConflictAsync(_controller.ReapplyAsync);
         _operations.SelectionChanged += (_, _) => UpdateActions();
         Shown += async (_, _) => await RefreshRowsAsync();
 
@@ -100,6 +101,24 @@ public sealed class SyncOperationsForm : Form
             _message.Text = result.Message;
             if (result.Succeeded)
                 _operations.DataSource = (await _controller.RefreshAsync(_lifetime.Token)).ToList();
+        });
+    }
+
+    private async Task RunConflictAsync(
+        Func<Guid, string, CancellationToken, Task<SyncUiActionResult>> action)
+    {
+        if (_busy || Selected is not { } selected)
+            return;
+
+        await RunBusyAsync(async () =>
+        {
+            var result = await action(selected.LocalOperationId, _reason.Text, _lifetime.Token);
+            _message.Text = result.Message;
+            if (result.Succeeded)
+            {
+                _reason.Clear();
+                _operations.DataSource = (await _controller.RefreshAsync(_lifetime.Token)).ToList();
+            }
         });
     }
 

@@ -111,6 +111,8 @@ public sealed class AdminOfflineRuntime
     private readonly OfflineReadCacheStore? _readCache;
     private readonly OfflineOperationStore? _outbox;
     private readonly OfflineSyncTransportClient? _transport;
+    private readonly OfflineOperationScope _scope;
+    private readonly OfflineSyncSupervisor? _supervisor;
 
     internal AdminOfflineRuntime(
         AdminOfflineCompositionOptions options,
@@ -122,6 +124,12 @@ public sealed class AdminOfflineRuntime
         _readCache = result.ReadCache;
         _outbox = result.Outbox;
         _transport = result.Transport;
+        _scope = new OfflineOperationScope(
+            options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
+        _supervisor = result is { Outbox: not null, Transport: not null }
+            ? new OfflineSyncSupervisor(
+                result.Outbox, result.Transport, new AdminSyncConnectivity(dependencies.Network))
+            : null;
         Status = new(
             Map(result.Mode), result.ReasonCode,
             result.ReadCache is not null, result.Outbox is not null, result.Transport is not null);
@@ -129,8 +137,16 @@ public sealed class AdminOfflineRuntime
 
     public AdminOfflineRuntimeStatus Status { get; }
 
-    public async Task<OfflineEnqueueResult> QueueAsync(
+    [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
+    public Task<OfflineEnqueueResult> QueueAsync(
         OfflineOperationEnqueueRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<OfflineEnqueueResult>(
+            new AdminOfflineUnavailableException("OFFLINE_IDENTITY_FACTORY_REQUIRED"));
+
+    public async Task<OfflineEnqueueResult> QueueAsync(
+        OfflineOperationEnqueueTemplate request,
+        Func<OfflineGeneratedOperationIdentity, string> payloadFactory,
         CancellationToken cancellationToken = default)
     {
         var outbox = _outbox ?? throw Unavailable();
@@ -143,8 +159,14 @@ public sealed class AdminOfflineRuntime
             throw new AdminOfflineUnavailableException("OFFLINE_WRITE_CONTRACT_REQUIRED");
         }
 
-        return await outbox.EnqueueAsync(request, cancellationToken);
+        var result = await outbox.EnqueueAsync(request, payloadFactory, cancellationToken);
+        if (result.Created)
+            _supervisor?.NotifyWorkAvailable();
+        return result;
     }
+
+    public Task RunSyncSupervisorAsync(CancellationToken cancellationToken = default) =>
+        (_supervisor ?? throw Unavailable()).RunAsync(cancellationToken);
 
     public async Task<OfflineSyncTransportRunResult> SynchronizeAsync(
         int? maximumOperations = null,
@@ -167,18 +189,30 @@ public sealed class AdminOfflineRuntime
     public async Task<AdminOfflineOperationStatusView?> GetOperationStatusAsync(
         Guid localOperationId, CancellationToken cancellationToken = default)
     {
-        var operation = await (_outbox ?? throw Unavailable()).GetAsync(localOperationId, cancellationToken);
+        var operation = await (_outbox ?? throw Unavailable()).GetAsync(localOperationId, _scope, cancellationToken);
         return operation is null ? null : AdminOfflineOperationStatusView.From(operation);
     }
 
     public Task<int> RedactExpiredPayloadsAsync(CancellationToken cancellationToken = default) =>
         (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(cancellationToken: cancellationToken);
 
-    private bool MatchesScope(OfflineOperationEnqueueRequest request) =>
+    private bool MatchesScope(OfflineOperationEnqueueTemplate request) =>
         request.CompanyId == _options.CompanyId && request.BranchId == _options.BranchId &&
         request.UserId == _options.UserId && request.RegisteredDeviceId == _options.RegisteredDeviceId;
 
     private AdminOfflineUnavailableException Unavailable() => new(Status.ReasonCode);
+
+    private sealed class AdminSyncConnectivity(IAdminSyncNetworkProvider network) : IOfflineSyncConnectivity
+    {
+        public async ValueTask<bool> IsOnlineAsync(CancellationToken cancellationToken = default) =>
+            network.IsPlatformTransportAvailable && await network.IsNetworkAvailableAsync(cancellationToken);
+
+        public async Task WaitUntilOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            while (!await IsOnlineAsync(cancellationToken))
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+    }
 
     private static AdminOfflineRuntimeMode Map(MobileOfflineKernelMode mode) => mode switch
     {

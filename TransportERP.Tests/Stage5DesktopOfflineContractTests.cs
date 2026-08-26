@@ -99,9 +99,28 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("new OfflineReadCacheStore", source, StringComparison.Ordinal);
         Assert.Contains("new OfflineSyncTransportClient", source, StringComparison.Ordinal);
         Assert.Contains("new OfflineSyncConflictClient", source, StringComparison.Ordinal);
+        Assert.Contains("new OfflineSyncSupervisor", source, StringComparison.Ordinal);
+        Assert.Contains("RunSyncSupervisorAsync", source, StringComparison.Ordinal);
+        Assert.Contains("OfflineOperationEnqueueTemplate", source, StringComparison.Ordinal);
+        Assert.Contains("payloadFactory", source, StringComparison.Ordinal);
+        Assert.Contains("store.ListAsync(scope", source, StringComparison.Ordinal);
+        Assert.Contains("keys, scope, timeProvider", source, StringComparison.Ordinal);
         Assert.Contains("new SyncOperationsController", source, StringComparison.Ordinal);
         Assert.Contains("request.CompanyId != _options.CompanyId", source, StringComparison.Ordinal);
         Assert.DoesNotContain("OfflineRuntimeAuthorized = true", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Conflict_decisions_require_a_reviewed_reason_before_transport()
+    {
+        var form = Read("TransportERP.Desktop", "Offline", "SyncOperationsForm.cs");
+        var controller = Read("TransportERP.Desktop", "Offline", "SyncOperationsController.cs");
+        var composition = Read("TransportERP.Desktop", "Offline", "DesktopOfflineComposition.cs");
+
+        Assert.Contains("سبب قرار التعارض (مطلوب)", form, StringComparison.Ordinal);
+        Assert.Contains("string.IsNullOrWhiteSpace(reason)", controller, StringComparison.Ordinal);
+        Assert.Contains("CONFLICT_REASON_REQUIRED", controller, StringComparison.Ordinal);
+        Assert.Contains("reason, baseVersion, cancellationToken", composition, StringComparison.Ordinal);
     }
 
     private static string Read(params string[] path) =>

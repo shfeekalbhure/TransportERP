@@ -70,9 +70,15 @@ internal static class MobileOfflineCompositionKernel
         }
 
         ValidatePaths(configuration);
+        var scope = new OfflineOperationScope(
+            configuration.TransportOptions.CompanyId,
+            configuration.TransportOptions.BranchId,
+            configuration.TransportOptions.UserId,
+            configuration.TransportOptions.RegisteredDeviceId);
         var readCache = new OfflineReadCacheStore(
             configuration.ReadCacheDatabasePath,
             encryptionKeys,
+            scope,
             timeProvider);
 
         try

@@ -50,11 +50,13 @@ public sealed class SyncOperationsController
         return SyncUiActionResult.Success("أُعيدت العملية إلى قائمة الانتظار.");
     }
 
-    public Task<SyncUiActionResult> KeepServerAsync(Guid localOperationId, CancellationToken cancellationToken = default) =>
-        ResolveAsync(localOperationId, SyncConflictDecision.KeepServer, cancellationToken);
+    public Task<SyncUiActionResult> KeepServerAsync(Guid localOperationId, string reason,
+        CancellationToken cancellationToken = default) =>
+        ResolveAsync(localOperationId, SyncConflictDecision.KeepServer, reason, cancellationToken);
 
-    public Task<SyncUiActionResult> ReapplyAsync(Guid localOperationId, CancellationToken cancellationToken = default) =>
-        ResolveAsync(localOperationId, SyncConflictDecision.Reapply, cancellationToken);
+    public Task<SyncUiActionResult> ReapplyAsync(Guid localOperationId, string reason,
+        CancellationToken cancellationToken = default) =>
+        ResolveAsync(localOperationId, SyncConflictDecision.Reapply, reason, cancellationToken);
 
     public bool CanRetry(SyncOperationDisplayRow? row) =>
         row is not null && _allowedActions.TryGetValue(row.LocalOperationId, out var allowed) && allowed.Retry;
@@ -69,6 +71,7 @@ public sealed class SyncOperationsController
     private async Task<SyncUiActionResult> ResolveAsync(
         Guid localOperationId,
         SyncConflictDecision decision,
+        string reason,
         CancellationToken cancellationToken)
     {
         var operation = await FindCurrentAsync(localOperationId, cancellationToken);
@@ -77,7 +80,10 @@ public sealed class SyncOperationsController
         if (!_permissions.CanResolveConflict(operation, decision))
             return SyncUiActionResult.Denied();
 
-        await _conflicts.ResolveAsync(operation.LocalOperationId, decision, cancellationToken);
+        if (string.IsNullOrWhiteSpace(reason))
+            return new SyncUiActionResult(false, "CONFLICT_REASON_REQUIRED", "أدخل سببًا واضحًا ومراجعًا للقرار.");
+
+        await _conflicts.ResolveAsync(operation.LocalOperationId, decision, reason, cancellationToken);
         return SyncUiActionResult.Success(
             decision == SyncConflictDecision.KeepServer
                 ? "حُفظت نسخة الخادم وأُغلقت العملية المتعارضة."

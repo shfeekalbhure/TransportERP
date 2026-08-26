@@ -61,6 +61,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
     private readonly OfflineReadCacheStore? _readCache;
     private readonly OfflineSyncTransportClient? _transport;
     private readonly OfflineSyncConflictClient? _conflictClient;
+    private readonly OfflineSyncSupervisor? _supervisor;
     private readonly IDeviceProofSigningKey? _signingKey;
 
     internal DesktopOfflineRuntime(
@@ -71,6 +72,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
         OfflineReadCacheStore? readCache = null,
         OfflineSyncTransportClient? transport = null,
         OfflineSyncConflictClient? conflictClient = null,
+        OfflineSyncSupervisor? supervisor = null,
         IDeviceProofSigningKey? signingKey = null)
     {
         _options = options;
@@ -80,23 +82,39 @@ public sealed class DesktopOfflineRuntime : IDisposable
         _readCache = readCache;
         _transport = transport;
         _conflictClient = conflictClient;
+        _supervisor = supervisor;
         _signingKey = signingKey;
     }
 
     public DesktopOfflineRuntimeStatus Status { get; }
 
-    public async Task<OfflineEnqueueResult> QueueAsync(
+    [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
+    public Task<OfflineEnqueueResult> QueueAsync(
         OfflineOperationEnqueueRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<OfflineEnqueueResult>(new OfflineStoreException(
+            "OFFLINE_IDENTITY_FACTORY_REQUIRED",
+            "The desktop host must build the payload from the durable operation identity."));
+
+    public async Task<OfflineEnqueueResult> QueueAsync(
+        OfflineOperationEnqueueTemplate template,
+        Func<OfflineGeneratedOperationIdentity, string> payloadFactory,
         CancellationToken cancellationToken = default)
     {
         var outbox = _outbox ?? throw Unavailable();
-        if (request.CompanyId != _options.CompanyId || request.BranchId != _options.BranchId ||
-            request.UserId != _options.UserId || request.RegisteredDeviceId != _options.RegisteredDeviceId)
+        if (template.CompanyId != _options.CompanyId || template.BranchId != _options.BranchId ||
+            template.UserId != _options.UserId || template.RegisteredDeviceId != _options.RegisteredDeviceId)
             throw new OfflineStoreException("LOCAL_SCOPE_DENIED", "The operation does not match the authenticated desktop scope.");
-        if (!_dependencies.WritePolicy.Allows(request.ActionCode, request.OperationType, request.EntityType))
+        if (!_dependencies.WritePolicy.Allows(template.ActionCode, template.OperationType, template.EntityType))
             throw new OfflineStoreException("OFFLINE_ACTION_NOT_AUTHORIZED", "The action is not authorized for offline execution.");
-        return await outbox.EnqueueAsync(request, cancellationToken);
+        var result = await outbox.EnqueueAsync(template, payloadFactory, cancellationToken);
+        if (result.Created)
+            _supervisor?.NotifyWorkAvailable();
+        return result;
     }
+
+    public Task RunSyncSupervisorAsync(CancellationToken cancellationToken = default) =>
+        (_supervisor ?? throw Unavailable()).RunAsync(cancellationToken);
 
     public Task<OfflineSyncTransportRunResult> SynchronizeAsync(
         int? maximumOperations = null,
@@ -119,8 +137,9 @@ public sealed class DesktopOfflineRuntime : IDisposable
     public SyncOperationsForm CreateOperationsForm()
     {
         var outbox = _outbox ?? throw Unavailable();
+        var scope = Scope(_options);
         return new SyncOperationsForm(new SyncOperationsController(
-            new StoreOperationsQuery(outbox),
+            new StoreOperationsQuery(outbox, scope),
             new StoreManualRetryService(outbox),
             new StoreConflictActionService(
                 _conflictClient ?? throw Unavailable(), _dependencies.ReapplyVersions),
@@ -135,10 +154,15 @@ public sealed class DesktopOfflineRuntime : IDisposable
     private OfflineStoreException Unavailable() =>
         new(Status.ReasonCode, "The desktop offline runtime is unavailable.");
 
-    private sealed class StoreOperationsQuery(OfflineOperationStore store) : ISyncOperationsQuery
+    private static OfflineOperationScope Scope(DesktopOfflineCompositionOptions options) =>
+        new(options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
+
+    private sealed class StoreOperationsQuery(
+        OfflineOperationStore store,
+        OfflineOperationScope scope) : ISyncOperationsQuery
     {
         public Task<IReadOnlyList<OfflineOperation>> ListAsync(CancellationToken cancellationToken = default) =>
-            store.ListAsync(cancellationToken);
+            store.ListAsync(scope, cancellationToken);
     }
 
     private sealed class StoreManualRetryService(OfflineOperationStore store) : ISyncManualRetryService
@@ -151,7 +175,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
         OfflineSyncConflictClient conflicts,
         IDesktopConflictBaseVersionProvider versions) : ISyncConflictActionService
     {
-        public async Task ResolveAsync(Guid localOperationId, SyncConflictDecision decision,
+        public async Task ResolveAsync(Guid localOperationId, SyncConflictDecision decision, string reason,
             CancellationToken cancellationToken = default)
         {
             long? baseVersion = null;
@@ -161,7 +185,7 @@ public sealed class DesktopOfflineRuntime : IDisposable
                 decision == SyncConflictDecision.KeepServer
                     ? OfflineConflictDecision.KeepServer
                     : OfflineConflictDecision.Reapply,
-                baseVersion, cancellationToken);
+                reason, baseVersion, cancellationToken);
         }
     }
 }
@@ -187,7 +211,9 @@ public static class DesktopOfflineComposition
         {
             var keys = new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory);
             var outbox = new OfflineOperationStore(options.OutboxDatabasePath, keys, timeProvider, options.RetryPolicy);
-            var readCache = new OfflineReadCacheStore(options.ReadCacheDatabasePath, keys, timeProvider);
+            var scope = new OfflineOperationScope(
+                options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
+            var readCache = new OfflineReadCacheStore(options.ReadCacheDatabasePath, keys, scope, timeProvider);
             await outbox.InitializeAsync(cancellationToken);
             await readCache.InitializeAsync(cancellationToken);
             signingKey = await new WindowsCertificateDeviceProofSigningKeyStore()
@@ -198,9 +224,11 @@ public static class DesktopOfflineComposition
             var conflicts = new OfflineSyncConflictClient(
                 dependencies.Network.SyncHttpClient, outbox, dependencies.VolatileSession,
                 signingKey, options.TransportOptions, timeProvider);
+            var supervisor = new OfflineSyncSupervisor(
+                outbox, transport, new DesktopSyncConnectivity(dependencies.Network));
             return new DesktopOfflineRuntime(options, dependencies,
                 new(DesktopOfflineRuntimeMode.Ready, "READY", true, true, true),
-                outbox, readCache, transport, conflicts, signingKey);
+                outbox, readCache, transport, conflicts, supervisor, signingKey);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -211,6 +239,21 @@ public static class DesktopOfflineComposition
         {
             signingKey?.Dispose();
             return Closed(options, dependencies, "DESKTOP_SECURE_RUNTIME_UNAVAILABLE", security: true);
+        }
+    }
+
+    private sealed class DesktopSyncConnectivity(IDesktopSyncNetworkProvider network) : IOfflineSyncConnectivity
+    {
+        public ValueTask<bool> IsOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(network.IsTransportAvailable && network.IsNetworkAvailable);
+        }
+
+        public async Task WaitUntilOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            while (!network.IsTransportAvailable || !network.IsNetworkAvailable)
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
     }
 

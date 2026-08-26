@@ -120,11 +120,13 @@ public sealed class DriverOfflineRuntime
     private readonly Guid _branchId;
     private readonly Guid _userId;
     private readonly Guid _registeredDeviceId;
+    private readonly OfflineOperationScope _scope;
     private readonly IDriverOfflineActionAllowlist? _allowlist;
     private readonly IDriverSyncNetworkProvider _network;
     private readonly OfflineReadCacheStore? _readCache;
     private readonly OfflineOperationStore? _outbox;
     private readonly OfflineSyncTransportClient? _transport;
+    private readonly OfflineSyncSupervisor? _supervisor;
 
     internal DriverOfflineRuntime(
         DriverOfflineCompositionOptions options,
@@ -135,11 +137,17 @@ public sealed class DriverOfflineRuntime
         _branchId = options.BranchId;
         _userId = options.UserId;
         _registeredDeviceId = options.RegisteredDeviceId;
+        _scope = new OfflineOperationScope(
+            options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
         _allowlist = dependencies.ActionAllowlist;
         _network = dependencies.Network;
         _readCache = result.ReadCache;
         _outbox = result.Outbox;
         _transport = result.Transport;
+        _supervisor = result is { Outbox: not null, Transport: not null }
+            ? new OfflineSyncSupervisor(
+                result.Outbox, result.Transport, new DriverSyncConnectivity(dependencies.Network))
+            : null;
         Status = new(
             Map(result.Mode),
             result.ReasonCode,
@@ -150,23 +158,37 @@ public sealed class DriverOfflineRuntime
 
     public DriverOfflineRuntimeStatus Status { get; }
 
-    public async Task<OfflineEnqueueResult> QueueAsync(
+    [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
+    public Task<OfflineEnqueueResult> QueueAsync(
         OfflineOperationEnqueueRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<OfflineEnqueueResult>(
+            new DriverOfflineUnavailableException("OFFLINE_IDENTITY_FACTORY_REQUIRED"));
+
+    public async Task<OfflineEnqueueResult> QueueAsync(
+        OfflineOperationEnqueueTemplate template,
+        Func<OfflineGeneratedOperationIdentity, string> payloadFactory,
         CancellationToken cancellationToken = default)
     {
         var outbox = _outbox ?? throw Unavailable();
-        if (!MatchesScope(request))
+        if (!MatchesScope(template))
         {
             throw new DriverOfflineUnavailableException("LOCAL_SCOPE_DENIED");
         }
 
-        if (_allowlist is null || !_allowlist.Allows(request.ActionCode, request.OperationType, request.EntityType))
+        if (_allowlist is null || !_allowlist.Allows(template.ActionCode, template.OperationType, template.EntityType))
         {
             throw new DriverOfflineUnavailableException("OFFLINE_ACTION_NOT_AUTHORIZED");
         }
 
-        return await outbox.EnqueueAsync(request, cancellationToken);
+        var result = await outbox.EnqueueAsync(template, payloadFactory, cancellationToken);
+        if (result.Created)
+            _supervisor?.NotifyWorkAvailable();
+        return result;
     }
+
+    public Task RunSyncSupervisorAsync(CancellationToken cancellationToken = default) =>
+        (_supervisor ?? throw Unavailable()).RunAsync(cancellationToken);
 
     public async Task<OfflineSyncTransportRunResult> SynchronizeAsync(
         int? maximumOperations = null,
@@ -199,18 +221,30 @@ public sealed class DriverOfflineRuntime
         Guid localOperationId,
         CancellationToken cancellationToken = default)
     {
-        var operation = await (_outbox ?? throw Unavailable()).GetAsync(localOperationId, cancellationToken);
+        var operation = await (_outbox ?? throw Unavailable()).GetAsync(localOperationId, _scope, cancellationToken);
         return operation is null ? null : DriverOfflineOperationStatusView.From(operation);
     }
 
     public Task<int> RedactExpiredPayloadsAsync(CancellationToken cancellationToken = default) =>
         (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(cancellationToken: cancellationToken);
 
-    private bool MatchesScope(OfflineOperationEnqueueRequest request) =>
+    private bool MatchesScope(OfflineOperationEnqueueTemplate request) =>
         request.CompanyId == _companyId && request.BranchId == _branchId &&
         request.UserId == _userId && request.RegisteredDeviceId == _registeredDeviceId;
 
     private DriverOfflineUnavailableException Unavailable() => new(Status.ReasonCode);
+
+    private sealed class DriverSyncConnectivity(IDriverSyncNetworkProvider network) : IOfflineSyncConnectivity
+    {
+        public async ValueTask<bool> IsOnlineAsync(CancellationToken cancellationToken = default) =>
+            network.IsPlatformTransportAvailable && await network.IsNetworkAvailableAsync(cancellationToken);
+
+        public async Task WaitUntilOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            while (!await IsOnlineAsync(cancellationToken))
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+    }
 
     private static DriverOfflineRuntimeMode Map(MobileOfflineKernelMode mode) => mode switch
     {

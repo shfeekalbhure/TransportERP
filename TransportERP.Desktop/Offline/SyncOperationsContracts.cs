@@ -60,6 +60,7 @@ public interface ISyncConflictActionService
     Task ResolveAsync(
         Guid localOperationId,
         SyncConflictDecision decision,
+        string reason,
         CancellationToken cancellationToken = default);
 }
 
