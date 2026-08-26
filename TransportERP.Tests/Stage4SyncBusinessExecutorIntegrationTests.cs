@@ -29,11 +29,25 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
         var adapters = new FakeBusinessAdapters();
         var audit = new CapturingAuditSink();
         var executor = Executor(db, permission, adapters, audit);
+        // The execution claim is immutable provenance captured before mutable
+        // device state changes (credential/proof rotation included).
+        var claim = Claim(fixture);
         switch (mutation)
         {
             case "suspended": fixture.Device.Status = "SUSPENDED"; break;
             case "assignment": fixture.Assignment.Status = "REVOKED"; break;
-            case "assignment-scope": fixture.Assignment.BranchId = Guid.NewGuid(); break;
+            case "assignment-scope":
+                db.RegisteredDeviceAssignments.Remove(fixture.Assignment);
+                await db.SaveChangesAsync();
+                var now = DateTimeOffset.UtcNow;
+                db.RegisteredDeviceAssignments.Add(new RegisteredDeviceAssignment
+                {
+                    Id = Guid.NewGuid(), RegisteredDeviceId = fixture.Device.Id,
+                    UserId = fixture.UserId, CompanyId = fixture.CompanyId, BranchId = Guid.NewGuid(),
+                    Status = "ACTIVE", AssignedByUserId = fixture.UserId, AssignedAt = now,
+                    CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+                });
+                break;
             case "credential": fixture.Device.CredentialVersion++; break;
             case "proof-key-rotation-before-execute": fixture.Device.ProofKeyVersion++; break;
             case "expired": fixture.Device.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1); break;
@@ -41,7 +55,7 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
         }
         await db.SaveChangesAsync();
 
-        var result = await executor.ExecuteAsync(Claim(fixture));
+        var result = await executor.ExecuteAsync(claim);
 
         Assert.Equal(expectedCode, Assert.IsType<SyncActionExecutionOutcome.Failed>(result).ErrorCode);
         Assert.Equal(0, adapters.EffectCount);
