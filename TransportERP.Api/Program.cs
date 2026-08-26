@@ -22,6 +22,12 @@ if (bootstrapRequested && args.Any(x => x.Contains("AdminPassword", StringCompar
 var hostArgs = args.Where(x => !string.Equals(x, "--bootstrap-admin", StringComparison.Ordinal)).ToArray();
 var builder = WebApplication.CreateBuilder(hostArgs);
 
+var syncRuntimePolicy = SyncRuntimePolicyOptions.Load(builder.Configuration);
+var syncRuntimePolicyValidation = new SyncRuntimePolicyOptionsValidator().Validate(null, syncRuntimePolicy);
+if (syncRuntimePolicyValidation.Failed)
+    throw new OptionsValidationException("Sync", typeof(SyncRuntimePolicyOptions),
+        syncRuntimePolicyValidation.Failures);
+
 var connectionString = builder.Configuration.GetConnectionString("TransportErp")
     ?? Environment.GetEnvironmentVariable("TRANSPORTERP_CONNECTION_STRING")
     ?? throw new InvalidOperationException("Transport ERP database connection is not configured.");
@@ -46,14 +52,16 @@ builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
 builder.Services.AddScoped<BootstrapAdminService>();
 builder.Services.AddScoped<ISystemPermissionCatalogVerifier, SystemPermissionCatalogVerifier>();
+builder.Services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(syncRuntimePolicy));
+builder.Services.AddSingleton<SyncEffectivePolicyResolver>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),
         services.GetRequiredService<AuditEventService>(),
         new SyncRetryPolicy(
-            builder.Configuration.GetValue("Sync:MaxRetryCount", 5),
-            TimeSpan.FromSeconds(builder.Configuration.GetValue("Sync:BaseRetrySeconds", 5)),
-            TimeSpan.FromMinutes(builder.Configuration.GetValue("Sync:MaxRetryMinutes", 30)))));
+            syncRuntimePolicy.ServerExecutionMaxRetryCount!.Value,
+            TimeSpan.FromSeconds(syncRuntimePolicy.ServerExecutionBaseSeconds!.Value),
+            TimeSpan.FromMinutes(syncRuntimePolicy.ServerExecutionMaxDelayMinutes!.Value))));
 builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();
