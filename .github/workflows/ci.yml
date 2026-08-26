@@ -91,6 +91,41 @@ jobs:
       - name: Run the complete test suite fail-closed
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-all-tests.trx"
 
+      - name: Write exact-head evidence manifest
+        if: ${{ always() }}
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p ci-evidence/core
+          actual=$(git rev-parse HEAD 2>/dev/null || echo unavailable)
+          tree=$(git rev-parse HEAD^{tree} 2>/dev/null || echo unavailable)
+          {
+            echo "workflow=$GITHUB_WORKFLOW"
+            echo "job=core-postgresql"
+            echo "event=$GITHUB_EVENT_NAME"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "job_status=$JOB_STATUS"
+            echo "ref=$GITHUB_REF"
+            echo "expected_sha=$EXPECTED_SHA"
+            echo "actual_sha=$actual"
+            echo "tree_sha=$tree"
+          } > ci-evidence/core/exact-head-manifest.txt
+          test "$actual" = "$EXPECTED_SHA"
+
+      - name: Upload core CI evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-core-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ci-evidence/core/exact-head-manifest.txt
+            TransportERP.Tests/TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 30
+
   desktop-contract:
     name: Required CI / Desktop RTL contract surface
     runs-on: windows-latest
@@ -124,3 +159,38 @@ jobs:
 
       - name: Build Desktop contract surface
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore -p:OutputType=Library
+
+      - name: Write exact-head evidence manifest
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          New-Item -ItemType Directory -Force -Path 'ci-evidence/desktop' | Out-Null
+          $actual = (& git rev-parse HEAD 2>$null)
+          if ($LASTEXITCODE -ne 0) { $actual = 'unavailable' } else { $actual = $actual.Trim() }
+          $tree = (& git rev-parse 'HEAD^{tree}' 2>$null)
+          if ($LASTEXITCODE -ne 0) { $tree = 'unavailable' } else { $tree = $tree.Trim() }
+          @(
+            "workflow=$env:GITHUB_WORKFLOW"
+            'job=desktop-contract'
+            "event=$env:GITHUB_EVENT_NAME"
+            "run_id=$env:GITHUB_RUN_ID"
+            "run_attempt=$env:GITHUB_RUN_ATTEMPT"
+            "job_status=$env:JOB_STATUS"
+            "ref=$env:GITHUB_REF"
+            "expected_sha=$env:EXPECTED_SHA"
+            "actual_sha=$actual"
+            "tree_sha=$tree"
+          ) | Set-Content -Encoding utf8 'ci-evidence/desktop/exact-head-manifest.txt'
+          if ($actual -ne $env:EXPECTED_SHA) { throw 'Desktop evidence manifest does not match the expected exact head.' }
+
+      - name: Upload Desktop CI evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-desktop-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ci-evidence/desktop/exact-head-manifest.txt
+          if-no-files-found: warn
+          retention-days: 30
