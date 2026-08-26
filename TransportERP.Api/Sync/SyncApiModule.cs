@@ -7,6 +7,7 @@ using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Api.Sync;
@@ -215,13 +216,14 @@ public static class SyncApiModule
         SyncBatchRequest? request;
         try { request = SyncBatchJsonContract.Deserialize(rawBody); }
         catch (JsonException) { return Results.BadRequest(new { ErrorCode = "REQUEST_SCHEMA_INVALID", CorrelationId = attemptCorrelationId }); }
-        if (request is null || request.Operations is null || request.Operations.Count is < 1 or > MaximumBatchOperations ||
-            !string.Equals(request.ProtocolVersion, "sync-v1", StringComparison.Ordinal) ||
-            !string.Equals(request.DeviceId, current.DeviceId, StringComparison.Ordinal))
-            return Results.BadRequest(new { ErrorCode = "REQUEST_SCHEMA_INVALID", CorrelationId = attemptCorrelationId });
+        var envelopeError = SyncBatchEnvelopeContract.Validate(request, current.DeviceId, MaximumBatchOperations);
+        if (envelopeError is not null)
+            return Results.BadRequest(new { ErrorCode = envelopeError, CorrelationId = attemptCorrelationId });
 
-        var results = new List<SyncBatchOperationResult>(request.Operations.Count);
-        foreach (var item in request.Operations)
+        var validRequest = request!;
+        var operations = validRequest.Operations!;
+        var results = new List<SyncBatchOperationResult>(operations.Count);
+        foreach (var item in operations)
         {
             var serverTime = DateTimeOffset.UtcNow;
             var validationCode = ValidateOperation(item);
@@ -236,7 +238,7 @@ public static class SyncApiModule
                 _ = TryParseClientOccurredAt(validItem.ClientOccurredAt, out var clientOccurredAt);
                 var operation = await sync.EnqueueAcceptedSyncOperationAsync(
                     new EnqueueAcceptedSyncOperationCommand(
-                        request.ProtocolVersion, validItem.ActionCode, validItem.OperationType, validItem.EntityType,
+                        validRequest.ProtocolVersion, validItem.ActionCode, validItem.OperationType, validItem.EntityType,
                         validItem.EntityId, validItem.ClientOperationId, validItem.PayloadJson, validItem.PayloadHash,
                         clientOccurredAt, validItem.OperationCorrelationId, validItem.BaseVersion),
                     acceptedProof, cancellationToken);
@@ -253,7 +255,7 @@ public static class SyncApiModule
         }
 
         return Results.Ok(new SyncBatchResponse(
-            request.ProtocolVersion, results, DateTimeOffset.UtcNow, attemptCorrelationId.Value));
+            validRequest.ProtocolVersion, results, DateTimeOffset.UtcNow, attemptCorrelationId.Value));
     }
 
     private static string? ValidateOperation(SyncBatchOperationRequest? item)
@@ -274,7 +276,8 @@ public static class SyncApiModule
             });
         }
         catch (JsonException) { return "PAYLOAD_INVALID"; }
-        return SyncActionContract.Validate(item);
+        return SyncActionCatalog.Validate(item.ActionCode, item.OperationType, item.EntityType,
+            item.EntityId, item.BaseVersion).ErrorCode;
     }
 
     private static string? ValidateRequestMetadata(HttpRequest request)
@@ -487,39 +490,18 @@ public sealed record SyncBatchResponse(
     DateTimeOffset ServerTime,
     Guid AttemptCorrelationId);
 
-internal static class SyncActionContract
+public static class SyncBatchEnvelopeContract
 {
-    private sealed record Rule(string OperationType, string EntityType, bool EntityRequired, bool BaseVersionRequired);
-
-    private static readonly IReadOnlyDictionary<string, Rule> Rules = new Dictionary<string, Rule>(StringComparer.Ordinal)
+    public static string? Validate(SyncBatchRequest? request, string currentDeviceId, int maximumBatchOperations)
     {
-        ["CreateJournalEntry"] = new("CREATE", "JournalEntry", false, false),
-        ["CreateReceiptVoucher"] = new("CREATE", "ReceiptVoucher", false, false),
-        ["CreatePaymentVoucher"] = new("CREATE", "PaymentVoucher", false, false),
-        ["CreateWaybillDraft"] = new("CREATE", "Waybill", false, false),
-        ["UpdateWaybillDraft"] = new("UPDATE", "Waybill", true, true),
-        ["CreateOperationalParty"] = new("CREATE", "OperationalParty", false, false),
-        ["AddWaybillAttachment"] = new("CREATE", "Waybill", true, false),
-        ["RecordCollection"] = new("COMMAND", "Waybill", true, false),
-        ["LoadAllocatedQuantity"] = new("COMMAND", "ManifestLine", true, false),
-        ["RecordArrival"] = new("COMMAND", "Trip", true, false),
-        ["RecordUnload"] = new("COMMAND", "ArrivalReceipt", true, false),
-        ["DeliverQuantity"] = new("COMMAND", "Waybill", true, false),
-        ["RecordProofOfDelivery"] = new("CREATE", "Delivery", true, false),
-        ["CreateShipmentException"] = new("COMMAND", "Waybill", true, false)
-    };
-
-    public static string Validate(SyncBatchOperationRequest operation)
-    {
-        if (operation.OperationType == "DELETE" || !Rules.TryGetValue(operation.ActionCode, out var rule))
-            return "ONLINE_REQUIRED";
-        if (operation.OperationType != rule.OperationType || operation.EntityType != rule.EntityType ||
-            (rule.EntityRequired && !operation.EntityId.HasValue) ||
-            (rule.BaseVersionRequired && !operation.BaseVersion.HasValue) ||
-            (!rule.BaseVersionRequired && operation.BaseVersion.HasValue))
-            return "ACTION_CONTRACT_MISMATCH";
-        // No baseline action has an approved offline dispatcher yet. Keeping this explicit prevents
-        // an allowlisted name from becoming executable merely because the transport Runtime exists.
-        return "ACTION_RUNTIME_UNAVAILABLE";
+        if (request is null || request.Operations is null ||
+            string.IsNullOrEmpty(request.DeviceId) ||
+            !string.Equals(request.DeviceId, currentDeviceId, StringComparison.Ordinal))
+            return "REQUEST_SCHEMA_INVALID";
+        if (request.Operations.Count is < 1 || request.Operations.Count > maximumBatchOperations)
+            return "BATCH_SIZE_INVALID";
+        if (!string.Equals(request.ProtocolVersion, "sync-v1", StringComparison.Ordinal))
+            return "PROTOCOL_VERSION_UNSUPPORTED";
+        return null;
     }
 }
