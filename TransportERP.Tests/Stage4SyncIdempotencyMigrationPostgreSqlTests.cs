@@ -144,7 +144,11 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
                NULL,'QUEUED',0,NULL,NULL,{scope.RegisteredDeviceId},1,{now},{now},{RandomNumberGenerator.GetBytes(16)})
             """);
 
-        await migrator.MigrateAsync(Stage4Migration);
+        // The DbContext model includes later Stage 4 execution columns. Bring the
+        // database to the current exact-head schema before exercising an EF insert;
+        // otherwise EF correctly emits those columns against the older 030000 schema
+        // and masks the cross-generation idempotency assertion with 42703.
+        await db.Database.MigrateAsync();
         var legacyShape = await db.Database.SqlQuery<int>($"""
             SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations
             WHERE "Id"={legacyId} AND "RequestFingerprintVersion" IS NULL
@@ -176,7 +180,7 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
             SELECT count(*)::int AS "Value" FROM pg_indexes
             WHERE schemaname='transport_erp' AND indexname='IX_sync_operations_DeviceId_ClientOperationId'
             """).SingleAsync());
-        await migrator.MigrateAsync(Stage4Migration);
+        await db.Database.MigrateAsync();
         Assert.Equal(2, await db.Database.SqlQuery<int>($"""
             SELECT count(*)::int AS "Value" FROM information_schema.tables
             WHERE table_schema='transport_erp' AND table_name IN ('sync_proof_nonces','sync_proof_replays')
