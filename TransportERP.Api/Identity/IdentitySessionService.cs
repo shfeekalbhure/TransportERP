@@ -182,8 +182,8 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
                 {
                     try
                     {
-                        provenBinding = await registeredDevices.ValidateBindingAsync(preview.UserId, preview.CompanyId,
-                            preview.BranchId, preview.DeviceId, request.DeviceCredential, updateLastSeen: true,
+                        provenBinding = await registeredDevices.ValidateBindingForRefreshAsync(preview.UserId,
+                            preview.CompanyId, preview.BranchId, preview.DeviceId, request.DeviceCredential,
                             correlationId, ct);
                     }
                     catch (RegisteredDeviceException)
@@ -194,28 +194,37 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
                 if (provenBinding is null || provenBinding.RegisteredDeviceId != preview.RegisteredDeviceId ||
                     provenBinding.CredentialVersion != preview.DeviceCredentialVersion)
                 {
+                    await AppendDeferredLastSeenAuditAsync(provenBinding, preview, correlationId, ct);
                     await AuditAsync("IdentityRefresh", "FAILURE", preview.UserId, preview.CompanyId,
                         preview.BranchId, preview.DeviceId, correlationId, "DEVICE_PROOF_INVALID", ip, ct);
                     await transaction.CommitAsync(ct);
                     throw InvalidRefresh();
                 }
             }
-            var old = await LockSessionByRefreshHashAsync(hash, ct);
+            // A trusted refresh already owns the RegisteredDevice row. Lock the complete family in
+            // database UUID order before either the deferred LastSeen audit or the refresh audit.
+            // This keeps the global order Device -> AuthSession(s) -> AuditStreamHead.
+            var old = preview is null
+                ? null
+                : (await LockSessionFamilyAsync(preview.RefreshTokenFamilyId, ct))
+                    .SingleOrDefault(x => x.RefreshTokenHash == hash);
             if (old is null)
             {
+                if (preview is not null)
+                    await AppendDeferredLastSeenAuditAsync(provenBinding, preview, correlationId, ct);
                 await AuditAsync("IdentityRefresh", "FAILURE", null, null, null, null, correlationId, "REFRESH_TOKEN_INVALID", ip, ct);
                 await transaction.CommitAsync(ct);
                 throw InvalidRefresh();
             }
             var now = DateTimeOffset.UtcNow;
-            if (old.RevokedAt.HasValue) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_REUSE", correlationId, ip, transaction, ct);
-            if (old.RefreshTokenExpiresAt <= now) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_EXPIRED", correlationId, ip, transaction, ct);
-            if (!string.Equals(old.DeviceId, deviceId, StringComparison.Ordinal)) return await RejectTrustedRefreshAsync(old, "DEVICE_MISMATCH", correlationId, ip, transaction, ct);
+            if (old.RevokedAt.HasValue) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_REUSE", provenBinding, correlationId, ip, transaction, ct);
+            if (old.RefreshTokenExpiresAt <= now) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_EXPIRED", provenBinding, correlationId, ip, transaction, ct);
+            if (!string.Equals(old.DeviceId, deviceId, StringComparison.Ordinal)) return await RejectTrustedRefreshAsync(old, "DEVICE_MISMATCH", provenBinding, correlationId, ip, transaction, ct);
 
             if (old.RegisteredDeviceId.HasValue &&
                 (provenBinding is null || provenBinding.RegisteredDeviceId != old.RegisteredDeviceId ||
                  provenBinding.CredentialVersion != old.DeviceCredentialVersion))
-                return await RejectTrustedRefreshAsync(old, "DEVICE_BINDING_CHANGED", correlationId, ip, transaction, ct);
+                return await RejectTrustedRefreshAsync(old, "DEVICE_BINDING_CHANGED", provenBinding, correlationId, ip, transaction, ct);
 
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == old.UserId, ct);
             var scope = user is null ? null : await scopeResolver.ResolveAsync(user, old.CompanyId, old.BranchId, ct);
@@ -235,7 +244,7 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             if (user is null || user.Status != "ACTIVE" || user.LockoutEnd > now || scope is null ||
                 !FixedEquals(user.SecurityStamp, old.SecurityStampAtIssue) ||
                 user.AuthVersion != old.AuthVersionAtIssue || !deviceBindingActive)
-                return await RejectTrustedRefreshAsync(old, "SECURITY_CONTEXT_CHANGED", correlationId, ip, transaction, ct);
+                return await RejectTrustedRefreshAsync(old, "SECURITY_CONTEXT_CHANGED", provenBinding, correlationId, ip, transaction, ct);
 
             var refresh = NewRefreshToken();
             var binding = old.RegisteredDeviceId.HasValue && old.DeviceCredentialVersion.HasValue
@@ -246,6 +255,7 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             old.LastUsedAt = now; old.UpdatedAt = now; old.RowVersion = RandomNumberGenerator.GetBytes(16);
             db.AuthSessions.Add(replacement);
             await db.SaveChangesAsync(ct);
+            await AppendDeferredLastSeenAuditAsync(provenBinding, old, correlationId, ct);
             await AuditAsync("IdentityRefresh", "SUCCESS", user.Id, old.CompanyId, old.BranchId, old.DeviceId,
                 correlationId, "SESSION_ROTATED", ip, ct);
             await transaction.CommitAsync(ct);
@@ -281,9 +291,11 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
     }
 
     private async Task<IdentitySessionResponse> RejectTrustedRefreshAsync(AuthSession session, string reason,
+        TrustedDeviceBinding? binding,
         Guid correlationId, string? ip, Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction, CancellationToken ct)
     {
         await RevokeFamilyAsync(session.RefreshTokenFamilyId, reason, DateTimeOffset.UtcNow, ct);
+        await AppendDeferredLastSeenAuditAsync(binding, session, correlationId, ct);
         await AuditAsync("IdentityRefresh", "FAILURE", session.UserId, session.CompanyId, session.BranchId,
             session.DeviceId, correlationId, reason, ip, ct);
         await transaction.CommitAsync(ct);
@@ -293,7 +305,12 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
     private async Task RevokeAfterRefreshRaceAsync(string hash, Guid correlationId, string? ip, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        var session = await LockSessionByRefreshHashAsync(hash, ct);
+        var preview = await db.AuthSessions.AsNoTracking().SingleOrDefaultAsync(
+            x => x.RefreshTokenHash == hash, ct);
+        var session = preview is null
+            ? null
+            : (await LockSessionFamilyAsync(preview.RefreshTokenFamilyId, ct))
+                .SingleOrDefault(x => x.RefreshTokenHash == hash);
         if (session is null)
             await AuditAsync("IdentityRefresh", "FAILURE", null, null, null, null, correlationId, "REFRESH_TOKEN_INVALID", ip, ct);
         else
@@ -305,9 +322,12 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
         await transaction.CommitAsync(ct);
     }
 
-    private Task<AuthSession?> LockSessionByRefreshHashAsync(string hash, CancellationToken ct)
-        => db.AuthSessions.FromSqlInterpolated(
-            $"SELECT * FROM transport_erp.auth_sessions WHERE \"RefreshTokenHash\" = {hash} FOR UPDATE").SingleOrDefaultAsync(ct);
+    private Task<List<AuthSession>> LockSessionFamilyAsync(Guid familyId, CancellationToken ct)
+        => db.AuthSessions.FromSqlInterpolated($$"""
+            SELECT * FROM transport_erp.auth_sessions
+            WHERE "RefreshTokenFamilyId"={{familyId}}
+            ORDER BY "Id" FOR UPDATE
+            """).ToListAsync(ct);
 
     private PasswordVerificationResult VerifyPassword(User? user, string password)
     {
@@ -351,10 +371,17 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
 
     private async Task RevokeFamilyAsync(Guid familyId, string reason, DateTimeOffset now, CancellationToken ct)
     {
-        var active = await db.AuthSessions.Where(x => x.RefreshTokenFamilyId == familyId && x.RevokedAt == null).ToListAsync(ct);
+        var active = (await LockSessionFamilyAsync(familyId, ct)).Where(x => x.RevokedAt == null).ToList();
         foreach (var item in active) { item.RevokedAt = now; item.RevokeReason = reason; item.UpdatedAt = now; item.RowVersion = RandomNumberGenerator.GetBytes(16); }
         if (active.Count > 0) await db.SaveChangesAsync(ct);
     }
+
+    private Task AppendDeferredLastSeenAuditAsync(TrustedDeviceBinding? binding, AuthSession session,
+        Guid correlationId, CancellationToken ct)
+        => binding is null || registeredDevices is null
+            ? Task.CompletedTask
+            : registeredDevices.AppendDeferredLastSeenAuditAsync(binding, session.UserId, session.CompanyId,
+                session.BranchId, correlationId, session.DeviceId, ct);
 
     private async Task AuditAsync(string action, string outcome, Guid? userId, Guid? companyId, Guid? branchId,
         string? deviceId, Guid correlationId, string reason, string? ip, CancellationToken ct)

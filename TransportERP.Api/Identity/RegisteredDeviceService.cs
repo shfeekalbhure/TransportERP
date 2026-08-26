@@ -12,7 +12,10 @@ public sealed class RegisteredDeviceException(string code) : InvalidOperationExc
     public string Code { get; } = code;
 }
 
-public sealed record TrustedDeviceBinding(Guid RegisteredDeviceId, int CredentialVersion);
+public sealed record TrustedDeviceBinding(Guid RegisteredDeviceId, int CredentialVersion)
+{
+    internal bool LastSeenAuditPending { get; init; }
+}
 
 public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEventService audit)
 {
@@ -215,13 +218,26 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
         }
     }
 
-    public async Task<TrustedDeviceBinding?> ValidateBindingAsync(Guid userId, Guid companyId, Guid? branchId,
+    public Task<TrustedDeviceBinding?> ValidateBindingAsync(Guid userId, Guid companyId, Guid? branchId,
         string deviceId, string? credential, bool updateLastSeen, Guid correlationId, CancellationToken ct)
+        => ValidateBindingCoreAsync(userId, companyId, branchId, deviceId, credential, updateLastSeen,
+            correlationId, ct, deferLastSeenAudit: false);
+
+    internal Task<TrustedDeviceBinding?> ValidateBindingForRefreshAsync(Guid userId, Guid companyId, Guid? branchId,
+        string deviceId, string? credential, Guid correlationId, CancellationToken ct)
+        => ValidateBindingCoreAsync(userId, companyId, branchId, deviceId, credential, updateLastSeen: true,
+            correlationId, ct, deferLastSeenAudit: true);
+
+    private async Task<TrustedDeviceBinding?> ValidateBindingCoreAsync(Guid userId, Guid companyId, Guid? branchId,
+        string deviceId, string? credential, bool updateLastSeen, Guid correlationId, CancellationToken ct,
+        bool deferLastSeenAudit)
     {
         if (!branchId.HasValue || !TryHashCredential(credential, out var hash)) return null;
         var normalizedDevice = IdentitySessionService.NormalizeDevice(deviceId);
         if (normalizedDevice is null) return null;
         var ownsTransaction = db.Database.CurrentTransaction is null;
+        if (deferLastSeenAudit && ownsTransaction)
+            throw new InvalidOperationException("Deferred LastSeen audit requires a caller-owned transaction.");
         await using var transaction = ownsTransaction
             ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct) : null;
         try
@@ -256,16 +272,18 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
             if (transaction is not null) await transaction.CommitAsync(ct);
             return null;
         }
+        var lastSeenAuditPending = false;
         if (updateLastSeen && (!device.LastSeenAt.HasValue || now - device.LastSeenAt.Value >= LastSeenWriteInterval))
         {
             device.LastSeenAt = now; Touch(device, now);
             await db.SaveChangesAsync(ct);
-            await audit.AppendAuditEventAsync(new AuditEventDraft("RegisteredDeviceSeen", "SUCCESS",
-                nameof(RegisteredDevice), device.Id, userId, companyId, branchId, correlationId,
-                device.DeviceId, Reason: $"CredentialVersion={device.CredentialVersion}"), ct);
+            lastSeenAuditPending = deferLastSeenAudit;
+            if (!deferLastSeenAudit)
+                await AppendSeenAuditAsync(device.Id, device.CredentialVersion, userId, companyId, branchId,
+                    correlationId, device.DeviceId, ct);
         }
         if (transaction is not null) await transaction.CommitAsync(ct);
-        return new(device.Id, device.CredentialVersion);
+        return new(device.Id, device.CredentialVersion) { LastSeenAuditPending = lastSeenAuditPending };
         }
         catch
         {
@@ -276,6 +294,16 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
             }
             throw;
         }
+    }
+
+    internal async Task AppendDeferredLastSeenAuditAsync(TrustedDeviceBinding binding, Guid userId, Guid companyId,
+        Guid? branchId, Guid correlationId, string deviceId, CancellationToken ct)
+    {
+        if (!binding.LastSeenAuditPending) return;
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Deferred LastSeen audit must remain in the identity transaction.");
+        await AppendSeenAuditAsync(binding.RegisteredDeviceId, binding.CredentialVersion, userId, companyId,
+            branchId, correlationId, deviceId, ct);
     }
 
     private async Task<RegisteredDeviceResponse> ChangeStatusAsync(Guid id, CurrentSecurityContext current,
@@ -324,15 +352,49 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
     private async Task RevokeSessionsAsync(Guid deviceId, string reason, DateTimeOffset now, CancellationToken ct,
         Guid? userId = null, Guid? branchId = null)
     {
-        var query = db.AuthSessions.Where(x => x.RegisteredDeviceId == deviceId && x.RevokedAt == null);
-        if (userId.HasValue) query = query.Where(x => x.UserId == userId);
-        if (branchId.HasValue) query = query.Where(x => x.BranchId == branchId);
-        foreach (var session in await query.ToListAsync(ct))
+        // Every caller owns the RegisteredDevice row. Explicit row locks make multi-session
+        // revocation deterministic before the caller appends to AuditStreamHead.
+        List<AuthSession> sessions;
+        if (userId.HasValue && branchId.HasValue)
+            sessions = await db.AuthSessions.FromSqlInterpolated($$"""
+                SELECT * FROM transport_erp.auth_sessions
+                WHERE "RegisteredDeviceId"={{deviceId}} AND "RevokedAt" IS NULL
+                  AND "UserId"={{userId.Value}} AND "BranchId"={{branchId.Value}}
+                ORDER BY "Id" FOR UPDATE
+                """).ToListAsync(ct);
+        else if (userId.HasValue)
+            sessions = await db.AuthSessions.FromSqlInterpolated($$"""
+                SELECT * FROM transport_erp.auth_sessions
+                WHERE "RegisteredDeviceId"={{deviceId}} AND "RevokedAt" IS NULL
+                  AND "UserId"={{userId.Value}}
+                ORDER BY "Id" FOR UPDATE
+                """).ToListAsync(ct);
+        else if (branchId.HasValue)
+            sessions = await db.AuthSessions.FromSqlInterpolated($$"""
+                SELECT * FROM transport_erp.auth_sessions
+                WHERE "RegisteredDeviceId"={{deviceId}} AND "RevokedAt" IS NULL
+                  AND "BranchId"={{branchId.Value}}
+                ORDER BY "Id" FOR UPDATE
+                """).ToListAsync(ct);
+        else
+            sessions = await db.AuthSessions.FromSqlInterpolated($$"""
+                SELECT * FROM transport_erp.auth_sessions
+                WHERE "RegisteredDeviceId"={{deviceId}} AND "RevokedAt" IS NULL
+                ORDER BY "Id" FOR UPDATE
+                """).ToListAsync(ct);
+
+        foreach (var session in sessions)
         {
             session.RevokedAt = now; session.RevokeReason = reason;
             session.UpdatedAt = now; session.RowVersion = RandomNumberGenerator.GetBytes(16);
         }
     }
+
+    private Task AppendSeenAuditAsync(Guid deviceId, int credentialVersion, Guid userId, Guid companyId,
+        Guid? branchId, Guid correlationId, string textualDeviceId, CancellationToken ct)
+        => audit.AppendAuditEventAsync(new AuditEventDraft("RegisteredDeviceSeen", "SUCCESS",
+            nameof(RegisteredDevice), deviceId, userId, companyId, branchId, correlationId,
+            textualDeviceId, Reason: $"CredentialVersion={credentialVersion}"), ct);
 
     private Task AppendAuditAsync(string action, RegisteredDevice device, CurrentSecurityContext actor,
         Guid correlationId, string reason, CancellationToken ct)

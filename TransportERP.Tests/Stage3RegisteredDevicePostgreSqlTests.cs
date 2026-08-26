@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Claims;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -365,6 +366,95 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Refresh_with_due_last_seen_racing_self_revoke_has_no_deadlock_and_is_linearizable()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        var scope = await SeedAsync(seedDb, "REFSELF");
+        var hasher = new PasswordHasher<User>();
+        var user = await seedDb.Users.SingleAsync(x => x.Id == scope.UserId);
+        const string password = "Refresh-Self-Deadlock-42!";
+        user.PasswordHash = hasher.HashPassword(user, password);
+        await seedDb.SaveChangesAsync();
+        var secret = Secret();
+        var seedDevices = new RegisteredDeviceService(seedDb, new AuditEventService(seedDb));
+        var device = await seedDevices.RegisterAsync(scope.Actor,
+            new($"terminal-{Guid.NewGuid():N}", "Refresh self lock order", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", secret), Guid.NewGuid(), default);
+        await seedDevices.ApproveAsync(device.Id, scope.Actor, Guid.NewGuid(), default);
+        await seedDevices.AddAssignmentAsync(device.Id, new(scope.UserId, scope.BranchId),
+            scope.Actor, Guid.NewGuid(), default);
+        var identity = CreateIdentity(seedDb, hasher, seedDevices);
+        var login = await identity.CreateAsync(new(user.UserName, password, scope.CompanyId,
+            scope.BranchId, device.DeviceId, secret), Guid.NewGuid(), "127.0.0.1", default);
+        var familyId = await seedDb.AuthSessions.Where(x => x.Id == login.SessionId)
+            .Select(x => x.RefreshTokenFamilyId).SingleAsync();
+        await seedDb.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.registered_devices
+            SET "LastSeenAt"={DateTimeOffset.UtcNow.Subtract(RegisteredDeviceService.LastSeenWriteInterval).AddMinutes(-1)}
+            WHERE "Id"={device.Id}
+            """);
+        seedDb.ChangeTracker.Clear();
+
+        var streamKey = AuditEventService.GetStreamKey(scope.CompanyId, scope.BranchId, device.DeviceId);
+        await using var holderDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await holderDb.Database.OpenConnectionAsync();
+        await using var holderTransaction = await holderDb.Database.BeginTransactionAsync();
+        await holderDb.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT "StreamKey" FROM transport_erp.audit_stream_heads
+            WHERE "StreamKey"={streamKey}
+            FOR UPDATE
+            """);
+
+        var refreshCorrelation = Guid.NewGuid();
+        await using var refreshDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await refreshDb.Database.OpenConnectionAsync();
+        var refreshPid = await refreshDb.Database.SqlQueryRaw<int>(
+            "SELECT pg_backend_pid() AS \"Value\"").SingleAsync();
+        var refreshDevices = new RegisteredDeviceService(refreshDb, new AuditEventService(refreshDb));
+        var refreshTask = CaptureExceptionAsync(() => CreateIdentity(refreshDb, new PasswordHasher<User>(), refreshDevices)
+            .RefreshAsync(new(login.RefreshToken, device.DeviceId, secret), refreshCorrelation, "127.0.0.1", default));
+
+        await using var monitorDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await WaitUntilBackendWaitsForLockAsync(monitorDb, refreshPid);
+
+        var revokeCorrelation = Guid.NewGuid();
+        await using var revokeDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await revokeDb.Database.OpenConnectionAsync();
+        var revokePid = await revokeDb.Database.SqlQueryRaw<int>(
+            "SELECT pg_backend_pid() AS \"Value\"").SingleAsync();
+        var revokeService = CreateIdentity(revokeDb, new PasswordHasher<User>(),
+            new RegisteredDeviceService(revokeDb, new AuditEventService(revokeDb)));
+        var current = scope.Actor with
+        {
+            SessionId = login.SessionId, DeviceId = device.DeviceId, RegisteredDeviceId = device.Id,
+            DeviceCredentialVersion = device.CredentialVersion
+        };
+        var revokeTask = CaptureExceptionAsync(() => revokeService.RevokeAsync(login.SessionId, current,
+            "CONCURRENT_SELF_REVOKE", revokeCorrelation, "127.0.0.1", default));
+        await WaitUntilBackendWaitsForLockAsync(monitorDb, revokePid);
+
+        await holderTransaction.CommitAsync();
+        var outcomes = await Task.WhenAll(refreshTask, revokeTask).WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.DoesNotContain(outcomes, IsDeadlock);
+        Assert.All(outcomes, outcome => Assert.Null(outcome));
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var family = await verify.AuthSessions.AsNoTracking()
+            .Where(x => x.RefreshTokenFamilyId == familyId).ToListAsync();
+        Assert.Equal(2, family.Count);
+        Assert.Single(family, x => x.RevokedAt is null);
+        Assert.NotNull(family.Single(x => x.Id == login.SessionId).RevokedAt);
+        Assert.Equal(2, await verify.AuditEvents.CountAsync(x => x.CorrelationId == refreshCorrelation));
+        Assert.Single(await verify.AuditEvents.Where(x => x.CorrelationId == revokeCorrelation).ToListAsync());
+        var chain = await new AuditEventService(verify).VerifyHashChainAsync(
+            scope.CompanyId, scope.BranchId, device.DeviceId);
+        Assert.True(chain.IsValid, chain.FailureReason);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task External_authority_device_claims_never_create_a_trusted_registered_device_binding()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -691,6 +781,19 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
                 new(user.UserName, password, scope.CompanyId, scope.BranchId, device.DeviceId, secret),
                 Guid.NewGuid(), "127.0.0.1", default);
         }
+        if (mutation is "suspend" or "rotate" or "remove" or "revoke")
+        {
+            seedDb.AuthSessions.AddRange(
+                NewSession(scope, device.Id, 1, device.DeviceId),
+                NewSession(scope, device.Id, 1, device.DeviceId));
+            await seedDb.SaveChangesAsync();
+            await seedDb.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE transport_erp.registered_devices
+                SET "LastSeenAt"={DateTimeOffset.UtcNow.Subtract(RegisteredDeviceService.LastSeenWriteInterval).AddMinutes(-1)}
+                WHERE "Id"={device.Id}
+                """);
+            seedDb.ChangeTracker.Clear();
+        }
 
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async Task<Exception?> IdentityAction()
@@ -766,6 +869,37 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
     private static bool IsDeadlock(Exception? exception)
         => exception is Npgsql.PostgresException { SqlState: "40P01" } ||
            exception?.GetBaseException() is Npgsql.PostgresException { SqlState: "40P01" };
+
+    private static async Task<Exception?> CaptureExceptionAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
+    private static async Task WaitUntilBackendWaitsForLockAsync(TransportErpDbContext monitorDb, int backendPid)
+    {
+        var timeout = Stopwatch.StartNew();
+        while (timeout.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            var waiting = await monitorDb.Database.SqlQueryInterpolated<bool>($"""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE pid={backendPid} AND wait_event_type='Lock'
+                ) AS "Value"
+                """).SingleAsync();
+            if (waiting) return;
+            await Task.Delay(20);
+        }
+
+        throw new TimeoutException($"PostgreSQL backend {backendPid} did not reach the required lock wait.");
+    }
 
     [Fact]
     public async Task Stage3_offline_policy_is_hard_disabled_even_when_configuration_might_be_true()
