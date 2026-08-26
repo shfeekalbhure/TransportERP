@@ -27,8 +27,15 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("session.BranchId != request.BranchId", authenticated, StringComparison.Ordinal);
         Assert.Contains("request.CompanyId is null", authenticated, StringComparison.Ordinal);
         Assert.Contains("request.BranchId is null", authenticated, StringComparison.Ordinal);
-        Assert.Contains("SameOrigin(request.ServerOrigin, decision.BatchEndpoint)", authenticated,
+        Assert.Contains("DriverDeploymentAuthority.Origin", authenticated, StringComparison.Ordinal);
+        Assert.Contains("https://sync.example.test/", authenticated, StringComparison.Ordinal);
+        Assert.Contains("SameOrigin(DriverDeploymentAuthority.Origin, decision.BatchEndpoint)", authenticated,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerOrigin", authenticated, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.GetEnvironmentVariable", authenticated, StringComparison.Ordinal);
+        Assert.Contains("MaximumJsonResponseBytes = 65_536", authenticated, StringComparison.Ordinal);
+        Assert.Contains("ReadAsStreamAsync", authenticated, StringComparison.Ordinal);
+        Assert.Contains("SERVER_RESPONSE_TOO_LARGE", authenticated, StringComparison.Ordinal);
         Assert.Contains("ArmExpiry(session.AccessTokenExpiresAt)", authenticated, StringComparison.Ordinal);
         Assert.Contains("PolicySourceFingerprint", authenticated, StringComparison.Ordinal);
         Assert.Contains("IsSha256Hex(decision.PolicySourceFingerprint)", authenticated,
@@ -227,7 +234,11 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("ConflictDecisionReady", page, StringComparison.Ordinal);
         Assert.Contains("RESOLUTION_CONFIRMATION_REQUIRED", page, StringComparison.Ordinal);
         Assert.Contains("RESOLUTION_REASON_REQUIRED", page, StringComparison.Ordinal);
-        Assert.Contains("parsed <= 0", page, StringComparison.Ordinal);
+        Assert.Contains("_selected.ConflictServerVersion is not > 0", page, StringComparison.Ordinal);
+        Assert.Contains("baseVersion = _selected.ConflictServerVersion", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current base version for REAPPLY", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("_reapplyBaseVersion", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("_serverOrigin", page, StringComparison.Ordinal);
         Assert.Contains("CanRetryFailedOperations", page, StringComparison.Ordinal);
         Assert.Contains("CanResolveConflicts", page, StringComparison.Ordinal);
         Assert.Contains("SafeCode(exception)", page, StringComparison.Ordinal);
@@ -245,6 +256,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("DriverOfflineOperationPermissions operationPermissions", activation,
             StringComparison.Ordinal);
         Assert.Contains("request.OperationPermissions", activation, StringComparison.Ordinal);
+        Assert.Contains("request.UserId.ToString(\"N\")", activation, StringComparison.Ordinal);
         Assert.Contains("StateChanged", activation, StringComparison.Ordinal);
         Assert.Contains("OFFLINE_CLOSED", activation, StringComparison.Ordinal);
         Assert.True(

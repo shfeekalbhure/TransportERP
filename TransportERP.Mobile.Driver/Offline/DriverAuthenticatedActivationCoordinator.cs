@@ -11,6 +11,12 @@ using TransportERP.Offline.Transport;
 
 namespace TransportERP.Mobile.Driver.Offline;
 
+internal static class DriverDeploymentAuthority
+{
+    // Build-pinned authority. It cannot be replaced by UI, arguments or environment variables.
+    internal static readonly Uri Origin = new("https://sync.example.test/", UriKind.Absolute);
+}
+
 /// <summary>
 /// Secrets supplied by the interactive sign-in surface. This is deliberately a class rather than
 /// a record so generated formatting cannot disclose the password or device credential.
@@ -18,7 +24,6 @@ namespace TransportERP.Mobile.Driver.Offline;
 public sealed class DriverInteractiveSignInRequest
 {
     public DriverInteractiveSignInRequest(
-        Uri serverOrigin,
         string userNameOrEmail,
         string password,
         Guid? companyId,
@@ -26,7 +31,6 @@ public sealed class DriverInteractiveSignInRequest
         string deviceId,
         string? deviceCredential)
     {
-        ServerOrigin = serverOrigin;
         UserNameOrEmail = userNameOrEmail;
         Password = password;
         CompanyId = companyId;
@@ -35,7 +39,6 @@ public sealed class DriverInteractiveSignInRequest
         DeviceCredential = deviceCredential;
     }
 
-    public Uri ServerOrigin { get; }
     internal string UserNameOrEmail { get; }
     internal string Password { get; }
     public Guid? CompanyId { get; }
@@ -79,11 +82,11 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             await DeactivateCoreAsync(cancellationToken);
             var session = await CreateSessionAsync(request, cancellationToken);
             _authenticatedSession = new(
-                request.ServerOrigin, session.SessionId, session.AccessToken, session.AccessTokenExpiresAt);
+                session.SessionId, session.AccessToken, session.AccessTokenExpiresAt);
             try
             {
                 var decision = await GetActivationDecisionAsync(
-                    request.ServerOrigin, session.AccessToken, cancellationToken);
+                    session.AccessToken, cancellationToken);
                 ValidateDecision(request, session, decision);
 
                 var localKeyAvailable = await signingKey.IsNativeSigningKeyAvailableAsync(cancellationToken);
@@ -101,13 +104,13 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                             ? DriverKeyProvisioning.ReplaceForRecovery
                             : DriverKeyProvisioning.UseExisting;
                     await EnrollOrRecoverKeyAsync(
-                        request.ServerOrigin, session, decision, provisioning,
+                        session, decision, provisioning,
                         cancellationToken);
                     if (serverHasBinding)
                         throw new DriverOfflineUnavailableException(
                             "DEVICE_KEY_RECOVERY_REAUTHENTICATION_REQUIRED");
                     decision = await GetActivationDecisionAsync(
-                        request.ServerOrigin, session.AccessToken, cancellationToken);
+                        session.AccessToken, cancellationToken);
                     ValidateDecision(request, session, decision);
                 }
 
@@ -158,7 +161,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         DriverInteractiveSignInRequest request,
         CancellationToken cancellationToken)
     {
-        var endpoint = Endpoint(request.ServerOrigin, "/api/v1/auth/sessions");
+        var endpoint = Endpoint("/api/v1/auth/sessions");
         using var message = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = JsonContent.Create(new
@@ -189,12 +192,11 @@ public sealed class DriverAuthenticatedActivationCoordinator(
     }
 
     private async Task<DriverServerActivationDecision> GetActivationDecisionAsync(
-        Uri origin,
         string bearer,
         CancellationToken cancellationToken)
     {
         using var message = AuthorizedRequest(
-            HttpMethod.Get, Endpoint(origin, "/api/v1/sync/activation"), bearer);
+            HttpMethod.Get, Endpoint("/api/v1/sync/activation"), bearer);
         using var response = await network.SyncHttpClient.SendAsync(
             message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.StatusCode != HttpStatusCode.OK)
@@ -205,7 +207,6 @@ public sealed class DriverAuthenticatedActivationCoordinator(
     }
 
     private async Task EnrollOrRecoverKeyAsync(
-        Uri origin,
         DriverSessionResponse session,
         DriverServerActivationDecision decision,
         DriverKeyProvisioning provisioning,
@@ -234,7 +235,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         var publicKey = await signingKey.GetPublicJwkAsync(cancellationToken);
         var changeRequestId = Guid.NewGuid();
         var expectedVersion = decision.ProofKeyVersion;
-        var challengeEndpoint = Endpoint(origin,
+        var challengeEndpoint = Endpoint(
             $"/api/v1/devices/{decision.RegisteredDeviceId:D}/proof-key-challenges");
         using var challengeRequest = AuthorizedRequest(HttpMethod.Post, challengeEndpoint, session.AccessToken);
         challengeRequest.Content = JsonContent.Create(new
@@ -257,9 +258,9 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             throw new DriverOfflineUnavailableException("DEVICE_KEY_ENROLLMENT_CHALLENGE_INVALID");
 
         var suffix = changeType == "BIND" ? "bind-proof-key" : "recover-proof-key";
-        var changeEndpoint = Endpoint(origin,
+        var changeEndpoint = Endpoint(
             $"/api/v1/devices/{decision.RegisteredDeviceId:D}:{suffix}");
-        var reason = changeType == "RECOVER" ? "Android Keystore alias unavailable; explicit recovery requested." : null;
+        var reason = changeType == "RECOVER" ? "Explicit Android Keystore proof-key recovery requested." : null;
         var rawBody = JsonSerializer.SerializeToUtf8Bytes(new
         {
             challengeId = challenge.ChallengeId,
@@ -353,7 +354,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             !IsSha256Hex(decision.PolicySourceFingerprint) ||
             decision.BatchEndpoint is null || !decision.BatchEndpoint.IsAbsoluteUri ||
             decision.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
-            !SameOrigin(request.ServerOrigin, decision.BatchEndpoint) ||
+            !SameOrigin(DriverDeploymentAuthority.Origin, decision.BatchEndpoint) ||
             decision.BatchEndpoint.AbsolutePath != "/api/v1/sync/operations:batch" ||
             decision.ProofKeyVersion is <= 0 ||
             decision.ProofKeyVersion is null &&
@@ -383,7 +384,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             try
             {
                 using var revoke = AuthorizedRequest(HttpMethod.Post,
-                    Endpoint(session.ServerOrigin, $"/api/v1/auth/sessions/{session.SessionId:D}:revoke"),
+                    Endpoint($"/api/v1/auth/sessions/{session.SessionId:D}:revoke"),
                     session.Bearer);
                 revoke.Content = JsonContent.Create(new { reason = "Mobile driver sign-out" });
                 using var _ = await network.SyncHttpClient.SendAsync(
@@ -419,21 +420,41 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         return request;
     }
 
+    private const int MaximumJsonResponseBytes = 65_536;
+
     private static async Task<T> ReadJsonAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
+        if (response.Content.Headers.ContentLength is > MaximumJsonResponseBytes)
+            throw new DriverOfflineUnavailableException("SERVER_RESPONSE_TOO_LARGE");
+        var payload = new byte[MaximumJsonResponseBytes + 1];
         try
         {
-            return await response.Content.ReadFromJsonAsync<T>(Json, cancellationToken)
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var total = 0;
+            while (total < payload.Length)
+            {
+                var read = await stream.ReadAsync(payload.AsMemory(total, payload.Length - total), cancellationToken);
+                if (read == 0) break;
+                total += read;
+            }
+            if (total > MaximumJsonResponseBytes)
+                throw new DriverOfflineUnavailableException("SERVER_RESPONSE_TOO_LARGE");
+            return JsonSerializer.Deserialize<T>(payload.AsSpan(0, total), Json)
                 ?? throw new DriverOfflineUnavailableException("SERVER_RESPONSE_INVALID");
         }
         catch (JsonException exception)
         {
             throw new DriverOfflineUnavailableException("SERVER_RESPONSE_INVALID", exception);
         }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(payload);
+        }
     }
 
-    private static Uri Endpoint(Uri origin, string path)
+    private static Uri Endpoint(string path)
     {
+        var origin = DriverDeploymentAuthority.Origin;
         if (origin.Scheme != Uri.UriSchemeHttps || origin.AbsolutePath != "/" ||
             !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) ||
             !string.IsNullOrEmpty(origin.UserInfo))
@@ -443,7 +464,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
 
     private static void ValidateInteractiveRequest(DriverInteractiveSignInRequest request)
     {
-        _ = Endpoint(request.ServerOrigin, "/");
+        _ = Endpoint("/");
         if (string.IsNullOrWhiteSpace(request.UserNameOrEmail) || string.IsNullOrEmpty(request.Password) ||
             request.CompanyId is null || request.CompanyId == Guid.Empty ||
             request.BranchId is null || request.BranchId == Guid.Empty ||
@@ -554,7 +575,6 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         DateTimeOffset ChangedAt);
 
     private sealed record AuthenticatedSessionHandle(
-        Uri ServerOrigin,
         Guid SessionId,
         string Bearer,
         DateTimeOffset ExpiresAt);

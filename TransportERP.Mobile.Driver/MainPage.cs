@@ -26,14 +26,7 @@ public sealed class MainPage : ContentPage
         MaxLength = 500,
         IsEnabled = false
     };
-    private readonly Entry _reapplyBaseVersion = new()
-    {
-        Placeholder = "Current base version for REAPPLY",
-        Keyboard = Keyboard.Numeric,
-        IsEnabled = false
-    };
     private readonly CheckBox _resolutionConfirmed = new() { IsEnabled = false };
-    private readonly Entry _serverOrigin = new() { Placeholder = "https://server.example/" };
     private readonly Entry _userName = new() { Placeholder = "User name or email" };
     private readonly Entry _password = new() { Placeholder = "Password", IsPassword = true };
     private readonly Entry _companyId = new() { Placeholder = "Company UUID (required)" };
@@ -115,7 +108,6 @@ public sealed class MainPage : ContentPage
                 _reason,
                 _evidence,
                 _actionResult,
-                _serverOrigin,
                 _userName,
                 _password,
                 _companyId,
@@ -133,7 +125,6 @@ public sealed class MainPage : ContentPage
             {
                 _retry,
                 _resolutionReason,
-                _reapplyBaseVersion,
                 new HorizontalStackLayout
                 {
                     Spacing = 8,
@@ -220,7 +211,6 @@ public sealed class MainPage : ContentPage
             _operationList.SelectedItem = null;
             _conflictReview.Text = "Conflict review: NOT_SELECTED";
             _resolutionReason.Text = string.Empty;
-            _reapplyBaseVersion.Text = string.Empty;
             _resolutionConfirmed.IsChecked = false;
             UpdateActionAvailability(runtime);
         }
@@ -247,7 +237,6 @@ public sealed class MainPage : ContentPage
         _selected = null;
         _conflictReview.Text = "Conflict review: NOT_SELECTED";
         _resolutionReason.Text = string.Empty;
-        _reapplyBaseVersion.Text = string.Empty;
         DisableActions();
     }
 
@@ -289,8 +278,7 @@ public sealed class MainPage : ContentPage
         var deviceCredential = string.IsNullOrEmpty(_deviceCredential.Text) ? null : _deviceCredential.Text;
         _password.Text = string.Empty;
         _deviceCredential.Text = string.Empty;
-        if (!Uri.TryCreate(_serverOrigin.Text, UriKind.Absolute, out var origin) ||
-            !TryRequiredGuid(_companyId.Text, out var companyId) ||
+        if (!TryRequiredGuid(_companyId.Text, out var companyId) ||
             !TryRequiredGuid(_branchId.Text, out var branchId))
         {
             _actionResult.Text = "Result: AUTHENTICATION_INPUT_INVALID";
@@ -303,7 +291,6 @@ public sealed class MainPage : ContentPage
         {
             await _authenticatedActivation.SignInAndActivateAsync(
                 new DriverInteractiveSignInRequest(
-                    origin,
                     _userName.Text ?? string.Empty,
                     password,
                     companyId,
@@ -375,12 +362,12 @@ public sealed class MainPage : ContentPage
         long? baseVersion = null;
         if (decision == OfflineConflictDecision.Reapply)
         {
-            if (!long.TryParse(_reapplyBaseVersion.Text, out var parsed) || parsed <= 0)
+            if (_selected.ConflictServerVersion is not > 0)
             {
                 _actionResult.Text = "Result: REAPPLY_BASE_VERSION_REQUIRED";
                 return;
             }
-            baseVersion = parsed;
+            baseVersion = _selected.ConflictServerVersion;
         }
 
         try
@@ -388,7 +375,6 @@ public sealed class MainPage : ContentPage
             await active.Runtime.ResolveConflictAsync(
                 _selected.LocalOperationId, decision, reason, baseVersion);
             _resolutionReason.Text = string.Empty;
-            _reapplyBaseVersion.Text = string.Empty;
             _resolutionConfirmed.IsChecked = false;
             _actionResult.Text = "Result: CONFLICT_RESOLVED";
             await RefreshAsync();
@@ -407,17 +393,16 @@ public sealed class MainPage : ContentPage
         _retry.IsEnabled = ready && runtime.OperationPermissions.CanRetryFailedOperations &&
             _selected?.Status == OfflineOperationStatus.Failed;
         _resolutionReason.IsEnabled = ready && runtime.OperationPermissions.CanResolveConflicts && conflictSelected;
-        _reapplyBaseVersion.IsEnabled = _resolutionReason.IsEnabled;
         _resolutionConfirmed.IsEnabled = _resolutionReason.IsEnabled;
         _keepServer.IsEnabled = _resolutionReason.IsEnabled && _resolutionConfirmed.IsChecked;
-        _reapply.IsEnabled = _resolutionReason.IsEnabled && _resolutionConfirmed.IsChecked;
+        _reapply.IsEnabled = _resolutionReason.IsEnabled && _resolutionConfirmed.IsChecked &&
+            _selected?.ConflictServerVersion is > 0;
     }
 
     private void DisableActions()
     {
         _retry.IsEnabled = false;
         _resolutionReason.IsEnabled = false;
-        _reapplyBaseVersion.IsEnabled = false;
         _resolutionConfirmed.IsEnabled = false;
         _resolutionConfirmed.IsChecked = false;
         _keepServer.IsEnabled = false;

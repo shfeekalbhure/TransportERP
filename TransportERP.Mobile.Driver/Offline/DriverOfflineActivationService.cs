@@ -175,6 +175,7 @@ public sealed class DriverOfflineActivationService(
                     "offline-v1",
                     request.CompanyId.ToString("N"),
                     request.BranchId.ToString("N"),
+                    request.UserId.ToString("N"),
                     request.RegisteredDeviceId.ToString("N"));
                 var transport = new OfflineSyncTransportOptions(
                     request.BatchEndpoint,
