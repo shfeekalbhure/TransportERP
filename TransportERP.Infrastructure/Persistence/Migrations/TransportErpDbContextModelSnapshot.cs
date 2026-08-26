@@ -629,6 +629,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("RedactedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("ReplacedByOperationId")
                         .HasColumnType("uuid");
 
@@ -674,8 +677,13 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "BranchId", "Status", "CreatedAt");
 
+                    b.HasIndex("RedactedAt", "Status", "ResolvedAt")
+                        .HasDatabaseName("ix_sync_conflict_retention_cleanup");
+
                     b.ToTable("conflict_cases", "transport_erp", t =>
                         {
+                            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape", "(\"RedactedAt\" IS NULL) OR (\"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND \"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND \"RedactedAt\" >= \"ResolvedAt\" + INTERVAL '90 days')");
+
                             t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
                         });
                 });
@@ -2304,6 +2312,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("RedactedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("ProofKeyVersion")
                         .HasColumnType("integer");
 
@@ -2390,12 +2401,17 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
 
+                    b.HasIndex("RedactedAt", "Status", "UpdatedAt")
+                        .HasDatabaseName("ix_sync_operation_retention_cleanup");
+
                     b.HasIndex("Status", "NextRetryAt", "ExecutionLeaseExpiresAt", "CreatedAt")
                         .HasDatabaseName("ix_sync_operation_execution_queue");
 
                     b.ToTable("sync_operations", "transport_erp", t =>
                         {
                             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
+
+                            t.HasCheckConstraint("ck_sync_payload_redaction_shape", "(\"RedactedAt\" IS NULL) OR (\"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') AND \"RedactedAt\" >= \"UpdatedAt\" + INTERVAL '90 days')");
 
                             t.HasCheckConstraint("ck_sync_execution_claim_bundle", "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND \"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"ExecutionAttemptStartedAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" > \"ExecutionAttemptStartedAt\") OR (\"Status\" <> 'SENDING' AND \"ExecutionClaimToken\" IS NULL AND \"ExecutionAttemptStartedAt\" IS NULL AND \"ExecutionLeaseExpiresAt\" IS NULL)");
 

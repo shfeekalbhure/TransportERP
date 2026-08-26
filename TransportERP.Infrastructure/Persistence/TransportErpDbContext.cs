@@ -579,6 +579,10 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+            t.HasCheckConstraint("ck_sync_payload_redaction_shape",
+                "(\"RedactedAt\" IS NULL) OR " +
+                "(\"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') AND " +
+                "\"RedactedAt\" >= \"UpdatedAt\" + INTERVAL '90 days')");
             t.HasCheckConstraint("ck_sync_execution_claim_bundle",
                 "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND " +
                 "\"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND " +
@@ -633,6 +637,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             .HasDatabaseName("ux_sync_operation_execution_claim");
         sync.HasIndex(x => new { x.Status, x.NextRetryAt, x.ExecutionLeaseExpiresAt, x.CreatedAt })
             .HasDatabaseName("ix_sync_operation_execution_queue");
+        sync.HasIndex(x => new { x.RedactedAt, x.Status, x.UpdatedAt })
+            .HasDatabaseName("ix_sync_operation_retention_cleanup");
         sync.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
@@ -703,7 +709,14 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_sync_replay_nonce_scope");
 
         var conflict = mb.Entity<ConflictCase>();
-        conflict.ToTable("conflict_cases", t => t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')"));
+        conflict.ToTable("conflict_cases", t =>
+        {
+            t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
+            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape",
+                "(\"RedactedAt\" IS NULL) OR (\"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
+                "\"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND " +
+                "\"RedactedAt\" >= \"ResolvedAt\" + INTERVAL '90 days')");
+        });
         conflict.HasKey(x => x.Id);
         conflict.Property(x => x.DeviceSnapshot).HasColumnType("text").IsRequired();
         conflict.Property(x => x.ServerSnapshot).HasColumnType("text").IsRequired();
@@ -713,6 +726,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         conflict.Property(x => x.Status).HasMaxLength(20).IsRequired();
         conflict.HasIndex(x => x.SyncOperationId).IsUnique();
         conflict.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status, x.CreatedAt });
+        conflict.HasIndex(x => new { x.RedactedAt, x.Status, x.ResolvedAt })
+            .HasDatabaseName("ix_sync_conflict_retention_cleanup");
         conflict.HasOne(x => x.SyncOperation).WithOne(x => x.ConflictCase)
             .HasForeignKey<ConflictCase>(x => x.SyncOperationId).OnDelete(DeleteBehavior.Restrict);
         conflict.HasOne<SyncOperation>().WithMany()
