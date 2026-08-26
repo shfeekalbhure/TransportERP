@@ -564,10 +564,69 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 }
                 catch (Exception exception)
                 {
-                    Result = "FAIL:" + exception.GetType().Name;
+                    Result = "FAIL:" + exception.GetType().Name + ":" + Diagnose(
+                        Assert.Single(proofs),
+                        request.Headers.Authorization?.Parameter ?? string.Empty,
+                        await request.Content!.ReadAsByteArrayAsync(cancellationToken),
+                        Guid.ParseExact(Assert.Single(request.Headers.GetValues("X-Correlation-Id")), "D"));
                 }
             }
             return await base.SendAsync(request, cancellationToken);
+        }
+
+        private static string Diagnose(string proof, string bearer, byte[] body, Guid correlation)
+        {
+            try
+            {
+                var segments = proof.Split('.');
+                if (segments.Length != 3) return "SEGMENTS";
+                var headerBytes = Decode(segments[0]);
+                var claimBytes = Decode(segments[1]);
+                var signature = Decode(segments[2]);
+                if (signature.Length != 64) return "SIGNATURE_LENGTH";
+                using var header = JsonDocument.Parse(headerBytes);
+                using var claims = JsonDocument.Parse(claimBytes);
+                var jwk = header.RootElement.GetProperty("jwk");
+                if (header.RootElement.GetProperty("typ").GetString() != "dpop+jwt") return "TYP";
+                if (header.RootElement.GetProperty("alg").GetString() != "ES256") return "ALG";
+                var x = Decode(jwk.GetProperty("x").GetString()!);
+                var y = Decode(jwk.GetProperty("y").GetString()!);
+                using var publicKey = ECDsa.Create(new ECParameters
+                {
+                    Curve = ECCurve.NamedCurves.nistP256,
+                    Q = new ECPoint { X = x, Y = y }
+                });
+                if (!publicKey.VerifyData(Encoding.ASCII.GetBytes(segments[0] + "." + segments[1]),
+                        signature, HashAlgorithmName.SHA256,
+                        DSASignatureFormat.IeeeP1363FixedFieldConcatenation)) return "SIGNATURE";
+                var jtiText = claims.RootElement.GetProperty("jti").GetString()!;
+                if (!Guid.TryParseExact(jtiText, "D", out var jti)) return "JTI_FORMAT";
+                if (jti.Version != 4) return "JTI_VERSION";
+                if (jtiText.ToLowerInvariant()[19] is not ('8' or '9' or 'a' or 'b')) return "JTI_VARIANT";
+                if (claims.RootElement.GetProperty("htm").GetString() != "POST") return "HTM";
+                if (claims.RootElement.GetProperty("htu").GetString() != BatchEndpoint.AbsoluteUri) return "HTU";
+                var issuedAt = DateTimeOffset.FromUnixTimeSeconds(claims.RootElement.GetProperty("iat").GetInt64());
+                if (issuedAt < DateTimeOffset.UtcNow.AddSeconds(-120) ||
+                    issuedAt > DateTimeOffset.UtcNow.AddSeconds(30)) return "IAT";
+                if (claims.RootElement.GetProperty("ath").GetString() !=
+                    Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(bearer)))) return "ATH";
+                if (claims.RootElement.GetProperty("tbh").GetString() !=
+                    Base64Url(SHA256.HashData(body))) return "TBH";
+                if (claims.RootElement.GetProperty("cid").GetString() != correlation.ToString("D")) return "CID";
+                if (Decode(claims.RootElement.GetProperty("nonce").GetString()!).Length != 32) return "NONCE";
+                return "STRICT_SHAPE";
+            }
+            catch (Exception exception)
+            {
+                return "DIAGNOSTIC_" + exception.GetType().Name;
+            }
+        }
+
+        private static byte[] Decode(string value)
+        {
+            var padded = value.Replace('-', '+').Replace('_', '/');
+            padded += new string('=', (4 - padded.Length % 4) % 4);
+            return Convert.FromBase64String(padded);
         }
     }
 }
