@@ -53,6 +53,42 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("android:usesCleartextTraffic=\"false\"", manifest, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Android_runtime_self_test_is_compile_gated_sanitized_and_exercises_process_restart()
+    {
+        var project = Read("TransportERP.Mobile.Driver", "TransportERP.Mobile.Driver.csproj");
+        var activity = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
+            "DriverDeviceTestActivity.cs");
+        var selfTest = Read("TransportERP.Mobile.Driver", "DeviceTesting",
+            "AndroidDriverRuntimeSelfTest.cs");
+        var workflow = Read(".github", "workflows", "ci.yml");
+
+        Assert.Contains("Condition=\"'$(TransportERPDeviceTests)' == 'true'\"", project,
+            StringComparison.Ordinal);
+        Assert.Contains("TRANSPORTERP_DEVICE_TESTS", project, StringComparison.Ordinal);
+        Assert.True(activity.StartsWith("#if TRANSPORTERP_DEVICE_TESTS", StringComparison.Ordinal));
+        Assert.True(selfTest.StartsWith("#if TRANSPORTERP_DEVICE_TESTS", StringComparison.Ordinal));
+        Assert.Contains("IDriverOfflineFeatureGate", selfTest, StringComparison.Ordinal);
+        Assert.Contains("activation.Active is null", selfTest, StringComparison.Ordinal);
+        Assert.Contains("PrivateSigningKeyIsNonExportable", selfTest, StringComparison.Ordinal);
+        Assert.Contains("DSASignatureFormat.IeeeP1363FixedFieldConcatenation", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("VerifySealedProbe", selfTest, StringComparison.Ordinal);
+        Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
+        Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
+
+        Assert.Contains("runs-on: ubuntu-24.04", workflow, StringComparison.Ordinal);
+        Assert.Contains("system-images;android-35;google_apis;x86_64", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("adb shell am force-stop", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase seed", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase verify", workflow, StringComparison.Ordinal);
+        Assert.Contains("offline_runtime_enabled=false", workflow, StringComparison.Ordinal);
+        Assert.Contains("The test-only Android activity leaked into the Release APK", workflow,
+            StringComparison.Ordinal);
+    }
+
     private static string Read(params string[] path) =>
         File.ReadAllText(Path.Combine([RepositoryRoot(), .. path]));
 

@@ -317,10 +317,22 @@ jobs:
           dotnet build TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj --configuration Release --no-restore
           dotnet build TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj --configuration Release --no-restore
           dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk
-          find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*.apk' -print -quit | grep -q . || {
+          release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*-Signed.apk' -print -quit)
+          if [ -z "$release_apk" ]; then
+            release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*.apk' -print -quit)
+          fi
+          if [ -z "$release_apk" ]; then
             echo 'Android Driver APK artifact was not produced.'
             exit 1
-          }
+          fi
+          apkanalyzer=$(command -v apkanalyzer || find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -print -quit)
+          test -n "$apkanalyzer" && test -x "$apkanalyzer"
+          mkdir -p ci-evidence/mobile
+          "$apkanalyzer" manifest print "$release_apk" > ci-evidence/mobile/release-manifest.xml
+          if grep -Fq 'com.transporterp.mobile.driver.DriverDeviceTestActivity' ci-evidence/mobile/release-manifest.xml; then
+            echo 'The test-only Android activity leaked into the Release APK.'
+            exit 1
+          fi
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -353,6 +365,243 @@ jobs:
           name: ci-mobile-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ci-evidence/mobile/exact-head-manifest.txt
+            ci-evidence/mobile/release-manifest.xml
             TransportERP.Mobile.Driver/bin/Release/net10.0-android/**/*.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+  android-device-runtime:
+    name: Required CI / Android native security runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
+      ANDROID_TEST_PACKAGE: com.transporterp.mobile.driver
+      ANDROID_TEST_COMPONENT: com.transporterp.mobile.driver/com.transporterp.mobile.driver.DriverDeviceTestActivity
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact PR head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "actual=$actual"
+          echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Android runtime job is not running on the exact PR head.'; exit 1; }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install MAUI and pinned Android emulator image
+        shell: bash
+        run: |
+          dotnet workload install maui-android --skip-sign-check
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          test -x "$sdkmanager"
+          test -x "$avdmanager"
+          set +o pipefail
+          yes | "$sdkmanager" --licenses >/dev/null
+          license_status=${PIPESTATUS[1]}
+          set -o pipefail
+          test "$license_status" -eq 0
+          "$sdkmanager" \
+            'platform-tools' \
+            'emulator' \
+            'system-images;android-35;google_apis;x86_64'
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$avdmanager" create avd \
+            --force \
+            --name transporterptest \
+            --package 'system-images;android-35;google_apis;x86_64'
+
+      - name: Build compile-gated Android device-test APK
+        shell: bash
+        run: |
+          dotnet restore TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj
+          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj \
+            --configuration Debug \
+            --no-restore \
+            -f net10.0-android \
+            -p:TransportERPDeviceTests=true \
+            -p:AndroidPackageFormats=apk \
+            -p:EmbedAssembliesIntoApk=true
+          test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*-Signed.apk' -print -quit)
+          if [ -z "$test_apk" ]; then
+            test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*.apk' -print -quit)
+          fi
+          test -n "$test_apk"
+          echo "$test_apk" > "$RUNNER_TEMP/android-device-test-apk.txt"
+
+      - name: Start API 35 emulator
+        shell: bash
+        run: |
+          mkdir -p ci-evidence/android-runtime
+          "$ANDROID_HOME/emulator/emulator" -version 2>&1 | head -n 1 > ci-evidence/android-runtime/emulator-version.txt
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd transporterptest \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -wipe-data \
+            -gpu swiftshader_indirect \
+            > "$RUNNER_TEMP/android-emulator.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/android-emulator.pid"
+          adb wait-for-device
+          booted=false
+          for attempt in $(seq 1 150); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; then
+              booted=true
+              break
+            fi
+            sleep 2
+          done
+          test "$booted" = true
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell getprop ro.build.version.sdk | tr -d '\r' | grep -Fx '35'
+
+      - name: Run closed startup and native security restart proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_name='driver-device-test-result.json'
+          apk=$(cat "$RUNNER_TEMP/android-device-test-apk.txt")
+          adb install -r "$apk"
+
+          validate_result() {
+            local phase="$1"
+            local evidence="ci-evidence/android-runtime/${phase}.json"
+            python3 - "$phase" "$evidence" <<'PY'
+          import json
+          import sys
+
+          phase, path = sys.argv[1:]
+          with open(path, encoding="utf-8") as stream:
+              result = json.load(stream)
+          if set(result) != {"schemaVersion", "phase", "passed", "code", "checks"}:
+              raise SystemExit("Unexpected Android evidence schema.")
+          if result["schemaVersion"] != 1 or result["phase"] != phase:
+              raise SystemExit("Android evidence phase mismatch.")
+          if result["passed"] is not True or result["code"] != "PASS":
+              raise SystemExit(f"Android runtime phase failed with code {result['code']}.")
+          if not result["checks"] or any(value is not True for value in result["checks"].values()):
+              raise SystemExit("Android runtime check failed.")
+          PY
+          }
+
+          run_phase() {
+            local phase="$1"
+            local temporary="$RUNNER_TEMP/android-${phase}-result.json"
+            adb shell run-as "$ANDROID_TEST_PACKAGE" rm -f "files/$result_name"
+            adb shell am start -W \
+              -n "$ANDROID_TEST_COMPONENT" \
+              --es phase "$phase" >/dev/null
+            complete=false
+            for attempt in $(seq 1 60); do
+              if adb exec-out run-as "$ANDROID_TEST_PACKAGE" cat "files/$result_name" > "$temporary" 2>/dev/null && [ -s "$temporary" ]; then
+                complete=true
+                break
+              fi
+              sleep 1
+            done
+            test "$complete" = true
+            mv "$temporary" "ci-evidence/android-runtime/${phase}.json"
+            validate_result "$phase"
+          }
+
+          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+          adb shell monkey \
+            -p "$ANDROID_TEST_PACKAGE" \
+            -c android.intent.category.LAUNCHER \
+            1 >/dev/null
+          for attempt in $(seq 1 30); do
+            test -n "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" && break
+            sleep 1
+          done
+          test -n "$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')"
+
+          run_phase startup
+          run_phase seed
+          seed_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          test -n "$seed_pid"
+          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          stopped=false
+          for attempt in $(seq 1 30); do
+            if [ -z "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+              stopped=true
+              break
+            fi
+            sleep 1
+          done
+          test "$stopped" = true
+
+          run_phase verify
+          verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          test -n "$verify_pid"
+          {
+            echo 'process_stopped_before_restart=true'
+            echo 'new_process_observed_after_restart=true'
+            echo 'offline_runtime_activated=false'
+            echo 'raw_security_artifacts_exported=false'
+          } > ci-evidence/android-runtime/restart-evidence.txt
+          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+
+      - name: Write Android exact-head evidence manifest
+        if: ${{ always() }}
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p ci-evidence/android-runtime
+          actual=$(git rev-parse HEAD 2>/dev/null || echo unavailable)
+          tree=$(git rev-parse HEAD^{tree} 2>/dev/null || echo unavailable)
+          {
+            echo "workflow=$GITHUB_WORKFLOW"
+            echo 'job=android-device-runtime'
+            echo "event=$GITHUB_EVENT_NAME"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "job_status=$JOB_STATUS"
+            echo "ref=$GITHUB_REF"
+            echo "expected_sha=$EXPECTED_SHA"
+            echo "actual_sha=$actual"
+            echo "tree_sha=$tree"
+            echo 'runner=ubuntu-24.04-x64'
+            echo 'system_image=android-35-google_apis-x86_64'
+            echo 'offline_runtime_enabled=false'
+          } > ci-evidence/android-runtime/exact-head-manifest.txt
+          test "$actual" = "$EXPECTED_SHA"
+
+      - name: Stop Android emulator
+        if: ${{ always() }}
+        shell: bash
+        run: adb emu kill >/dev/null 2>&1 || true
+
+      - name: Upload sanitized Android runtime evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-android-runtime-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ci-evidence/android-runtime/exact-head-manifest.txt
+            ci-evidence/android-runtime/emulator-version.txt
+            ci-evidence/android-runtime/startup.json
+            ci-evidence/android-runtime/seed.json
+            ci-evidence/android-runtime/verify.json
+            ci-evidence/android-runtime/restart-evidence.txt
           if-no-files-found: warn
           retention-days: 30
