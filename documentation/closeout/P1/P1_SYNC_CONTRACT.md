@@ -8,7 +8,9 @@
 **G3 exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 
 **Stage 4 implementation baseline reviewed:** remote implementation `5ca9a86acef4053cf731fb896ca0c77b17a575ae` / tree `9ce37459c22c6f4c47beee203af0fa9d0a167080`.
-**Stage 4 initial contract record:** remote docs commit `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`; قرار التعديل `DEC-P1-SYNC-POP-AMEND-20260826-02` يبقى `CONTRACT_WIP` حتى يثبت commit الحاوي لهذه الصياغة ومتجهات `fp-v1` المستقلة.
+**Stage 4 initial contract record:** remote docs commit `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`.
+
+**Stage 4 normative amended contract:** remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`، وقد نجحت CI #16 عليه. هذه الإضافة توثق البصمة فقط ولا تغير أحكام الأقسام 19.1–19.12 المثبتة في ذلك commit.
 **Authority:** قرار مفوض من المالك داخل المحادثة بتاريخ 2026-08-25؛ لا يدعي هذا السجل توقيع أشخاص أو مراجعين غير مثبتين.
 
 **تثبيت حوكمي — 2026-08-25:** اعتمد القرار المفوض أعمدة وسياسات Offline/Sync فقط في عقود W2 المشار إليها، ولا يقبل بقية حقول W2 أو يغير حالة مراجعتها أو يفوض runtime أو مرحلة P2 لاحقة. يغطي القرار allowlist Payload Actions، وإعادة المحاولة وBackoff، وسياسة التعارض، والاحتفاظ، وحجم الدفعة وذريتها، وصلاحيات حل التعارض، وتسلسل الإعدادات. يبقى `sync.offline.enabled=false` حتى تثبت مطابقة التنفيذ واجتياز G4 ثم يصدر تفويض G5.
