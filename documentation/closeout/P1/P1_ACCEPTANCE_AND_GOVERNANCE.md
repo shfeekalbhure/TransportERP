@@ -1,11 +1,11 @@
 # TransportERP — سجل اختبارات القبول وحوكمة P1
 **دور الملف:** المرجع التشغيلي الموحد للحالة والبوابات والأدلة الخاصة بـ`PR #69`، مع إبقاء تفاصيل العقود في ملفاتها الأصلية وعدم نسخها هنا.
 
-**آخر تحديث جوهري:** `2026-08-26 02:56 Asia/Riyadh`
+**آخر تحديث جوهري:** `2026-08-26 06:00 Asia/Riyadh`
 
-**الحالة التشغيلية الحالية:** `PHASES_1_3_IMPLEMENTED_AND_CI_VERIFIED — PREPARING_INDEPENDENT_REVIEW`.
+**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_S4_A_IMPLEMENTED_AND_CI_VERIFIED — OFFLINE_CLOSED`.
 
-**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات 185 اختبارًا تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203.
+**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3 أو `196` اختبارًا على HEAD الحالي تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203.
 
 ## 0. مركز قيادة PR #69 وحزمة إغلاق المراحل 1–3
 
@@ -20,7 +20,8 @@
 | base | `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5` |
 | مرشح تنفيذ المراحل 1–3 | [`5ca9a86acef4053cf731fb896ca0c77b17a575ae`](https://github.com/shfeekalbhure/TransportERP/commit/5ca9a86acef4053cf731fb896ca0c77b17a575ae) |
 | أول HEAD توثيقي للمرجع الموحد | `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`؛ tree=`5c15cd219d55752eb78cf233f87cbcf3ff1b7df2`؛ CI أخضر |
-| النظير المحلي | `d0860d70d808374bd5582d2e71c14afa5429f8cd` |
+| HEAD الحالي | `e84486a1e350057e2c9ff4c54588dfe05cbb0181`؛ tree=`1469cbfe6a55031e7ab1fbdeaff0f78c388e0f0d`؛ أول شريحة Stage 4 محدودة؛ CI أخضر `196/196` |
+| النظير المحلي لمرشح المراحل 1–3 | `d0860d70d808374bd5582d2e71c14afa5429f8cd` |
 | tree المشترك | `9ce37459c22c6f4c47beee203af0fa9d0a167080`؛ تطابق remote/local حرفيًا |
 | نطاق التغيير | `6` commits بعيدة، `48` ملفًا؛ يعاد إنتاج manifest بالأمر `git diff --name-status 2ec6ccc..5ca9a86` |
 | الدمج | `NOT AUTHORIZED`; لم يتغير `master` ولم يصبح PR جاهزًا للدمج |
@@ -34,7 +35,7 @@
 | المرحلة 1 — الهوية والتفويض والتدقيق الأساسي | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 2 — العزل والتدقيق والمعاملات الذرية | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 3 — حدود ثقة الجهاز المسجل | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
-| المرحلة 4 — `TransportERP Sync-PoP v1` | لا؛ `CONTRACT_WIP` فقط | لا | مراجعة تصميم داخلية لا تساوي مراجعة مستقلة | تفويض صياغة قرارات فقط؛ لا G4/G5 ولا Offline |
+| المرحلة 4 — `TransportERP Sync-PoP v1` | جزئي فقط؛ S4-A primitive `fp-v1` الحتمي واختباراته، بلا DB/API/PoP runtime | نعم للشريحة S4-A على exact SHA؛ لا لبقية المرحلة | مراجعتان داخليتان ساكنتان لا تساويان مراجعة ضمان مستقلة | تفويض تنفيذ محدود وفق العقد؛ لا G4/G5 ولا Offline |
 | المرحلة 5 | `NOT AUTHORIZED` | لا | لا | لا |
 
 لا تستبدل حالةٌ حالةً أخرى. نجاح CI لا يعني مراجعة مستقلة، والمراجعة المستقلة لا تعني اعتماد المالك، واعتماد القرار التعاقدي لا يعني وجود runtime.
@@ -49,6 +50,8 @@
 | 3 | `3cd32ce2b04f0686abca4e1ce30456fef4a1dff4` | `7b1b2d4`: trusted registered device boundary | نُفذ؛ فشل اختباران لتصادم currency seed |
 | 3/CI | `90cc841fca714c25aed8f4fc2fe33c5ea8303869` | `a361ebb`: allocator ذري موحد لاختبارات PostgreSQL | أزال التصادم؛ كشف خطأ استدعاء lock وأدى إلى 70 فشلًا |
 | 3/CI | `5ca9a86acef4053cf731fb896ca0c77b17a575ae` | `d0860d7`: تنفيذ advisory lock كـnon-query | الإغلاق الأخضر النهائي `185/185` |
+| 4/عقد | `63057d0f8b47ebf10c935b7349aeeb67128ff412` | `fd5187a`: تثبيت عقد Sync-PoP المعدل ومتجهي `fp-v1` | CI أخضر `185/185`؛ لا runtime في هذا الالتزام |
+| 4/S4-A | `e84486a1e350057e2c9ff4c54588dfe05cbb0181` | `0d98b15`: primitive `fp-v1` داخلي حتمي + اختبارات golden/حدود + regression لبقاء Offline مغلقًا | CI أخضر `196/196`؛ لا DB/API/DI/migration/settings أو Offline enablement |
 
 ### 0.4 سجل CI — النجاح والفشل محفوظان
 
@@ -63,6 +66,8 @@
 | A/B/C/W0-5 | path-filtered | `SKIPPED` بحسب المسارات، وليس PASS مزعومًا |
 
 **التحقق التوثيقي اللاحق:** [CI run 32914032537](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537) على docs HEAD `9d9ba3...` نجح أيضًا: [Core job 98013809603](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537/job/98013809603)=`185/185`, و[Desktop job 98013809430](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537/job/98013809430)=`SUCCESS`، و[P2 foundation 32914032608](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032608) و[W0-3 32914032504](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032504)=`SUCCESS`. لا يستبدل هذا مرشح التنفيذ المثبت أعلاه ولا يمحو أثر التشغيلات الفاشلة.
+
+**أول شريحة تنفيذية محدودة من Stage 4:** [CI run 32924353724](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724) على exact SHA `e84486a1...` انتهى `SUCCESS`. [Core + PostgreSQL + HTTP job 98044081433](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724/job/98044081433)=`196 passed / 0 failed / 0 skipped` في 37s، و[Desktop RTL job 98044081285](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353724/job/98044081285)=`SUCCESS`، و[P2 foundation 32924353757](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353757) و[W0-3 32924353818](https://github.com/shfeekalbhure/TransportERP/actions/runs/32924353818)=`SUCCESS`. كانت A/B/C/W0-5 `SKIPPED` بمرشحات المسارات وليست إخفاقات. يثبت هذا S4-A فقط ولا يثبت migration أو PoP أو replay أو batch runtime ولا يفتح G4/G5.
 
 الأثر التاريخي غير مطموس:
 
@@ -100,9 +105,11 @@
 
 ### 0.7 الحد الفاصل مع المرحلة الرابعة
 
-`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` عقديًا فقط وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. لا يبدأ runtime قبل إغلاق تعارضات المراجعة الحاكمة، ولا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G4/G5 بهذا السجل.
+`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`؛ المنفذ حتى الآن هو S4-A فقط: primitive `fp-v1` داخلي حتمي واختباراته، من دون توصيله بمسار إنتاج أو قاعدة بيانات أو PoP. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G4/G5 بهذا السجل.
 
 **حالة البوابة:** `STAGE4_CONTRACT_FIXED_AND_CI_VERIFIED — BOUNDED SERVER IMPLEMENTATION AUTHORIZED — OFFLINE CLOSED`. ثبت القرار المعدل `DEC-P1-SYNC-POP-AMEND-20260826-02` في remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`. حسم مفاتيح idempotency المعزولة بالشركة، وDown غير المدمر، وbind/rotate/recovery، ونقطة linearization وترتيب الأقفال، وschema والقيود والفهارس والمحفزات الدقيقة، وفصل operation/attempt correlation، و`fp-v1` byte layout، وحدود body/payload. طابقت ثلاثة مراجعات داخلية مستقلة النص مع EF/PostgreSQL والكود الحالي، وحُسب متجها `fp-v1` بأداتين مستقلتين وتطابقا. نجحت [CI #16](https://github.com/shfeekalbhure/TransportERP/actions/runs/32920027662) على العقد المثبت: Core=`185/185` وDesktop/Foundation/W0-3 ناجحة. يجوز بدء دفعة server-side مستقلة وآمنة وفق العقد، لكن هذا لا يدعي runtime مكتملًا أو `INDEPENDENTLY REVIEWED` من فريق الضمان المستقل، ولا يفتح Offline أو G4/G5.
+
+**حالة S4-A:** `IMPLEMENTED + VERIFIED BY CI` على `e84486a1...` فقط. ثبتت البصمة byte-for-byte بالمتجهين A/B، وUUID network order، وBE framing، وNFC/UTF-8 الصارم، وUTC `Z` بحد 0..6 كسور، وحدود Unicode/PostgreSQL، وبقاء `/api/v1/sync/operations:batch` مغلقًا بـ`OFFLINE_DISABLED`. لا يدعي هذا `INDEPENDENTLY REVIEWED` أو `OWNER APPROVED` للـexact SHA، ولا يرفع حالة S4-B وما بعدها قبل اجتياز بواباتها الخضراء المنفصلة.
 ## 1. نطاق السجل
 يغطي السجل كل عقود W1 السبعة عشر، وكل أفعال W2 الخمسة عشر، وكل شاشات W3 الاثنتي عشرة، إضافة إلى عشرة اختبارات حاكمة للمزامنة. كل اختبار مرتبط بمعرف عقد واضح، وله نتيجة مطلوبة ودليل تنفيذ يجب حفظه عند بدء الاختبار البرمجي.
 | الفئة | عدد الاختبارات | الغرض |
