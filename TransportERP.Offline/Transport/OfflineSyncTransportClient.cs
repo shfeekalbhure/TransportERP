@@ -15,9 +15,11 @@ public sealed record OfflineSyncTransportOptions(
     Guid UserId,
     string WorkerId,
     TimeSpan? LeaseDuration = null,
-    int MaximumBatchOperations = 100)
+    int MaximumBatchOperations = 100,
+    TimeSpan? AcceptedPollInterval = null)
 {
     public TimeSpan EffectiveLeaseDuration => LeaseDuration ?? TimeSpan.FromMinutes(2);
+    public TimeSpan EffectiveAcceptedPollInterval => AcceptedPollInterval ?? TimeSpan.FromSeconds(5);
 }
 
 public sealed record OfflineSyncTransportRunResult(
@@ -25,7 +27,8 @@ public sealed record OfflineSyncTransportRunResult(
     int Succeeded,
     int Conflicted,
     int Rejected,
-    int RetryScheduled);
+    int RetryScheduled,
+    int AcceptedPending = 0);
 
 /// <summary>
 /// sync-v1 client transport. Authentication artifacts exist only for one HTTP request and are
@@ -46,6 +49,8 @@ public sealed class OfflineSyncTransportClient
     private readonly OfflineSyncTransportOptions _options;
     private readonly string _canonicalHtu;
 
+    public OfflineOperationScope Scope { get; }
+
     public OfflineSyncTransportClient(
         HttpClient httpClient,
         OfflineOperationStore store,
@@ -59,13 +64,19 @@ public sealed class OfflineSyncTransportClient
         _bearerTokens = bearerTokens;
         _options = options;
         _canonicalHtu = CanonicalizeBatchEndpoint(options.BatchEndpoint);
+        Scope = new OfflineOperationScope(
+            options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
+        Scope.Validate();
         _proofs = new SyncDpopProofFactory(signingKey, timeProvider ?? TimeProvider.System);
 
         if (string.IsNullOrWhiteSpace(options.DeviceId) || options.DeviceId.Any(char.IsWhiteSpace) ||
             options.RegisteredDeviceId == Guid.Empty || options.CompanyId == Guid.Empty ||
             options.BranchId == Guid.Empty || options.UserId == Guid.Empty ||
             string.IsNullOrWhiteSpace(options.WorkerId) ||
-            options.EffectiveLeaseDuration <= TimeSpan.Zero || options.MaximumBatchOperations is < 1 or > 100)
+            options.EffectiveLeaseDuration <= TimeSpan.Zero ||
+            options.EffectiveAcceptedPollInterval <= TimeSpan.Zero ||
+            options.EffectiveAcceptedPollInterval > TimeSpan.FromHours(1) ||
+            options.MaximumBatchOperations is < 1 or > 100)
             throw new ArgumentException("The sync transport options are invalid.", nameof(options));
     }
 
@@ -81,7 +92,7 @@ public sealed class OfflineSyncTransportClient
         for (var index = 0; index < limit; index++)
         {
             var operation = await _store.ClaimNextAsync(
-                _options.WorkerId, _options.EffectiveLeaseDuration, cancellationToken);
+                _options.WorkerId, _options.EffectiveLeaseDuration, Scope, cancellationToken);
             if (operation is null) break;
             claimed.Add(operation);
         }
@@ -129,24 +140,22 @@ public sealed class OfflineSyncTransportClient
         SyncV1BatchResponse? response = null;
         string? requestError = null;
         var requestErrorRetryable = false;
-        // sync-v1 defines one X-Correlation-Id/DPoP cid for the whole HTTP batch. Every outbox
-        // row still has its own fresh claim-attempt id for compare-and-set completion; the first
-        // claimed row supplies the wire batch attempt id and response correlation.
-        var batchAttemptCorrelationId = eligible[0].AttemptCorrelationId!.Value;
+        // Local claim-attempt identity is only the encrypted-store CAS token. Every HTTP request
+        // below receives an independent wire AttemptCorrelationId and, when signed, matching cid.
         try
         {
             var bearer = await _bearerTokens.GetBearerTokenAsync(cancellationToken);
             ValidateBearer(bearer);
-            var nonceResult = await AcquireNonceAsync(body, batchAttemptCorrelationId, bearer, cancellationToken);
+            var nonceResult = await AcquireNonceAsync(body, bearer, cancellationToken);
             if (nonceResult.ErrorCode is not null)
             {
                 requestError = nonceResult.ErrorCode;
-                requestErrorRetryable = IsRetryableCode(requestError);
+                requestErrorRetryable = nonceResult.Retryable;
             }
             else
             {
                 var signedResult = await SendSignedAsync(
-                    body, batchAttemptCorrelationId, bearer, nonceResult.Nonce!, cancellationToken);
+                    body, bearer, nonceResult.Nonce!, cancellationToken);
                 response = signedResult.Response;
                 requestError = signedResult.ErrorCode;
                 requestErrorRetryable = signedResult.Retryable;
@@ -205,12 +214,12 @@ public sealed class OfflineSyncTransportClient
         return SyncV1Json.Serialize(new SyncV1BatchRequest(_options.DeviceId, ProtocolVersion, requests));
     }
 
-    private async Task<(string? Nonce, string? ErrorCode)> AcquireNonceAsync(
+    private async Task<(string? Nonce, string? ErrorCode, bool Retryable)> AcquireNonceAsync(
         byte[] body,
-        Guid attemptCorrelationId,
         string bearer,
         CancellationToken cancellationToken)
     {
+        var attemptCorrelationId = Guid.NewGuid();
         using var request = CreateRequest(body, bearer, attemptCorrelationId, proof: null);
         using var response = await _httpClient.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -218,16 +227,16 @@ public sealed class OfflineSyncTransportClient
             response.Headers.TryGetValues(NonceHeader, out var values))
         {
             var nonces = values.ToArray();
-            if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0])) return (nonces[0], null);
-            return (null, "NONCE_CHALLENGE_INVALID");
+            if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0])) return (nonces[0], null, false);
+            return (null, "NONCE_CHALLENGE_INVALID", false);
         }
 
-        return (null, await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken));
+        var errorCode = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
+        return (null, errorCode, IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
     }
 
     private async Task<(SyncV1BatchResponse? Response, string? ErrorCode, bool Retryable)> SendSignedAsync(
         byte[] body,
-        Guid attemptCorrelationId,
         string bearer,
         string nonce,
         CancellationToken cancellationToken)
@@ -235,6 +244,7 @@ public sealed class OfflineSyncTransportClient
         // One nonce refresh is accepted. Each signed HTTP attempt still receives a new jti and signature.
         for (var signedAttempt = 0; signedAttempt < 2; signedAttempt++)
         {
+            var attemptCorrelationId = Guid.NewGuid();
             var proof = await _proofs.CreateAsync(
                 _canonicalHtu, bearer, body, nonce, attemptCorrelationId, cancellationToken);
             using var request = CreateRequest(body, bearer, attemptCorrelationId, proof);
@@ -263,7 +273,7 @@ public sealed class OfflineSyncTransportClient
                     continue;
                 }
             }
-            return (null, errorCode, IsRetryableCode(errorCode));
+            return (null, errorCode, IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
         }
 
         return (null, "NONCE_CHALLENGE_INVALID", false);
@@ -314,45 +324,56 @@ public sealed class OfflineSyncTransportClient
         var conflicted = 0;
         var rejected = 0;
         var retryScheduled = 0;
+        var acceptedPending = 0;
         foreach (var operation in operations)
         {
             if (!returned.TryGetValue((operation.ClientOperationId, operation.OperationCorrelationId), out var result))
             {
-                await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                var missingResult = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
                     operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
-                retryScheduled++;
+                CountFailure(missingResult, ref retryScheduled, ref rejected);
                 continue;
             }
 
             switch (result.Status)
             {
-                // QUEUED/SENDING are durable server acceptance. The outbox item has completed its
-                // transport responsibility; server-side execution remains independently audited.
                 case "QUEUED":
                 case "SENDING":
+                    if (result.ServerOperationId is not { } serverOperationId || serverOperationId == Guid.Empty)
+                    {
+                        var malformedPending = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                        CountFailure(malformedPending, ref retryScheduled, ref rejected);
+                        break;
+                    }
+                    await _store.MarkAcceptedPendingAsync(operation.LocalOperationId,
+                        operation.AttemptCorrelationId!.Value, serverOperationId, result.Status,
+                        _options.EffectiveAcceptedPollInterval, cancellationToken);
+                    acceptedPending++;
+                    break;
                 case "SUCCEEDED":
                     await _store.MarkSucceededAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, result.ResultEntityId, result.ResultVersion,
-                        cancellationToken);
+                        result.ServerOperationId, cancellationToken);
                     succeeded++;
                     break;
                 case "CONFLICT" when result.ConflictCaseId is { } conflictCaseId && conflictCaseId != Guid.Empty:
                     await _store.MarkConflictAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, conflictCaseId,
-                        result.ErrorCode ?? "BASE_VERSION_CONFLICT",
+                        result.ErrorCode ?? "BASE_VERSION_CONFLICT", result.ServerOperationId,
                         cancellationToken);
                     conflicted++;
                     break;
                 case "CONFLICT":
-                    await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                    var conflictFailure = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
-                    retryScheduled++;
+                    CountFailure(conflictFailure, ref retryScheduled, ref rejected);
                     break;
                 case "FAILED" when IsRetryableCode(result.ErrorCode):
                 case "REJECTED" when IsRetryableCode(result.ErrorCode):
-                    await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+                    var retryFailure = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, true, result.ErrorCode!, cancellationToken);
-                    retryScheduled++;
+                    CountFailure(retryFailure, ref retryScheduled, ref rejected);
                     break;
                 case "FAILED":
                 case "REJECTED":
@@ -368,7 +389,7 @@ public sealed class OfflineSyncTransportClient
             }
         }
 
-        return new(operations.Count, succeeded, conflicted, rejected, retryScheduled);
+        return new(operations.Count, succeeded, conflicted, rejected, retryScheduled, acceptedPending);
     }
 
     private async Task<OfflineSyncTransportRunResult> CompleteRequestFailureAsync(
@@ -377,12 +398,15 @@ public sealed class OfflineSyncTransportClient
         bool retryable,
         CancellationToken cancellationToken)
     {
+        var retryScheduled = 0;
+        var rejected = 0;
         foreach (var operation in operations)
-            await _store.MarkTransportFailureAsync(operation.LocalOperationId,
+        {
+            var disposition = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
                 operation.AttemptCorrelationId!.Value, retryable, errorCode, cancellationToken);
-        return retryable
-            ? new(operations.Count, 0, 0, 0, operations.Count)
-            : new(operations.Count, 0, 0, operations.Count, 0);
+            CountFailure(disposition, ref retryScheduled, ref rejected);
+        }
+        return new(operations.Count, 0, 0, rejected, retryScheduled);
     }
 
     private static async Task<string> ReadErrorCodeAsync(
@@ -406,7 +430,23 @@ public sealed class OfflineSyncTransportClient
 
     private static bool IsRetryableCode(string? code) =>
         string.Equals(code, "INTERNAL_ERROR", StringComparison.Ordinal) ||
-        string.Equals(code, "RATE_LIMITED", StringComparison.Ordinal);
+        string.Equals(code, "RATE_LIMITED", StringComparison.Ordinal) ||
+        string.Equals(code, "TIMEOUT", StringComparison.Ordinal) ||
+        string.Equals(code, "NO_RESPONSE", StringComparison.Ordinal);
+
+    private static bool IsRetryableStatus(HttpStatusCode statusCode) =>
+        statusCode == HttpStatusCode.RequestTimeout ||
+        statusCode == HttpStatusCode.TooManyRequests ||
+        (int)statusCode >= 500;
+
+    private static void CountFailure(
+        OfflineTransportFailureDisposition disposition,
+        ref int retryScheduled,
+        ref int rejected)
+    {
+        if (disposition == OfflineTransportFailureDisposition.RetryScheduled) retryScheduled++;
+        else rejected++;
+    }
 
     private static void ValidateBearer(string bearer)
     {

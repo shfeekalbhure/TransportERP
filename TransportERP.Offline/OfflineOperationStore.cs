@@ -57,6 +57,7 @@ public sealed class OfflineOperationStore
                 LeaseExpiresAt TEXT NULL,
                 ResultCode TEXT NULL,
                 ConflictCaseId TEXT NULL,
+                ServerOperationId TEXT NULL,
                 ResultEntityId TEXT NULL,
                 ResultVersion INTEGER NULL,
                 CreatedAt TEXT NOT NULL,
@@ -75,6 +76,7 @@ public sealed class OfflineOperationStore
         // Existing encrypted stores predate conflict resolution. Upgrade them in place without
         // recreating or decrypting into a plaintext staging database.
         await EnsureColumnAsync(connection, "offline_operations", "ConflictCaseId", "TEXT NULL", cancellationToken);
+        await EnsureColumnAsync(connection, "offline_operations", "ServerOperationId", "TEXT NULL", cancellationToken);
     }
 
     public async Task<OfflineEnqueueResult> EnqueueAsync(
@@ -96,6 +98,30 @@ public sealed class OfflineOperationStore
 
             await transaction.CommitAsync(cancellationToken);
             return new OfflineEnqueueResult(existing, false);
+        }
+
+        await using (var stale = connection.CreateCommand())
+        {
+            stale.Transaction = transaction;
+            stale.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM offline_operations
+                    WHERE CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
+                      AND RegisteredDeviceId = $registeredDeviceId
+                      AND Status IN ('QUEUED','SENDING','FAILED','CONFLICT')
+                      AND CreatedAt <= $staleBoundary
+                );
+                """;
+            Add(stale, "$companyId", request.CompanyId);
+            Add(stale, "$branchId", request.BranchId);
+            Add(stale, "$userId", request.UserId);
+            Add(stale, "$registeredDeviceId", request.RegisteredDeviceId);
+            stale.Parameters.AddWithValue("$staleBoundary", Format(now - TimeSpan.FromDays(7)));
+            if (Convert.ToInt64(await stale.ExecuteScalarAsync(cancellationToken),
+                    System.Globalization.CultureInfo.InvariantCulture) != 0)
+                throw new OfflineStoreException(
+                    "OFFLINE_QUEUE_ESCALATION_REQUIRED",
+                    "A non-terminal operation has reached seven days; synchronize or escalate before creating new offline writes.");
         }
 
         var localOperationId = Guid.NewGuid();
@@ -140,15 +166,87 @@ public sealed class OfflineOperationStore
         return new OfflineEnqueueResult(operation, true);
     }
 
+    public async Task<OfflineEnqueueResult> EnqueueAsync(
+        OfflineOperationEnqueueTemplate template,
+        Func<OfflineGeneratedOperationIdentity, string> payloadFactory,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(payloadFactory);
+        var now = _timeProvider.GetUtcNow();
+        await using var connection = await _connections.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        var existing = await FindByIntentAsync(connection, transaction, template.CompanyId,
+            template.RegisteredDeviceId, template.LocalIntentId, cancellationToken);
+        if (existing is not null)
+        {
+            EnsureTemplateMatches(existing, template);
+            await transaction.CommitAsync(cancellationToken);
+            return new OfflineEnqueueResult(existing, false);
+        }
+
+        await EnsureNoStaleQueueAsync(connection, transaction, template.CompanyId, template.BranchId,
+            template.UserId, template.RegisteredDeviceId, now, cancellationToken);
+        var identity = new OfflineGeneratedOperationIdentity(Guid.NewGuid().ToString("D"), Guid.NewGuid());
+        var payloadJson = payloadFactory(identity);
+        OfflineOperationIntegrity.ValidatePayloadIdentity(payloadJson, identity.ClientOperationId);
+        var request = new OfflineOperationEnqueueRequest(
+            template.LocalIntentId, template.CompanyId, template.BranchId, template.UserId,
+            template.RegisteredDeviceId, template.ActionCode, template.OperationType, template.EntityType,
+            template.EntityId, template.BaseVersion, template.ClientOccurredAt, payloadJson);
+        var (payloadHash, fingerprint) = OfflineOperationIntegrity.ValidateAndHash(request);
+
+        var localOperationId = Guid.NewGuid();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO offline_operations (
+                LocalOperationId, LocalIntentId, CompanyId, BranchId, UserId, RegisteredDeviceId,
+                ClientOperationId, OperationCorrelationId, ProtocolVersion, ActionCode, OperationType,
+                EntityType, EntityId, BaseVersion, ClientOccurredAt, PayloadJson, PayloadHash,
+                RequestFingerprint, Status, CreatedAt, UpdatedAt)
+            VALUES (
+                $localOperationId, $localIntentId, $companyId, $branchId, $userId, $registeredDeviceId,
+                $clientOperationId, $operationCorrelationId, 'sync-v1', $actionCode, $operationType,
+                $entityType, $entityId, $baseVersion, $clientOccurredAt, $payloadJson, $payloadHash,
+                $fingerprint, 'QUEUED', $now, $now);
+            """;
+        Add(command, "$localOperationId", localOperationId);
+        Add(command, "$localIntentId", template.LocalIntentId);
+        Add(command, "$companyId", template.CompanyId);
+        Add(command, "$branchId", template.BranchId);
+        Add(command, "$userId", template.UserId);
+        Add(command, "$registeredDeviceId", template.RegisteredDeviceId);
+        command.Parameters.AddWithValue("$clientOperationId", identity.ClientOperationId);
+        Add(command, "$operationCorrelationId", identity.OperationCorrelationId);
+        command.Parameters.AddWithValue("$actionCode", template.ActionCode);
+        command.Parameters.AddWithValue("$operationType", template.OperationType);
+        command.Parameters.AddWithValue("$entityType", template.EntityType);
+        AddNullable(command, "$entityId", template.EntityId);
+        AddNullable(command, "$baseVersion", template.BaseVersion);
+        command.Parameters.AddWithValue("$clientOccurredAt", Format(template.ClientOccurredAt));
+        command.Parameters.AddWithValue("$payloadJson", payloadJson);
+        command.Parameters.AddWithValue("$payloadHash", payloadHash);
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+        command.Parameters.AddWithValue("$now", Format(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        var operation = await GetRequiredAsync(connection, transaction, localOperationId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new OfflineEnqueueResult(operation, true);
+    }
+
     public async Task<OfflineOperation?> ClaimNextAsync(
         string workerId,
         TimeSpan leaseDuration,
+        OfflineOperationScope scope,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(workerId) || leaseDuration <= TimeSpan.Zero)
         {
             throw new ArgumentException("A worker identity and positive lease duration are required.");
         }
+        ArgumentNullException.ThrowIfNull(scope);
+        scope.Validate();
 
         var now = _timeProvider.GetUtcNow();
         var attemptId = Guid.NewGuid();
@@ -166,9 +264,11 @@ public sealed class OfflineOperationStore
             WHERE LocalOperationId = (
                 SELECT LocalOperationId
                 FROM offline_operations
-                WHERE (Status = 'QUEUED')
-                   OR (Status = 'FAILED' AND NextRetryAt IS NOT NULL AND NextRetryAt <= $now)
-                   OR (Status = 'SENDING' AND LeaseExpiresAt IS NOT NULL AND LeaseExpiresAt <= $now)
+                WHERE CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
+                  AND RegisteredDeviceId = $registeredDeviceId
+                  AND ((Status = 'QUEUED' AND (NextRetryAt IS NULL OR NextRetryAt <= $now))
+                    OR (Status = 'FAILED' AND NextRetryAt IS NOT NULL AND NextRetryAt <= $now)
+                    OR (Status = 'SENDING' AND LeaseExpiresAt IS NOT NULL AND LeaseExpiresAt <= $now))
                 ORDER BY CreatedAt, LocalOperationId
                 LIMIT 1
             )
@@ -178,27 +278,120 @@ public sealed class OfflineOperationStore
         command.Parameters.AddWithValue("$workerId", workerId);
         command.Parameters.AddWithValue("$leaseExpiresAt", Format(now + leaseDuration));
         command.Parameters.AddWithValue("$now", Format(now));
+        Add(command, "$companyId", scope.CompanyId);
+        Add(command, "$branchId", scope.BranchId);
+        Add(command, "$userId", scope.UserId);
+        Add(command, "$registeredDeviceId", scope.RegisteredDeviceId);
         var operation = await ReadSingleAsync(command, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return operation;
     }
 
     public Task MarkSucceededAsync(Guid localOperationId, Guid attemptCorrelationId, Guid? resultEntityId, long? resultVersion, CancellationToken cancellationToken = default) =>
+        MarkSucceededAsync(localOperationId, attemptCorrelationId, resultEntityId, resultVersion, null, cancellationToken);
+
+    public Task MarkSucceededAsync(Guid localOperationId, Guid attemptCorrelationId, Guid? resultEntityId,
+        long? resultVersion, Guid? serverOperationId, CancellationToken cancellationToken = default) =>
         CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Succeeded,
-            "SUCCEEDED", null, resultEntityId, resultVersion, cancellationToken);
+            "SUCCEEDED", null, serverOperationId, resultEntityId, resultVersion, cancellationToken);
 
     public Task MarkConflictAsync(Guid localOperationId, Guid attemptCorrelationId, Guid conflictCaseId,
         string resultCode, CancellationToken cancellationToken = default)
+        => MarkConflictAsync(localOperationId, attemptCorrelationId, conflictCaseId, resultCode, null, cancellationToken);
+
+    public Task MarkConflictAsync(Guid localOperationId, Guid attemptCorrelationId, Guid conflictCaseId,
+        string resultCode, Guid? serverOperationId, CancellationToken cancellationToken = default)
     {
         if (conflictCaseId == Guid.Empty)
             throw new ArgumentException("A server conflict identity is required.", nameof(conflictCaseId));
         return CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Conflict,
-            resultCode, conflictCaseId, null, null, cancellationToken);
+            resultCode, conflictCaseId, serverOperationId, null, null, cancellationToken);
     }
 
     public Task MarkRejectedAsync(Guid localOperationId, Guid attemptCorrelationId, string resultCode, CancellationToken cancellationToken = default) =>
         CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected,
-            resultCode, null, null, null, cancellationToken);
+            resultCode, null, null, null, null, cancellationToken);
+
+    /// <summary>
+    /// Records durable server acceptance without claiming business success. The operation remains
+    /// queued for an idempotent status replay with fresh attempt/PoP identities, and this polling
+    /// transition does not consume the client transport retry budget.
+    /// </summary>
+    public async Task MarkAcceptedPendingAsync(
+        Guid localOperationId,
+        Guid attemptCorrelationId,
+        Guid serverOperationId,
+        string serverStatus,
+        TimeSpan pollInterval,
+        CancellationToken cancellationToken = default)
+    {
+        if (serverOperationId == Guid.Empty)
+            throw new ArgumentException("A server operation identity is required.", nameof(serverOperationId));
+        if (serverStatus is not ("QUEUED" or "SENDING"))
+            throw new ArgumentException("Only a pending server status can be recorded.", nameof(serverStatus));
+        if (pollInterval <= TimeSpan.Zero || pollInterval > TimeSpan.FromHours(1))
+            throw new ArgumentOutOfRangeException(nameof(pollInterval));
+
+        var now = _timeProvider.GetUtcNow();
+        await using var connection = await _connections.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        var current = await GetRequiredAsync(connection, transaction, localOperationId, cancellationToken);
+        EnsureAttempt(current, attemptCorrelationId);
+        if (current.ServerOperationId is { } existing && existing != serverOperationId)
+            throw new OfflineStoreException("SERVER_OPERATION_MISMATCH", "The server operation identity changed across an idempotent replay.");
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE offline_operations
+            SET Status = 'QUEUED', ServerOperationId = $serverOperationId, ResultCode = $serverStatus,
+                NextRetryAt = $nextPollAt, LeaseOwner = NULL, LeaseExpiresAt = NULL, UpdatedAt = $now
+            WHERE LocalOperationId = $id AND Status = 'SENDING' AND AttemptCorrelationId = $attemptId;
+            """;
+        Add(command, "$serverOperationId", serverOperationId);
+        command.Parameters.AddWithValue("$serverStatus", serverStatus);
+        command.Parameters.AddWithValue("$nextPollAt", Format(now + pollInterval));
+        command.Parameters.AddWithValue("$now", Format(now));
+        Add(command, "$id", localOperationId);
+        Add(command, "$attemptId", attemptCorrelationId);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new OfflineStoreException("LOCAL_ATTEMPT_STALE", "The claimed attempt is no longer current.");
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<DateTimeOffset?> GetNextWorkAtAsync(
+        OfflineOperationScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        scope.Validate();
+        var now = _timeProvider.GetUtcNow();
+        await using var connection = await _connections.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT DueAt FROM (
+                SELECT CASE
+                    WHEN Status = 'QUEUED' THEN COALESCE(NextRetryAt, $now)
+                    WHEN Status = 'FAILED' THEN NextRetryAt
+                    WHEN Status = 'SENDING' THEN LeaseExpiresAt
+                END AS DueAt
+                FROM offline_operations
+                WHERE Status IN ('QUEUED','FAILED','SENDING')
+                  AND CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
+                  AND RegisteredDeviceId = $registeredDeviceId
+            ) AS pending
+            WHERE DueAt IS NOT NULL
+            ORDER BY DueAt
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$now", Format(now));
+        Add(command, "$companyId", scope.CompanyId);
+        Add(command, "$branchId", scope.BranchId);
+        Add(command, "$userId", scope.UserId);
+        Add(command, "$registeredDeviceId", scope.RegisteredDeviceId);
+        var value = await command.ExecuteScalarAsync(cancellationToken) as string;
+        return value is null ? null : DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     public async Task MarkResolvedAsync(Guid localOperationId, string resultCode, CancellationToken cancellationToken = default)
     {
@@ -220,7 +413,7 @@ public sealed class OfflineOperationStore
         }
     }
 
-    public async Task MarkTransportFailureAsync(
+    public async Task<OfflineTransportFailureDisposition> MarkTransportFailureAsync(
         Guid localOperationId,
         Guid attemptCorrelationId,
         bool retryable,
@@ -230,8 +423,8 @@ public sealed class OfflineOperationStore
         if (!retryable)
         {
             await CompleteAttemptAsync(localOperationId, attemptCorrelationId, OfflineOperationStatus.Rejected,
-                resultCode, null, null, null, cancellationToken);
-            return;
+                resultCode, null, null, null, null, cancellationToken);
+            return OfflineTransportFailureDisposition.Rejected;
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -262,6 +455,9 @@ public sealed class OfflineOperationStore
         Add(command, "$attemptId", attemptCorrelationId);
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return exhausted
+            ? OfflineTransportFailureDisposition.Rejected
+            : OfflineTransportFailureDisposition.RetryScheduled;
     }
 
     public async Task<int> RedactExpiredPayloadsAsync(
@@ -295,20 +491,56 @@ public sealed class OfflineOperationStore
         return count;
     }
 
-    public async Task<OfflineOperation?> GetAsync(Guid localOperationId, CancellationToken cancellationToken = default)
+    [Obsolete("An authenticated local scope is required.")]
+    public Task<OfflineOperation?> GetAsync(Guid localOperationId, CancellationToken cancellationToken = default) =>
+        Task.FromException<OfflineOperation?>(new OfflineStoreException(
+            "LOCAL_SCOPE_REQUIRED", "An authenticated local scope is required to read an offline operation."));
+
+    public async Task<OfflineOperation?> GetAsync(
+        Guid localOperationId,
+        OfflineOperationScope scope,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(scope);
+        scope.Validate();
         await using var connection = await _connections.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT * FROM offline_operations WHERE LocalOperationId = $id;";
+        command.CommandText = """
+            SELECT * FROM offline_operations
+            WHERE LocalOperationId = $id AND CompanyId = $companyId AND BranchId = $branchId
+              AND UserId = $userId AND RegisteredDeviceId = $registeredDeviceId;
+            """;
         Add(command, "$id", localOperationId);
+        Add(command, "$companyId", scope.CompanyId);
+        Add(command, "$branchId", scope.BranchId);
+        Add(command, "$userId", scope.UserId);
+        Add(command, "$registeredDeviceId", scope.RegisteredDeviceId);
         return await ReadSingleAsync(command, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<OfflineOperation>> ListAsync(CancellationToken cancellationToken = default)
+    [Obsolete("An authenticated local scope is required.")]
+    public Task<IReadOnlyList<OfflineOperation>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<OfflineOperation>>(new OfflineStoreException(
+            "LOCAL_SCOPE_REQUIRED", "An authenticated local scope is required to list offline operations."));
+
+    public async Task<IReadOnlyList<OfflineOperation>> ListAsync(
+        OfflineOperationScope scope,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(scope);
+        scope.Validate();
         await using var connection = await _connections.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT * FROM offline_operations ORDER BY UpdatedAt DESC, LocalOperationId;";
+        command.CommandText = """
+            SELECT * FROM offline_operations
+            WHERE CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
+              AND RegisteredDeviceId = $registeredDeviceId
+            ORDER BY UpdatedAt DESC, LocalOperationId;
+            """;
+        Add(command, "$companyId", scope.CompanyId);
+        Add(command, "$branchId", scope.BranchId);
+        Add(command, "$userId", scope.UserId);
+        Add(command, "$registeredDeviceId", scope.RegisteredDeviceId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var operations = new List<OfflineOperation>();
         while (await reader.ReadAsync(cancellationToken)) operations.Add(Read(reader));
@@ -338,6 +570,7 @@ public sealed class OfflineOperationStore
         OfflineOperationStatus status,
         string resultCode,
         Guid? conflictCaseId,
+        Guid? serverOperationId,
         Guid? resultEntityId,
         long? resultVersion,
         CancellationToken cancellationToken)
@@ -353,14 +586,17 @@ public sealed class OfflineOperationStore
         command.CommandText = """
             UPDATE offline_operations
             SET Status = $status, ResultCode = $resultCode, ConflictCaseId = $conflictCaseId,
+                ServerOperationId = COALESCE(ServerOperationId, $serverOperationId),
                 ResultEntityId = $resultEntityId,
                 ResultVersion = $resultVersion, AcknowledgedAt = $now, UpdatedAt = $now,
                 LeaseOwner = NULL, LeaseExpiresAt = NULL, NextRetryAt = NULL
-            WHERE LocalOperationId = $id AND Status = 'SENDING' AND AttemptCorrelationId = $attemptId;
+            WHERE LocalOperationId = $id AND Status = 'SENDING' AND AttemptCorrelationId = $attemptId
+              AND (ServerOperationId IS NULL OR $serverOperationId IS NULL OR ServerOperationId = $serverOperationId);
             """;
         command.Parameters.AddWithValue("$status", ToDatabase(status));
         command.Parameters.AddWithValue("$resultCode", RequireResultCode(resultCode));
         AddNullable(command, "$conflictCaseId", conflictCaseId?.ToString("D"));
+        AddNullable(command, "$serverOperationId", serverOperationId?.ToString("D"));
         AddNullable(command, "$resultEntityId", resultEntityId);
         AddNullable(command, "$resultVersion", resultVersion);
         command.Parameters.AddWithValue("$now", Format(now));
@@ -390,6 +626,55 @@ public sealed class OfflineOperationStore
         Add(command, "$deviceId", deviceId);
         Add(command, "$localIntentId", localIntentId);
         return await ReadSingleAsync(command, cancellationToken);
+    }
+
+    private static async Task EnsureNoStaleQueueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid companyId,
+        Guid branchId,
+        Guid userId,
+        Guid registeredDeviceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1 FROM offline_operations
+                WHERE CompanyId = $companyId AND BranchId = $branchId AND UserId = $userId
+                  AND RegisteredDeviceId = $registeredDeviceId
+                  AND Status IN ('QUEUED','SENDING','FAILED','CONFLICT')
+                  AND CreatedAt <= $staleBoundary
+            );
+            """;
+        Add(command, "$companyId", companyId);
+        Add(command, "$branchId", branchId);
+        Add(command, "$userId", userId);
+        Add(command, "$registeredDeviceId", registeredDeviceId);
+        command.Parameters.AddWithValue("$staleBoundary", Format(now - TimeSpan.FromDays(7)));
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken),
+                System.Globalization.CultureInfo.InvariantCulture) != 0)
+            throw new OfflineStoreException(
+                "OFFLINE_QUEUE_ESCALATION_REQUIRED",
+                "A non-terminal operation has reached seven days; synchronize or escalate before creating new offline writes.");
+    }
+
+    private static void EnsureTemplateMatches(
+        OfflineOperation existing,
+        OfflineOperationEnqueueTemplate template)
+    {
+        if (existing.CompanyId != template.CompanyId || existing.BranchId != template.BranchId ||
+            existing.UserId != template.UserId || existing.RegisteredDeviceId != template.RegisteredDeviceId ||
+            !string.Equals(existing.ActionCode, template.ActionCode, StringComparison.Ordinal) ||
+            !string.Equals(existing.OperationType, template.OperationType, StringComparison.Ordinal) ||
+            !string.Equals(existing.EntityType, template.EntityType, StringComparison.Ordinal) ||
+            existing.EntityId != template.EntityId || existing.BaseVersion != template.BaseVersion ||
+            existing.ClientOccurredAt.ToUniversalTime() != template.ClientOccurredAt.ToUniversalTime())
+            throw new OfflineStoreException(
+                "LOCAL_IDEMPOTENCY_MISMATCH",
+                "The local intent identity is already bound to different operation metadata.");
     }
 
     private static async Task<OfflineOperation> GetRequiredAsync(
@@ -439,6 +724,7 @@ public sealed class OfflineOperationStore
         NullableDateTimeOffset(reader, "LeaseExpiresAt"),
         NullableString(reader, "ResultCode"),
         NullableGuid(reader, "ConflictCaseId"),
+        NullableGuid(reader, "ServerOperationId"),
         NullableGuid(reader, "ResultEntityId"),
         NullableInt64(reader, "ResultVersion"),
         DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("CreatedAt")), System.Globalization.CultureInfo.InvariantCulture),

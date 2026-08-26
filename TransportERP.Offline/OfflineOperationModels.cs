@@ -29,6 +29,23 @@ public sealed record OfflineOperationEnqueueRequest(
     DateTimeOffset ClientOccurredAt,
     string PayloadJson);
 
+public sealed record OfflineOperationEnqueueTemplate(
+    Guid LocalIntentId,
+    Guid CompanyId,
+    Guid BranchId,
+    Guid UserId,
+    Guid RegisteredDeviceId,
+    string ActionCode,
+    string OperationType,
+    string EntityType,
+    Guid? EntityId,
+    long? BaseVersion,
+    DateTimeOffset ClientOccurredAt);
+
+public sealed record OfflineGeneratedOperationIdentity(
+    string ClientOperationId,
+    Guid OperationCorrelationId);
+
 public sealed record OfflineOperation(
     Guid LocalOperationId,
     Guid LocalIntentId,
@@ -56,6 +73,7 @@ public sealed record OfflineOperation(
     DateTimeOffset? LeaseExpiresAt,
     string? ResultCode,
     Guid? ConflictCaseId,
+    Guid? ServerOperationId,
     Guid? ResultEntityId,
     long? ResultVersion,
     DateTimeOffset CreatedAt,
@@ -64,6 +82,25 @@ public sealed record OfflineOperation(
     DateTimeOffset? RedactedAt);
 
 public sealed record OfflineEnqueueResult(OfflineOperation Operation, bool Created);
+
+public sealed record OfflineOperationScope(
+    Guid CompanyId,
+    Guid BranchId,
+    Guid UserId,
+    Guid RegisteredDeviceId)
+{
+    internal void Validate()
+    {
+        if (CompanyId == Guid.Empty || BranchId == Guid.Empty || UserId == Guid.Empty || RegisteredDeviceId == Guid.Empty)
+            throw new ArgumentException("Every local operation scope identity must be non-empty.");
+    }
+}
+
+public enum OfflineTransportFailureDisposition
+{
+    RetryScheduled,
+    Rejected
+}
 
 public sealed record OfflineRetryPolicy(
     int MaxRetryCount = 5,
@@ -185,6 +222,34 @@ internal static class OfflineOperationIntegrity
         catch (JsonException exception)
         {
             throw new OfflineStoreException("LOCAL_PAYLOAD_INVALID", "Payload must be valid JSON.", exception);
+        }
+    }
+
+    public static void ValidatePayloadIdentity(string payloadJson, string clientOperationId)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        var identities = new List<string?>();
+        CollectClientOperationIds(document.RootElement, identities);
+        if (identities.Count != 1 || !string.Equals(identities[0]?.Trim(), clientOperationId, StringComparison.Ordinal))
+            throw new OfflineStoreException(
+                "LOCAL_PAYLOAD_IDENTITY_MISMATCH",
+                "The generated client operation identity must appear exactly once in the action payload.");
+    }
+
+    private static void CollectClientOperationIds(JsonElement element, ICollection<string?> identities)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, "clientOperationId", StringComparison.OrdinalIgnoreCase))
+                    identities.Add(property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() : null);
+                CollectClientOperationIds(property.Value, identities);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) CollectClientOperationIds(item, identities);
         }
     }
 

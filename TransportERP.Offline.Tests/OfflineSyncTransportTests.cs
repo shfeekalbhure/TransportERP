@@ -26,6 +26,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var nonce = Base64Url(RandomNumberGenerator.GetBytes(32));
         const string bearer = "volatile-session-token";
         byte[]? challengeBody = null;
+        Guid? challengeCorrelation = null;
         CapturedRequest? signed = null;
         using var key = new TestSigningKey();
         var calls = 0;
@@ -36,6 +37,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
             if (calls == 1)
             {
                 challengeBody = captured.Body;
+                challengeCorrelation = captured.AttemptCorrelationId;
                 Assert.Null(captured.Proof);
                 return Challenge(nonce, captured.AttemptCorrelationId);
             }
@@ -52,9 +54,10 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(bearer, signed.Bearer);
         Assert.Equal("application/json", signed.MediaType);
         Assert.NotNull(signed.Proof);
+        Assert.NotEqual(challengeCorrelation, signed.AttemptCorrelationId);
         AssertExactJsonOnlyWireContract(signed.Body);
         VerifyProof(signed.Proof!, signed.Body, bearer, nonce, signed.AttemptCorrelationId, key);
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
         Assert.Equal(OfflineOperationStatus.Succeeded, persisted!.Status);
         Assert.Equal(9, persisted.ResultVersion);
     }
@@ -85,7 +88,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.Succeeded);
         Assert.Equal(3, call);
         Assert.Equal(signed[0].Body, signed[1].Body);
-        Assert.Equal(signed[0].AttemptCorrelationId, signed[1].AttemptCorrelationId);
+        Assert.NotEqual(signed[0].AttemptCorrelationId, signed[1].AttemptCorrelationId);
         Assert.NotEqual(signed[0].Proof, signed[1].Proof);
         var firstClaims = ProofClaims(signed[0].Proof!);
         var refreshedClaims = ProofClaims(signed[1].Proof!);
@@ -107,24 +110,36 @@ public sealed class OfflineSyncTransportTests : IDisposable
         {
             call++;
             var captured = await CaptureAsync(request, cancellationToken);
-            if (call is 1 or 3) return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            if (call is 1 or 3 or 5) return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
             signedRequests.Add(captured);
             if (call == 2) throw new TaskCanceledException("simulated timeout after server acceptance");
-            return Success(captured, "QUEUED");
+            return Success(captured, call == 4 ? "QUEUED" : "SUCCEEDED",
+                resultEntityId: call == 6 ? Guid.NewGuid() : null,
+                resultVersion: call == 6 ? 1 : null);
         }));
         var client = Client(http, store, key, clock, "memory-only-token");
 
         var firstRun = await client.ProcessNextBatchAsync();
-        var failed = await store.GetAsync(queued.Operation.LocalOperationId);
+        var failed = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
         Assert.Equal(1, firstRun.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, failed!.Status);
         var firstAttempt = failed.AttemptCorrelationId;
 
         clock.Advance(TimeSpan.FromSeconds(5));
         var secondRun = await client.ProcessNextBatchAsync();
-        var completed = await store.GetAsync(queued.Operation.LocalOperationId);
+        var accepted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
 
-        Assert.Equal(1, secondRun.Succeeded);
+        Assert.Equal(0, secondRun.Succeeded);
+        Assert.Equal(1, secondRun.AcceptedPending);
+        Assert.Equal(OfflineOperationStatus.Queued, accepted!.Status);
+        Assert.NotNull(accepted.ServerOperationId);
+        Assert.Equal(1, accepted.ClientTransportRetryCount);
+
+        clock.Advance(TimeSpan.FromSeconds(5));
+        var thirdRun = await client.ProcessNextBatchAsync();
+        var completed = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, thirdRun.Succeeded);
         Assert.Equal(OfflineOperationStatus.Succeeded, completed!.Status);
         Assert.NotEqual(firstAttempt, completed.AttemptCorrelationId);
         Assert.Equal(queued.Operation.ClientOperationId, completed.ClientOperationId);
@@ -135,6 +150,163 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var secondClaims = ProofClaims(signedRequests[1].Proof!);
         Assert.NotEqual(firstClaims.GetProperty("jti").GetString(), secondClaims.GetProperty("jti").GetString());
         Assert.NotEqual(firstClaims.GetProperty("cid").GetString(), secondClaims.GetProperty("cid").GetString());
+    }
+
+    [Theory]
+    [InlineData("SUCCEEDED", OfflineOperationStatus.Succeeded, null)]
+    [InlineData("CONFLICT", OfflineOperationStatus.Conflict, "BASE_VERSION_CONFLICT")]
+    [InlineData("FAILED", OfflineOperationStatus.Rejected, "ACTION_EXECUTION_FAILED")]
+    public async Task Server_acceptance_is_polled_until_a_real_terminal_outcome_without_spending_transport_retry(
+        string terminalStatus,
+        OfflineOperationStatus expectedLocalStatus,
+        string? terminalError)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await store.EnqueueAsync(Request());
+        using var key = new TestSigningKey();
+        var signed = new List<CapturedRequest>();
+        var call = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            call++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (call is 1 or 3)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            signed.Add(captured);
+            return Success(captured, call == 2 ? "QUEUED" : terminalStatus,
+                call == 4 ? terminalError : null,
+                call == 4 && terminalStatus == "SUCCEEDED" ? Guid.NewGuid() : null,
+                call == 4 && terminalStatus == "SUCCEEDED" ? 1 : null);
+        }));
+        var client = Client(http, store, key, clock, "token");
+
+        var acceptedRun = await client.ProcessNextBatchAsync();
+        var accepted = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(1, acceptedRun.AcceptedPending);
+        Assert.Equal(OfflineOperationStatus.Queued, accepted.Status);
+        Assert.Equal("QUEUED", accepted.ResultCode);
+        Assert.NotNull(accepted.ServerOperationId);
+        Assert.Null(accepted.AcknowledgedAt);
+        Assert.Equal(0, accepted.ClientTransportRetryCount);
+        var acceptedAttempt = accepted.AttemptCorrelationId;
+
+        clock.Advance(TimeSpan.FromSeconds(5));
+        await client.ProcessNextBatchAsync();
+        var terminal = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(expectedLocalStatus, terminal.Status);
+        Assert.Equal(0, terminal.ClientTransportRetryCount);
+        Assert.NotEqual(acceptedAttempt, terminal.AttemptCorrelationId);
+        Assert.Equal(accepted.ServerOperationId, terminal.ServerOperationId);
+        Assert.Equal(signed[0].Body, signed[1].Body);
+        Assert.NotEqual(signed[0].Proof, signed[1].Proof);
+    }
+
+    [Fact]
+    public async Task Supervisor_reopens_the_encrypted_queue_waits_for_connectivity_and_drains_accepted_work_once()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "supervised-outbox.db");
+        var firstStore = new OfflineOperationStore(path, new FixedKeyProvider(_outboxKey, _cacheKey));
+        await firstStore.InitializeAsync();
+        var queued = await firstStore.EnqueueAsync(Request());
+
+        var reopened = new OfflineOperationStore(path, new FixedKeyProvider(_outboxKey, _cacheKey));
+        await reopened.InitializeAsync();
+        using var key = new TestSigningKey();
+        var signedCalls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (captured.Proof is null)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            signedCalls++;
+            return Success(captured, signedCalls == 1 ? "QUEUED" : "SUCCEEDED",
+                resultEntityId: signedCalls == 2 ? Guid.NewGuid() : null,
+                resultVersion: signedCalls == 2 ? 1 : null);
+        }));
+        var transport = new OfflineSyncTransportClient(http, reopened, new FixedBearerProvider("token"), key,
+            new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
+                CompanyId, BranchId, UserId, "supervised-worker", AcceptedPollInterval: TimeSpan.FromMilliseconds(20)));
+        var connectivity = new ManualConnectivity(initiallyOnline: false);
+        var supervisor = new OfflineSyncSupervisor(reopened, transport, connectivity,
+            new OfflineSyncSupervisorOptions(10, TimeSpan.FromMilliseconds(20)));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+
+        await Task.Delay(30);
+        Assert.Equal(0, signedCalls);
+        connectivity.SetOnline();
+        await WaitUntilAsync(async () =>
+            (await reopened.GetAsync(queued.Operation.LocalOperationId, Scope()))?.Status == OfflineOperationStatus.Succeeded,
+            stop.Token);
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        var completed = (await reopened.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+        Assert.Equal(2, signedCalls);
+        Assert.Equal(0, completed.ClientTransportRetryCount);
+        Assert.NotNull(completed.ServerOperationId);
+    }
+
+    [Fact]
+    public async Task A_second_supervisor_cannot_drain_the_same_local_outbox()
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        await store.EnqueueAsync(Request());
+        using var key = new TestSigningKey();
+        var signedEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSigned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (captured.Proof is null)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            signedEntered.TrySetResult();
+            await releaseSigned.Task.WaitAsync(cancellationToken);
+            return Success(captured, "SUCCEEDED", resultEntityId: Guid.NewGuid(), resultVersion: 1);
+        }));
+        var transport = Client(http, store, key, TimeProvider.System, "token");
+        var first = new OfflineSyncSupervisor(store, transport, new AlwaysOnlineSyncConnectivity());
+        var second = new OfflineSyncSupervisor(store, transport, new AlwaysOnlineSyncConnectivity());
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var firstRun = first.RunAsync(stop.Token);
+        await signedEntered.Task.WaitAsync(stop.Token);
+
+        var error = await Assert.ThrowsAsync<OfflineStoreException>(() => second.RunAsync(stop.Token));
+        Assert.Equal("LOCAL_SYNC_SUPERVISOR_ALREADY_RUNNING", error.Code);
+
+        releaseSigned.TrySetResult();
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstRun);
+    }
+
+    [Fact]
+    public async Task Supervisor_runs_local_retention_even_without_transport_work()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await store.EnqueueAsync(Request());
+        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
+        await store.MarkSucceededAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
+            Guid.NewGuid(), 1);
+        clock.Advance(TimeSpan.FromHours(24));
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+            throw new InvalidOperationException("Retention-only supervision must not call HTTP.")));
+        var transport = Client(http, store, key, clock, "token");
+        var supervisor = new OfflineSyncSupervisor(store, transport, new AlwaysOnlineSyncConnectivity(),
+            new OfflineSyncSupervisorOptions(RetentionPolicy: new OfflineRetentionPolicy()), clock);
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+
+        await WaitUntilAsync(async () =>
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))?.PayloadJson is null,
+            stop.Token);
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
     }
 
     [Fact]
@@ -154,12 +326,61 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
 
         var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
 
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
         Assert.Equal("NO_RESPONSE", persisted.ResultCode);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.RequestTimeout)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task Http_408_and_5xx_are_retryable_even_when_the_error_body_is_missing_or_not_retryable(
+        HttpStatusCode statusCode)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await store.EnqueueAsync(Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((request, _) => Task.FromResult(
+            statusCode == HttpStatusCode.InternalServerError
+                ? Json(statusCode, new { ErrorCode = "SCOPE_DENIED", CorrelationId = Guid.Parse(
+                    request.Headers.GetValues("X-Correlation-Id").Single()) })
+                : new HttpResponseMessage(statusCode))));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var operation = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(0, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Failed, operation.Status);
+        Assert.Equal(1, operation.ClientTransportRetryCount);
+    }
+
+    [Fact]
+    public async Task Exhausted_transport_failure_is_reported_as_rejected_not_retry_scheduled()
+    {
+        Directory.CreateDirectory(_directory);
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
+        var store = new OfflineOperationStore(Path.Combine(_directory, "exhausted.db"),
+            new FixedKeyProvider(_outboxKey, _cacheKey), clock,
+            new OfflineRetryPolicy(0, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)));
+        await store.InitializeAsync();
+        var queued = await store.EnqueueAsync(Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var operation = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
+
+        Assert.Equal(0, outcome.RetryScheduled);
+        Assert.Equal(1, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, operation.Status);
+        Assert.Equal("RETRY_EXHAUSTED", operation.ResultCode);
     }
 
     [Fact]
@@ -196,9 +417,9 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.Succeeded);
         Assert.Equal(1, outcome.Conflicted);
         Assert.Equal(1, outcome.Rejected);
-        var completedFirst = (await store.GetAsync(first.Operation.LocalOperationId))!;
-        var completedSecond = (await store.GetAsync(second.Operation.LocalOperationId))!;
-        var completedThird = (await store.GetAsync(third.Operation.LocalOperationId))!;
+        var completedFirst = (await store.GetAsync(first.Operation.LocalOperationId, Scope()))!;
+        var completedSecond = (await store.GetAsync(second.Operation.LocalOperationId, Scope()))!;
+        var completedThird = (await store.GetAsync(third.Operation.LocalOperationId, Scope()))!;
         Assert.Equal(OfflineOperationStatus.Succeeded, completedFirst.Status);
         Assert.Equal(OfflineOperationStatus.Conflict, completedSecond.Status);
         Assert.NotNull(completedSecond.ConflictCaseId);
@@ -208,11 +429,11 @@ public sealed class OfflineSyncTransportTests : IDisposable
             completedFirst.AttemptCorrelationId, completedSecond.AttemptCorrelationId, completedThird.AttemptCorrelationId
         };
         Assert.Equal(3, localAttempts.Distinct().Count());
-        Assert.Contains(wireAttempt, localAttempts);
+        Assert.DoesNotContain(wireAttempt, localAttempts);
     }
 
     [Fact]
-    public async Task A_claim_from_another_company_branch_user_or_device_is_rejected_before_http()
+    public async Task A_queue_from_another_scope_is_not_claimed_or_mutated_by_this_transport()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
@@ -226,12 +447,13 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
 
         var result = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
 
         Assert.Equal(0, calls);
-        Assert.Equal(1, result.Rejected);
-        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
-        Assert.Equal("LOCAL_SCOPE_INVALID", persisted.ResultCode);
+        Assert.Equal(0, result.Claimed);
+        Assert.Equal(0, result.Rejected);
+        Assert.Equal(OfflineOperationStatus.Queued, persisted!.Status);
+        Assert.Null(persisted.ResultCode);
     }
 
     [Theory]
@@ -262,7 +484,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
 
         var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
 
         Assert.Equal(1, outcome.Rejected);
         Assert.Equal(0, outcome.RetryScheduled);
@@ -290,7 +512,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
 
         var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
 
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
@@ -321,7 +543,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         await Client(http, store, key, clock, bearer).ProcessNextBatchAsync();
 
         var jti = ProofClaims(signed!.Proof!).GetProperty("jti").GetString()!;
-        var persisted = await store.GetAsync(queued.Operation.LocalOperationId);
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
         var fileBytes = Directory.EnumerateFiles(_directory).SelectMany(File.ReadAllBytes).ToArray();
         var fileText = Encoding.UTF8.GetString(fileBytes);
         var persistedJson = JsonSerializer.Serialize(persisted);
@@ -338,17 +560,19 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
         var queued = await store.EnqueueAsync(Request());
-        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         var conflictCaseId = Guid.NewGuid();
         await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
             conflictCaseId, "BASE_VERSION_CONFLICT");
         using var key = new TestSigningKey();
         var signed = new List<CapturedRequest>();
+        var wireCorrelations = new List<Guid>();
         var call = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
         {
             call++;
             var captured = await CaptureAsync(request, cancellationToken);
+            wireCorrelations.Add(captured.AttemptCorrelationId);
             if (call is 1 or 3)
                 return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
             signed.Add(captured);
@@ -364,21 +588,52 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var client = new OfflineSyncConflictClient(http, store, new FixedBearerProvider("token"), key, options, clock);
 
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
-            client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply, 12));
+            client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply,
+                "إعادة تطبيق بعد مراجعة الإصدار الحالي", 12));
         Assert.Equal(OfflineOperationStatus.Conflict,
-            (await store.GetAsync(queued.Operation.LocalOperationId))!.Status);
-        await client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply, 12);
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!.Status);
+        await client.ResolveAsync(queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply,
+            "إعادة تطبيق بعد مراجعة الإصدار الحالي", 12);
 
         Assert.Equal(signed[0].Body, signed[1].Body);
         Assert.NotEqual(signed[0].Proof, signed[1].Proof);
+        Assert.Equal(4, wireCorrelations.Distinct().Count());
+        Assert.NotEqual(signed[0].AttemptCorrelationId, signed[1].AttemptCorrelationId);
         var first = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(signed[0].Body,
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         var second = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(signed[1].Body,
             new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         Assert.Equal(first.Reapply!.ClientOperationId, second.Reapply!.ClientOperationId);
         Assert.Equal(first.Reapply.OperationCorrelationId, second.Reapply.OperationCorrelationId);
+        Assert.Equal("إعادة تطبيق بعد مراجعة الإصدار الحالي", first.Reason);
+        Assert.DoesNotContain(first.Reason, JsonSerializer.Serialize(
+            await store.GetAsync(queued.Operation.LocalOperationId, Scope())), StringComparison.Ordinal);
         Assert.Equal(OfflineOperationStatus.Resolved,
-            (await store.GetAsync(queued.Operation.LocalOperationId))!.Status);
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!.Status);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("contains access_token=secret")]
+    [InlineData("line\nbreak")]
+    public async Task Conflict_reason_must_be_explicit_bounded_safe_text(string reason)
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        var queued = await store.EnqueueAsync(Request());
+        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
+        await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
+            Guid.NewGuid(), "BASE_VERSION_CONFLICT");
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+            throw new InvalidOperationException("An invalid reason must fail before HTTP.")));
+        var client = new OfflineSyncConflictClient(http, store, new FixedBearerProvider("token"), key,
+            new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
+                CompanyId, BranchId, UserId, "test-worker"));
+
+        var error = await Assert.ThrowsAsync<OfflineStoreException>(() => client.ResolveAsync(
+            queued.Operation.LocalOperationId, OfflineConflictDecision.KeepServer, reason));
+
+        Assert.Equal("CONFLICT_REASON_INVALID", error.Code);
     }
 
     public void Dispose()
@@ -421,6 +676,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
         new DateTimeOffset(2026, 8, 26, 9, 30, 0, TimeSpan.Zero),
         "{\"amount\":42}");
 
+    private static OfflineOperationScope Scope() => new(CompanyId, BranchId, UserId, RegisteredDeviceId);
+
     private static HttpResponseMessage Challenge(string nonce, Guid correlationId)
     {
         var response = Json(HttpStatusCode.Unauthorized, new
@@ -455,7 +712,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         long? resultVersion = null) => new(
         operation.ClientOperationId,
         operation.OperationCorrelationId,
-        Guid.NewGuid(),
+        StableServerOperationId(operation.ClientOperationId),
         operation.ActionCode,
         resultEntityId,
         status,
@@ -463,6 +720,18 @@ public sealed class OfflineSyncTransportTests : IDisposable
         errorCode,
         status == "CONFLICT" ? Guid.NewGuid() : null,
         DateTimeOffset.UtcNow);
+
+    private static Guid StableServerOperationId(string clientOperationId)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("server-operation|" + clientOperationId));
+        return new Guid(hash.AsSpan(0, 16));
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, CancellationToken cancellationToken)
+    {
+        while (!await condition())
+            await Task.Delay(10, cancellationToken);
+    }
 
     private static HttpResponseMessage Json(HttpStatusCode status, object value) => new(status)
     {
@@ -599,6 +868,30 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         public ValueTask<byte[]> GetKeyAsync(LocalStorePurpose purpose, CancellationToken cancellationToken = default) =>
             ValueTask.FromResult((purpose == LocalStorePurpose.WriteOutbox ? outboxKey : cacheKey).ToArray());
+    }
+
+    private sealed class ManualConnectivity(bool initiallyOnline) : IOfflineSyncConnectivity
+    {
+        private volatile bool _online = initiallyOnline;
+        private TaskCompletionSource _onlineSignal = NewSignal();
+
+        public ValueTask<bool> IsOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(_online);
+        }
+
+        public Task WaitUntilOnlineAsync(CancellationToken cancellationToken = default) =>
+            _online ? Task.CompletedTask : _onlineSignal.Task.WaitAsync(cancellationToken);
+
+        public void SetOnline()
+        {
+            _online = true;
+            _onlineSignal.TrySetResult();
+        }
+
+        private static TaskCompletionSource NewSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset initial) : TimeProvider

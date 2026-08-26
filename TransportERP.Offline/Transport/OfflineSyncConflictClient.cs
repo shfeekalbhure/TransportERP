@@ -12,8 +12,11 @@ public sealed class OfflineSyncConflictClient
 {
     private const string KeepServerDecision = "KEEP_SERVER_AND_REJECT_LOCAL";
     private const string ReapplyDecision = "REAPPLY_AS_NEW";
-    private const string KeepReason = "USER_CONFIRMED_SERVER_VERSION";
-    private const string ReapplyReason = "USER_CONFIRMED_REAPPLY";
+    private static readonly string[] ForbiddenReasonFragments =
+    [
+        "authorization", "bearer ", "token=", "password", "clientsecret", "devicecredential",
+        "dpop", "privatekey", "refresh_token", "access_token"
+    ];
     private readonly HttpClient _httpClient;
     private readonly OfflineOperationStore _store;
     private readonly IInMemoryBearerTokenProvider _bearerTokens;
@@ -42,28 +45,40 @@ public sealed class OfflineSyncConflictClient
             throw new ArgumentException("The sync conflict transport options are invalid.", nameof(options));
     }
 
-    public async Task ResolveAsync(
+    [Obsolete("A distinct reviewed user reason is required for conflict resolution.")]
+    public Task ResolveAsync(
         Guid localOperationId,
         OfflineConflictDecision decision,
         long? reapplyBaseVersion = null,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException(new OfflineStoreException(
+            "CONFLICT_REASON_REQUIRED", "A distinct reviewed user reason is required for conflict resolution."));
+
+    public async Task ResolveAsync(
+        Guid localOperationId,
+        OfflineConflictDecision decision,
+        string reason,
+        long? reapplyBaseVersion = null,
         CancellationToken cancellationToken = default)
     {
-        var operation = await _store.GetAsync(localOperationId, cancellationToken)
+        ValidateReason(reason);
+        var operation = await _store.GetAsync(localOperationId,
+                new OfflineOperationScope(_options.CompanyId, _options.BranchId, _options.UserId,
+                    _options.RegisteredDeviceId), cancellationToken)
             ?? throw new OfflineStoreException("LOCAL_OPERATION_NOT_FOUND", "The local operation does not exist.");
         Validate(operation, decision, reapplyBaseVersion);
 
         var conflictCaseId = operation.ConflictCaseId!.Value;
-        var body = CreateBody(operation, decision, reapplyBaseVersion);
+        var body = CreateBody(operation, decision, reason, reapplyBaseVersion);
         var endpoint = ConflictEndpoint(conflictCaseId);
         var htu = endpoint.AbsoluteUri;
-        var attemptCorrelationId = Guid.NewGuid();
         var bearer = await _bearerTokens.GetBearerTokenAsync(cancellationToken);
         ValidateBearer(bearer);
 
-        var nonce = await AcquireNonceAsync(endpoint, body, bearer, attemptCorrelationId, cancellationToken);
-        var response = await SendSignedAsync(endpoint, htu, body, bearer, nonce,
-            attemptCorrelationId, cancellationToken);
-        if (response.ConflictCaseId != conflictCaseId || response.CorrelationId != attemptCorrelationId ||
+        var nonce = await AcquireNonceAsync(endpoint, body, bearer, cancellationToken);
+        var signed = await SendSignedAsync(endpoint, htu, body, bearer, nonce, cancellationToken);
+        var response = signed.Response;
+        if (response.ConflictCaseId != conflictCaseId || response.CorrelationId != signed.CorrelationId ||
             !string.Equals(response.ConflictStatus, "RESOLVED", StringComparison.Ordinal) ||
             !string.Equals(response.Decision,
                 decision == OfflineConflictDecision.KeepServer ? KeepServerDecision : ReapplyDecision,
@@ -75,7 +90,11 @@ public sealed class OfflineSyncConflictClient
             cancellationToken);
     }
 
-    private byte[] CreateBody(OfflineOperation operation, OfflineConflictDecision decision, long? baseVersion)
+    private byte[] CreateBody(
+        OfflineOperation operation,
+        OfflineConflictDecision decision,
+        string reason,
+        long? baseVersion)
     {
         SyncV1ConflictReapplyRequest? reapply = null;
         if (decision == OfflineConflictDecision.Reapply)
@@ -90,13 +109,14 @@ public sealed class OfflineSyncConflictClient
 
         return SyncV1Json.Serialize(new SyncV1ConflictResolutionRequest(
             decision == OfflineConflictDecision.KeepServer ? KeepServerDecision : ReapplyDecision,
-            decision == OfflineConflictDecision.KeepServer ? KeepReason : ReapplyReason,
+            reason,
             reapply));
     }
 
     private async Task<string> AcquireNonceAsync(Uri endpoint, byte[] body, string bearer,
-        Guid correlationId, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
+        var correlationId = Guid.NewGuid();
         using var request = Request(endpoint, body, bearer, correlationId, proof: null);
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
@@ -109,12 +129,13 @@ public sealed class OfflineSyncConflictClient
         throw await ErrorAsync(response, cancellationToken);
     }
 
-    private async Task<SyncV1ConflictResolutionResponse> SendSignedAsync(
+    private async Task<(SyncV1ConflictResolutionResponse Response, Guid CorrelationId)> SendSignedAsync(
         Uri endpoint, string htu, byte[] body, string bearer, string nonce,
-        Guid correlationId, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            var correlationId = Guid.NewGuid();
             var proof = await _proofs.CreateAsync(htu, bearer, body, nonce, correlationId, cancellationToken);
             using var request = Request(endpoint, body, bearer, correlationId, proof);
             using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
@@ -122,8 +143,9 @@ public sealed class OfflineSyncConflictClient
             if (response.IsSuccessStatusCode)
             {
                 var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                return SyncV1Json.Deserialize<SyncV1ConflictResolutionResponse>(bytes)
+                var parsed = SyncV1Json.Deserialize<SyncV1ConflictResolutionResponse>(bytes)
                     ?? throw new SyncTransportException("CONFLICT_RESPONSE_INVALID", retryable: true);
+                return (parsed, correlationId);
             }
 
             var error = await ErrorAsync(response, cancellationToken);
@@ -187,11 +209,17 @@ public sealed class OfflineSyncConflictClient
             var error = SyncV1Json.Deserialize<SyncV1ErrorResponse>(bytes);
             var code = string.IsNullOrEmpty(error?.ErrorCode) ? "HTTP_REJECTED" : error.ErrorCode;
             return new SyncTransportException(code, retryable:
-                code is "INTERNAL_ERROR" or "RATE_LIMITED");
+                code is "INTERNAL_ERROR" or "RATE_LIMITED" or "TIMEOUT" or "NO_RESPONSE" ||
+                response.StatusCode == HttpStatusCode.RequestTimeout ||
+                response.StatusCode == HttpStatusCode.TooManyRequests ||
+                (int)response.StatusCode >= 500);
         }
         catch (JsonException)
         {
-            return new SyncTransportException("HTTP_REJECTED", retryable: false);
+            return new SyncTransportException("HTTP_REJECTED", retryable:
+                response.StatusCode == HttpStatusCode.RequestTimeout ||
+                response.StatusCode == HttpStatusCode.TooManyRequests ||
+                (int)response.StatusCode >= 500);
         }
     }
 
@@ -208,5 +236,14 @@ public sealed class OfflineSyncConflictClient
     {
         if (string.IsNullOrEmpty(bearer) || bearer.Any(character => character > 0x7f || char.IsWhiteSpace(character)))
             throw new SyncTransportException("SESSION_TOKEN_INVALID", retryable: false);
+    }
+
+    private static void ValidateReason(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 500 || reason.Any(char.IsControl) ||
+            ForbiddenReasonFragments.Any(fragment => reason.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            throw new OfflineStoreException(
+                "CONFLICT_REASON_INVALID",
+                "Conflict reasons must contain 1..500 safe text characters and no authentication material.");
     }
 }

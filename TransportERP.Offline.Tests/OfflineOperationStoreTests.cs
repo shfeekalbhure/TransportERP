@@ -22,7 +22,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var duplicate = await firstStore.EnqueueAsync(request);
         var reopened = Store(path);
         await reopened.InitializeAsync();
-        var afterRestart = await reopened.GetAsync(first.Operation.LocalOperationId);
+        var afterRestart = await reopened.GetAsync(first.Operation.LocalOperationId, Scope());
 
         Assert.True(first.Created);
         Assert.False(duplicate.Created);
@@ -53,6 +53,58 @@ public sealed class OfflineOperationStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Identity_bound_payload_factory_generates_business_ids_once_and_replay_does_not_reinvoke_it()
+    {
+        var store = Store(OutboxPath());
+        await store.InitializeAsync();
+        var template = Template();
+        OfflineGeneratedOperationIdentity? generated = null;
+        var calls = 0;
+
+        var first = await store.EnqueueAsync(template, identity =>
+        {
+            calls++;
+            generated = identity;
+            return $"{{\"clientOperationId\":\"{identity.ClientOperationId}\",\"nameAr\":\"طرف\"}}";
+        });
+        var replay = await store.EnqueueAsync(template, _ =>
+            throw new InvalidOperationException("An idempotent local replay must not regenerate payload identity."));
+
+        Assert.Equal(1, calls);
+        Assert.True(first.Created);
+        Assert.False(replay.Created);
+        Assert.Equal(generated!.ClientOperationId, first.Operation.ClientOperationId);
+        Assert.Equal(generated.OperationCorrelationId, first.Operation.OperationCorrelationId);
+        Assert.Equal(first.Operation.LocalOperationId, replay.Operation.LocalOperationId);
+
+        var mismatch = await Assert.ThrowsAsync<OfflineStoreException>(() => store.EnqueueAsync(
+            Template(Guid.NewGuid()), _ => "{\"clientOperationId\":\"caller-changed\"}"));
+        Assert.Equal("LOCAL_PAYLOAD_IDENTITY_MISMATCH", mismatch.Code);
+    }
+
+    [Fact]
+    public async Task Seven_day_non_terminal_boundary_blocks_new_scope_writes_without_deleting_the_old_queue()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
+        var store = Store(OutboxPath(), clock);
+        await store.InitializeAsync();
+        var oldest = await store.EnqueueAsync(Request());
+
+        clock.Advance(TimeSpan.FromDays(7) - TimeSpan.FromTicks(1));
+        var beforeBoundary = await store.EnqueueAsync(Request(Guid.NewGuid()));
+        Assert.True(beforeBoundary.Created);
+
+        clock.Advance(TimeSpan.FromTicks(1));
+        var blocked = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+            store.EnqueueAsync(Request(Guid.NewGuid())));
+
+        Assert.Equal("OFFLINE_QUEUE_ESCALATION_REQUIRED", blocked.Code);
+        Assert.Equal(OfflineOperationStatus.Queued,
+            (await store.GetAsync(oldest.Operation.LocalOperationId, Scope()))!.Status);
+        Assert.Equal(2, (await store.ListAsync(Scope())).Count);
+    }
+
+    [Fact]
     public async Task Unknown_and_generic_delete_actions_fail_before_persistence()
     {
         var store = Store(OutboxPath());
@@ -65,7 +117,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
 
         Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", unknown.Code);
         Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", delete.Code);
-        Assert.Null(await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1)));
+        Assert.Null(await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope()));
     }
 
     [Fact]
@@ -76,11 +128,11 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var store = Store(path, clock);
         await store.InitializeAsync();
         var queued = await store.EnqueueAsync(Request());
-        var firstAttempt = await store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1));
+        var firstAttempt = await store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1), Scope());
 
         clock.Advance(TimeSpan.FromMinutes(2));
         var reopened = Store(path, clock);
-        var recovered = await reopened.ClaimNextAsync("worker-b", TimeSpan.FromMinutes(1));
+        var recovered = await reopened.ClaimNextAsync("worker-b", TimeSpan.FromMinutes(1), Scope());
 
         Assert.NotNull(firstAttempt);
         Assert.NotNull(recovered);
@@ -99,8 +151,8 @@ public sealed class OfflineOperationStoreTests : IDisposable
         await store.EnqueueAsync(Request());
 
         var claims = await Task.WhenAll(
-            store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1)),
-            store.ClaimNextAsync("worker-b", TimeSpan.FromMinutes(1)));
+            store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1), Scope()),
+            store.ClaimNextAsync("worker-b", TimeSpan.FromMinutes(1), Scope()));
 
         Assert.Single(claims, operation => operation is not null);
         Assert.Single(claims, operation => operation is null);
@@ -113,11 +165,11 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var store = Store(OutboxPath(), clock);
         await store.InitializeAsync();
         var queued = await store.EnqueueAsync(Request());
-        var first = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var first = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkTransportFailureAsync(first!.LocalOperationId, first.AttemptCorrelationId!.Value, true, "TIMEOUT");
 
         clock.Advance(TimeSpan.FromSeconds(5));
-        var second = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var second = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
 
         Assert.NotNull(second);
         Assert.NotEqual(first.AttemptCorrelationId, second!.AttemptCorrelationId);
@@ -137,17 +189,17 @@ public sealed class OfflineOperationStoreTests : IDisposable
 
         for (var attemptNumber = 0; attemptNumber < 3; attemptNumber++)
         {
-            var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+            var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
             Assert.NotNull(attempt);
             await store.MarkTransportFailureAsync(attempt!.LocalOperationId, attempt.AttemptCorrelationId!.Value, true, "TIMEOUT");
             clock.Advance(TimeSpan.FromSeconds(4));
         }
 
-        var operation = await store.GetAsync(queued.Operation.LocalOperationId);
+        var operation = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
         Assert.Equal(OfflineOperationStatus.Rejected, operation!.Status);
         Assert.Equal("RETRY_EXHAUSTED", operation.ResultCode);
         Assert.Equal(2, operation.ClientTransportRetryCount);
-        Assert.Null(await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1)));
+        Assert.Null(await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope()));
     }
 
     [Theory]
@@ -167,13 +219,13 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var store = Store(OutboxPath());
         await store.InitializeAsync();
         await store.EnqueueAsync(Request());
-        var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         var conflictCaseId = Guid.NewGuid();
         await store.MarkConflictAsync(attempt!.LocalOperationId, attempt.AttemptCorrelationId!.Value,
             conflictCaseId, "BASE_VERSION_CONFLICT");
         await store.MarkResolvedAsync(attempt.LocalOperationId, "KEEP_SERVER");
 
-        var operation = await store.GetAsync(attempt.LocalOperationId);
+        var operation = await store.GetAsync(attempt.LocalOperationId, Scope());
         Assert.Equal(OfflineOperationStatus.Resolved, operation!.Status);
         Assert.Equal(conflictCaseId, operation.ConflictCaseId);
         await Assert.ThrowsAsync<OfflineStoreException>(() =>
@@ -186,12 +238,12 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var store = Store(OutboxPath());
         await store.InitializeAsync();
         var queued = await store.EnqueueAsync(Request());
-        var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var attempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkTransportFailureAsync(attempt!.LocalOperationId,
             attempt.AttemptCorrelationId!.Value, true, "TIMEOUT");
 
         await store.RequeueFailedAsync(queued.Operation.LocalOperationId);
-        var listed = Assert.Single(await store.ListAsync());
+        var listed = Assert.Single(await store.ListAsync(Scope()));
 
         Assert.Equal(OfflineOperationStatus.Queued, listed.Status);
         Assert.Equal(queued.Operation.ClientOperationId, listed.ClientOperationId);
@@ -204,30 +256,46 @@ public sealed class OfflineOperationStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Operation_get_and_list_require_exact_authenticated_scope()
+    {
+        var store = Store(OutboxPath());
+        await store.InitializeAsync();
+        var queued = await store.EnqueueAsync(Request());
+        var other = Scope() with { UserId = Guid.NewGuid() };
+
+        Assert.Null(await store.GetAsync(queued.Operation.LocalOperationId, other));
+        Assert.Empty(await store.ListAsync(other));
+        Assert.NotNull(await store.GetAsync(queued.Operation.LocalOperationId, Scope()));
+        var unscoped = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+            store.GetAsync(queued.Operation.LocalOperationId));
+        Assert.Equal("LOCAL_SCOPE_REQUIRED", unscoped.Code);
+    }
+
+    [Fact]
     public async Task Retention_redacts_only_acknowledged_terminal_payloads_at_exact_boundaries()
     {
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 26, 8, 0, 0, TimeSpan.Zero));
         var store = Store(OutboxPath(), clock);
         await store.InitializeAsync();
         var succeeded = await store.EnqueueAsync(Request());
-        var succeededAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var succeededAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkSucceededAsync(succeededAttempt!.LocalOperationId, succeededAttempt.AttemptCorrelationId!.Value, Guid.NewGuid(), 1);
         var rejected = await store.EnqueueAsync(Request(Guid.NewGuid()));
-        var rejectedAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1));
+        var rejectedAttempt = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
         await store.MarkRejectedAsync(rejectedAttempt!.LocalOperationId, rejectedAttempt.AttemptCorrelationId!.Value, "SCOPE_DENIED");
         var pending = await store.EnqueueAsync(Request(Guid.NewGuid()));
 
         clock.Advance(TimeSpan.FromHours(24));
         var concurrentCleanup = await Task.WhenAll(store.RedactExpiredPayloadsAsync(), store.RedactExpiredPayloadsAsync());
         Assert.Equal(1, concurrentCleanup.Sum());
-        Assert.Null((await store.GetAsync(succeeded.Operation.LocalOperationId))!.PayloadJson);
-        Assert.NotNull((await store.GetAsync(rejected.Operation.LocalOperationId))!.PayloadJson);
-        Assert.NotNull((await store.GetAsync(pending.Operation.LocalOperationId))!.PayloadJson);
+        Assert.Null((await store.GetAsync(succeeded.Operation.LocalOperationId, Scope()))!.PayloadJson);
+        Assert.NotNull((await store.GetAsync(rejected.Operation.LocalOperationId, Scope()))!.PayloadJson);
+        Assert.NotNull((await store.GetAsync(pending.Operation.LocalOperationId, Scope()))!.PayloadJson);
 
         clock.Advance(TimeSpan.FromDays(6));
         Assert.Equal(1, await store.RedactExpiredPayloadsAsync());
-        Assert.Null((await store.GetAsync(rejected.Operation.LocalOperationId))!.PayloadJson);
-        Assert.NotNull((await store.GetAsync(pending.Operation.LocalOperationId))!.PayloadJson);
+        Assert.Null((await store.GetAsync(rejected.Operation.LocalOperationId, Scope()))!.PayloadJson);
+        Assert.NotNull((await store.GetAsync(pending.Operation.LocalOperationId, Scope()))!.PayloadJson);
         Assert.Equal(0, await store.RedactExpiredPayloadsAsync());
     }
 
@@ -277,18 +345,35 @@ public sealed class OfflineOperationStoreTests : IDisposable
     {
         var cachePath = Path.Combine(_directory, "read-cache.db");
         var outboxPath = OutboxPath();
-        var cache = new OfflineReadCacheStore(cachePath, Keys());
+        var cache = new OfflineReadCacheStore(cachePath, Keys(), Scope());
         var outbox = Store(outboxPath);
         await cache.InitializeAsync();
         await outbox.InitializeAsync();
         await cache.PutAsync("SearchOperationalParties", "party:1", "{\"name\":\"cached\"}", TimeSpan.FromHours(24));
 
         Assert.Equal("{\"name\":\"cached\"}", await cache.GetAsync("SearchOperationalParties", "party:1"));
-        Assert.Null(await outbox.ClaimNextAsync("worker", TimeSpan.FromMinutes(1)));
+        Assert.Null(await outbox.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope()));
         Assert.NotEqual(Path.GetFullPath(cache.DatabasePath), Path.GetFullPath(outbox.DatabasePath));
         var denied = await Assert.ThrowsAsync<OfflineStoreException>(() =>
             cache.PutAsync("ArbitraryApiResponse", "secret", "{}", TimeSpan.FromHours(1)));
         Assert.Equal("READ_CACHE_INVALID", denied.Code);
+    }
+
+    [Fact]
+    public async Task Read_cache_database_is_bound_to_one_authenticated_scope_and_cross_scope_open_fails_closed()
+    {
+        var path = Path.Combine(_directory, "scope-bound-cache.db");
+        var first = new OfflineReadCacheStore(path, Keys(), Scope());
+        await first.InitializeAsync();
+        await first.PutAsync("SearchOperationalParties", "party:1", "{\"name\":\"scope-a\"}", TimeSpan.FromHours(1));
+
+        var otherScope = Scope() with { UserId = Guid.NewGuid() };
+        var second = new OfflineReadCacheStore(path, Keys(), otherScope);
+        var denied = await Assert.ThrowsAsync<OfflineStoreException>(() => second.InitializeAsync());
+
+        Assert.Equal("READ_CACHE_SCOPE_DENIED", denied.Code);
+        Assert.Equal("{\"name\":\"scope-a\"}",
+            await first.GetAsync("SearchOperationalParties", "party:1"));
     }
 
     public void Dispose()
@@ -309,6 +394,12 @@ public sealed class OfflineOperationStoreTests : IDisposable
 
     private FixedKeyProvider Keys() => new(_outboxKey, _cacheKey);
 
+    private static OfflineOperationScope Scope() => new(
+        Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        Guid.Parse("22222222-2222-2222-2222-222222222222"),
+        Guid.Parse("33333333-3333-3333-3333-333333333333"),
+        Guid.Parse("44444444-4444-4444-4444-444444444444"));
+
     private static OfflineOperationEnqueueRequest Request(Guid? localIntentId = null) => new(
         localIntentId ?? Guid.NewGuid(),
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
@@ -322,6 +413,19 @@ public sealed class OfflineOperationStoreTests : IDisposable
         null,
         new DateTimeOffset(2026, 8, 26, 7, 0, 0, TimeSpan.Zero),
         "{\"amount\":42}");
+
+    private static OfflineOperationEnqueueTemplate Template(Guid? localIntentId = null) => new(
+        localIntentId ?? Guid.NewGuid(),
+        Scope().CompanyId,
+        Scope().BranchId,
+        Scope().UserId,
+        Scope().RegisteredDeviceId,
+        "CreateOperationalParty",
+        "CREATE",
+        "OperationalParty",
+        null,
+        null,
+        new DateTimeOffset(2026, 8, 26, 7, 0, 0, TimeSpan.Zero));
 
     private sealed class FixedKeyProvider(byte[] outboxKey, byte[] cacheKey) : ILocalEncryptionKeyProvider
     {
