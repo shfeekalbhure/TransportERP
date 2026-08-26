@@ -126,9 +126,10 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
             var terminalAt = Normalize(DateTimeOffset.UtcNow.AddDays(-91));
             var operationId = await InsertStage4OperationAsync(db, accepted, "SUCCEEDED", terminalAt);
             var redactedAt = Normalize(DateTimeOffset.UtcNow);
+            const string emptyJson = "{}";
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE transport_erp.sync_operations
-                SET "PayloadJson"='{{}}', "RedactedAt"={redactedAt}
+                SET "PayloadJson"={emptyJson}, "RedactedAt"={redactedAt}
                 WHERE "Id"={operationId}
                 """);
 
@@ -141,7 +142,7 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
             Assert.Equal(1, await db.Database.SqlQuery<int>($"""
                 SELECT count(*)::int AS "Value"
                 FROM transport_erp.sync_operations
-                WHERE "Id"={operationId} AND "PayloadJson"='{{}}' AND "RedactedAt"={redactedAt}
+                WHERE "Id"={operationId} AND "PayloadJson"={emptyJson} AND "RedactedAt"={redactedAt}
                 """).SingleAsync());
 
             await db.Database.ExecuteSqlInterpolatedAsync(
