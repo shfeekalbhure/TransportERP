@@ -1,5 +1,7 @@
 # TransportERP — PR #69 Full Execution Mechanism
 
+> **Execution update — 2026-08-27:** This mechanism is the historical plan. The owner later delegated G4/G5 and Ready authority while still prohibiting merge. Stages 4 and 5 have since been implemented and exact-SHA verified; current status is in `PR69_EXECUTION_CHECKPOINT.md` and `PR69_FULL_EXECUTION_AND_COMPLETION_REPORT.md`.
+
 **Record:** `PR69-EXEC-MECH-20260826-01`  
 **Prepared:** 2026-08-26, Asia/Riyadh  
 **Repository:** `shfeekalbhure/TransportERP`  

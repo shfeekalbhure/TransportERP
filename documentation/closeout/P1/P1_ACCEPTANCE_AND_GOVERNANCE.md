@@ -1,13 +1,16 @@
 # TransportERP — سجل اختبارات القبول وحوكمة P1
+
+> **إشعار حاكم أحدث — 2026-08-27:** الأقسام التاريخية التي تصف Stage 4 بأنها WIP أو Stage 5 بأنها غير منفذة، أو تمنع Ready/G4/G5 بسبب سلطة المالك، أصبحت `HISTORICAL_SUPERSEDED`. المرجع التشغيلي الحالي هو `PR69_EXECUTION_CHECKPOINT.md` ومصفوفة `PR69_G4_G5_EVIDENCE_MATRIX_2026-08-27.md` والتقرير `PR69_FULL_EXECUTION_AND_COMPLETION_REPORT.md`. مرشح التنفيذ هو exact SHA `b9788d5a6e4deca9505ae481fa92432ba3ddb6e3` / tree `25656a07ca26bd2d5d32281ab971b865eaf9e80f`، واجتاز Core/PostgreSQL/HTTP `514/514` وOffline `56/56` وجميع وظائف Android/Mobile/Desktop الإلزامية في [run 33024451748](https://github.com/shfeekalbhure/TransportERP/actions/runs/33024451748). فوّض المالك في 2026-08-27 الفريق بإصدار قراري G4/G5 وتحويل PR إلى Ready بعد الأدلة والمراجعة المستقلة؛ الدمج مستثنى صراحةً، وOffline الإنتاجي يبقى مغلقًا.
+
 **دور الملف:** المرجع التشغيلي الموحد للحالة والبوابات والأدلة الخاصة بـ`PR #69`، مع إبقاء تفاصيل العقود في ملفاتها الأصلية وعدم نسخها هنا.
 
-**آخر تحديث جوهري:** `2026-08-26 — PR69 full-execution owner order`
+**آخر تحديث جوهري:** `2026-08-27 — exact-SHA Stage 4/5 closure evidence`
 
-**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_SERVER_AND_BUSINESS_RUNTIME_WIP — G4_OPEN — STAGE5_IMPLEMENTATION_AUTHORIZED_WITH_OFFLINE_CLOSED — G5_OWNER_DECISION_REQUIRED`.
+**الحالة التشغيلية الحالية:** `STAGES_1_5_IMPLEMENTED_AND_EXACT_SHA_CI_VERIFIED — INDEPENDENT_IMPLEMENTATION_REVIEW_COMPLETE — FINAL_DOCUMENTATION_HEAD_CI_REQUIRED — PRODUCTION_OFFLINE_CLOSED — MERGE_PROHIBITED`.
 
-**قرار المالك الأحدث — 2026-08-26:** يفوض أمر `PR69_FULL_EXECUTION` تنفيذ Stage 4 كاملًا ثم بناء Stage 5 واختبارها مع بقاء `sync.offline.enabled=false` في الإنتاج. يحل هذا القرار محل عبارات `STAGE5 NOT AUTHORIZED` و«لا يبدأ Phase 5» السابقة من ناحية **التنفيذ على فرع PR #69 فقط**. لا يمنح القرار `G4 PASS` أو `G5 PASS`، ولا يجيز Ready أو Merge أو auto-merge أو نشرًا أو migration إنتاجية أو استخدام أسرار إنتاجية.
+**قرار المالك الأحدث — 2026-08-27:** فوض المالك فريق التنفيذ بكل قرارات الاعتماد والإطلاق والرفع وتحويل Ready داخل PR #69، مع منع الدمج وحده صراحةً. لا يشمل ذلك نشر الإنتاج أو migrations/أسرار الإنتاج، ويبقى `sync.offline.enabled=false` في الإعدادات الإنتاجية. لا يسجل G4/G5 أو Ready قبل اكتمال المراجعة المستقلة وCI النهائي الفعلي.
 
-**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على S4-B، أو `204` اختبارًا على الرأس البعيد بعد S4-C، أو `291` اختبارًا على مرشح Runtime تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203. نجح مرشح Runtime على exact SHA `1acddb3384fc6f61fed24444a8bc54cd23fe212d` في CI run `32992686767`؛ يبقى `G4 OPEN` إلى حين اكتمال أدلة القبول والمراجعة المستقلة.
+**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** لا تتغير الصفوف جماعيًا. رُبطت حالات `T-SYNC-001..010` فقط بالأدلة الحالية؛ تبقى بقية الصفوف بحالتها التاريخية ما لم تملك اختبارًا ودليلًا exact-SHA مستقلين. العدد الإجمالي الأخضر ليس بديلًا عن الربط الصفّي.
 
 ## 0. مركز قيادة PR #69 وحزمة إغلاق المراحل 1–3
 

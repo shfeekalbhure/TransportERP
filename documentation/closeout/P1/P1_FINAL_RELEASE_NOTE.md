@@ -1,5 +1,7 @@
 # TransportERP — قرار إصدار حزمة P1 النهائية
 
+> **`HISTORICAL_CONTRACT_PACKAGE_SUPERSEDED` — 2026-08-27:** هذه الوثيقة تسجل اعتماد الحزمة التعاقدية في 2026-08-25 ولا تمثل حالة تنفيذ PR #69 الحالية. المرجع التنفيذي الحالي هو `PR69_FULL_EXECUTION_AND_COMPLETION_REPORT.md`; التنفيذ الحالي تجاوز قيد `LIMITED_ANALYSIS_AND_POC_ONLY` بقرارات المالك اللاحقة، مع بقاء Offline الإنتاجي مغلقًا والدمج ممنوعًا.
+
 **Release_ID:** `P1-PLATFORM-SETTINGS-ACCOUNTING-2026-08`  
 **نتيجة المراجعة المستقلة:** `PASS`  
 **حالة الإصدار:** `ACCEPTED_BY_OWNER`  

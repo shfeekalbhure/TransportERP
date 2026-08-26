@@ -2,9 +2,9 @@
 
 **الإصدار:** P1-SYNC-CONTRACT-2026-08  
 **المعرف الحاكم:** `W1-P1-017` / `W2-P1-015` / `W3-P1-012`  
-**الحالة:** `G3_POLICY_ACCEPTED — STAGE4_SYNC_POP_POLICY_ACCEPTED — SERVER_AND_CLIENT_IMPLEMENTATION_AUTHORIZED_WITH_OFFLINE_CLOSED — RUNTIME_CONFORMANCE_PENDING_G4/G5`؛ لا يمثل اعتماد السياسة أو تفويض البناء إذنًا لتفعيل Offline أو ادعاء اكتمال التنفيذ.
+**الحالة:** `G3_POLICY_ACCEPTED — STAGE4_AND_STAGE5_IMPLEMENTED_AND_EXACT_SHA_CI_VERIFIED — PRODUCTION_OFFLINE_CLOSED` على implementation SHA `b9788d5a6e4deca9505ae481fa92432ba3ddb6e3` / tree `25656a07ca26bd2d5d32281ab971b865eaf9e80f`. تفاصيل الأدلة في `PR69_G4_G5_EVIDENCE_MATRIX_2026-08-27.md`؛ لا يمثل ذلك تشغيلًا إنتاجيًا أو إذن دمج.
 
-**قرار المالك الأحدث — 2026-08-26 / `PR69_FULL_EXECUTION`:** فُوض استكمال Stage 4 الخادمية والتجارية وبناء Stage 5 على فرع PR #69 مع بقاء الإنتاج `OFFLINE_DISABLED`. عبارات هذا الملف الأقدم التي تقول إن عميل Stage 5 أو runtime غير مفوض أصبحت تاريخًا متجاوزًا من ناحية التنفيذ فقط. تظل `G4 PASS` و`G5 PASS` وReady وMerge وauto-merge والنشر وmigrations/الأسرار الإنتاجية محجوبة لقرار المالك.
+**قرار المالك الأحدث — 2026-08-27:** فوض المالك فريق التنفيذ بإصدار G4/G5 وتحويل PR إلى Ready بعد اكتمال الأدلة والمراجعة المستقلة. الدمج ممنوع صراحةً. بقي الإنتاج `OFFLINE_DISABLED` ولم تُستخدم أسرار أو migrations أو بيئة إنتاج.
 **Decision ID:** `DEC-G3-SYNC-20260825-01`
 
 **G3 exact baseline:** `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
@@ -13,8 +13,8 @@
 **Stage 4 initial contract record:** remote docs commit `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`.
 
 **Stage 4 normative amended contract:** remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`، وقد نجحت CI #16 عليه. هذه الإضافة توثق البصمة فقط ولا تغير أحكام الأقسام 19.1–19.12 المثبتة في ذلك commit.
-**Stage 4 corrigendum:** `DEC-P1-SYNC-POP-CORR-20260826-03` يصحح التناقض الداخلي بين نافذة `iat` في §19.5 وتعبير `ck_sync_replay_window` السابق. التعبير المصحح يطابق النافذة المعتمدة نفسها دون توسيعها: `FirstSeenAt>=IssuedAt-30s` و`FirstSeenAt<=IssuedAt+120s` مع `ExpiresAt>FirstSeenAt`. حالة التصحيح `WIP_UNVERIFIED` حتى exact-SHA CI وG4؛ لا Offline ولا G5 ولا تفويض دمج.
-**Stage 4 challenge-hardening corrigendum:** `DEC-P1-SYNC-POP-CORR-20260826-04` يجعل حقول challenge الصادرة immutable، ويجعل الاستهلاك انتقالًا وحيد الاتجاه من NULL إلى وقت داخل نافذة الصلاحية ومشروطًا بوجود change ledger مطابق. حالة التصحيح `WIP_UNVERIFIED` حتى exact-SHA CI وG4؛ لا Offline ولا G5 ولا PR Ready ولا تفويض دمج.
+**Stage 4 corrigendum:** `DEC-P1-SYNC-POP-CORR-20260826-03` يصحح التناقض الداخلي بين نافذة `iat` في §19.5 وتعبير `ck_sync_replay_window` السابق. التعبير المصحح يطابق النافذة المعتمدة نفسها دون توسيعها: `FirstSeenAt>=IssuedAt-30s` و`FirstSeenAt<=IssuedAt+120s` مع `ExpiresAt>FirstSeenAt`. الحالة `IMPLEMENTED_AND_EXACT_SHA_CI_VERIFIED` على المرشح الحالي.
+**Stage 4 challenge-hardening corrigendum:** `DEC-P1-SYNC-POP-CORR-20260826-04` يجعل حقول challenge الصادرة immutable، ويجعل الاستهلاك انتقالًا وحيد الاتجاه من NULL إلى وقت داخل نافذة الصلاحية ومشروطًا بوجود change ledger مطابق. الحالة `IMPLEMENTED_AND_EXACT_SHA_CI_VERIFIED` على المرشح الحالي.
 **Authority:** قرار مفوض من المالك داخل المحادثة بتاريخ 2026-08-25؛ لا يدعي هذا السجل توقيع أشخاص أو مراجعين غير مثبتين.
 
 **تثبيت حوكمي — 2026-08-25:** اعتمد القرار المفوض أعمدة وسياسات Offline/Sync فقط في عقود W2 المشار إليها، ولا يقبل بقية حقول W2 أو يغير حالة مراجعتها أو يفوض runtime أو مرحلة P2 لاحقة. يغطي القرار allowlist Payload Actions، وإعادة المحاولة وBackoff، وسياسة التعارض، والاحتفاظ، وحجم الدفعة وذريتها، وصلاحيات حل التعارض، وتسلسل الإعدادات. يبقى `sync.offline.enabled=false` حتى تثبت مطابقة التنفيذ واجتياز G4 ثم يصدر تفويض G5.
@@ -162,12 +162,12 @@ Read-cache منفصل عن write queue ولا ينشئ `SyncOperation`. الاس
 | `CreateJournalEntry` | `CREATE` | `JournalEntry` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `JournalEntryId` مطلوب | `OFFLINE_DISPATCH_UNAVAILABLE`؛ لا API/dispatcher إنتاجي مثبت |
 | `CreateReceiptVoucher` | `CREATE` | `ReceiptVoucher` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `ReceiptVoucherId` مطلوب | `OFFLINE_DISPATCH_UNAVAILABLE`؛ service موجود بلا sync dispatch مثبت |
 | `CreatePaymentVoucher` | `CREATE` | `PaymentVoucher` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `PaymentVoucherId` مطلوب | `OFFLINE_DISPATCH_UNAVAILABLE`؛ service موجود بلا sync dispatch مثبت |
-| `CreateWaybillDraft` | `CREATE` | `Waybill` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `WaybillId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `UpdateWaybillDraft` | `UPDATE` | `Waybill` | `WaybillId` مطلوب | **مطلوب** | `WaybillId` مطلوب ويساوي EntityId | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `CreateOperationalParty` | `CREATE` | `OperationalParty` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `OperationalPartyId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `CreateWaybillDraft` | `CREATE` | `Waybill` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `WaybillId` مطلوب | `OFFLINE_RUNTIME_AVAILABLE`؛ typed dispatcher + business idempotency |
+| `UpdateWaybillDraft` | `UPDATE` | `Waybill` | `WaybillId` مطلوب | **مطلوب** | `WaybillId` مطلوب ويساوي EntityId | `OFFLINE_RUNTIME_AVAILABLE`؛ BaseVersion/conflict enforced |
+| `CreateOperationalParty` | `CREATE` | `OperationalParty` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `OperationalPartyId` مطلوب | `OFFLINE_RUNTIME_AVAILABLE`؛ company/branch isolation enforced |
 | `AddWaybillAttachment` | `CREATE` | `Waybill` | owner `WaybillId` مطلوب | غير مطلوب | `WaybillAttachmentId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE`; metadata فقط، لا binary upload |
-| `RecordCollection` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + server state/serialization | `CollectionTransactionId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `LoadAllocatedQuantity` | `COMMAND` | `ManifestLine` | `ManifestLineId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized quantity/domain state | `MovementEventId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `RecordCollection` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + server state/serialization | `CollectionTransactionId` مطلوب | `OFFLINE_RUNTIME_AVAILABLE`؛ typed command + idempotency |
+| `LoadAllocatedQuantity` | `COMMAND` | `ManifestLine` | `ManifestLineId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized quantity/domain state | `MovementEventId` مطلوب | `OFFLINE_RUNTIME_AVAILABLE`؛ serialized domain enforcement |
 | `RecordArrival` | `COMMAND` | `Trip` | `TripId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + server serialization/domain state | `ArrivalReceiptId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
 | `RecordUnload` | `COMMAND` | `ArrivalReceipt` | `ArrivalReceiptId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized quantity/domain state | `MovementEventId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
 | `DeliverQuantity` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized availability/domain state | `DeliveryId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |

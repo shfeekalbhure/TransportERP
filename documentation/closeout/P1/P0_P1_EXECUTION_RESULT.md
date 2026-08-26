@@ -1,5 +1,7 @@
 # نتيجة تنفيذ P0/P1
 
+> **`HISTORICAL_BASELINE_SUPERSEDED` — 2026-08-27:** هذا سجل baseline قديم لفرع `feature/p0-p1-closeout` ولا يمثل حالة PR #69 الحالية أو بواباتها. المرجع الحالي هو `PR69_FULL_EXECUTION_AND_COMPLETION_REPORT.md` و`PR69_G4_G5_EVIDENCE_MATRIX_2026-08-27.md`. لا توجد بوابة حاكمة بعد G5 في نطاق PR #69.
+
 **Release_ID:** `P1-PLATFORM-SETTINGS-ACCOUNTING-2026-08`  
 **Branch:** `feature/p0-p1-closeout`  
 **Baseline Commit:** `fc607fc6e735f7b554f80dd9ad5d668bf50659c3`  
