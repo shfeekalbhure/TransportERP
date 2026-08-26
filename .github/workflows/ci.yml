@@ -404,6 +404,8 @@ jobs:
       - name: Install MAUI and pinned Android emulator image
         shell: bash
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
           dotnet workload install maui-android --skip-sign-check
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
