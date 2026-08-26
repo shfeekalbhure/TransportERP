@@ -53,6 +53,76 @@ public sealed class DriverClosedDeviceKeyBindingVerifier : IDriverDeviceKeyBindi
 }
 
 /// <summary>
+/// Ephemeral verifier populated only by the authenticated activation authority. The server's
+/// public JWK and thumbprint are non-secret; they remain memory-only and exact-session scoped.
+/// </summary>
+public sealed class DriverServerDeviceKeyBindingVerifier : IDriverDeviceKeyBindingVerifier
+{
+    private readonly object _gate = new();
+    private AuthorizedBinding? _binding;
+
+    public ValueTask<DriverDeviceKeyBindingDecision> VerifyAsync(
+        DriverDeviceKeyBindingContext context,
+        DevicePublicP256Jwk currentPublicKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(currentPublicKey);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var binding = _binding;
+            if (binding is null || binding.ExpiresAt <= DateTimeOffset.UtcNow || !binding.Matches(context))
+                return ValueTask.FromResult(DriverDeviceKeyBindingDecision.VerificationUnavailable);
+            return ValueTask.FromResult(
+                string.Equals(binding.X, currentPublicKey.X, StringComparison.Ordinal) &&
+                string.Equals(binding.Y, currentPublicKey.Y, StringComparison.Ordinal)
+                    ? DriverDeviceKeyBindingDecision.Match
+                    : DriverDeviceKeyBindingDecision.Mismatch);
+        }
+    }
+
+    internal void Authorize(DriverServerActivationDecision decision, DateTimeOffset expiresAt)
+    {
+        ArgumentNullException.ThrowIfNull(decision);
+        var publicKey = decision.ProofPublicJwk;
+        lock (_gate)
+        {
+            _binding = decision.Enabled && decision.ProofKeyVersion is >= 1 && publicKey is not null &&
+                publicKey.Kty == "EC" && publicKey.Crv == "P-256" &&
+                !string.IsNullOrWhiteSpace(publicKey.X) && !string.IsNullOrWhiteSpace(publicKey.Y) &&
+                expiresAt > DateTimeOffset.UtcNow
+                    ? new(decision.CompanyId, decision.BranchId, decision.UserId,
+                        decision.RegisteredDeviceId, decision.SessionId, decision.DeviceId,
+                        publicKey.X, publicKey.Y, expiresAt)
+                    : null;
+        }
+    }
+
+    internal void Clear()
+    {
+        lock (_gate) _binding = null;
+    }
+
+    private sealed record AuthorizedBinding(
+        Guid CompanyId,
+        Guid BranchId,
+        Guid UserId,
+        Guid RegisteredDeviceId,
+        Guid SessionId,
+        string DeviceId,
+        string X,
+        string Y,
+        DateTimeOffset ExpiresAt)
+    {
+        internal bool Matches(DriverDeviceKeyBindingContext context) =>
+            CompanyId == context.CompanyId && BranchId == context.BranchId &&
+            UserId == context.UserId && RegisteredDeviceId == context.RegisteredDeviceId &&
+            SessionId == context.SessionId && string.Equals(DeviceId, context.DeviceId, StringComparison.Ordinal);
+    }
+}
+
+/// <summary>
 /// Opaque capability issued only after the governed verifier accepts the exact native public key.
 /// External composition callers cannot construct one and therefore cannot bypass activation.
 /// </summary>

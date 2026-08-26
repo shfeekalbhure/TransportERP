@@ -96,11 +96,18 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             using var keyStore = LoadKeyStore();
             using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            using var signer = Java.Security.Signature.GetInstance("SHA256withECDSA")
+            var nativeP1363 = TrySignNativeP1363(privateKey, input);
+            if (nativeP1363 is not null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return nativeP1363;
+            }
+
+            using var derSigner = Java.Security.Signature.GetInstance("SHA256withECDSA")
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            signer.InitSign(privateKey);
-            signer.Update(input);
-            derSignature = signer.Sign();
+            derSigner.InitSign(privateKey);
+            derSigner.Update(input);
+            derSignature = derSigner.Sign();
             cancellationToken.ThrowIfCancellationRequested();
             return DerToP1363(derSignature);
         }
@@ -121,6 +128,27 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             CryptographicOperations.ZeroMemory(input);
             if (derSignature is not null)
                 CryptographicOperations.ZeroMemory(derSignature);
+        }
+    }
+
+    private static byte[]? TrySignNativeP1363(IPrivateKey privateKey, byte[] input)
+    {
+        try
+        {
+            using var p1363Signer = Java.Security.Signature.GetInstance("SHA256withECDSAinP1363Format");
+            if (p1363Signer is null) return null;
+            p1363Signer.InitSign(privateKey);
+            p1363Signer.Update(input);
+            var signature = p1363Signer.Sign();
+            if (signature is { Length: 64 }) return signature;
+            if (signature is not null) CryptographicOperations.ZeroMemory(signature);
+            return null;
+        }
+        catch
+        {
+            // Android providers are not required to expose the JDK P1363 alias. The strict DER
+            // parser below remains the portable path and never accepts an ambiguous signature.
+            return null;
         }
     }
 
@@ -152,13 +180,48 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         }
     }
 
-#if TRANSPORTERP_DEVICE_TESTS
     /// <summary>
-    /// Test-APK-only enrollment seam. Production binaries have no implicit or callable key
-    /// creation path; registration/rebind must be implemented by a separately governed flow.
+    /// Production enrollment/recovery seam. The opaque one-use authority can only be issued by
+    /// the authenticated activation coordinator after an exact-scope server decision. A signing
+    /// or activation path can never create or replace the alias implicitly.
     /// </summary>
-    internal async ValueTask ProvisionFreshKeyForDeviceTestAsync(
+    internal async ValueTask ProvisionForAuthorizedEnrollmentAsync(
+        DriverDeviceKeyEnrollmentAuthorization authorization,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(authorization);
+        authorization.Consume();
+        await GenerateFreshKeyAsync("DEVICE_KEY_ALREADY_PROVISIONED", cancellationToken);
+    }
+
+    internal async ValueTask ReplaceForAuthorizedRecoveryAsync(
+        DriverDeviceKeyEnrollmentAuthorization authorization,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(authorization);
+        if (authorization.ChangeType != "RECOVER")
+            throw new DriverOfflineUnavailableException("DEVICE_KEY_ENROLLMENT_AUTHORITY_INVALID");
+        authorization.Consume();
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var keyStore = LoadKeyStore();
+            if (keyStore.ContainsAlias(KeyAlias)) keyStore.DeleteEntry(KeyAlias);
+            GenerateFreshKey(keyStore);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (DriverOfflineUnavailableException) { throw; }
+        catch (Exception exception)
+        {
+            throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE", exception);
+        }
+        finally { _gate.Release(); }
+    }
+
+    private async ValueTask GenerateFreshKeyAsync(
+        string existingKeyCode,
+        CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -166,21 +229,9 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             cancellationToken.ThrowIfCancellationRequested();
             using var keyStore = LoadKeyStore();
             if (keyStore.ContainsAlias(KeyAlias))
-                throw new DriverOfflineUnavailableException("DEVICE_TEST_KEY_ALREADY_EXISTS");
+                throw new DriverOfflineUnavailableException(existingKeyCode);
 
-            using var generator = KeyPairGenerator.GetInstance(KeyProperties.KeyAlgorithmEc, AndroidKeyStore)
-                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            using var curve = new ECGenParameterSpec("secp256r1");
-            using var specification = new KeyGenParameterSpec.Builder(
-                    KeyAlias,
-                    KeyStorePurpose.Sign | KeyStorePurpose.Verify)
-                .SetAlgorithmParameterSpec(curve)
-                .SetDigests(KeyProperties.DigestSha256)
-                .SetUserAuthenticationRequired(false)
-                .Build();
-            generator.Initialize(specification);
-            using var generated = generator.GenerateKeyPair()
-                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            GenerateFreshKey(keyStore);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -200,6 +251,137 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         }
     }
 
+    private static void GenerateFreshKey(KeyStore keyStore)
+    {
+        if (keyStore.ContainsAlias(KeyAlias))
+            throw new DriverOfflineUnavailableException("DEVICE_KEY_ALREADY_PROVISIONED");
+        using var generator = KeyPairGenerator.GetInstance(KeyProperties.KeyAlgorithmEc, AndroidKeyStore)
+            ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+        using var curve = new ECGenParameterSpec("secp256r1");
+        using var specification = new KeyGenParameterSpec.Builder(
+                KeyAlias,
+                KeyStorePurpose.Sign | KeyStorePurpose.Verify)
+            .SetAlgorithmParameterSpec(curve)
+            .SetDigests(KeyProperties.DigestSha256)
+            .SetUserAuthenticationRequired(false)
+            .Build();
+        generator.Initialize(specification);
+        using var generated = generator.GenerateKeyPair()
+            ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+    }
+
+#if TRANSPORTERP_DEVICE_TESTS
+    internal sealed record AndroidSignatureDiagnostics(
+        bool JavaDerSignatureVerified,
+        bool DerP1363RoundTripVerified,
+        bool PublicJwkMatchesCertificate,
+        bool ProductionP1363Verified);
+
+    /// <summary>
+    /// Test-APK-only diagnosis. Only booleans leave this method; signature, SPKI and coordinates
+    /// are zeroed and are never persisted by the device-test activity.
+    /// </summary>
+    internal async ValueTask<AndroidSignatureDiagnostics> DiagnoseSignatureForDeviceTestAsync(
+        ReadOnlyMemory<byte> signingInput,
+        ReadOnlyMemory<byte> productionP1363,
+        DevicePublicP256Jwk expectedPublicJwk,
+        CancellationToken cancellationToken = default)
+    {
+        if (signingInput.IsEmpty || productionP1363.Length != 64)
+            return new(false, false, false, false);
+        await RequireExistingKeyAsync(cancellationToken);
+        var input = signingInput.ToArray();
+        var p1363 = productionP1363.ToArray();
+        byte[]? rawDer = null;
+        byte[]? roundTripDer = null;
+        byte[]? spki = null;
+        var javaDerVerified = false;
+        var roundTripVerified = false;
+        var jwkMatches = false;
+        var productionVerified = false;
+        try
+        {
+            using var keyStore = LoadKeyStore();
+            using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var certificate = keyStore.GetCertificate(KeyAlias)
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var certificatePublicKey = certificate.PublicKey
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            spki = certificatePublicKey.GetEncoded()
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var keyFactory = KeyFactory.GetInstance(KeyProperties.KeyAlgorithmEc)
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var publicKeySpec = new X509EncodedKeySpec(spki);
+            using var publicKey = keyFactory.GeneratePublic(publicKeySpec) as IPublicKey
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+
+            using (var rawSigner = Java.Security.Signature.GetInstance("SHA256withECDSA")
+                       ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE"))
+            {
+                rawSigner.InitSign(privateKey);
+                rawSigner.Update(input);
+                rawDer = rawSigner.Sign();
+            }
+
+            javaDerVerified = VerifyDer(publicKey, input, rawDer);
+            var converted = DerToP1363(rawDer);
+            try
+            {
+                roundTripDer = P1363ToDer(converted);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(converted);
+            }
+            roundTripVerified = VerifyDer(publicKey, input, roundTripDer);
+            var productionDer = P1363ToDer(p1363);
+            try { productionVerified = VerifyDer(publicKey, input, productionDer); }
+            finally { CryptographicOperations.ZeroMemory(productionDer); }
+
+            using var publicEcdsa = ECDsa.Create();
+            publicEcdsa.ImportSubjectPublicKeyInfo(spki, out var consumed);
+            var parameters = publicEcdsa.ExportParameters(includePrivateParameters: false);
+            jwkMatches = consumed == spki.Length && parameters.Q.X is { Length: 32 } x &&
+                parameters.Q.Y is { Length: 32 } y &&
+                string.Equals(Base64Url(x), expectedPublicJwk.X, StringComparison.Ordinal) &&
+                string.Equals(Base64Url(y), expectedPublicJwk.Y, StringComparison.Ordinal);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch
+        {
+            // The fixed boolean matrix is the only diagnostic emitted by the device test.
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
+            CryptographicOperations.ZeroMemory(p1363);
+            if (rawDer is not null) CryptographicOperations.ZeroMemory(rawDer);
+            if (roundTripDer is not null) CryptographicOperations.ZeroMemory(roundTripDer);
+            if (spki is not null) CryptographicOperations.ZeroMemory(spki);
+        }
+        return new(javaDerVerified, roundTripVerified, jwkMatches, productionVerified);
+    }
+
+    private static bool VerifyDer(IPublicKey publicKey, byte[] input, byte[] der)
+    {
+        using var verifier = Java.Security.Signature.GetInstance("SHA256withECDSA")
+            ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+        verifier.InitVerify(publicKey);
+        verifier.Update(input);
+        return verifier.Verify(der);
+    }
+
+    /// <summary>
+    /// Test-APK-only enrollment seam. Production binaries have no implicit or callable key
+    /// creation path; registration/rebind must be implemented by a separately governed flow.
+    /// </summary>
+    internal async ValueTask ProvisionFreshKeyForDeviceTestAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await GenerateFreshKeyAsync("DEVICE_TEST_KEY_ALREADY_EXISTS", cancellationToken);
+    }
+
     /// <summary>
     /// Test-APK-only native verification of the JOSE P1363 bytes returned by the production
     /// signer. Re-encoding to canonical X9.62 DER and verifying through the same Android
@@ -217,20 +399,24 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         var input = signingInput.ToArray();
         var p1363 = p1363Signature.ToArray();
         byte[]? der = null;
+        byte[]? spki = null;
         try
         {
             using var keyStore = LoadKeyStore();
             using var certificate = keyStore.GetCertificate(KeyAlias)
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            using var publicKey = certificate.PublicKey
+            using var certificatePublicKey = certificate.PublicKey
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            using var verifier = Java.Security.Signature.GetInstance("SHA256withECDSA")
+            spki = certificatePublicKey.GetEncoded()
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            verifier.InitVerify(publicKey);
-            verifier.Update(input);
+            using var keyFactory = KeyFactory.GetInstance(KeyProperties.KeyAlgorithmEc)
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var publicKeySpec = new X509EncodedKeySpec(spki);
+            using var publicKey = keyFactory.GeneratePublic(publicKeySpec) as IPublicKey
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
             der = P1363ToDer(p1363);
             cancellationToken.ThrowIfCancellationRequested();
-            return verifier.Verify(der);
+            return VerifyDer(publicKey, input, der);
         }
         finally
         {
@@ -238,6 +424,8 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             CryptographicOperations.ZeroMemory(p1363);
             if (der is not null)
                 CryptographicOperations.ZeroMemory(der);
+            if (spki is not null)
+                CryptographicOperations.ZeroMemory(spki);
         }
     }
 #endif

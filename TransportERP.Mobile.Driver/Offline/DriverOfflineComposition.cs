@@ -27,11 +27,23 @@ public sealed record DriverOfflineOperationStatusView(
     int RetryCount,
     DateTimeOffset? NextRetryAt,
     string? ResultCode,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    long? ConflictBaseVersion,
+    string? ConflictReason,
+    long? ConflictServerVersion,
+    string? RedactedLocalSnapshot,
+    string? RedactedServerSnapshot,
+    bool ConflictDecisionReady)
 {
     public string SafeSummary =>
         $"{LocalOperationId:D} | {ActionCode} | {Status} | retries={RetryCount} | " +
         $"next={NextRetryAt?.ToString("O") ?? "NONE"} | result={ResultCode ?? "NONE"} | updated={UpdatedAt:O}";
+
+    public string SafeConflictReview => !ConflictDecisionReady
+        ? "Conflict review: NOT_AVAILABLE"
+        : $"Conflict review: reason={ConflictReason}; base={ConflictBaseVersion}; " +
+          $"serverVersion={ConflictServerVersion?.ToString() ?? "NONE"}; " +
+          $"local={RedactedLocalSnapshot}; server={RedactedServerSnapshot}";
 
     internal static DriverOfflineOperationStatusView From(OfflineOperation operation) => new(
         operation.LocalOperationId,
@@ -40,7 +52,13 @@ public sealed record DriverOfflineOperationStatusView(
         operation.ClientTransportRetryCount,
         operation.NextRetryAt,
         SanitizeResultCode(operation.ResultCode),
-        operation.UpdatedAt);
+        operation.UpdatedAt,
+        operation.ConflictReview?.BaseVersion,
+        SanitizeConflictReason(operation.ConflictReview?.ConflictReason),
+        operation.ConflictReview?.ServerSnapshot?.CurrentVersion,
+        RedactedLocalSnapshot(operation.ConflictReview),
+        RedactedServerSnapshot(operation.ConflictReview),
+        operation.ConflictReview is { IsDecisionReady: true, BaseVersion: > 0 });
 
     private static string SanitizeActionCode(string? code) => code switch
     {
@@ -56,6 +74,24 @@ public sealed record DriverOfflineOperationStatusView(
             character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_') => code,
         _ => "INVALID_RESULT_CODE"
     };
+
+    private static string? SanitizeConflictReason(string? code) => code switch
+    {
+        null => null,
+        { Length: > 0 and <= 120 } when code.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.') => code,
+        _ => "INVALID_CONFLICT_REASON"
+    };
+
+    private static string? RedactedLocalSnapshot(OfflineConflictReview? review) => review?.LocalSnapshot is { } local
+        ? $"action={SanitizeActionCode(local.ActionCode)},entityType={SanitizeActionCode(local.EntityType)}," +
+          $"entityId={local.EntityId?.ToString("D") ?? "NONE"},base={local.BaseVersion}"
+        : null;
+
+    private static string? RedactedServerSnapshot(OfflineConflictReview? review) => review?.ServerSnapshot is { } server
+        ? $"entityType={SanitizeActionCode(server.EntityType)},entityId={server.EntityId?.ToString("D") ?? "NONE"}," +
+          $"exists={server.Exists},version={server.CurrentVersion?.ToString() ?? "NONE"}"
+        : null;
 }
 
 public sealed record DriverOfflineCompositionOptions(

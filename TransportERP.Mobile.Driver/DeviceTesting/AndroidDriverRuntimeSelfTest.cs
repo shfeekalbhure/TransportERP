@@ -86,7 +86,8 @@ internal static class AndroidDriverRuntimeSelfTest
             failureCode = "NATIVE_SIGNING_PUBLIC_KEY_READ_FAILED";
             var publicJwk = await signingKey.GetPublicJwkAsync(cancellationToken);
             failureCode = "NATIVE_SIGNING_P1363_VERIFY_FAILED";
-            var signatureValid = await CreateAndVerifySignatureAsync(signingKey, publicJwk, cancellationToken);
+            var signatureDiagnostics = await CreateAndVerifySignatureAsync(
+                signingKey, publicJwk, cancellationToken);
             var bindingContext = TestBindingContext();
 
             failureCode = "DEVICE_KEY_BINDING_SELF_TEST_FAILED";
@@ -96,7 +97,11 @@ internal static class AndroidDriverRuntimeSelfTest
             checks["purpose_keys_are_distinct"] = outboxKey.Length == readCacheKey.Length &&
                 !CryptographicOperations.FixedTimeEquals(outboxKey, readCacheKey);
             checks["native_secure_storage_initialized"] = true;
-            checks["p256_p1363_signature_verified"] = signatureValid;
+            checks["java_der_signature_verified"] = signatureDiagnostics.JavaDerSignatureVerified;
+            checks["der_p1363_round_trip_verified"] = signatureDiagnostics.DerP1363RoundTripVerified;
+            checks["public_jwk_matches_keystore_certificate"] =
+                signatureDiagnostics.PublicJwkMatchesCertificate;
+            checks["p256_p1363_signature_verified"] = signatureDiagnostics.ProductionP1363Verified;
             checks["private_key_non_exportable"] = PrivateSigningKeyIsNonExportable();
             checks["matching_registered_binding_accepted"] = await BindingAcceptedAsync(
                 bindingContext,
@@ -247,8 +252,16 @@ internal static class AndroidDriverRuntimeSelfTest
             checks["signing_public_key_survived_restart"] =
                 Base64UrlEquals(publicJwk.X, state.PublicKeyX) &&
                 Base64UrlEquals(publicJwk.Y, state.PublicKeyY);
+            var restartSignatureDiagnostics = await CreateAndVerifySignatureAsync(
+                signingKey, publicJwk, cancellationToken);
+            checks["java_der_signature_verified_after_restart"] =
+                restartSignatureDiagnostics.JavaDerSignatureVerified;
+            checks["der_p1363_round_trip_verified_after_restart"] =
+                restartSignatureDiagnostics.DerP1363RoundTripVerified;
+            checks["public_jwk_matches_certificate_after_restart"] =
+                restartSignatureDiagnostics.PublicJwkMatchesCertificate;
             checks["p256_p1363_signature_verified_after_restart"] =
-                await CreateAndVerifySignatureAsync(signingKey, publicJwk, cancellationToken);
+                restartSignatureDiagnostics.ProductionP1363Verified;
             checks["private_key_still_non_exportable"] = PrivateSigningKeyIsNonExportable();
             checks["offline_storage_still_absent"] = !OfflineStorageDirectoryExists();
 
@@ -319,9 +332,9 @@ internal static class AndroidDriverRuntimeSelfTest
         return new(StringComparer.Ordinal)
         {
             ["activation_is_inactive"] = activation.Active is null,
-            ["default_feature_gate_is_closed"] = !featureGate.IsOfflineRuntimeAuthorized,
+            ["default_feature_gate_is_closed"] = !featureGate.Allows(TestBindingContext()),
             ["default_device_key_binding_verifier_is_closed"] =
-                bindingVerifier is DriverClosedDeviceKeyBindingVerifier,
+                bindingVerifier is DriverServerDeviceKeyBindingVerifier,
             ["offline_storage_absent"] = !OfflineStorageDirectoryExists()
         };
     }
@@ -427,7 +440,8 @@ internal static class AndroidDriverRuntimeSelfTest
         }
     }
 
-    private static async Task<bool> CreateAndVerifySignatureAsync(
+    private static async Task<AndroidKeystoreDeviceSigningKey.AndroidSignatureDiagnostics>
+        CreateAndVerifySignatureAsync(
         AndroidKeystoreDeviceSigningKey signingKey,
         DevicePublicP256Jwk publicJwk,
         CancellationToken cancellationToken)
@@ -438,15 +452,16 @@ internal static class AndroidDriverRuntimeSelfTest
         {
             signature = await signingKey.SignEs256Async(challenge, cancellationToken);
             if (signature.Length != 64)
-                return false;
+                return new(false, false, false, false);
 
             var x = DecodeBase64Url(publicJwk.X);
             var y = DecodeBase64Url(publicJwk.Y);
             try
             {
-                return x.Length == 32 && y.Length == 32 &&
-                    await signingKey.VerifyP1363ForDeviceTestAsync(
-                        challenge, signature, cancellationToken);
+                if (x.Length != 32 || y.Length != 32)
+                    return new(false, false, false, false);
+                return await signingKey.DiagnoseSignatureForDeviceTestAsync(
+                    challenge, signature, publicJwk, cancellationToken);
             }
             finally
             {

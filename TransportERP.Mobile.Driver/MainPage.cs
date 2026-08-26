@@ -9,10 +9,12 @@ namespace TransportERP.Mobile.Driver;
 public sealed class MainPage : ContentPage
 {
     private readonly DriverOfflineActivationService _activation;
+    private readonly DriverAuthenticatedActivationCoordinator _authenticatedActivation;
     private readonly ObservableCollection<DriverOfflineOperationStatusView> _operations = [];
     private readonly Label _mode = new();
     private readonly Label _reason = new();
     private readonly Label _evidence = new();
+    private readonly Label _conflictReview = new() { Text = "Conflict review: NOT_SELECTED" };
     private readonly Label _actionResult = new();
     private readonly CollectionView _operationList;
     private readonly Button _retry = new() { Text = "Manual retry", IsEnabled = false };
@@ -30,13 +32,30 @@ public sealed class MainPage : ContentPage
         Keyboard = Keyboard.Numeric,
         IsEnabled = false
     };
+    private readonly CheckBox _resolutionConfirmed = new() { IsEnabled = false };
+    private readonly Entry _serverOrigin = new() { Placeholder = "https://server.example/" };
+    private readonly Entry _userName = new() { Placeholder = "User name or email" };
+    private readonly Entry _password = new() { Placeholder = "Password", IsPassword = true };
+    private readonly Entry _companyId = new() { Placeholder = "Company UUID (required)" };
+    private readonly Entry _branchId = new() { Placeholder = "Branch UUID (required)" };
+    private readonly Entry _deviceId = new() { Placeholder = "Registered DeviceId" };
+    private readonly Entry _deviceCredential = new()
+    {
+        Placeholder = "Device credential (local session)",
+        IsPassword = true
+    };
+    private readonly Button _signIn = new() { Text = "Sign in and activate authorized Offline scope" };
+    private readonly Button _signOut = new() { Text = "Sign out", IsEnabled = false };
     private DriverOfflineOperationStatusView? _selected;
     private bool _subscribed;
     private bool _busy;
 
-    public MainPage(DriverOfflineActivationService activation)
+    public MainPage(
+        DriverOfflineActivationService activation,
+        DriverAuthenticatedActivationCoordinator authenticatedActivation)
     {
         _activation = activation ?? throw new ArgumentNullException(nameof(activation));
+        _authenticatedActivation = authenticatedActivation ?? throw new ArgumentNullException(nameof(authenticatedActivation));
         Title = "TransportERP Driver";
         BackgroundColor = Color.FromArgb("#F4F7F8");
 
@@ -44,6 +63,7 @@ public sealed class MainPage : ContentPage
         _mode.FontAttributes = FontAttributes.Bold;
         _reason.TextColor = Color.FromArgb("#455A64");
         _evidence.TextColor = Color.FromArgb("#455A64");
+        _conflictReview.TextColor = Color.FromArgb("#7A2E0B");
         _actionResult.TextColor = Color.FromArgb("#0B3A53");
 
         _operationList = new CollectionView
@@ -64,9 +84,15 @@ public sealed class MainPage : ContentPage
             })
         };
         _operationList.SelectionChanged += OnSelectionChanged;
+        _resolutionConfirmed.CheckedChanged += (_, _) =>
+        {
+            if (_activation.Active is { } active) UpdateActionAvailability(active.Runtime);
+        };
 
         var refresh = new Button { Text = "Refresh operation status" };
         refresh.Clicked += async (_, _) => await RefreshAsync();
+        _signIn.Clicked += async (_, _) => await SignInAndActivateAsync();
+        _signOut.Clicked += async (_, _) => await SignOutAsync();
         _retry.Clicked += async (_, _) => await RetrySelectedAsync();
         _keepServer.Clicked += async (_, _) =>
             await ResolveSelectedAsync(OfflineConflictDecision.KeepServer);
@@ -89,6 +115,14 @@ public sealed class MainPage : ContentPage
                 _reason,
                 _evidence,
                 _actionResult,
+                _serverOrigin,
+                _userName,
+                _password,
+                _companyId,
+                _branchId,
+                _deviceId,
+                _deviceCredential,
+                new HorizontalStackLayout { Spacing = 8, Children = { _signIn, _signOut } },
                 refresh
             }
         };
@@ -100,6 +134,16 @@ public sealed class MainPage : ContentPage
                 _retry,
                 _resolutionReason,
                 _reapplyBaseVersion,
+                new HorizontalStackLayout
+                {
+                    Spacing = 8,
+                    Children =
+                    {
+                        _resolutionConfirmed,
+                        new Label { Text = "I reviewed the redacted conflict evidence and confirm this decision." }
+                    }
+                },
+                _conflictReview,
                 new HorizontalStackLayout
                 {
                     Spacing = 8,
@@ -163,6 +207,8 @@ public sealed class MainPage : ContentPage
             }
 
             var runtime = active.Runtime;
+            _signOut.IsEnabled = true;
+            _signIn.IsEnabled = false;
             _mode.Text = $"Offline runtime: {runtime.Status.Mode.ToString().ToUpperInvariant()}";
             _reason.Text = $"Reason: {SanitizeCode(runtime.Status.ReasonCode)}";
             var statuses = await runtime.ListOperationStatusesAsync();
@@ -172,6 +218,10 @@ public sealed class MainPage : ContentPage
                 $"Sanitized evidence: {_operations.Count} scoped metadata row(s); payload, keys, bearer and proof omitted.";
             _selected = null;
             _operationList.SelectedItem = null;
+            _conflictReview.Text = "Conflict review: NOT_SELECTED";
+            _resolutionReason.Text = string.Empty;
+            _reapplyBaseVersion.Text = string.Empty;
+            _resolutionConfirmed.IsChecked = false;
             UpdateActionAvailability(runtime);
         }
         catch (Exception exception)
@@ -191,14 +241,21 @@ public sealed class MainPage : ContentPage
         _reason.Text = "Reason: OFFLINE_CLOSED";
         _evidence.Text = "No offline store is opened and no local operation evidence is available.";
         _actionResult.Text = "Sign in and explicitly activate an authorized scope to use synchronization.";
+        _signIn.IsEnabled = true;
+        _signOut.IsEnabled = false;
         _operations.Clear();
         _selected = null;
+        _conflictReview.Text = "Conflict review: NOT_SELECTED";
+        _resolutionReason.Text = string.Empty;
+        _reapplyBaseVersion.Text = string.Empty;
         DisableActions();
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs args)
     {
         _selected = args.CurrentSelection.FirstOrDefault() as DriverOfflineOperationStatusView;
+        _conflictReview.Text = _selected?.SafeConflictReview ?? "Conflict review: NOT_SELECTED";
+        _resolutionConfirmed.IsChecked = false;
         var active = _activation.Active;
         if (active is null) DisableActions();
         else UpdateActionAvailability(active.Runtime);
@@ -225,6 +282,71 @@ public sealed class MainPage : ContentPage
         }
     }
 
+    private async Task SignInAndActivateAsync()
+    {
+        if (_busy) return;
+        var password = _password.Text ?? string.Empty;
+        var deviceCredential = string.IsNullOrEmpty(_deviceCredential.Text) ? null : _deviceCredential.Text;
+        _password.Text = string.Empty;
+        _deviceCredential.Text = string.Empty;
+        if (!Uri.TryCreate(_serverOrigin.Text, UriKind.Absolute, out var origin) ||
+            !TryRequiredGuid(_companyId.Text, out var companyId) ||
+            !TryRequiredGuid(_branchId.Text, out var branchId))
+        {
+            _actionResult.Text = "Result: AUTHENTICATION_INPUT_INVALID";
+            return;
+        }
+
+        _busy = true;
+        _signIn.IsEnabled = false;
+        try
+        {
+            await _authenticatedActivation.SignInAndActivateAsync(
+                new DriverInteractiveSignInRequest(
+                    origin,
+                    _userName.Text ?? string.Empty,
+                    password,
+                    companyId,
+                    branchId,
+                    _deviceId.Text ?? string.Empty,
+                    deviceCredential));
+            _actionResult.Text = "Result: OFFLINE_ACTIVATED";
+        }
+        catch (Exception exception)
+        {
+            _actionResult.Text = $"Result: {SafeCode(exception)}";
+        }
+        finally
+        {
+            _password.Text = string.Empty;
+            _deviceCredential.Text = string.Empty;
+            _busy = false;
+            await RefreshAsync();
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            await _authenticatedActivation.SignOutAsync();
+            _actionResult.Text = "Result: SIGNED_OUT";
+        }
+        catch (Exception exception)
+        {
+            _actionResult.Text = $"Result: {SafeCode(exception)}";
+        }
+        finally
+        {
+            _password.Text = string.Empty;
+            _deviceCredential.Text = string.Empty;
+            _busy = false;
+            await RefreshAsync();
+        }
+    }
+
     private async Task ResolveSelectedAsync(OfflineConflictDecision decision)
     {
         var active = _activation.Active;
@@ -235,10 +357,25 @@ public sealed class MainPage : ContentPage
         }
 
         var reason = _resolutionReason.Text ?? string.Empty;
+        if (!_selected.ConflictDecisionReady || _selected.ConflictBaseVersion is not > 0)
+        {
+            _actionResult.Text = "Result: CONFLICT_REVIEW_REQUIRED";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            _actionResult.Text = "Result: RESOLUTION_REASON_REQUIRED";
+            return;
+        }
+        if (!_resolutionConfirmed.IsChecked)
+        {
+            _actionResult.Text = "Result: RESOLUTION_CONFIRMATION_REQUIRED";
+            return;
+        }
         long? baseVersion = null;
         if (decision == OfflineConflictDecision.Reapply)
         {
-            if (!long.TryParse(_reapplyBaseVersion.Text, out var parsed) || parsed < 0)
+            if (!long.TryParse(_reapplyBaseVersion.Text, out var parsed) || parsed <= 0)
             {
                 _actionResult.Text = "Result: REAPPLY_BASE_VERSION_REQUIRED";
                 return;
@@ -252,6 +389,7 @@ public sealed class MainPage : ContentPage
                 _selected.LocalOperationId, decision, reason, baseVersion);
             _resolutionReason.Text = string.Empty;
             _reapplyBaseVersion.Text = string.Empty;
+            _resolutionConfirmed.IsChecked = false;
             _actionResult.Text = "Result: CONFLICT_RESOLVED";
             await RefreshAsync();
         }
@@ -264,13 +402,15 @@ public sealed class MainPage : ContentPage
     private void UpdateActionAvailability(DriverOfflineRuntime runtime)
     {
         var ready = runtime.Status.Mode == DriverOfflineRuntimeMode.Ready;
-        var conflictSelected = _selected?.Status == OfflineOperationStatus.Conflict;
+        var conflictSelected = _selected is
+            { Status: OfflineOperationStatus.Conflict, ConflictDecisionReady: true, ConflictBaseVersion: > 0 };
         _retry.IsEnabled = ready && runtime.OperationPermissions.CanRetryFailedOperations &&
             _selected?.Status == OfflineOperationStatus.Failed;
         _resolutionReason.IsEnabled = ready && runtime.OperationPermissions.CanResolveConflicts && conflictSelected;
         _reapplyBaseVersion.IsEnabled = _resolutionReason.IsEnabled;
-        _keepServer.IsEnabled = _resolutionReason.IsEnabled;
-        _reapply.IsEnabled = _resolutionReason.IsEnabled;
+        _resolutionConfirmed.IsEnabled = _resolutionReason.IsEnabled;
+        _keepServer.IsEnabled = _resolutionReason.IsEnabled && _resolutionConfirmed.IsChecked;
+        _reapply.IsEnabled = _resolutionReason.IsEnabled && _resolutionConfirmed.IsChecked;
     }
 
     private void DisableActions()
@@ -278,6 +418,8 @@ public sealed class MainPage : ContentPage
         _retry.IsEnabled = false;
         _resolutionReason.IsEnabled = false;
         _reapplyBaseVersion.IsEnabled = false;
+        _resolutionConfirmed.IsEnabled = false;
+        _resolutionConfirmed.IsChecked = false;
         _keepServer.IsEnabled = false;
         _reapply.IsEnabled = false;
     }
@@ -295,4 +437,13 @@ public sealed class MainPage : ContentPage
         code.All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_')
             ? code
             : "OPERATION_FAILED";
+
+    private static bool TryRequiredGuid(string? value, out Guid? result)
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        if (!Guid.TryParse(value, out var parsed) || parsed == Guid.Empty) return false;
+        result = parsed;
+        return true;
+    }
 }

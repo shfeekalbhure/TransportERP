@@ -59,13 +59,64 @@ public sealed record DriverOfflineActivationResult(
 
 public interface IDriverOfflineFeatureGate
 {
-    bool IsOfflineRuntimeAuthorized { get; }
+    bool Allows(DriverDeviceKeyBindingContext context);
 }
 
 /// <summary>The shipping host is closed until the owner deliberately replaces this registration.</summary>
 public sealed class DriverClosedOfflineFeatureGate : IDriverOfflineFeatureGate
 {
-    public bool IsOfflineRuntimeAuthorized => false;
+    public bool Allows(DriverDeviceKeyBindingContext context) => false;
+}
+
+/// <summary>
+/// Ephemeral, exact-session authorization populated only from GET /api/v1/sync/activation.
+/// Restart, logout and access-token expiry all return the gate to closed.
+/// </summary>
+public sealed class DriverServerOfflineFeatureGate : IDriverOfflineFeatureGate
+{
+    private readonly object _gate = new();
+    private DriverOfflineFeatureAuthorization? _authorization;
+
+    public bool Allows(DriverDeviceKeyBindingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        lock (_gate)
+        {
+            var authorization = _authorization;
+            return authorization is not null && authorization.ExpiresAt > DateTimeOffset.UtcNow &&
+                authorization.CompanyId == context.CompanyId && authorization.BranchId == context.BranchId &&
+                authorization.UserId == context.UserId &&
+                authorization.RegisteredDeviceId == context.RegisteredDeviceId &&
+                authorization.SessionId == context.SessionId &&
+                string.Equals(authorization.DeviceId, context.DeviceId, StringComparison.Ordinal);
+        }
+    }
+
+    internal void Authorize(DriverServerActivationDecision decision, DateTimeOffset expiresAt)
+    {
+        ArgumentNullException.ThrowIfNull(decision);
+        lock (_gate)
+        {
+            _authorization = decision.Enabled && expiresAt > DateTimeOffset.UtcNow
+                ? new(decision.CompanyId, decision.BranchId, decision.UserId,
+                    decision.RegisteredDeviceId, decision.SessionId, decision.DeviceId, expiresAt)
+                : null;
+        }
+    }
+
+    internal void Clear()
+    {
+        lock (_gate) _authorization = null;
+    }
+
+    private sealed record DriverOfflineFeatureAuthorization(
+        Guid CompanyId,
+        Guid BranchId,
+        Guid UserId,
+        Guid RegisteredDeviceId,
+        Guid SessionId,
+        string DeviceId,
+        DateTimeOffset ExpiresAt);
 }
 
 /// <summary>
@@ -94,7 +145,14 @@ public sealed class DriverOfflineActivationService(
     {
         ArgumentNullException.ThrowIfNull(request);
         Validate(request);
-        if (!request.OfflineRuntimeAuthorized || !featureGate.IsOfflineRuntimeAuthorized)
+        var bindingContext = new DriverDeviceKeyBindingContext(
+            request.CompanyId,
+            request.BranchId,
+            request.UserId,
+            request.RegisteredDeviceId,
+            request.SessionId,
+            request.DeviceId);
+        if (!request.OfflineRuntimeAuthorized || !featureGate.Allows(bindingContext))
             throw new DriverOfflineUnavailableException("OFFLINE_CLOSED");
 
         await _gate.WaitAsync(cancellationToken);
@@ -104,13 +162,7 @@ public sealed class DriverOfflineActivationService(
                 throw new DriverOfflineUnavailableException("DRIVER_OFFLINE_ALREADY_ACTIVE");
 
             var verifiedDeviceKeyBinding = await DriverDeviceKeyBindingGuard.RequireMatchAsync(
-                new(
-                    request.CompanyId,
-                    request.BranchId,
-                    request.UserId,
-                    request.RegisteredDeviceId,
-                    request.SessionId,
-                    request.DeviceId),
+                bindingContext,
                 signingKey,
                 deviceKeyBindingVerifier,
                 cancellationToken);
