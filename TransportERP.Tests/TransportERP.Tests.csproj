@@ -25,6 +25,7 @@
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
     <ProjectReference Include="..\TransportERP.Infrastructure\TransportERP.Infrastructure.csproj" />
     <ProjectReference Include="..\TransportERP.Api\TransportERP.Api.csproj" />
+    <ProjectReference Include="..\TransportERP.Offline\TransportERP.Offline.csproj" />
   </ItemGroup>
 
   <ItemGroup>
