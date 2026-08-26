@@ -199,6 +199,47 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             _gate.Release();
         }
     }
+
+    /// <summary>
+    /// Test-APK-only native verification of the JOSE P1363 bytes returned by the production
+    /// signer. Re-encoding to canonical X9.62 DER and verifying through the same Android
+    /// provider proves both coordinates without relying on platform-specific .NET ECDsa support.
+    /// Linux server tests independently verify the same 64-byte format with .NET.
+    /// </summary>
+    internal async ValueTask<bool> VerifyP1363ForDeviceTestAsync(
+        ReadOnlyMemory<byte> signingInput,
+        ReadOnlyMemory<byte> p1363Signature,
+        CancellationToken cancellationToken = default)
+    {
+        if (signingInput.IsEmpty || p1363Signature.Length != 64)
+            return false;
+        await RequireExistingKeyAsync(cancellationToken);
+        var input = signingInput.ToArray();
+        var p1363 = p1363Signature.ToArray();
+        byte[]? der = null;
+        try
+        {
+            using var keyStore = LoadKeyStore();
+            using var certificate = keyStore.GetCertificate(KeyAlias)
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var publicKey = certificate.PublicKey
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var verifier = Java.Security.Signature.GetInstance("SHA256withECDSA")
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            verifier.InitVerify(publicKey);
+            verifier.Update(input);
+            der = P1363ToDer(p1363);
+            cancellationToken.ThrowIfCancellationRequested();
+            return verifier.Verify(der);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
+            CryptographicOperations.ZeroMemory(p1363);
+            if (der is not null)
+                CryptographicOperations.ZeroMemory(der);
+        }
+    }
 #endif
 
     private static KeyStore LoadKeyStore()
@@ -227,6 +268,40 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         CopyUnsignedCoordinate(s, signature.AsSpan(32, 32));
         return signature;
     }
+
+#if TRANSPORTERP_DEVICE_TESTS
+    private static byte[] P1363ToDer(ReadOnlySpan<byte> signature)
+    {
+        if (signature.Length != 64)
+            throw new CryptographicException("An ES256 P1363 signature must be 64 bytes.");
+        var r = CanonicalDerInteger(signature[..32]);
+        var s = CanonicalDerInteger(signature[32..]);
+        var result = new byte[2 + 2 + r.Length + 2 + s.Length];
+        var offset = 0;
+        result[offset++] = 0x30;
+        result[offset++] = checked((byte)(result.Length - 2));
+        result[offset++] = 0x02;
+        result[offset++] = checked((byte)r.Length);
+        r.CopyTo(result.AsSpan(offset));
+        offset += r.Length;
+        result[offset++] = 0x02;
+        result[offset++] = checked((byte)s.Length);
+        s.CopyTo(result.AsSpan(offset));
+        return result;
+    }
+
+    private static byte[] CanonicalDerInteger(ReadOnlySpan<byte> coordinate)
+    {
+        var first = 0;
+        while (first < coordinate.Length - 1 && coordinate[first] == 0)
+            first++;
+        var value = coordinate[first..];
+        var prefix = (value[0] & 0x80) == 0 ? 0 : 1;
+        var result = new byte[value.Length + prefix];
+        value.CopyTo(result.AsSpan(prefix));
+        return result;
+    }
+#endif
 
     private static ReadOnlySpan<byte> ReadInteger(ReadOnlySpan<byte> source, ref int offset)
     {

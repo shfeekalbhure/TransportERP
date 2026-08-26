@@ -444,18 +444,9 @@ internal static class AndroidDriverRuntimeSelfTest
             var y = DecodeBase64Url(publicJwk.Y);
             try
             {
-                if (x.Length != 32 || y.Length != 32)
-                    return false;
-                using var verifier = ECDsa.Create(new ECParameters
-                {
-                    Curve = ECCurve.NamedCurves.nistP256,
-                    Q = new ECPoint { X = x, Y = y }
-                });
-                return verifier.VerifyData(
-                    challenge,
-                    signature,
-                    HashAlgorithmName.SHA256,
-                    DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                return x.Length == 32 && y.Length == 32 &&
+                    await signingKey.VerifyP1363ForDeviceTestAsync(
+                        challenge, signature, cancellationToken);
             }
             finally
             {

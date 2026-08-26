@@ -71,8 +71,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("IDriverOfflineFeatureGate", selfTest, StringComparison.Ordinal);
         Assert.Contains("activation.Active is null", selfTest, StringComparison.Ordinal);
         Assert.Contains("PrivateSigningKeyIsNonExportable", selfTest, StringComparison.Ordinal);
-        Assert.Contains("DSASignatureFormat.IeeeP1363FixedFieldConcatenation", selfTest,
-            StringComparison.Ordinal);
+        Assert.Contains("VerifyP1363ForDeviceTestAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("VerifyP1363ForDeviceTestAsync", signer, StringComparison.Ordinal);
+        Assert.Contains("P1363ToDer", signer, StringComparison.Ordinal);
+        Assert.Contains("verifier.InitVerify(publicKey)", signer, StringComparison.Ordinal);
         Assert.Contains("VerifySealedProbe", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
