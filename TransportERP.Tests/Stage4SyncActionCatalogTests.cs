@@ -33,6 +33,27 @@ public sealed class Stage4SyncActionCatalogTests
         Assert.Equal(14, SyncActionCatalog.Definitions.Select(x => x.ActionCode).Distinct().Count());
         Assert.All(SyncActionCatalog.Definitions, definition =>
             Assert.Equal(SyncActionRuntimeAvailability.Unavailable, definition.RuntimeAvailability));
+        var supported = SyncActionCatalog.Definitions
+            .Where(x => x.DispatcherSupport == SyncActionDispatcherSupport.Supported)
+            .Select(x => x.ActionCode)
+            .ToArray();
+        Assert.Equal(
+        new[]
+        {
+            SyncActionCode.CreateWaybillDraft,
+            SyncActionCode.UpdateWaybillDraft,
+            SyncActionCode.CreateOperationalParty,
+            SyncActionCode.RecordCollection,
+            SyncActionCode.LoadAllocatedQuantity
+        }, supported);
+        Assert.All(SyncActionCatalog.Definitions, definition =>
+            Assert.False(string.IsNullOrWhiteSpace(definition.RequiredPermission)));
+        Assert.False(Assert.Single(SyncActionCatalog.Definitions,
+            x => x.ActionCode == SyncActionCode.LoadAllocatedQuantity).ResultVersionRequired);
+        Assert.All(SyncActionCatalog.Definitions.Where(x =>
+                x.DispatcherSupport == SyncActionDispatcherSupport.Supported &&
+                x.ActionCode != SyncActionCode.LoadAllocatedQuantity),
+            definition => Assert.True(definition.ResultVersionRequired));
     }
 
     [Theory]
