@@ -177,8 +177,8 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
     {
         var definition = SyncActionCatalog.Definitions.Single(x => x.ActionCode == action);
         var operationId = clientOperationId ?? "executor-" + Guid.NewGuid().ToString("N");
-        var entityId = definition.EntityId == SyncValueRequirement.Required ? Guid.NewGuid() : null;
-        var baseVersion = definition.BaseVersion == SyncValueRequirement.Required ? 1L : null;
+        Guid? entityId = definition.EntityId == SyncValueRequirement.Required ? Guid.NewGuid() : null;
+        long? baseVersion = definition.BaseVersion == SyncValueRequirement.Required ? 1L : null;
         var payload = action switch
         {
             SyncActionCode.CreateOperationalParty => JsonSerializer.Serialize(new OperationalPartyCreateRequest(
