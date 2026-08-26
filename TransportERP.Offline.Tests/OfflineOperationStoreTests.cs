@@ -45,8 +45,8 @@ public sealed class OfflineOperationStoreTests : IDisposable
 
         var results = await Task.WhenAll(store.EnqueueAsync(request), store.EnqueueAsync(request));
 
-        Assert.Single(results.Where(result => result.Created));
-        Assert.Single(results.Where(result => !result.Created));
+        Assert.Single(results, result => result.Created);
+        Assert.Single(results, result => !result.Created);
         Assert.Single(results.Select(result => result.Operation.LocalOperationId).Distinct());
         Assert.Single(results.Select(result => result.Operation.ClientOperationId).Distinct());
         Assert.Single(results.Select(result => result.Operation.OperationCorrelationId).Distinct());
@@ -102,8 +102,8 @@ public sealed class OfflineOperationStoreTests : IDisposable
             store.ClaimNextAsync("worker-a", TimeSpan.FromMinutes(1)),
             store.ClaimNextAsync("worker-b", TimeSpan.FromMinutes(1)));
 
-        Assert.Single(claims.Where(operation => operation is not null));
-        Assert.Single(claims.Where(operation => operation is null));
+        Assert.Single(claims, operation => operation is not null);
+        Assert.Single(claims, operation => operation is null);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
         var policy = new OfflineRetryPolicy(2, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(4));
         var store = Store(OutboxPath(), clock, policy);
         await store.InitializeAsync();
-        await store.EnqueueAsync(Request());
+        var queued = await store.EnqueueAsync(Request());
 
         for (var attemptNumber = 0; attemptNumber < 3; attemptNumber++)
         {
@@ -143,7 +143,7 @@ public sealed class OfflineOperationStoreTests : IDisposable
             clock.Advance(TimeSpan.FromSeconds(4));
         }
 
-        var operation = await store.GetAsync((await store.EnqueueAsync(Request())).Operation.LocalOperationId);
+        var operation = await store.GetAsync(queued.Operation.LocalOperationId);
         Assert.Equal(OfflineOperationStatus.Rejected, operation!.Status);
         Assert.Equal("RETRY_EXHAUSTED", operation.ResultCode);
         Assert.Equal(2, operation.ClientTransportRetryCount);
