@@ -95,7 +95,9 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         try
         {
             using var keyStore = LoadKeyStore();
-            using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
+            using var privateKeyEntry = keyStore.GetEntry(KeyAlias, null) as KeyStore.PrivateKeyEntry
+                ?? throw new DriverOfflineUnavailableException(failureCode);
+            using var privateKey = privateKeyEntry.PrivateKey
                 ?? throw new DriverOfflineUnavailableException(failureCode);
             // AndroidKeyStore providers are only required to implement the DER ECDSA form.
             // Do not infer that a 64-byte result from an optional provider alias is P1363:
@@ -284,7 +286,9 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         try
         {
             using var keyStore = LoadKeyStore();
-            using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
+            using var privateKeyEntry = keyStore.GetEntry(KeyAlias, null) as KeyStore.PrivateKeyEntry
+                ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
+            using var privateKey = privateKeyEntry.PrivateKey
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
             using var certificate = keyStore.GetCertificate(KeyAlias)
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");

@@ -438,7 +438,8 @@ internal static class AndroidDriverRuntimeSelfTest
         using var keyStore = KeyStore.GetInstance(AndroidKeyStore)
             ?? throw new InvalidOperationException("DEVICE_TEST_KEYSTORE_UNAVAILABLE");
         keyStore.Load(null);
-        using var privateKey = keyStore.GetKey(SigningKeyAlias, null) as IPrivateKey;
+        using var privateKeyEntry = keyStore.GetEntry(SigningKeyAlias, null) as KeyStore.PrivateKeyEntry;
+        using var privateKey = privateKeyEntry?.PrivateKey;
         if (privateKey is null)
             return false;
 
