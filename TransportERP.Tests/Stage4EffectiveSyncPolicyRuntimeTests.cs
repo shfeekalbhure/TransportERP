@@ -89,6 +89,7 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
         var scope = Scope();
         var values = new Dictionary<string, string?>
         {
+            ["Sync:EffectivePolicy:SourceVersion"] = "tenant-policy-v7",
             [$"Sync:EffectivePolicy:Companies:{scope.CompanyId:D}:MaxBatchOperations"] = "50",
             [$"Sync:EffectivePolicy:Companies:{scope.CompanyId:D}:AllowedActions:0"] = "CreateWaybillDraft",
             [$"Sync:EffectivePolicy:Branches:{scope.CompanyId:D}:{scope.BranchId:D}:MaxBatchOperations"] = "25",
@@ -103,6 +104,8 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
             new ConfigurationBuilder().AddInMemoryCollection(values).Build());
 
         Assert.Empty(source.LoadErrors);
+        Assert.Equal("tenant-policy-v7", source.SourceVersion);
+        Assert.Matches("^[0-9a-f]{64}$", source.SourceFingerprint);
         Assert.True(source.TryGetCompany(scope.CompanyId, out var company));
         Assert.Equal(50, company.MaxBatchOperations);
         Assert.True(source.TryGetBranch(scope.CompanyId, scope.BranchId, out var branch));
@@ -127,6 +130,24 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, x => x.Contains("non-empty company UUID", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Missing_policy_source_version_fails_startup_validation()
+    {
+        var source = EffectivePolicyConfiguration.Load(
+            new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Sync:Offline:Enabled"] = "false"
+                }).Build());
+        var options = Options.Create(Global(offlineEnabled: false));
+
+        var result = new EffectivePolicyConfigurationValidator(
+            new SyncEffectivePolicyResolver(options), options).Validate(source);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, x => x.Contains("SourceVersion", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -176,6 +197,8 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
         Assert.Equal(25, effective.MaxBatchOperations);
         Assert.Equal("UpdateWaybillDraft", Assert.Single(effective.AllowedActions));
         Assert.Null(effective.ClosedReason);
+        Assert.Equal("test-policy-v1", effective.SourceVersion);
+        Assert.Matches("^[0-9a-f]{64}$", effective.SourceFingerprint);
     }
 
     [Fact]
@@ -263,7 +286,10 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
 
         Assert.False(disabled.IsAllowed);
         Assert.Equal("OFFLINE_DISABLED", disabled.ErrorCode);
+        Assert.Equal("test-policy-v1", disabled.PolicySourceVersion);
+        Assert.Matches("^[0-9a-f]{64}$", disabled.PolicySourceFingerprint);
         Assert.True(allowed.IsAllowed);
+        Assert.Equal("test-policy-v1", allowed.PolicySourceVersion);
         Assert.False(tightened.IsAllowed);
         Assert.Equal("SCOPE_DENIED", tightened.ErrorCode);
     }

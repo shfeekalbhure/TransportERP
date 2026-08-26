@@ -31,7 +31,12 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         var firstClaim = await proofRuntime.ClaimAsync(scope.Security,
             Proof(firstNonce.Value, jti, scope.Thumbprint));
         var operationService = CreateOperationService(db);
-        var command = Command("client-" + Guid.NewGuid().ToString("N"), "{\"amount\":10}");
+        var policyFingerprint = new string('a', 64);
+        var command = Command("client-" + Guid.NewGuid().ToString("N"), "{\"amount\":10}") with
+        {
+            EffectivePolicySourceVersion = "tenant-policy-v7",
+            EffectivePolicySourceFingerprint = policyFingerprint
+        };
         var first = await operationService.EnqueueAcceptedSyncOperationAsync(command, firstClaim);
 
         var secondClaim = await proofRuntime.ClaimAsync(scope.Security,
@@ -41,8 +46,10 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         Assert.Equal(first.Id, replay.Id);
         Assert.Equal(first.OperationCorrelationId, replay.OperationCorrelationId);
         Assert.Single(await db.SyncOperations.Where(x => x.ClientOperationId == command.ClientOperationId).ToListAsync());
-        Assert.Single(await db.AuditEvents.Where(x => x.Action == "SyncOperationQueued" &&
+        var queuedAudit = Assert.Single(await db.AuditEvents.Where(x => x.Action == "SyncOperationQueued" &&
             x.OperationCorrelationId == command.OperationCorrelationId).ToListAsync());
+        Assert.Equal($"PolicySourceVersion=tenant-policy-v7;PolicySourceFingerprint={policyFingerprint}",
+            queuedAudit.Reason);
         Assert.Equal(2, await db.SyncProofReplays.CountAsync(x => x.RegisteredDeviceId == scope.DeviceId));
         var nonceBytes = DecodeBase64Url(firstNonce.Value);
         var persistedHashes = await db.SyncProofNonces.Where(x => x.RegisteredDeviceId == scope.DeviceId)

@@ -150,7 +150,9 @@ public sealed record EffectiveSyncPolicy(
     int LocalRejectedDays,
     int ServerPayloadDays,
     int CacheMaxAgeHours,
-    string? ClosedReason);
+    string? ClosedReason,
+    string? SourceVersion = null,
+    string? SourceFingerprint = null);
 
 /// <summary>
 /// Resolves the fixed global ceiling through company and branch restrictions.

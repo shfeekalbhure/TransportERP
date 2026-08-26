@@ -55,11 +55,18 @@ public interface ISyncRetryPolicyResolver
         => ValueTask.FromResult(SyncExecutionPolicyDecision.Allowed);
 }
 
-public sealed record SyncExecutionPolicyDecision(bool IsAllowed, string? ErrorCode)
+public sealed record SyncExecutionPolicyDecision(
+    bool IsAllowed,
+    string? ErrorCode,
+    string? PolicySourceVersion = null,
+    string? PolicySourceFingerprint = null)
 {
     public static SyncExecutionPolicyDecision Allowed { get; } = new(true, null);
     public static SyncExecutionPolicyDecision Denied(string errorCode)
         => new(false, string.IsNullOrWhiteSpace(errorCode) ? "SYNC_RUNTIME_POLICY_UNAVAILABLE" : errorCode);
+
+    public SyncExecutionPolicyDecision WithPolicySource(string version, string fingerprint)
+        => this with { PolicySourceVersion = version, PolicySourceFingerprint = fingerprint };
 }
 
 public sealed class FixedSyncRetryPolicyResolver(SyncRetryPolicy policy) : ISyncRetryPolicyResolver
@@ -100,7 +107,9 @@ public sealed record EnqueueAcceptedSyncOperationCommand(
     string PayloadHash,
     DateTimeOffset ClientOccurredAt,
     Guid OperationCorrelationId,
-    long? BaseVersion = null);
+    long? BaseVersion = null,
+    string? EffectivePolicySourceVersion = null,
+    string? EffectivePolicySourceFingerprint = null);
 
 public sealed record TransitionSyncOperationCommand(Guid OperationId, string NewStatus, string? ErrorCode = null);
 
@@ -262,7 +271,7 @@ public sealed class SyncOperationService
                     "SyncOperationExecutionPolicyDenied", "REJECTED", nameof(SyncOperation), operation.Id,
                     operation.UserId, operation.CompanyId, operation.BranchId,
                     Guid.NewGuid(), operation.DeviceId,
-                    Reason: operation.ErrorCode,
+                    Reason: $"{operation.ErrorCode};{PolicySourceReason(executionPolicy)}",
                     OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return null;
@@ -304,7 +313,7 @@ public sealed class SyncOperationService
                 "SUCCESS", nameof(SyncOperation), operation.Id,
                 operation.UserId, operation.CompanyId, operation.BranchId,
                 claimToken, operation.DeviceId,
-                Reason: $"LeaseExpiresAt={leaseExpiresAt:O}",
+                Reason: $"LeaseExpiresAt={leaseExpiresAt:O};{PolicySourceReason(executionPolicy)}",
                 OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
             var claim = ToExecutionClaim(operation, claimToken, claimedAt, leaseExpiresAt, recoveredStaleClaim);
             await transaction.CommitAsync(cancellationToken);
@@ -637,6 +646,7 @@ public sealed class SyncOperationService
                 "SyncOperationQueued", "SUCCESS", nameof(SyncOperation), operation.Id,
                 operation.UserId, operation.CompanyId, operation.BranchId,
                 acceptedProof.AttemptCorrelationId, operation.DeviceId,
+                Reason: PolicySourceReason(command),
                 OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
             if (transaction is not null) await transaction.CommitAsync(cancellationToken);
             return operation;
@@ -1198,7 +1208,32 @@ public sealed class SyncOperationService
             command.PayloadHash.Length != 64 ||
             command.OperationType is not ("CREATE" or "UPDATE" or "DELETE" or "COMMAND"))
             throw new SyncRuleException("PAYLOAD_INVALID", command.ClientOperationId);
+
+        var hasPolicyVersion = command.EffectivePolicySourceVersion is not null;
+        var hasPolicyFingerprint = command.EffectivePolicySourceFingerprint is not null;
+        if (hasPolicyVersion != hasPolicyFingerprint ||
+            (hasPolicyVersion && (!IsSafePolicyVersion(command.EffectivePolicySourceVersion!) ||
+                !IsSha256Hex(command.EffectivePolicySourceFingerprint!))))
+            throw new SyncRuleException("SYNC_RUNTIME_POLICY_UNAVAILABLE", command.ClientOperationId);
     }
+
+    private static string PolicySourceReason(EnqueueAcceptedSyncOperationCommand command) =>
+        command.EffectivePolicySourceVersion is { } version &&
+        command.EffectivePolicySourceFingerprint is { } fingerprint
+            ? $"PolicySourceVersion={version};PolicySourceFingerprint={fingerprint}"
+            : "PolicySourceVersion=INTERNAL_REAPPLY;PolicySourceFingerprint=NOT_CAPTURED";
+
+    private static string PolicySourceReason(SyncExecutionPolicyDecision decision) =>
+        decision.PolicySourceVersion is { } version && decision.PolicySourceFingerprint is { } fingerprint
+            ? $"PolicySourceVersion={version};PolicySourceFingerprint={fingerprint}"
+            : "PolicySourceVersion=UNAVAILABLE;PolicySourceFingerprint=UNAVAILABLE";
+
+    private static bool IsSafePolicyVersion(string value) =>
+        value.Length is >= 1 and <= 80 &&
+        value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
+
+    private static bool IsSha256Hex(string value) =>
+        value.Length == 64 && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static void EnsureAcceptedReplayMatches(
         SyncOperation operation,

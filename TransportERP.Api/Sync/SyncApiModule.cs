@@ -244,7 +244,8 @@ public static class SyncApiModule
                     new EnqueueAcceptedSyncOperationCommand(
                         validRequest.ProtocolVersion, validItem.ActionCode, validItem.OperationType, validItem.EntityType,
                         validItem.EntityId, validItem.ClientOperationId, validItem.PayloadJson, validItem.PayloadHash,
-                        clientOccurredAt, validItem.OperationCorrelationId, validItem.BaseVersion),
+                        clientOccurredAt, validItem.OperationCorrelationId, validItem.BaseVersion,
+                        effectivePolicy.SourceVersion, effectivePolicy.SourceFingerprint),
                     acceptedProof, cancellationToken);
                 results.Add(SyncBatchOperationResult.From(operation, serverTime));
             }

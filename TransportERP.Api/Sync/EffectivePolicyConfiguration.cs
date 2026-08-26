@@ -1,4 +1,6 @@
 using System.Collections.Frozen;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Options;
 using TransportERP.Api.Security;
 using TransportERP.Application.Sync;
@@ -28,7 +30,9 @@ public sealed class EffectivePolicyConfiguration
         IReadOnlyDictionary<Guid, SyncPolicyRestriction> companies,
         IReadOnlyDictionary<(Guid CompanyId, Guid BranchId), SyncPolicyRestriction> branches,
         IReadOnlyDictionary<Guid, ConfiguredDeviceSyncPolicy> devices,
-        IReadOnlyList<string> loadErrors)
+        IReadOnlyList<string> loadErrors,
+        string sourceVersion,
+        string sourceFingerprint)
     {
         this.companies = companies.ToFrozenDictionary(
             x => x.Key, x => Freeze(x.Value));
@@ -42,9 +46,13 @@ public sealed class EffectivePolicyConfiguration
                 Restriction = x.Value.Restriction is null ? null : Freeze(x.Value.Restriction)
             });
         LoadErrors = Array.AsReadOnly(loadErrors.ToArray());
+        SourceVersion = sourceVersion;
+        SourceFingerprint = sourceFingerprint;
     }
 
     public IReadOnlyList<string> LoadErrors { get; }
+    public string SourceVersion { get; }
+    public string SourceFingerprint { get; }
     public IEnumerable<KeyValuePair<Guid, SyncPolicyRestriction>> Companies => companies;
     public IEnumerable<KeyValuePair<(Guid CompanyId, Guid BranchId), SyncPolicyRestriction>> Branches => branches;
     public IEnumerable<ConfiguredDeviceSyncPolicy> Devices => devices.Values;
@@ -65,6 +73,9 @@ public sealed class EffectivePolicyConfiguration
         var branches = new Dictionary<(Guid, Guid), SyncPolicyRestriction>();
         var devices = new Dictionary<Guid, ConfiguredDeviceSyncPolicy>();
         var root = configuration.GetSection("Sync:EffectivePolicy");
+        var sourceVersion = root["SourceVersion"] ?? string.Empty;
+        if (!IsSafeSourceVersion(sourceVersion))
+            errors.Add("Sync:EffectivePolicy:SourceVersion must be 1..80 ASCII letters, digits, dot, dash or underscore.");
 
         foreach (var companySection in root.GetSection("Companies").GetChildren())
         {
@@ -117,18 +128,22 @@ public sealed class EffectivePolicyConfiguration
                 actions.ToHashSet(StringComparer.Ordinal), ReadRestriction(deviceSection));
         }
 
-        return new EffectivePolicyConfiguration(companies, branches, devices, errors);
+        return new EffectivePolicyConfiguration(
+            companies, branches, devices, errors, sourceVersion, ComputeSourceFingerprint(configuration));
     }
 
     public static EffectivePolicyConfiguration Create(
         IReadOnlyDictionary<Guid, SyncPolicyRestriction> companies,
         IReadOnlyDictionary<(Guid CompanyId, Guid BranchId), SyncPolicyRestriction> branches,
-        IReadOnlyCollection<ConfiguredDeviceSyncPolicy> devices)
+        IReadOnlyCollection<ConfiguredDeviceSyncPolicy> devices,
+        string sourceVersion = "test-policy-v1")
         => new(
             new Dictionary<Guid, SyncPolicyRestriction>(companies),
             new Dictionary<(Guid CompanyId, Guid BranchId), SyncPolicyRestriction>(branches),
             devices.ToDictionary(x => x.RegisteredDeviceId),
-            []);
+            [],
+            sourceVersion,
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceVersion))).ToLowerInvariant());
 
     private static SyncPolicyRestriction ReadRestriction(IConfiguration section) => new(
         section.GetValue<bool?>(nameof(SyncPolicyRestriction.Enabled)),
@@ -157,6 +172,19 @@ public sealed class EffectivePolicyConfiguration
 
     private static bool TryNonEmptyGuid(string? value, out Guid parsed)
         => Guid.TryParse(value, out parsed) && parsed != Guid.Empty;
+
+    private static bool IsSafeSourceVersion(string value) =>
+        value.Length is >= 1 and <= 80 &&
+        value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
+
+    private static string ComputeSourceFingerprint(IConfiguration configuration)
+    {
+        var canonical = string.Join('\n', configuration.AsEnumerable()
+            .Where(item => item.Value is not null && item.Key.StartsWith("Sync:", StringComparison.Ordinal))
+            .OrderBy(item => item.Key, StringComparer.Ordinal)
+            .Select(item => $"{item.Key}={item.Value}"));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
 }
 
 public sealed class EffectivePolicyConfigurationValidator(
@@ -220,16 +248,16 @@ public sealed class EffectiveSyncPolicyProvider(
     {
         if (!current.IsLocalSession || !current.BranchId.HasValue ||
             !current.RegisteredDeviceId.HasValue || string.IsNullOrEmpty(current.DeviceId))
-            return resolver.Close("SYNC_SECURITY_CONTEXT_INCOMPLETE");
+            return Stamp(resolver.Close("SYNC_SECURITY_CONTEXT_INCOMPLETE"));
         if (!configuration.TryGetDevice(current.RegisteredDeviceId.Value, out var device))
-            return resolver.Close("SYNC_SCOPE_POLICY_MISSING");
+            return Stamp(resolver.Close("SYNC_SCOPE_POLICY_MISSING"));
         SyncPolicyRestriction? company = configuration.TryGetCompany(
             current.CompanyId, out var configuredCompany) ? configuredCompany : null;
         SyncPolicyRestriction? branch = configuration.TryGetBranch(
             current.CompanyId, current.BranchId.Value, out var configuredBranch) ? configuredBranch : null;
         if (device.CompanyId != current.CompanyId || device.BranchId != current.BranchId ||
             !string.Equals(device.DeviceId, current.DeviceId, StringComparison.Ordinal))
-            return resolver.Close("SYNC_DEVICE_POLICY_MISMATCH");
+            return Stamp(resolver.Close("SYNC_DEVICE_POLICY_MISMATCH"));
 
         var permissionActions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var definition in SyncActionCatalog.Definitions)
@@ -238,9 +266,15 @@ public sealed class EffectiveSyncPolicyProvider(
                     definition.RequiredPermission, cancellationToken))
                 permissionActions.Add(definition.ActionCodeValue);
 
-        return resolver.Resolve(
-            company, branch, device.AllowedActions, permissionActions, device.Restriction);
+        return Stamp(resolver.Resolve(
+            company, branch, device.AllowedActions, permissionActions, device.Restriction));
     }
+
+    private EffectiveSyncPolicy Stamp(EffectiveSyncPolicy policy) => policy with
+    {
+        SourceVersion = configuration.SourceVersion,
+        SourceFingerprint = configuration.SourceFingerprint
+    };
 }
 
 /// <summary>
@@ -294,8 +328,8 @@ public sealed class EffectiveSyncRetryPolicyResolver(
             !configuration.TryGetDevice(registeredDeviceId.Value, out var device) ||
             device.CompanyId != companyId || device.BranchId != branchId ||
             !string.Equals(device.DeviceId, deviceId, StringComparison.Ordinal))
-            return ValueTask.FromResult(
-                SyncExecutionPolicyDecision.Denied("SYNC_RUNTIME_POLICY_UNAVAILABLE"));
+            return ValueTask.FromResult(Stamp(
+                SyncExecutionPolicyDecision.Denied("SYNC_RUNTIME_POLICY_UNAVAILABLE")));
         SyncPolicyRestriction? company = configuration.TryGetCompany(
             companyId, out var configuredCompany) ? configuredCompany : null;
         SyncPolicyRestriction? branch = configuration.TryGetBranch(
@@ -308,12 +342,15 @@ public sealed class EffectiveSyncRetryPolicyResolver(
         var effective = resolver.Resolve(
             company, branch, device.AllowedActions, globalActions, device.Restriction);
         if (!effective.Enabled)
-            return ValueTask.FromResult(SyncExecutionPolicyDecision.Denied(
-                effective.ClosedReason ?? "OFFLINE_DISABLED"));
-        return ValueTask.FromResult(effective.AllowedActions.Contains(actionCode)
+            return ValueTask.FromResult(Stamp(SyncExecutionPolicyDecision.Denied(
+                effective.ClosedReason ?? "OFFLINE_DISABLED")));
+        return ValueTask.FromResult(Stamp(effective.AllowedActions.Contains(actionCode)
             ? SyncExecutionPolicyDecision.Allowed
-            : SyncExecutionPolicyDecision.Denied("SCOPE_DENIED"));
+            : SyncExecutionPolicyDecision.Denied("SCOPE_DENIED")));
     }
+
+    private SyncExecutionPolicyDecision Stamp(SyncExecutionPolicyDecision decision) =>
+        decision.WithPolicySource(configuration.SourceVersion, configuration.SourceFingerprint);
 }
 
 public sealed class EffectivePolicySyncRuntimeGate(IEffectiveSyncPolicyProvider provider) : ISyncRuntimeGate
