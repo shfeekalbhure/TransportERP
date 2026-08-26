@@ -90,7 +90,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("ECGenParameterSpec(\"secp256r1\")", signer, StringComparison.Ordinal);
         Assert.Contains("DerToP1363", signer, StringComparison.Ordinal);
         Assert.Contains("new byte[64]", signer, StringComparison.Ordinal);
-        Assert.Contains("SHA256withECDSAinP1363Format", signer, StringComparison.Ordinal);
+        Assert.Contains("GetInstance(\"SHA256withECDSA\")", signer, StringComparison.Ordinal);
+        Assert.DoesNotContain("SHA256withECDSAinP1363Format", signer, StringComparison.Ordinal);
         Assert.Contains("X509EncodedKeySpec", signer, StringComparison.Ordinal);
         Assert.DoesNotContain("ExportParameters(includePrivateParameters: true)", signer,
             StringComparison.Ordinal);

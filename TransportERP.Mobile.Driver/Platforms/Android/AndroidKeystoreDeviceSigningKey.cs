@@ -96,13 +96,10 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             using var keyStore = LoadKeyStore();
             using var privateKey = keyStore.GetKey(KeyAlias, null) as IPrivateKey
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
-            var nativeP1363 = TrySignNativeP1363(privateKey, input);
-            if (nativeP1363 is not null)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                return nativeP1363;
-            }
-
+            // AndroidKeyStore providers are only required to implement the DER ECDSA form.
+            // Do not infer that a 64-byte result from an optional provider alias is P1363:
+            // a DER signature can also be 64 bytes.  Normalize the required DER form with the
+            // strict parser below so the wire representation is always unambiguous JOSE P1363.
             using var derSigner = Java.Security.Signature.GetInstance("SHA256withECDSA")
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
             derSigner.InitSign(privateKey);
@@ -128,27 +125,6 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             CryptographicOperations.ZeroMemory(input);
             if (derSignature is not null)
                 CryptographicOperations.ZeroMemory(derSignature);
-        }
-    }
-
-    private static byte[]? TrySignNativeP1363(IPrivateKey privateKey, byte[] input)
-    {
-        try
-        {
-            using var p1363Signer = Java.Security.Signature.GetInstance("SHA256withECDSAinP1363Format");
-            if (p1363Signer is null) return null;
-            p1363Signer.InitSign(privateKey);
-            p1363Signer.Update(input);
-            var signature = p1363Signer.Sign();
-            if (signature is { Length: 64 }) return signature;
-            if (signature is not null) CryptographicOperations.ZeroMemory(signature);
-            return null;
-        }
-        catch
-        {
-            // Android providers are not required to expose the JDK P1363 alias. The strict DER
-            // parser below remains the portable path and never accepts an ambiguous signature.
-            return null;
         }
     }
 
