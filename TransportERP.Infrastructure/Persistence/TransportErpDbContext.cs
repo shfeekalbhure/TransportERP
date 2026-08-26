@@ -11,6 +11,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<RegisteredDevice> RegisteredDevices => Set<RegisteredDevice>();
     public DbSet<RegisteredDeviceAssignment> RegisteredDeviceAssignments => Set<RegisteredDeviceAssignment>();
+    public DbSet<RegisteredDeviceProofKeyChallenge> RegisteredDeviceProofKeyChallenges => Set<RegisteredDeviceProofKeyChallenge>();
+    public DbSet<RegisteredDeviceProofKeyChange> RegisteredDeviceProofKeyChanges => Set<RegisteredDeviceProofKeyChange>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
@@ -199,6 +201,12 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "\"Status\" IN ('PENDING','ACTIVE','SUSPENDED','REVOKED','EXPIRED')");
             t.HasCheckConstraint("ck_registered_devices_credential_version", "\"CredentialVersion\" >= 1");
             t.HasCheckConstraint("ck_registered_devices_credential_hash", "length(\"CredentialHash\") = 64");
+            t.HasCheckConstraint("ck_reg_device_proof_key_bundle",
+                "(\"ProofPublicJwkCanonicalJson\" IS NULL AND \"ProofKeyThumbprint\" IS NULL AND \"ProofKeyVersion\" IS NULL AND " +
+                "\"ProofKeyChangedAt\" IS NULL AND \"ProofKeyChangedByUserId\" IS NULL) OR " +
+                "(\"ProofPublicJwkCanonicalJson\" IS NOT NULL AND \"ProofKeyThumbprint\" IS NOT NULL AND " +
+                "\"ProofKeyVersion\" >= 1 AND \"ProofKeyChangedAt\" IS NOT NULL AND \"ProofKeyChangedByUserId\" IS NOT NULL AND " +
+                "char_length(\"ProofKeyThumbprint\") = 43)");
         });
         registeredDevice.HasKey(x => x.Id);
         registeredDevice.HasAlternateKey(x => new { x.Id, x.CompanyId });
@@ -212,12 +220,21 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         registeredDevice.Property(x => x.RegistrationRequestId).HasMaxLength(120).IsRequired();
         registeredDevice.Property(x => x.CredentialHash).HasMaxLength(64).IsRequired();
         registeredDevice.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        registeredDevice.Property(x => x.ProofPublicJwkCanonicalJson).HasMaxLength(512);
+        registeredDevice.Property(x => x.ProofKeyThumbprint).HasMaxLength(43);
         registeredDevice.HasIndex(x => new { x.CompanyId, x.DeviceId }).IsUnique();
         registeredDevice.HasIndex(x => new { x.CompanyId, x.RegistrationRequestId }).IsUnique();
         registeredDevice.HasIndex(x => new { x.CompanyId, x.Status });
+        registeredDevice.HasIndex(x => x.ProofKeyThumbprint).IsUnique()
+            .HasFilter("\"ProofKeyThumbprint\" IS NOT NULL")
+            .HasDatabaseName("ux_registered_device_proof_thumbprint");
+        registeredDevice.HasIndex(x => x.ProofKeyChangedByUserId)
+            .HasDatabaseName("ix_reg_device_proof_changed_by");
         registeredDevice.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         registeredDevice.HasOne<User>().WithMany().HasForeignKey(x => x.RegisteredByUserId).OnDelete(DeleteBehavior.Restrict);
         registeredDevice.HasOne<User>().WithMany().HasForeignKey(x => x.ApprovedByUserId).OnDelete(DeleteBehavior.Restrict);
+        registeredDevice.HasOne<User>().WithMany().HasForeignKey(x => x.ProofKeyChangedByUserId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_reg_device_proof_changed_by");
 
         var deviceAssignment = mb.Entity<RegisteredDeviceAssignment>();
         deviceAssignment.ToTable("registered_device_assignments", t =>
@@ -239,6 +256,83 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
         deviceAssignment.HasOne<User>().WithMany().HasForeignKey(x => x.AssignedByUserId).OnDelete(DeleteBehavior.Restrict);
         deviceAssignment.HasOne<User>().WithMany().HasForeignKey(x => x.RemovedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+        var proofChallenge = mb.Entity<RegisteredDeviceProofKeyChallenge>();
+        proofChallenge.ToTable("registered_device_proof_key_challenges", t =>
+        {
+            t.HasCheckConstraint("ck_key_challenge_type", "\"ChangeType\" IN ('BIND','ROTATE','RECOVER')");
+            t.HasCheckConstraint("ck_key_challenge_expected_version",
+                "(\"ChangeType\" = 'BIND' AND \"ExpectedProofKeyVersion\" IS NULL) OR " +
+                "(\"ChangeType\" IN ('ROTATE','RECOVER') AND \"ExpectedProofKeyVersion\" IS NOT NULL AND \"ExpectedProofKeyVersion\" >= 1)");
+            t.HasCheckConstraint("ck_key_challenge_hash_len",
+                "octet_length(\"ChallengeHash\") = 32 AND char_length(\"NewProofKeyThumbprint\") = 43");
+            t.HasCheckConstraint("ck_key_challenge_window",
+                "\"ExpiresAt\" > \"IssuedAt\" AND (\"ConsumedAt\" IS NULL OR " +
+                "(\"ConsumedAt\" >= \"IssuedAt\" AND \"ConsumedAt\" < \"ExpiresAt\"))");
+        });
+        proofChallenge.HasKey(x => x.Id).HasName("pk_device_key_challenges");
+        proofChallenge.HasAlternateKey(x => new
+            { x.Id, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ChangeRequestId, x.ChangeType, x.NewProofKeyThumbprint })
+            .HasName("ux_key_challenge_change_scope");
+        proofChallenge.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        proofChallenge.Property(x => x.ChangeType).HasMaxLength(8).IsRequired();
+        proofChallenge.Property(x => x.NewProofKeyThumbprint).HasMaxLength(43).IsRequired();
+        proofChallenge.Property(x => x.ChallengeHash).HasColumnType("bytea").IsRequired();
+        proofChallenge.Property(x => x.IssuedAt).HasColumnType("timestamptz");
+        proofChallenge.Property(x => x.ExpiresAt).HasColumnType("timestamptz");
+        proofChallenge.Property(x => x.ConsumedAt).HasColumnType("timestamptz");
+        proofChallenge.HasIndex(x => new { x.RegisteredDeviceId, x.ChangeRequestId }).IsUnique()
+            .HasDatabaseName("ux_device_key_challenge_request");
+        proofChallenge.HasIndex(x => x.ExpiresAt).HasDatabaseName("ix_device_key_challenge_expiry");
+        proofChallenge.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasDatabaseName("ix_key_challenge_device_scope");
+        proofChallenge.HasIndex(x => x.CreatedByUserId).HasDatabaseName("ix_key_challenge_created_by");
+        proofChallenge.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_key_challenge_registered_device");
+        proofChallenge.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_key_challenge_created_by");
+
+        var proofChange = mb.Entity<RegisteredDeviceProofKeyChange>();
+        proofChange.ToTable("registered_device_proof_key_changes", t =>
+        {
+            t.HasCheckConstraint("ck_key_change_type", "\"ChangeType\" IN ('BIND','ROTATE','RECOVER')");
+            t.HasCheckConstraint("ck_key_change_version_shape",
+                "(\"ChangeType\" = 'BIND' AND \"ExpectedProofKeyVersion\" IS NULL AND \"PreviousProofKeyThumbprint\" IS NULL AND \"ResultProofKeyVersion\" = 1) OR " +
+                "(\"ChangeType\" IN ('ROTATE','RECOVER') AND \"ExpectedProofKeyVersion\" IS NOT NULL AND " +
+                "\"ExpectedProofKeyVersion\" >= 1 AND \"PreviousProofKeyThumbprint\" IS NOT NULL AND " +
+                "char_length(\"PreviousProofKeyThumbprint\") = 43 AND \"ResultProofKeyVersion\" = \"ExpectedProofKeyVersion\" + 1)");
+            t.HasCheckConstraint("ck_key_change_recovery_reason",
+                "\"ChangeType\" <> 'RECOVER' OR (\"Reason\" IS NOT NULL AND char_length(trim(\"Reason\")) > 0)");
+        });
+        proofChange.HasKey(x => x.Id).HasName("pk_device_key_changes");
+        proofChange.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
+        proofChange.Property(x => x.ChangeType).HasMaxLength(8).IsRequired();
+        proofChange.Property(x => x.PreviousProofKeyThumbprint).HasMaxLength(43);
+        proofChange.Property(x => x.NewProofKeyThumbprint).HasMaxLength(43).IsRequired();
+        proofChange.Property(x => x.Reason).HasMaxLength(500);
+        proofChange.Property(x => x.ChangedAt).HasColumnType("timestamptz");
+        proofChange.HasIndex(x => new { x.RegisteredDeviceId, x.ChangeRequestId }).IsUnique()
+            .HasDatabaseName("ux_device_key_change_request");
+        proofChange.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasDatabaseName("ix_key_change_device_scope");
+        proofChange.HasIndex(x => new
+            { x.ChallengeId, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ChangeRequestId, x.ChangeType, x.NewProofKeyThumbprint })
+            .HasDatabaseName("ix_key_change_challenge_scope");
+        proofChange.HasIndex(x => x.ChangedByUserId).HasDatabaseName("ix_key_change_changed_by");
+        proofChange.HasOne<RegisteredDevice>().WithMany()
+            .HasForeignKey(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId, x.DeviceId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_key_change_registered_device");
+        proofChange.HasOne<RegisteredDeviceProofKeyChallenge>().WithMany()
+            .HasForeignKey(x => new
+                { x.ChallengeId, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ChangeRequestId, x.ChangeType, x.NewProofKeyThumbprint })
+            .HasPrincipalKey(x => new
+                { x.Id, x.CompanyId, x.RegisteredDeviceId, x.DeviceId, x.ChangeRequestId, x.ChangeType, x.NewProofKeyThumbprint })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_key_change_challenge_scope");
+        proofChange.HasOne<User>().WithMany().HasForeignKey(x => x.ChangedByUserId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_key_change_changed_by");
 
         var role = mb.Entity<Role>();
         role.ToTable("roles", t => t.HasCheckConstraint("ck_roles_status", "\"Status\" IN ('ACTIVE','INACTIVE')"));
@@ -565,7 +659,9 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "octet_length(\"JtiHash\") = 32 AND octet_length(\"HtuHash\") = 32 AND char_length(\"ProofKeyThumbprint\") = 43");
             t.HasCheckConstraint("ck_sync_replay_method", "\"HttpMethod\" = 'POST'");
             t.HasCheckConstraint("ck_sync_replay_window",
-                "\"ExpiresAt\" > \"FirstSeenAt\" AND \"FirstSeenAt\" >= \"IssuedAt\"");
+                "\"ExpiresAt\" > \"FirstSeenAt\" AND " +
+                "\"FirstSeenAt\" >= \"IssuedAt\" - INTERVAL '30 seconds' AND " +
+                "\"FirstSeenAt\" <= \"IssuedAt\" + INTERVAL '120 seconds'");
         });
         replay.HasKey(x => x.Id).HasName("pk_sync_proof_replays");
         replay.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();

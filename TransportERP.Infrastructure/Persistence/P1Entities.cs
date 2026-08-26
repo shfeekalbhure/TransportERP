@@ -123,6 +123,11 @@ public sealed class RegisteredDevice : P1Entity
     public DateTimeOffset? RevokedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset? LastSeenAt { get; set; }
+    public string? ProofPublicJwkCanonicalJson { get; set; }
+    public string? ProofKeyThumbprint { get; set; }
+    public int? ProofKeyVersion { get; set; }
+    public DateTimeOffset? ProofKeyChangedAt { get; set; }
+    public Guid? ProofKeyChangedByUserId { get; set; }
 }
 
 public sealed class RegisteredDeviceAssignment : P1Entity
@@ -136,6 +141,41 @@ public sealed class RegisteredDeviceAssignment : P1Entity
     public Guid? RemovedByUserId { get; set; }
     public DateTimeOffset AssignedAt { get; set; }
     public DateTimeOffset? RemovedAt { get; set; }
+}
+
+public sealed class RegisteredDeviceProofKeyChallenge
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid ChangeRequestId { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int? ExpectedProofKeyVersion { get; set; }
+    public string NewProofKeyThumbprint { get; set; } = string.Empty;
+    public byte[] ChallengeHash { get; set; } = [];
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? ConsumedAt { get; set; }
+    public Guid CreatedByUserId { get; set; }
+}
+
+public sealed class RegisteredDeviceProofKeyChange
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid ChangeRequestId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int? ExpectedProofKeyVersion { get; set; }
+    public string? PreviousProofKeyThumbprint { get; set; }
+    public string NewProofKeyThumbprint { get; set; } = string.Empty;
+    public int ResultProofKeyVersion { get; set; }
+    public Guid ChangedByUserId { get; set; }
+    public string? Reason { get; set; }
+    public DateTimeOffset ChangedAt { get; set; }
 }
 
 public sealed class Role : P1Entity

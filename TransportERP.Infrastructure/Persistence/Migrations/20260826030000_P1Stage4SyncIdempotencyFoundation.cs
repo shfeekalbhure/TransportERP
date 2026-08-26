@@ -134,7 +134,9 @@ public partial class P1Stage4SyncIdempotencyFoundation : Migration
              char_length("ProofKeyThumbprint")=43),
           CONSTRAINT ck_sync_replay_method CHECK ("HttpMethod"='POST'),
           CONSTRAINT ck_sync_replay_window CHECK
-            ("ExpiresAt">"FirstSeenAt" AND "FirstSeenAt">="IssuedAt")
+            ("ExpiresAt">"FirstSeenAt" AND
+             "FirstSeenAt">="IssuedAt"-INTERVAL '30 seconds' AND
+             "FirstSeenAt"<="IssuedAt"+INTERVAL '120 seconds')
         );
         CREATE UNIQUE INDEX ux_sync_replay_device_key_jti
           ON transport_erp.sync_proof_replays ("RegisteredDeviceId","ProofKeyVersion","JtiHash");

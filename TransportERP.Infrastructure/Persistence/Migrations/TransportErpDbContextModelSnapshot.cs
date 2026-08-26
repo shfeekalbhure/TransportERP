@@ -1996,6 +1996,11 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastSeenAt").HasColumnType("timestamp with time zone");
                     b.Property<string>("OsVersion").HasMaxLength(80).HasColumnType("character varying(80)");
                     b.Property<string>("Platform").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<DateTimeOffset?>("ProofKeyChangedAt").HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("ProofKeyChangedByUserId").HasColumnType("uuid");
+                    b.Property<string>("ProofKeyThumbprint").HasMaxLength(43).HasColumnType("character varying(43)");
+                    b.Property<int?>("ProofKeyVersion").HasColumnType("integer");
+                    b.Property<string>("ProofPublicJwkCanonicalJson").HasMaxLength(512).HasColumnType("character varying(512)");
                     b.Property<Guid>("RegisteredByUserId").HasColumnType("uuid");
                     b.Property<string>("RegistrationRequestId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
                     b.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
@@ -2007,15 +2012,81 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.HasAlternateKey("Id", "CompanyId");
                     b.HasAlternateKey("Id", "CompanyId", "DeviceId");
                     b.HasIndex("ApprovedByUserId");
+                    b.HasIndex("ProofKeyChangedByUserId").HasDatabaseName("ix_reg_device_proof_changed_by");
                     b.HasIndex("RegisteredByUserId");
                     b.HasIndex("CompanyId", "DeviceId").IsUnique();
                     b.HasIndex("CompanyId", "RegistrationRequestId").IsUnique();
                     b.HasIndex("CompanyId", "Status");
+                    b.HasIndex("ProofKeyThumbprint").IsUnique()
+                        .HasDatabaseName("ux_registered_device_proof_thumbprint")
+                        .HasFilter("\"ProofKeyThumbprint\" IS NOT NULL");
                     b.ToTable("registered_devices", "transport_erp", t =>
                         {
+                            t.HasCheckConstraint("ck_reg_device_proof_key_bundle", "(\"ProofPublicJwkCanonicalJson\" IS NULL AND \"ProofKeyThumbprint\" IS NULL AND \"ProofKeyVersion\" IS NULL AND \"ProofKeyChangedAt\" IS NULL AND \"ProofKeyChangedByUserId\" IS NULL) OR (\"ProofPublicJwkCanonicalJson\" IS NOT NULL AND \"ProofKeyThumbprint\" IS NOT NULL AND \"ProofKeyVersion\" >= 1 AND \"ProofKeyChangedAt\" IS NOT NULL AND \"ProofKeyChangedByUserId\" IS NOT NULL AND char_length(\"ProofKeyThumbprint\") = 43)");
                             t.HasCheckConstraint("ck_registered_devices_credential_hash", "length(\"CredentialHash\") = 64");
                             t.HasCheckConstraint("ck_registered_devices_credential_version", "\"CredentialVersion\" >= 1");
                             t.HasCheckConstraint("ck_registered_devices_status", "\"Status\" IN ('PENDING','ACTIVE','SUSPENDED','REVOKED','EXPIRED')");
+                        });
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceProofKeyChallenge", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<byte[]>("ChallengeHash").IsRequired().HasColumnType("bytea");
+                    b.Property<Guid>("ChangeRequestId").HasColumnType("uuid");
+                    b.Property<string>("ChangeType").IsRequired().HasMaxLength(8).HasColumnType("character varying(8)");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<DateTimeOffset?>("ConsumedAt").HasColumnType("timestamptz");
+                    b.Property<Guid>("CreatedByUserId").HasColumnType("uuid");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<DateTimeOffset>("ExpiresAt").HasColumnType("timestamptz");
+                    b.Property<int?>("ExpectedProofKeyVersion").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("IssuedAt").HasColumnType("timestamptz");
+                    b.Property<string>("NewProofKeyThumbprint").IsRequired().HasMaxLength(43).HasColumnType("character varying(43)");
+                    b.Property<Guid>("RegisteredDeviceId").HasColumnType("uuid");
+                    b.HasKey("Id").HasName("pk_device_key_challenges");
+                    b.HasAlternateKey("Id", "CompanyId", "RegisteredDeviceId", "DeviceId", "ChangeRequestId", "ChangeType", "NewProofKeyThumbprint")
+                        .HasName("ux_key_challenge_change_scope");
+                    b.HasIndex("CreatedByUserId").HasDatabaseName("ix_key_challenge_created_by");
+                    b.HasIndex("ExpiresAt").HasDatabaseName("ix_device_key_challenge_expiry");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId").HasDatabaseName("ix_key_challenge_device_scope");
+                    b.HasIndex("RegisteredDeviceId", "ChangeRequestId").IsUnique().HasDatabaseName("ux_device_key_challenge_request");
+                    b.ToTable("registered_device_proof_key_challenges", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_key_challenge_expected_version", "(\"ChangeType\" = 'BIND' AND \"ExpectedProofKeyVersion\" IS NULL) OR (\"ChangeType\" IN ('ROTATE','RECOVER') AND \"ExpectedProofKeyVersion\" IS NOT NULL AND \"ExpectedProofKeyVersion\" >= 1)");
+                            t.HasCheckConstraint("ck_key_challenge_hash_len", "octet_length(\"ChallengeHash\") = 32 AND char_length(\"NewProofKeyThumbprint\") = 43");
+                            t.HasCheckConstraint("ck_key_challenge_type", "\"ChangeType\" IN ('BIND','ROTATE','RECOVER')");
+                            t.HasCheckConstraint("ck_key_challenge_window", "\"ExpiresAt\" > \"IssuedAt\" AND (\"ConsumedAt\" IS NULL OR (\"ConsumedAt\" >= \"IssuedAt\" AND \"ConsumedAt\" < \"ExpiresAt\"))");
+                        });
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceProofKeyChange", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<Guid>("ChallengeId").HasColumnType("uuid");
+                    b.Property<Guid>("ChangeRequestId").HasColumnType("uuid");
+                    b.Property<string>("ChangeType").IsRequired().HasMaxLength(8).HasColumnType("character varying(8)");
+                    b.Property<DateTimeOffset>("ChangedAt").HasColumnType("timestamptz");
+                    b.Property<Guid>("ChangedByUserId").HasColumnType("uuid");
+                    b.Property<Guid>("CompanyId").HasColumnType("uuid");
+                    b.Property<string>("DeviceId").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<int?>("ExpectedProofKeyVersion").HasColumnType("integer");
+                    b.Property<string>("NewProofKeyThumbprint").IsRequired().HasMaxLength(43).HasColumnType("character varying(43)");
+                    b.Property<string>("PreviousProofKeyThumbprint").HasMaxLength(43).HasColumnType("character varying(43)");
+                    b.Property<string>("Reason").HasMaxLength(500).HasColumnType("character varying(500)");
+                    b.Property<Guid>("RegisteredDeviceId").HasColumnType("uuid");
+                    b.Property<int>("ResultProofKeyVersion").HasColumnType("integer");
+                    b.HasKey("Id").HasName("pk_device_key_changes");
+                    b.HasIndex("ChangedByUserId").HasDatabaseName("ix_key_change_changed_by");
+                    b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId").HasDatabaseName("ix_key_change_device_scope");
+                    b.HasIndex("RegisteredDeviceId", "ChangeRequestId").IsUnique().HasDatabaseName("ux_device_key_change_request");
+                    b.HasIndex("ChallengeId", "CompanyId", "RegisteredDeviceId", "DeviceId", "ChangeRequestId", "ChangeType", "NewProofKeyThumbprint")
+                        .HasDatabaseName("ix_key_change_challenge_scope");
+                    b.ToTable("registered_device_proof_key_changes", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_key_change_recovery_reason", "\"ChangeType\" <> 'RECOVER' OR (\"Reason\" IS NOT NULL AND char_length(trim(\"Reason\")) > 0)");
+                            t.HasCheckConstraint("ck_key_change_type", "\"ChangeType\" IN ('BIND','ROTATE','RECOVER')");
+                            t.HasCheckConstraint("ck_key_change_version_shape", "(\"ChangeType\" = 'BIND' AND \"ExpectedProofKeyVersion\" IS NULL AND \"PreviousProofKeyThumbprint\" IS NULL AND \"ResultProofKeyVersion\" = 1) OR (\"ChangeType\" IN ('ROTATE','RECOVER') AND \"ExpectedProofKeyVersion\" IS NOT NULL AND \"ExpectedProofKeyVersion\" >= 1 AND \"PreviousProofKeyThumbprint\" IS NOT NULL AND char_length(\"PreviousProofKeyThumbprint\") = 43 AND \"ResultProofKeyVersion\" = \"ExpectedProofKeyVersion\" + 1)");
                         });
                 });
 
@@ -2377,7 +2448,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_sync_replay_hash_len", "octet_length(\"JtiHash\") = 32 AND octet_length(\"HtuHash\") = 32 AND char_length(\"ProofKeyThumbprint\") = 43");
                             t.HasCheckConstraint("ck_sync_replay_key_version", "\"ProofKeyVersion\" >= 1");
                             t.HasCheckConstraint("ck_sync_replay_method", "\"HttpMethod\" = 'POST'");
-                            t.HasCheckConstraint("ck_sync_replay_window", "\"ExpiresAt\" > \"FirstSeenAt\" AND \"FirstSeenAt\" >= \"IssuedAt\"");
+                            t.HasCheckConstraint("ck_sync_replay_window", "\"ExpiresAt\" > \"FirstSeenAt\" AND \"FirstSeenAt\" >= \"IssuedAt\" - INTERVAL '30 seconds' AND \"FirstSeenAt\" <= \"IssuedAt\" + INTERVAL '120 seconds'");
                         });
                 });
 
@@ -3737,6 +3808,50 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .WithMany().HasForeignKey("ApprovedByUserId").OnDelete(DeleteBehavior.Restrict);
                     b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
                         .WithMany().HasForeignKey("RegisteredByUserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany().HasForeignKey("ProofKeyChangedByUserId").OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_reg_device_proof_changed_by");
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceProofKeyChallenge", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_key_challenge_registered_device");
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_key_challenge_created_by");
+                });
+
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceProofKeyChange", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDevice", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredDeviceId", "CompanyId", "DeviceId")
+                        .HasPrincipalKey("Id", "CompanyId", "DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_key_change_registered_device");
+                    b.HasOne("TransportERP.Infrastructure.Persistence.RegisteredDeviceProofKeyChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId", "CompanyId", "RegisteredDeviceId", "DeviceId", "ChangeRequestId", "ChangeType", "NewProofKeyThumbprint")
+                        .HasPrincipalKey("Id", "CompanyId", "RegisteredDeviceId", "DeviceId", "ChangeRequestId", "ChangeType", "NewProofKeyThumbprint")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_key_change_challenge_scope");
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_key_change_changed_by");
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RegisteredDeviceAssignment", b =>

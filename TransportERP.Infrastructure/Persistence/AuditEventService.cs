@@ -22,7 +22,8 @@ public sealed record AuditEventDraft(
     string? AfterJson = null,
     string? Reason = null,
     string? Ip = null,
-    DateTimeOffset? OccurredAt = null);
+    DateTimeOffset? OccurredAt = null,
+    Guid? OperationCorrelationId = null);
 
 public sealed record AuditEventQuery(
     Guid? CompanyId = null,
@@ -185,6 +186,7 @@ public sealed class AuditEventService(TransportErpDbContext db)
             EntityType = draft.EntityType.Trim(),
             EntityId = draft.EntityId,
             CorrelationId = draft.CorrelationId ?? Guid.NewGuid(),
+            OperationCorrelationId = draft.OperationCorrelationId,
             DeviceId = deviceId,
             BeforeJson = draft.BeforeJson,
             AfterJson = draft.AfterJson,

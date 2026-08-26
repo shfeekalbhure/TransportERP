@@ -27,23 +27,27 @@ Offline is `deny by default`. لا تكفي صحة `OperationType` أو `EntityT
 
 ### 2.1 Exact Action mapping
 
+**Decision ID:** `DEC-P1-SYNC-ACTION-MAPPING-20260826-03`. هذا الجدول هو إسقاط P2 المطابق حرفيًا لقرار P1 الحاكم، ولا يفوض dispatcher أو Offline أو مرحلة خامسة.
+
 `SyncP1Operations` transport capability موروث من P1 وليس Payload ActionCode. Read-cache منفصل عن write queue ولا ينشئ SyncOperation؛ الاسمان الصريحان هما `SearchOperationalParties` و`ReadBasicWaybillCache`.
 
-| ActionCode | Class | EntityId | BaseVersion | ResultEntityId | Runtime availability on exact baseline |
-|---|---|---|---|---|---|
-| `CreateWaybillDraft` | Draft CREATE queue | اختياري فقط مع server-generated ID | غير مطلوب | WaybillId مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `UpdateWaybillDraft` | Optimistic aggregate UPDATE queue | WaybillId مطلوب | **مطلوب** | WaybillId مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `CreateOperationalParty` | CREATE queue | اختياري فقط مع server-generated ID | غير مطلوب | OperationalPartyId مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `AddWaybillAttachment` | Metadata append queue | owner WaybillId مطلوب | غير مطلوب | attachment metadata ID مطلوب | `PHASE_RUNTIME_UNAVAILABLE`; لا binary |
-| `RecordCollection` | Append-only business command | WaybillId مطلوب | غير مطلوب؛ ClientOperationId + server state/serialization | CollectionTransactionId مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `LoadAllocatedQuantity` | Append-only quantity command | ManifestLineId مطلوب | غير مطلوب؛ ClientOperationId + serialized quantity/domain state | load/movement result ID مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
-| `RecordArrival` | Append-only business command | TripId مطلوب | غير مطلوب؛ ClientOperationId + server serialization/domain state | ArrivalReceiptId مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
-| `RecordUnload` | Append-only quantity command | ArrivalReceiptId مطلوب | غير مطلوب؛ ClientOperationId + serialized quantity/domain state | unload/movement result ID مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
-| `DeliverQuantity` | Append-only quantity command | WaybillId مطلوب | غير مطلوب؛ ClientOperationId + serialized availability/domain state | DeliveryId مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
-| `RecordProofOfDelivery` | Metadata append queue | DeliveryId مطلوب | غير مطلوب | proof metadata ID مطلوب | `PHASE_RUNTIME_UNAVAILABLE`; لا binary |
-| `CreateShipmentException` | Append-only business command | WaybillId مطلوب | غير مطلوب؛ ClientOperationId + domain state | ShipmentExceptionId مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
-| `SearchOperationalParties` | Read-cache؛ لا write queue | لا ينطبق | لا ينطبق | لا ينطبق | Online source موجود؛ client cache غير مثبت |
-| `ReadBasicWaybillCache` | Read-cache؛ لا write queue | WaybillId مطلوب | لا ينطبق | لا ينطبق | `RUNTIME_UNAVAILABLE` |
+| ActionCode | OperationType | EntityType | EntityId | BaseVersion | ResultEntityId | Runtime availability on exact baseline |
+|---|---|---|---|---|---|---|
+| `CreateWaybillDraft` | `CREATE` | `Waybill` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `WaybillId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `UpdateWaybillDraft` | `UPDATE` | `Waybill` | `WaybillId` مطلوب | **مطلوب** | `WaybillId` مطلوب ويساوي EntityId | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `CreateOperationalParty` | `CREATE` | `OperationalParty` | اختياري فقط إذا ولّد الخادم ID | غير مطلوب | `OperationalPartyId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `AddWaybillAttachment` | `CREATE` | `Waybill` | owner `WaybillId` مطلوب | غير مطلوب | `WaybillAttachmentId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE`; metadata فقط، لا binary upload |
+| `RecordCollection` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + server state/serialization | `CollectionTransactionId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `LoadAllocatedQuantity` | `COMMAND` | `ManifestLine` | `ManifestLineId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized quantity/domain state | `MovementEventId` مطلوب | `ONLINE_RUNTIME_PRESENT; OFFLINE_DISPATCH_UNAVAILABLE` |
+| `RecordArrival` | `COMMAND` | `Trip` | `TripId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + server serialization/domain state | `ArrivalReceiptId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
+| `RecordUnload` | `COMMAND` | `ArrivalReceipt` | `ArrivalReceiptId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized quantity/domain state | `MovementEventId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
+| `DeliverQuantity` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + serialized availability/domain state | `DeliveryId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
+| `RecordProofOfDelivery` | `CREATE` | `Delivery` | `DeliveryId` مطلوب | غير مطلوب | `ProofOfDeliveryId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE`; metadata فقط، لا binary upload |
+| `CreateShipmentException` | `COMMAND` | `Waybill` | `WaybillId` مطلوب | غير مطلوب؛ يعتمد ClientOperationId + domain state | `ShipmentExceptionId` مطلوب | `PHASE_RUNTIME_UNAVAILABLE` |
+| `SearchOperationalParties` | لا ينطبق | لا ينطبق | لا ينطبق | لا ينطبق | لا ينطبق | Read-cache؛ لا `SyncOperation`؛ Online source موجود وclient cache runtime غير مثبت |
+| `ReadBasicWaybillCache` | لا ينطبق | لا ينطبق | `WaybillId` مدخل القراءة فقط | لا ينطبق | لا ينطبق | Read-cache؛ لا `SyncOperation`؛ `RUNTIME_UNAVAILABLE` على baseline |
+
+`OperationType` و`EntityType` أعلاه literals حاكمة وحساسة لحالة الأحرف. يعرّف `EntityType` نوع الـaggregate الذي يشير إليه `EntityId`؛ وفي `CREATE` الذي يولّد الخادم هويته ويكون `EntityId=NULL` يعرّف نوع الكيان المنشأ. يعرّف `ResultEntityId` هوية الأثر أو الكيان الناتج، وقد يختلف نوعه عن `EntityType`. لا تنشئ أفعال read-cache سجل `SyncOperation` ولا تدخل حقولها في `fp-v1`.
 
 كل Action آخر `ONLINE_REQUIRED`. وإذا كان Action policy-allowed لكن runtime غير متاح في الإصدار، يرفض قبل enqueue بـ`ACTION_RUNTIME_UNAVAILABLE`. لا تفوض الخانة Offline تنفيذ Arrival/Delivery أو أي مرحلة لاحقة.
 

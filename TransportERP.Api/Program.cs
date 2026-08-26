@@ -5,11 +5,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
+using TransportERP.Api.Sync;
 using TransportERP.Api.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
@@ -90,6 +92,16 @@ builder.Services.AddSingleton<IdentityPasswordSentinel>();
 builder.Services.AddScoped<IdentitySessionService>();
 builder.Services.AddScoped<RegisteredDeviceService>();
 builder.Services.AddScoped<OfflineSyncPolicyService>();
+builder.Services.AddScoped<ISyncRuntimeGate, ClosedSyncRuntimeGate>();
+builder.Services.AddScoped<SyncProofRuntimeService>();
+builder.Services.AddScoped<SyncProofCleanupService>();
+builder.Services.AddHostedService<SyncProofCleanupWorker>();
+builder.Services.AddSingleton<SyncPopProofValidator>();
+builder.Services.AddScoped<ProofKeyLifecycleService>();
+builder.Services.AddSingleton<ProofKeyChangeProofValidator>();
+var syncPopDeployment = SyncPopDeploymentProfile.Load(builder.Configuration);
+builder.Services.AddSingleton(syncPopDeployment);
+builder.Services.Configure<ForwardedHeadersOptions>(syncPopDeployment.ConfigureForwardedHeaders);
 builder.Services.AddSingleton<IdentityRateLimiter>();
 builder.Services.AddScoped<IAuthorizationHandler, SecurityAuthorizationHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
@@ -140,78 +152,16 @@ await using (var catalogScope = app.Services.CreateAsyncScope())
 {
     await catalogScope.ServiceProvider.GetRequiredService<ISystemPermissionCatalogVerifier>().VerifyAsync();
 }
+app.UseForwardedHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapIdentitySessions(securityOptions.Mode);
 app.MapRegisteredDevices();
+app.MapRegisteredDeviceProofKeys();
 app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
-
-app.MapPost("/api/v1/sync/operations:batch", async (
-    SyncBatchRequest request,
-    HttpContext httpContext,
-    ICurrentSecurityContext currentSecurity,
-    IDeviceTrustResolver deviceTrust,
-    OfflineSyncPolicyService offlinePolicy,
-    SyncOperationService sync,
-    CancellationToken cancellationToken) =>
-{
-    var correlationId = GetCorrelationId(httpContext);
-    if (request is null || request.Operations is null || request.Operations.Count is < 1 or > 100)
-        return Results.BadRequest(new { ErrorCode = "BATCH_SIZE_INVALID", CorrelationId = correlationId });
-    var requestDeviceId = IdentitySessionService.NormalizeDevice(request.DeviceId);
-    if (requestDeviceId is null || string.IsNullOrWhiteSpace(request.ProtocolVersion))
-        return Results.BadRequest(new { ErrorCode = "BATCH_METADATA_REQUIRED", CorrelationId = correlationId });
-    var current = await currentSecurity.ResolveAsync(httpContext.User, cancellationToken);
-    if (current is null) return Results.Unauthorized();
-    if (!await offlinePolicy.IsEnabledAsync(current.CompanyId, cancellationToken))
-        return Results.Json(new { ErrorCode = "OFFLINE_DISABLED", CorrelationId = correlationId },
-            statusCode: StatusCodes.Status403Forbidden);
-    var binding = await deviceTrust.ResolveForSyncAsync(current, requestDeviceId,
-        request.DeviceCredential, correlationId, cancellationToken);
-    if (string.IsNullOrWhiteSpace(current.DeviceId) || binding is null ||
-        !string.Equals(current.DeviceId, requestDeviceId, StringComparison.Ordinal) ||
-        current.RegisteredDeviceId != binding.RegisteredDeviceId)
-        return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
-    var security = new SyncSecurityContext(current.UserId, requestDeviceId, current.CompanyId, current.BranchId,
-        true, true, binding.RegisteredDeviceId, binding.CredentialVersion);
-    var results = new List<SyncBatchOperationResult>(request.Operations.Count);
-
-    foreach (var item in request.Operations)
-    {
-        var serverTime = DateTimeOffset.UtcNow;
-        try
-        {
-            if (!Guid.TryParse(item.EntityId, out var entityId))
-                throw new SyncRuleException("PAYLOAD_INVALID", item.ClientOperationId ?? "");
-
-            var command = new EnqueueSyncOperationCommand(
-                requestDeviceId, current.UserId, current.CompanyId, current.BranchId,
-                item.OperationType, item.EntityType, entityId, item.ClientOperationId,
-                item.PayloadJson, item.PayloadHash, item.ClientOccurredAt, item.BaseVersion);
-            var operation = await sync.EnqueueSyncOperationAsync(command, security, cancellationToken);
-            results.Add(SyncBatchOperationResult.From(operation, serverTime));
-        }
-        catch (SyncRuleException ex)
-        {
-            results.Add(new SyncBatchOperationResult(
-                item.ClientOperationId, null, "REJECTED", null, ex.Code, null, serverTime));
-        }
-        catch (ArgumentException)
-        {
-            results.Add(new SyncBatchOperationResult(
-                item.ClientOperationId, null, "REJECTED", null, "PAYLOAD_INVALID", null, serverTime));
-        }
-        catch (Exception)
-        {
-            results.Add(new SyncBatchOperationResult(
-                item.ClientOperationId, null, "FAILED", null, "INTERNAL_ERROR", null, serverTime));
-        }
-    }
-
-    return Results.Ok(new SyncBatchResponse(request.ProtocolVersion, results, DateTimeOffset.UtcNow, correlationId));
-}).RequireAuthorization(SecurityPolicies.Permission("sync.operations.execute"));
+app.MapTransportSync();
 
 app.MapGet("/api/v1/audit/events", async (
     [AsParameters] AuditQueryRequest request,
@@ -249,41 +199,5 @@ app.Run();
 
 static Guid GetCorrelationId(HttpContext context)
     => Guid.TryParse(context.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var id) ? id : Guid.NewGuid();
-
-public sealed record SyncBatchRequest(
-    string DeviceId,
-    string ProtocolVersion,
-    IReadOnlyList<SyncBatchOperationRequest> Operations,
-    string? DeviceCredential = null);
-
-public sealed record SyncBatchOperationRequest(
-    string OperationType,
-    string EntityType,
-    string EntityId,
-    string ClientOperationId,
-    string PayloadJson,
-    string PayloadHash,
-    DateTimeOffset ClientOccurredAt,
-    long? BaseVersion = null);
-
-public sealed record SyncBatchOperationResult(
-    string? ClientOperationId,
-    Guid? ServerOperationId,
-    string Status,
-    long? ResultVersion,
-    string? ErrorCode,
-    Guid? ConflictCaseId,
-    DateTimeOffset ServerTime)
-{
-    public static SyncBatchOperationResult From(SyncOperation operation, DateTimeOffset serverTime)
-        => new(operation.ClientOperationId, operation.Id, operation.Status, operation.ResultVersion,
-            operation.ErrorCode, operation.ConflictCase?.Id, serverTime);
-}
-
-public sealed record SyncBatchResponse(
-    string ProtocolVersion,
-    IReadOnlyList<SyncBatchOperationResult> Results,
-    DateTimeOffset ServerTime,
-    Guid CorrelationId);
 
 public partial class Program { }

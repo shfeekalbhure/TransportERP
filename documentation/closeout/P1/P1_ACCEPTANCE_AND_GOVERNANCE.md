@@ -1,11 +1,11 @@
 # TransportERP — سجل اختبارات القبول وحوكمة P1
 **دور الملف:** المرجع التشغيلي الموحد للحالة والبوابات والأدلة الخاصة بـ`PR #69`، مع إبقاء تفاصيل العقود في ملفاتها الأصلية وعدم نسخها هنا.
 
-**آخر تحديث جوهري:** `2026-08-26 06:00 Asia/Riyadh`
+**آخر تحديث جوهري:** `2026-08-26 14:20 Asia/Riyadh`
 
-**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_S4_A_AND_S4_B_IMPLEMENTED_AND_CI_VERIFIED — OFFLINE_CLOSED`.
+**الحالة التشغيلية الحالية:** `PHASES_1_3_READY_FOR_INDEPENDENT_REVIEW — PHASE4_RUNTIME_CANDIDATE_WIP — G4_OPEN — G5_CLOSED — OFFLINE_CLOSED`.
 
-**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على HEAD الحالي بعد S4-B تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203.
+**حالة سجل الاختبارات التعاقدي ذي 203 حالة أدناه:** `SPECIFIED_NOT_EXECUTED` ما لم يربط صفه صراحةً بدليل تشغيل؛ لا يساوي نجاح مجموعة CI ذات `185` اختبارًا على مرشح المراحل 1–3، أو `196` اختبارًا على S4-A، أو `197` اختبارًا على S4-B، أو `204` اختبارًا على الرأس البعيد بعد S4-C تنفيذ جميع حالات القبول التعاقدية البالغ عددها 203. مرشح Runtime المحلي مثبت على `840d15ba543c177b403c0f8596e4262d7d8fcf92`، لكنه غير مرفوع ولم يشغّل عليه CI بعد.
 
 ## 0. مركز قيادة PR #69 وحزمة إغلاق المراحل 1–3
 
@@ -20,7 +20,8 @@
 | base | `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5` |
 | مرشح تنفيذ المراحل 1–3 | [`5ca9a86acef4053cf731fb896ca0c77b17a575ae`](https://github.com/shfeekalbhure/TransportERP/commit/5ca9a86acef4053cf731fb896ca0c77b17a575ae) |
 | أول HEAD توثيقي للمرجع الموحد | `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`؛ tree=`5c15cd219d55752eb78cf233f87cbcf3ff1b7df2`؛ CI أخضر |
-| HEAD الحالي | `86475a1b54dc593e2057c4fa0e7789a224154914`؛ tree=`44c03399b3de426db3e38757aef51812fdd2c8a3`؛ شريحتا Stage 4 المحدودتان S4-A وS4-B؛ CI أخضر `197/197` |
+| HEAD البعيد الحالي | `bf10d2529b5f644f6f694140ca417413bcf8a5ec`؛ يتضمن S4-A وS4-B وأساس S4-C للمخطط/idempotency؛ CI أخضر `204/204` في run `32935705567` |
+| مرشح Runtime المحلي | `LOCAL_COMMIT_CI_PENDING` على `840d15ba543c177b403c0f8596e4262d7d8fcf92`؛ Proof-key lifecycle وSync-PoP/nonce/replay/batch runtime والتنظيف مثبتة محليًا؛ تبقى أدلة مصفوفة §19.12 وCI غير مكتملة، ولم يُرفع المرشح ولا توجد نتيجة PASS تنفيذية |
 | النظير المحلي لمرشح المراحل 1–3 | `d0860d70d808374bd5582d2e71c14afa5429f8cd` |
 | tree المشترك | `9ce37459c22c6f4c47beee203af0fa9d0a167080`؛ تطابق remote/local حرفيًا |
 | نطاق التغيير | `6` commits بعيدة، `48` ملفًا؛ يعاد إنتاج manifest بالأمر `git diff --name-status 2ec6ccc..5ca9a86` |
@@ -35,7 +36,7 @@
 | المرحلة 1 — الهوية والتفويض والتدقيق الأساسي | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 2 — العزل والتدقيق والمعاملات الذرية | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
 | المرحلة 3 — حدود ثقة الجهاز المسجل | نعم، ضمن المرشح | نعم، ضمن CI الأخضر النهائي | لا؛ الحزمة قيد التجهيز للمراجع المستقل | لا يوجد اعتماد نهائي للـexact SHA |
-| المرحلة 4 — `TransportERP Sync-PoP v1` | جزئي فقط؛ S4-A primitive `fp-v1` الحتمي واختباراته، وS4-B ترتيب أقفال الجهاز/الجلسات/التدقيق وذرية `LastSeenAt`، بلا migration أو PoP/replay/batch runtime | نعم للشريحتين S4-A وS4-B على رأسيهما exact SHA؛ لا لبقية المرحلة | لا؛ المراجعات الداخلية لا تساوي مراجعة ضمان مستقلة | تفويض تنفيذ محدود وفق العقد؛ لا G4/G5 ولا Offline |
+| المرحلة 4 — `TransportERP Sync-PoP v1` | جزئي؛ S4-A وS4-B وأساس S4-C البعيد منفذة، ومرشح Runtime المحلي مثبت على `840d15b...` ويضيف proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف؛ أدلة السباقات والحالات الإلزامية في §19.12 والرفع وCI ما زالت معلقة | نعم فقط للنطاق البعيد حتى `bf10d25...` بنتيجة `204/204`؛ لا اعتماد تنفيذي لمرشح Runtime المحلي بعد | مراجعة ضمان ساكنة للكود بلا علة تنفيذية Critical/High مثبتة؛ مصفوفة القبول غير مكتملة، ولا حكم CI/PostgreSQL أو G4 | تفويض تنفيذ Stage 4 فقط؛ `G4 OPEN`, `G5 CLOSED`, وOffline مغلق |
 | المرحلة 5 | `NOT AUTHORIZED` | لا | لا | لا |
 
 لا تستبدل حالةٌ حالةً أخرى. نجاح CI لا يعني مراجعة مستقلة، والمراجعة المستقلة لا تعني اعتماد المالك، واعتماد القرار التعاقدي لا يعني وجود runtime.
@@ -53,6 +54,8 @@
 | 4/عقد | `63057d0f8b47ebf10c935b7349aeeb67128ff412` | `fd5187a`: تثبيت عقد Sync-PoP المعدل ومتجهي `fp-v1` | CI أخضر `185/185`؛ لا runtime في هذا الالتزام |
 | 4/S4-A | `e84486a1e350057e2c9ff4c54588dfe05cbb0181` | `0d98b15`: primitive `fp-v1` داخلي حتمي + اختبارات golden/حدود + regression لبقاء Offline مغلقًا | CI أخضر `196/196`؛ لا DB/API/DI/migration/settings أو Offline enablement |
 | 4/S4-B | `86475a1b54dc593e2057c4fa0e7789a224154914` | `b1c9dc5` ثم إصلاح EF scalar API في `86475a1`: ترتيب أقفال الجهاز/عائلة الجلسات/التدقيق وذرية `LastSeenAt` + اختبار PostgreSQL حتمي | CI أخضر `197/197`؛ لا schema/API أو Offline enablement |
+| 4/S4-C foundation | `bf10d2529b5f644f6f694140ca417413bcf8a5ec` | `229eedd` ثم `a80718b` و`bf10d25`: مخطط nonce/replay وحقول provenance/idempotency وإصلاح fixtures | CI أخضر `204/204` في run `32935705567`؛ أساس مخطط فقط، ولا يثبت اكتمال Runtime أو G4 |
+| 4/Runtime candidate | `840d15ba543c177b403c0f8596e4262d7d8fcf92` (محلي، غير مرفوع) | proof-key lifecycle، Sync-PoP validator، nonce/proof claim، batch/idempotency، cleanup واختبارات الحدود وrotation/claim وحالات device/assignment منفذة محليًا؛ تبقى غير متحققة تنفيذيًا | CI/PostgreSQL غير مشغلين؛ ممنوع تسجيل G4 PASS قبل رفع exact-SHA واكتمال الأدلة التنفيذية |
 
 ### 0.4 سجل CI — النجاح والفشل محفوظان
 
@@ -108,13 +111,40 @@
 
 ### 0.7 الحد الفاصل مع المرحلة الرابعة
 
-`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`؛ المنفذ حتى الآن هو S4-A: primitive `fp-v1` داخلي حتمي واختباراته، وS4-B: ترتيب حتمي لأقفال الجهاز والجلسات والتدقيق مع ذرية تحديث `LastSeenAt` وسجله. لم يُوصل ذلك بعد بمسار Stage 4 الكامل أو migration أو PoP/replay. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G4/G5 بهذا السجل.
+`PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. ثبتت S4-A وS4-B وأساس S4-C على الرؤوس البعيدة المذكورة، وثُبت مرشح proof-key lifecycle وPoP/nonce/replay/batch runtime والتنظيف واختبارات PostgreSQL/HTTP محليًا على `840d15ba543c177b403c0f8596e4262d7d8fcf92`. هذا المرشح غير مرفوع ولم يُشغّل عليه CI بعد، ولا يمنح `G4 PASS`. لا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G5، ولا يتحول PR إلى Ready ولا يدمج بهذا السجل.
 
 **حالة البوابة:** `STAGE4_CONTRACT_FIXED_AND_CI_VERIFIED — BOUNDED SERVER IMPLEMENTATION AUTHORIZED — OFFLINE CLOSED`. ثبت القرار المعدل `DEC-P1-SYNC-POP-AMEND-20260826-02` في remote commit `63057d0f8b47ebf10c935b7349aeeb67128ff412` / tree `db5cbe92db5c467c48699146829ab72e21865517`. حسم مفاتيح idempotency المعزولة بالشركة، وDown غير المدمر، وbind/rotate/recovery، ونقطة linearization وترتيب الأقفال، وschema والقيود والفهارس والمحفزات الدقيقة، وفصل operation/attempt correlation، و`fp-v1` byte layout، وحدود body/payload. طابقت ثلاثة مراجعات داخلية مستقلة النص مع EF/PostgreSQL والكود الحالي، وحُسب متجها `fp-v1` بأداتين مستقلتين وتطابقا. نجحت [CI #16](https://github.com/shfeekalbhure/TransportERP/actions/runs/32920027662) على العقد المثبت: Core=`185/185` وDesktop/Foundation/W0-3 ناجحة. يجوز بدء دفعة server-side مستقلة وآمنة وفق العقد، لكن هذا لا يدعي runtime مكتملًا أو `INDEPENDENTLY REVIEWED` من فريق الضمان المستقل، ولا يفتح Offline أو G4/G5.
 
 **حالة S4-A:** `IMPLEMENTED + VERIFIED BY CI` على `e84486a1...` فقط. ثبتت البصمة byte-for-byte بالمتجهين A/B، وUUID network order، وBE framing، وNFC/UTF-8 الصارم، وUTC `Z` بحد 0..6 كسور، وحدود Unicode/PostgreSQL، وبقاء `/api/v1/sync/operations:batch` مغلقًا بـ`OFFLINE_DISABLED`. لا يدعي هذا `INDEPENDENTLY REVIEWED` أو `OWNER APPROVED` للـexact SHA، ولا يرفع حالة الشرائح اللاحقة تلقائيًا قبل اجتياز بواباتها الخضراء المنفصلة.
 
 **حالة S4-B:** `IMPLEMENTED + VERIFIED BY CI` على `86475a1b54dc593e2057c4fa0e7789a224154914` / tree `44c03399b3de426db3e38757aef51812fdd2c8a3` فقط، ودليلها الأخضر run `32930275141` / job `98061049661` بنتيجة `197/197`. أبقت الشريحة Offline معطلًا ولم تغير مخطط قاعدة البيانات أو عقود API. هذه حالة تنفيذ وCI وليست `INDEPENDENTLY REVIEWED` أو `OWNER APPROVED`، ولا تفوض الدمج أو بدء Stage 5.
+
+**حالة S4-C foundation:** `IMPLEMENTED + VERIFIED BY CI` على `bf10d2529b5f644f6f694140ca417413bcf8a5ec` فقط، ودليلها [run 32935705567](https://github.com/shfeekalbhure/TransportERP/actions/runs/32935705567) بنتيجة `204 passed / 0 failed / 0 skipped`. يثبت هذا مخطط idempotency/replay وfixtures المرتبطة فقط؛ لا يثبت Runtime الكامل أو cleanup أو مصفوفة §19.12، ولا يرفع G4.
+
+### 0.8 تصحيح حاكم لاتساق نافذة `iat` وقيد replay
+
+**Decision ID:** `DEC-P1-SYNC-POP-CORR-20260826-03`
+
+اكتشفت مراجعة الضمان أثناء تنفيذ Runtime تعارضًا داخليًا في النص السابق: نافذة §19.5 تقبل proof عندما يكون `iat` بين `serverNow-120s` و`serverNow+30s`، بينما كان تعبير `ck_sync_replay_window` السابق يشترط `FirstSeenAt>=IssuedAt`، وبذلك يرفض PostgreSQL proof صحيحًا بانحراف مستقبلي من `+1s` إلى `+30s`.
+
+التصحيح لا يغير قرار النافذة ولا يوسعها؛ بل يجعل القيد يطابقها حرفيًا:
+
+`ExpiresAt > FirstSeenAt AND FirstSeenAt >= IssuedAt - INTERVAL '30 seconds' AND FirstSeenAt <= IssuedAt + INTERVAL '120 seconds'`.
+
+أضيفت حالات حدود `+30/+31/-120/-121` إلى اختبارات PostgreSQL. يبقى هذا التصحيح `WIP_UNVERIFIED` حتى نجاح migration/model/tests على exact SHA في CI، ولا يفتح G4 أو G5 أو Offline.
+
+### 0.9 تصحيح حاكم لتقوية lifecycle التحدي
+
+**Decision ID:** `DEC-P1-SYNC-POP-CORR-20260826-04`
+
+أثبتت المراجعة المستقلة أن القيد السابق كان يمنع `ConsumedAt<IssuedAt` لكنه لا يمنع تعديل حقول challenge الصادرة، أو إلغاء الاستهلاك، أو ضبط الاستهلاك بعد انتهاء التحدي، أو استهلاكه مباشرة بلا change ledger مطابق. يعتمد التصحيح الآتي دون توسيع صلاحيات أو فتح runtime إنتاجي:
+
+- جميع issued challenge fields immutable بعد INSERT.
+- `ConsumedAt` انتقال وحيد الاتجاه من NULL إلى قيمة تحقق `IssuedAt <= ConsumedAt < ExpiresAt`.
+- الانتقال يتطلب change ledger مطابقًا لنطاق الجهاز وChangeRequestId/ChangeType/thumbprint نفسه.
+- تختبر PostgreSQL رفض تعديل hash/expiry، والاستهلاك بلا ledger، وإرجاع `ConsumedAt` إلى NULL، وتطابق model/snapshot/migration.
+
+يبقى التصحيح ومرشح Runtime `CI_PENDING` حتى exact-SHA CI واكتمال مصفوفة §19.12. لا يرفع G4 إلى PASS، ولا يفتح G5 أو Offline، ولا يحول PR إلى Ready، ولا يفوض الدمج.
 
 ## 1. نطاق السجل
 يغطي السجل كل عقود W1 السبعة عشر، وكل أفعال W2 الخمسة عشر، وكل شاشات W3 الاثنتي عشرة، إضافة إلى عشرة اختبارات حاكمة للمزامنة. كل اختبار مرتبط بمعرف عقد واضح، وله نتيجة مطلوبة ودليل تنفيذ يجب حفظه عند بدء الاختبار البرمجي.

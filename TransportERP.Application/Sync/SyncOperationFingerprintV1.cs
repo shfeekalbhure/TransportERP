@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace TransportERP.Application.Sync;
 
-internal sealed record SyncOperationFingerprintV1Input(
+public sealed record SyncOperationFingerprintV1Input(
     Guid CompanyId,
     Guid RegisteredDeviceId,
     Guid UserId,
@@ -22,7 +22,7 @@ internal sealed record SyncOperationFingerprintV1Input(
     long? BaseVersion,
     Guid OperationCorrelationId);
 
-internal static class SyncOperationFingerprintV1
+public static class SyncOperationFingerprintV1
 {
     private const string DomainSeparator = "TransportERP.SyncOperationFingerprint";
     private const string Version = "fp-v1";
@@ -38,10 +38,10 @@ internal static class SyncOperationFingerprintV1
         "yyyy-MM-dd'T'HH:mm:ss.FFFFFF'Z'"
     ];
 
-    internal static byte[] ComputeHash(SyncOperationFingerprintV1Input input)
+    public static byte[] ComputeHash(SyncOperationFingerprintV1Input input)
         => SHA256.HashData(Encode(input));
 
-    internal static byte[] Encode(SyncOperationFingerprintV1Input input)
+    public static byte[] Encode(SyncOperationFingerprintV1Input input)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (input.OperationCorrelationId == Guid.Empty)

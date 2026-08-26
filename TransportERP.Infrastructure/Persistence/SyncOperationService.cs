@@ -3,6 +3,7 @@ using System.Text;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TransportERP.Application.Sync;
 
 namespace TransportERP.Infrastructure.Persistence;
 
@@ -44,6 +45,19 @@ public sealed record EnqueueSyncOperationCommand(
     DateTimeOffset ClientOccurredAt,
     long? BaseVersion = null);
 
+public sealed record EnqueueAcceptedSyncOperationCommand(
+    string ProtocolVersion,
+    string ActionCode,
+    string OperationType,
+    string EntityType,
+    Guid? EntityId,
+    string ClientOperationId,
+    string PayloadJson,
+    string PayloadHash,
+    DateTimeOffset ClientOccurredAt,
+    Guid OperationCorrelationId,
+    long? BaseVersion = null);
+
 public sealed record TransitionSyncOperationCommand(Guid OperationId, string NewStatus, string? ErrorCode = null);
 
 public sealed record ConflictCaseDraft(
@@ -67,6 +81,134 @@ public sealed class SyncOperationService(
     SyncRetryPolicy retryPolicy)
 {
     private readonly SyncRetryPolicy _retryPolicy = retryPolicy.Validate();
+
+    public async Task<SyncOperation> EnqueueAcceptedSyncOperationAsync(
+        EnqueueAcceptedSyncOperationCommand command,
+        AcceptedSyncProofContext acceptedProof,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateAcceptedCommand(command, acceptedProof);
+        if (!PayloadHashMatches(command.PayloadJson, command.PayloadHash))
+            throw new SyncRuleException("HASH_MISMATCH", command.ClientOperationId);
+
+        var clientOccurredAt = CanonicalTimestamp(command.ClientOccurredAt);
+        byte[] fingerprint;
+        try
+        {
+            fingerprint = SyncOperationFingerprintV1.ComputeHash(new SyncOperationFingerprintV1Input(
+                acceptedProof.CompanyId, acceptedProof.RegisteredDeviceId, acceptedProof.UserId,
+                acceptedProof.BranchId, command.ProtocolVersion, command.ActionCode,
+                command.OperationType, command.EntityType, command.EntityId,
+                command.ClientOperationId, command.PayloadHash, clientOccurredAt,
+                command.BaseVersion, command.OperationCorrelationId));
+        }
+        catch (ArgumentException exception)
+        {
+            throw new SyncRuleException("PAYLOAD_INVALID", exception.ParamName ?? command.ClientOperationId);
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            var userLockKey = "user-scope|" + acceptedProof.UserId;
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({userLockKey}, 0))", cancellationToken);
+            var idempotencyLockKey = $"sync-stage4|{acceptedProof.CompanyId}|{acceptedProof.RegisteredDeviceId}|{command.ClientOperationId}";
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({idempotencyLockKey}, 0))", cancellationToken);
+
+            var existing = await db.SyncOperations.Include(x => x.ConflictCase).SingleOrDefaultAsync(x =>
+                x.CompanyId == acceptedProof.CompanyId &&
+                x.RegisteredDeviceId == acceptedProof.RegisteredDeviceId &&
+                x.ClientOperationId == command.ClientOperationId &&
+                x.RequestFingerprintVersion == "fp-v1", cancellationToken);
+            if (existing is not null)
+            {
+                EnsureAcceptedReplayMatches(existing, fingerprint, acceptedProof);
+                await transaction.CommitAsync(cancellationToken);
+                return existing;
+            }
+
+            var now = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
+            var operation = new SyncOperation
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = acceptedProof.DeviceId,
+                UserId = acceptedProof.UserId,
+                CompanyId = acceptedProof.CompanyId,
+                BranchId = acceptedProof.BranchId,
+                OperationType = command.OperationType,
+                EntityType = command.EntityType,
+                EntityId = command.EntityId,
+                ClientOperationId = command.ClientOperationId,
+                PayloadJson = command.PayloadJson,
+                PayloadHash = command.PayloadHash.ToLowerInvariant(),
+                ClientOccurredAt = NormalizePostgreSqlTimestamp(command.ClientOccurredAt),
+                ServerReceivedAt = now,
+                BaseVersion = command.BaseVersion,
+                Status = "QUEUED",
+                RetryCount = 0,
+                RegisteredDeviceId = acceptedProof.RegisteredDeviceId,
+                // Snapshot claim-time provenance; enqueue does not re-lock the live device.
+                RegisteredDeviceCredentialVersion = acceptedProof.DeviceCredentialVersion,
+                ActionCode = command.ActionCode,
+                ProtocolVersion = command.ProtocolVersion,
+                OperationCorrelationId = command.OperationCorrelationId,
+                RequestFingerprintVersion = "fp-v1",
+                RequestFingerprintHash = fingerprint,
+                ProofKeyVersion = acceptedProof.ProofKeyVersion,
+                ProofKeyThumbprint = acceptedProof.ProofKeyThumbprint,
+                AcceptedProofReplayId = acceptedProof.ReplayId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.SyncOperations.Add(operation);
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationQueued", "SUCCESS", nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                acceptedProof.AttemptCorrelationId, operation.DeviceId,
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return operation;
+        }
+        catch (DbUpdateException exception) when (
+            exception.GetBaseException() is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_sync_op_registered_device_client"
+            })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            var existing = await db.SyncOperations.Include(x => x.ConflictCase).SingleAsync(x =>
+                x.CompanyId == acceptedProof.CompanyId &&
+                x.RegisteredDeviceId == acceptedProof.RegisteredDeviceId &&
+                x.ClientOperationId == command.ClientOperationId &&
+                x.RequestFingerprintVersion == "fp-v1", cancellationToken);
+            EnsureAcceptedReplayMatches(existing, fingerprint, acceptedProof);
+            return existing;
+        }
+        catch (DbUpdateException exception) when (
+            exception.GetBaseException() is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_sync_op_legacy_company_device_client"
+            })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            throw new SyncRuleException("LEGACY_IDEMPOTENCY_CONFLICT", command.ClientOperationId);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            throw;
+        }
+    }
 
     public async Task<SyncOperation> EnqueueSyncOperationAsync(
         EnqueueSyncOperationCommand command,
@@ -470,6 +612,44 @@ public sealed class SyncOperationService(
             throw new SyncRuleException("PAYLOAD_INVALID", command.ClientOperationId);
         if (command.OperationType.Trim().ToUpperInvariant() is not ("CREATE" or "UPDATE" or "DELETE" or "COMMAND"))
             throw new SyncRuleException("OPERATION_TYPE_INVALID", command.OperationType);
+    }
+
+    private static void ValidateAcceptedCommand(
+        EnqueueAcceptedSyncOperationCommand command,
+        AcceptedSyncProofContext acceptedProof)
+    {
+        if (acceptedProof.ReplayId == Guid.Empty || acceptedProof.UserId == Guid.Empty ||
+            acceptedProof.CompanyId == Guid.Empty || acceptedProof.BranchId == Guid.Empty ||
+            acceptedProof.RegisteredDeviceId == Guid.Empty || acceptedProof.AttemptCorrelationId == Guid.Empty ||
+            acceptedProof.DeviceCredentialVersion < 1 || acceptedProof.ProofKeyVersion < 1 ||
+            acceptedProof.ProofKeyThumbprint.Length != 43 ||
+            string.IsNullOrEmpty(acceptedProof.DeviceId))
+            throw new SyncRuleException("PROOF_CONTEXT_INVALID", command.ClientOperationId);
+        if (!string.Equals(command.ProtocolVersion, "sync-v1", StringComparison.Ordinal) ||
+            string.IsNullOrEmpty(command.ActionCode) || string.IsNullOrEmpty(command.EntityType) ||
+            string.IsNullOrEmpty(command.ClientOperationId) || string.IsNullOrEmpty(command.PayloadJson) ||
+            command.OperationCorrelationId == Guid.Empty || string.IsNullOrEmpty(command.PayloadHash) ||
+            command.PayloadHash.Length != 64 ||
+            command.OperationType is not ("CREATE" or "UPDATE" or "DELETE" or "COMMAND"))
+            throw new SyncRuleException("PAYLOAD_INVALID", command.ClientOperationId);
+    }
+
+    private static void EnsureAcceptedReplayMatches(
+        SyncOperation operation,
+        byte[] fingerprint,
+        AcceptedSyncProofContext acceptedProof)
+    {
+        if (operation.CompanyId != acceptedProof.CompanyId ||
+            operation.RegisteredDeviceId != acceptedProof.RegisteredDeviceId ||
+            operation.RequestFingerprintVersion != "fp-v1" || operation.RequestFingerprintHash is null ||
+            !CryptographicOperations.FixedTimeEquals(operation.RequestFingerprintHash, fingerprint))
+            throw new SyncRuleException("IDEMPOTENCY_MISMATCH", operation.ClientOperationId);
+    }
+
+    private static string CanonicalTimestamp(DateTimeOffset value)
+    {
+        var utc = NormalizePostgreSqlTimestamp(value);
+        return utc.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFF'Z'", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static bool PayloadHashMatches(string payload, string expectedHash)
