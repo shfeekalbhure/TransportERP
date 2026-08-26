@@ -215,10 +215,13 @@ public static class SyncApiModule
             .Select(definition => new SyncActivationAction(
                 definition.ActionCodeValue, definition.OperationTypeValue, definition.EntityTypeValue))
             .ToArray();
-        var enabled = policy.Enabled && proofKey is not null && availableActions.Length > 0 && hasExecutePermission;
-        var closedReason = enabled ? null : proofKey is null
-            ? "PROOF_KEY_BINDING_REQUIRED"
-            : policy.ClosedReason ?? "OFFLINE_DISABLED";
+        // Enabled is the governed server policy decision. Key readiness is returned separately so
+        // an authorized client can complete BIND/RECOVER without treating a missing local key as
+        // policy authority. The write runtime still refuses activation until the binding matches.
+        var enabled = policy.Enabled && availableActions.Length > 0 && hasExecutePermission;
+        var closedReason = !enabled
+            ? policy.ClosedReason ?? "OFFLINE_DISABLED"
+            : proofKey is null ? "PROOF_KEY_BINDING_REQUIRED" : null;
 
         return Results.Ok(new SyncActivationResponse(
             enabled,

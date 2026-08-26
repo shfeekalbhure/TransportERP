@@ -366,6 +366,33 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    [Trait("Acceptance", "G4-END-TO-END")]
+    public async Task Governed_activation_authorizes_explicit_key_enrollment_without_opening_write_runtime()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var scope = await SeedAsync(seedDb, proofKey, "ENROLL", bindProofKey: false);
+        using var factory = CreateFactory(connection);
+        using var client = CreateClient(factory, scope.Bearer);
+
+        using var response = await client.GetAsync("/api/v1/sync/activation");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.True(root.GetProperty("enabled").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("proofPublicJwk").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("proofKeyVersion").ValueKind);
+        Assert.True(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
+        Assert.False(root.GetProperty("keyRecoveryAllowed").GetBoolean());
+        Assert.Equal("PROOF_KEY_BINDING_REQUIRED", root.GetProperty("closedReason").GetString());
+    }
+
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, string bearer)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = PublicOrigin });
@@ -551,7 +578,8 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
     private static async Task<TestScope> SeedAsync(
         TransportErpDbContext db,
         ECDsa proofKey,
-        string suffix)
+        string suffix,
+        bool bindProofKey = true)
     {
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
@@ -635,8 +663,11 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
             RegistrationRequestId = "g4-http-" + Guid.NewGuid().ToString("N"),
             CredentialHash = new string('a', 64), CredentialVersion = 1, Status = "ACTIVE",
             RegisteredByUserId = user.Id, ApprovedByUserId = user.Id, ApprovedAt = now, LastSeenAt = now,
-            ProofPublicJwkCanonicalJson = canonicalJwk, ProofKeyThumbprint = thumbprint, ProofKeyVersion = 1,
-            ProofKeyChangedAt = now, ProofKeyChangedByUserId = user.Id,
+            ProofPublicJwkCanonicalJson = bindProofKey ? canonicalJwk : null,
+            ProofKeyThumbprint = bindProofKey ? thumbprint : null,
+            ProofKeyVersion = bindProofKey ? 1 : null,
+            ProofKeyChangedAt = bindProofKey ? now : null,
+            ProofKeyChangedByUserId = bindProofKey ? user.Id : null,
             CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
         });
         db.RegisteredDeviceAssignments.Add(new RegisteredDeviceAssignment
