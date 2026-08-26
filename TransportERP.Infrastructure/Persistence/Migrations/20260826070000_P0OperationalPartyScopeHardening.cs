@@ -66,9 +66,13 @@ public partial class P0OperationalPartyScopeHardening : Migration
           SELECT w."CompanyId", w."BranchId" INTO scope_company, scope_branch
             FROM transport_erp.waybills w WHERE w."Id"=NEW."WaybillId" FOR KEY SHARE;
           IF NOT FOUND THEN RAISE EXCEPTION 'operational party reference scope denied'; END IF;
-          IF TG_TABLE_NAME='collection_transactions' AND
-             (NEW."CompanyId"<>scope_company OR NEW."BranchId"<>scope_branch) THEN
-            RAISE EXCEPTION 'operational party reference scope denied';
+          -- NEW is a polymorphic trigger record. Keep collection-only columns inside
+          -- a nested branch so PostgreSQL never resolves them for waybill_parties or
+          -- payment_plan_lines, neither of which owns CompanyId/BranchId columns.
+          IF TG_TABLE_NAME='collection_transactions' THEN
+            IF NEW."CompanyId"<>scope_company OR NEW."BranchId"<>scope_branch THEN
+              RAISE EXCEPTION 'operational party reference scope denied';
+            END IF;
           END IF;
           IF party_id IS NULL THEN RETURN NEW; END IF;
 
