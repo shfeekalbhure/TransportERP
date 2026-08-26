@@ -674,7 +674,9 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
 
         var httpResult = await SyncApiModule.HandleBatchAsync(
             http, new AcceptedRequestAuthenticator(accepted), CreateOperationService(db),
-            new DenyPermissionResolver(), CancellationToken.None);
+            new DenyPermissionResolver(),
+            new SyncBatchRejectionAuditSink(new AuditEventService(db)),
+            CancellationToken.None);
 
         var response = Assert.IsType<SyncBatchResponse>(
             Assert.IsAssignableFrom<IValueHttpResult>(httpResult).Value);
@@ -687,6 +689,19 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         });
         Assert.Equal(rowsBefore, await db.SyncOperations.CountAsync());
         Assert.Equal(auditsBefore, await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued"));
+        var rejectionAudits = await db.AuditEvents.Where(x =>
+            x.Action == "SyncOperationRejected" && x.Outcome == "REJECTED" &&
+            x.Reason == "SCOPE_DENIED" && x.CompanyId == scope.Security.CompanyId &&
+            x.BranchId == scope.Security.BranchId && x.ActorUserId == scope.Security.UserId &&
+            x.DeviceId == scope.Security.DeviceId).ToListAsync();
+        Assert.Equal(2, rejectionAudits.Count);
+        Assert.All(rejectionAudits, auditEvent =>
+        {
+            Assert.Null(auditEvent.EntityId);
+            Assert.Null(auditEvent.BeforeJson);
+            Assert.Null(auditEvent.AfterJson);
+            Assert.NotNull(auditEvent.OperationCorrelationId);
+        });
     }
 
     [Fact]

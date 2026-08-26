@@ -19,6 +19,41 @@ public interface ISyncRuntimeGate
         CancellationToken cancellationToken);
 }
 
+public interface ISyncBatchRejectionAuditSink
+{
+    Task WriteAsync(
+        AcceptedSyncProofContext proof,
+        Guid? operationCorrelationId,
+        string errorCode,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Persists a metadata-only record for an authenticated batch item that is rejected before a
+/// SyncOperation exists. Payload, payload hash, entity id, proof and bearer artifacts are never
+/// copied into the audit stream.
+/// </summary>
+public sealed class SyncBatchRejectionAuditSink(AuditEventService audit) : ISyncBatchRejectionAuditSink
+{
+    public async Task WriteAsync(
+        AcceptedSyncProofContext proof,
+        Guid? operationCorrelationId,
+        string errorCode,
+        CancellationToken cancellationToken)
+    {
+        _ = await audit.AppendAuditEventAsync(new AuditEventDraft(
+            "SyncOperationRejected", "REJECTED", "SyncOperationAttempt",
+            ActorUserId: proof.UserId,
+            CompanyId: proof.CompanyId,
+            BranchId: proof.BranchId,
+            CorrelationId: proof.AttemptCorrelationId,
+            DeviceId: proof.DeviceId,
+            Reason: errorCode,
+            OperationCorrelationId: operationCorrelationId is { } value && value != Guid.Empty ? value : null),
+            cancellationToken);
+    }
+}
+
 public sealed record SyncPopDeploymentProfile(
     bool IsValid,
     string? CanonicalHtu,
@@ -133,6 +168,7 @@ public static class SyncApiModule
         ISyncPopHttpRequestAuthenticator authenticator,
         SyncOperationService sync,
         IEffectivePermissionResolver permissions,
+        ISyncBatchRejectionAuditSink rejectionAudit,
         CancellationToken cancellationToken)
     {
         var authentication = await authenticator.AuthenticateAsync(
@@ -165,6 +201,8 @@ public static class SyncApiModule
             var validationCode = ValidateOperation(item, effectivePolicy.MaximumPayloadBytes);
             if (validationCode is not null)
             {
+                await rejectionAudit.WriteAsync(
+                    acceptedProof, item?.OperationCorrelationId, validationCode, cancellationToken);
                 results.Add(SyncBatchOperationResult.Rejected(item, validationCode, serverTime));
                 continue;
             }
@@ -175,6 +213,8 @@ public static class SyncApiModule
                     string.Equals(x.ActionCodeValue, validItem.ActionCode, StringComparison.Ordinal));
                 if (!effectivePolicy.AllowedActions.Contains(definition.ActionCodeValue))
                 {
+                    await rejectionAudit.WriteAsync(
+                        acceptedProof, validItem.OperationCorrelationId, "SCOPE_DENIED", cancellationToken);
                     results.Add(SyncBatchOperationResult.Rejected(item, "SCOPE_DENIED", serverTime));
                     continue;
                 }
@@ -182,14 +222,19 @@ public static class SyncApiModule
                         acceptedProof.UserId, acceptedProof.CompanyId, acceptedProof.BranchId,
                         definition.RequiredPermission, cancellationToken))
                 {
-                    // Permission is checked before persistence so a denied item creates neither a
-                    // SyncOperation row nor a queued audit event. The response does not disclose
-                    // whether any target entity exists.
+                    // Permission is checked before persistence, so no SyncOperation or queued
+                    // event is created. The metadata-only rejection record does not disclose
+                    // whether a target entity exists.
+                    await rejectionAudit.WriteAsync(
+                        acceptedProof, validItem.OperationCorrelationId, "SCOPE_DENIED", cancellationToken);
                     results.Add(SyncBatchOperationResult.Rejected(item, "SCOPE_DENIED", serverTime));
                     continue;
                 }
                 if (definition.RuntimeAvailability != SyncActionRuntimeAvailability.Available)
                 {
+                    await rejectionAudit.WriteAsync(
+                        acceptedProof, validItem.OperationCorrelationId,
+                        "ACTION_RUNTIME_UNAVAILABLE", cancellationToken);
                     results.Add(SyncBatchOperationResult.Rejected(
                         item, "ACTION_RUNTIME_UNAVAILABLE", serverTime));
                     continue;
@@ -205,10 +250,14 @@ public static class SyncApiModule
             }
             catch (SyncRuleException exception)
             {
+                await rejectionAudit.WriteAsync(
+                    acceptedProof, item?.OperationCorrelationId, exception.Code, cancellationToken);
                 results.Add(SyncBatchOperationResult.Rejected(item, exception.Code, serverTime));
             }
             catch
             {
+                await rejectionAudit.WriteAsync(
+                    acceptedProof, item?.OperationCorrelationId, "INTERNAL_ERROR", cancellationToken);
                 results.Add(SyncBatchOperationResult.Rejected(item, "INTERNAL_ERROR", serverTime, "FAILED"));
             }
         }

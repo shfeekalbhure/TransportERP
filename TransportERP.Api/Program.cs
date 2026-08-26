@@ -58,6 +58,7 @@ if (bootstrapRequested)
 
 builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
+builder.Services.AddScoped<ISyncBatchRejectionAuditSink, SyncBatchRejectionAuditSink>();
 builder.Services.AddScoped<BootstrapAdminService>();
 builder.Services.AddScoped<ISystemPermissionCatalogVerifier, SystemPermissionCatalogVerifier>();
 builder.Services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(syncRuntimePolicyOptions);

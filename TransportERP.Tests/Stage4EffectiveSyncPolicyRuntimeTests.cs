@@ -315,7 +315,8 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
             Guid.NewGuid(),
             policy);
         return await SyncApiModule.HandleBatchAsync(
-            new DefaultHttpContext(), new AcceptedAuthenticator(accepted), null!, null!, default);
+            new DefaultHttpContext(), new AcceptedAuthenticator(accepted), null!, null!,
+            NoOpRejectionAuditSink.Instance, default);
     }
 
     private static Task<string?> ErrorCodeAsync(IResult result)
@@ -449,5 +450,17 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
             TryReadSyncRequestDeviceId? tryReadBodyDeviceId,
             CancellationToken cancellationToken)
             => Task.FromResult(new SyncHttpAuthenticationResult(accepted, null));
+    }
+
+    private sealed class NoOpRejectionAuditSink : ISyncBatchRejectionAuditSink
+    {
+        public static readonly NoOpRejectionAuditSink Instance = new();
+
+        public Task WriteAsync(
+            AcceptedSyncProofContext proof,
+            Guid? operationCorrelationId,
+            string errorCode,
+            CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 }
