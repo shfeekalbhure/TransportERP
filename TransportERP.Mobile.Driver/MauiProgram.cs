@@ -22,6 +22,7 @@ public static class MauiProgram
             services.GetRequiredService<AndroidDriverSyncNetworkProvider>());
         builder.Services.AddSingleton<DriverVolatileSessionProvider>();
         builder.Services.AddSingleton<IDriverOfflineFeatureGate, DriverClosedOfflineFeatureGate>();
+        builder.Services.AddSingleton<IDriverDeviceKeyBindingVerifier, DriverClosedDeviceKeyBindingVerifier>();
         builder.Services.AddSingleton<DriverOfflineActivationService>();
 
         // No activation at startup: an authenticated flow must explicitly supply the scope,

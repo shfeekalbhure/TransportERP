@@ -8,8 +8,9 @@ using TransportERP.Offline.Transport;
 namespace TransportERP.Mobile.Driver.Platforms.Android;
 
 /// <summary>
-/// Owns a non-exportable P-256 private key in Android Keystore. Only the public SPKI and signing
-/// operation leave Keystore; the Android DER ECDSA result is normalized to JOSE P1363 format.
+/// Uses a pre-enrolled, non-exportable P-256 private key in Android Keystore. Signing paths never
+/// provision or replace a missing alias. Only the public SPKI and signing operation leave
+/// Keystore; the Android DER ECDSA result is normalized to JOSE P1363 format.
 /// </summary>
 public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigningKey
 {
@@ -22,7 +23,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
     {
         try
         {
-            await EnsureKeyAsync(cancellationToken);
+            await RequireExistingKeyAsync(cancellationToken);
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -38,7 +39,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
     public async ValueTask<DevicePublicP256Jwk> GetPublicJwkAsync(
         CancellationToken cancellationToken = default)
     {
-        await EnsureKeyAsync(cancellationToken);
+        await RequireExistingKeyAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
@@ -85,7 +86,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
     {
         if (signingInput.IsEmpty)
             throw new ArgumentException("A signing input is required.", nameof(signingInput));
-        await EnsureKeyAsync(cancellationToken);
+        await RequireExistingKeyAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         var input = signingInput.ToArray();
@@ -123,7 +124,41 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
         }
     }
 
-    private async Task EnsureKeyAsync(CancellationToken cancellationToken)
+    private async Task RequireExistingKeyAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var keyStore = LoadKeyStore();
+            if (!keyStore.ContainsAlias(KeyAlias))
+                throw new DriverOfflineUnavailableException("DEVICE_KEY_REBIND_REQUIRED");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (DriverOfflineUnavailableException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE", exception);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+#if TRANSPORTERP_DEVICE_TESTS
+    /// <summary>
+    /// Test-APK-only enrollment seam. Production binaries have no implicit or callable key
+    /// creation path; registration/rebind must be implemented by a separately governed flow.
+    /// </summary>
+    internal async ValueTask ProvisionFreshKeyForDeviceTestAsync(
+        CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -131,7 +166,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             cancellationToken.ThrowIfCancellationRequested();
             using var keyStore = LoadKeyStore();
             if (keyStore.ContainsAlias(KeyAlias))
-                return;
+                throw new DriverOfflineUnavailableException("DEVICE_TEST_KEY_ALREADY_EXISTS");
 
             using var generator = KeyPairGenerator.GetInstance(KeyProperties.KeyAlgorithmEc, AndroidKeyStore)
                 ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
@@ -164,6 +199,7 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             _gate.Release();
         }
     }
+#endif
 
     private static KeyStore LoadKeyStore()
     {

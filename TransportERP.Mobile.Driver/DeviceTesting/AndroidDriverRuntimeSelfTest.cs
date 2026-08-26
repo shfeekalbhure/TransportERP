@@ -1,5 +1,6 @@
 #if TRANSPORTERP_DEVICE_TESTS
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Java.Security;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,14 @@ internal static class AndroidDriverRuntimeSelfTest
     private const int SchemaVersion = 1;
     private const string AndroidKeyStore = "AndroidKeyStore";
     private const string SigningKeyAlias = "transporterp.driver.device-pop.p256.v1";
+    private const string OutboxTestPayloadName = "Android runtime test";
+    private static readonly Guid OutboxTestLocalIntentId = Guid.Parse("10000000-0000-4000-8000-000000000001");
+    private static readonly Guid OutboxTestCompanyId = Guid.Parse("10000000-0000-4000-8000-000000000002");
+    private static readonly Guid OutboxTestBranchId = Guid.Parse("10000000-0000-4000-8000-000000000003");
+    private static readonly Guid OutboxTestUserId = Guid.Parse("10000000-0000-4000-8000-000000000004");
+    private static readonly Guid OutboxTestRegisteredDeviceId = Guid.Parse("10000000-0000-4000-8000-000000000005");
+    private static readonly DateTimeOffset OutboxTestOccurredAt =
+        new(2026, 8, 27, 0, 0, 0, TimeSpan.Zero);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     internal static async Task<DriverDeviceTestResult> RunAsync(
@@ -29,6 +38,7 @@ internal static class AndroidDriverRuntimeSelfTest
             "startup" => await VerifyClosedStartupAsync(statePath, cancellationToken),
             "seed" => await SeedNativeSecurityAsync(statePath, cancellationToken),
             "verify" => await VerifyNativeSecurityAfterRestartAsync(statePath, cancellationToken),
+            "loss" => await VerifyMissingSigningAliasFailsClosedAsync(statePath, cancellationToken),
             _ => DriverDeviceTestResult.Failure(phase, "UNKNOWN_PHASE")
         };
     }
@@ -55,39 +65,106 @@ internal static class AndroidDriverRuntimeSelfTest
         if (File.Exists(statePath))
             return DriverDeviceTestResult.Failure("seed", "TEST_STATE_ALREADY_EXISTS");
 
-        var services = Services();
-        var encryptionKeys = services.GetRequiredService<AndroidSecureStorageEncryptionKeyProvider>();
-        var signingKey = services.GetRequiredService<AndroidKeystoreDeviceSigningKey>();
         byte[]? outboxKey = null;
         byte[]? readCacheKey = null;
+        var failureCode = "DEVICE_TEST_SERVICES_RESOLUTION_FAILED";
         try
         {
-            outboxKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.WriteOutbox, cancellationToken);
-            readCacheKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.ReadCache, cancellationToken);
-            var publicJwk = await signingKey.GetPublicJwkAsync(cancellationToken);
-            var signatureValid = await CreateAndVerifySignatureAsync(signingKey, publicJwk, cancellationToken);
+            var services = Services();
+            var encryptionKeys = services.GetRequiredService<AndroidSecureStorageEncryptionKeyProvider>();
+            var signingKey = services.GetRequiredService<AndroidKeystoreDeviceSigningKey>();
+            failureCode = "NATIVE_SECURE_STORAGE_INITIALIZATION_FAILED";
+            if (!await encryptionKeys.IsNativeSecureStorageAvailableAsync(cancellationToken))
+                return DriverDeviceTestResult.Failure("seed", failureCode);
 
+            failureCode = "NATIVE_SECURE_STORAGE_OUTBOX_KEY_FAILED";
+            outboxKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.WriteOutbox, cancellationToken);
+            failureCode = "NATIVE_SECURE_STORAGE_READ_CACHE_KEY_FAILED";
+            readCacheKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.ReadCache, cancellationToken);
+            failureCode = "NATIVE_SIGNING_KEY_TEST_PROVISION_FAILED";
+            await signingKey.ProvisionFreshKeyForDeviceTestAsync(cancellationToken);
+            failureCode = "NATIVE_SIGNING_PUBLIC_KEY_READ_FAILED";
+            var publicJwk = await signingKey.GetPublicJwkAsync(cancellationToken);
+            failureCode = "NATIVE_SIGNING_P1363_VERIFY_FAILED";
+            var signatureValid = await CreateAndVerifySignatureAsync(signingKey, publicJwk, cancellationToken);
+            var bindingContext = TestBindingContext();
+
+            failureCode = "DEVICE_KEY_BINDING_SELF_TEST_FAILED";
             var checks = ClosedRuntimeChecks();
             checks["outbox_key_is_32_bytes"] = outboxKey.Length == 32;
             checks["read_cache_key_is_32_bytes"] = readCacheKey.Length == 32;
             checks["purpose_keys_are_distinct"] = outboxKey.Length == readCacheKey.Length &&
                 !CryptographicOperations.FixedTimeEquals(outboxKey, readCacheKey);
+            checks["native_secure_storage_initialized"] = true;
             checks["p256_p1363_signature_verified"] = signatureValid;
             checks["private_key_non_exportable"] = PrivateSigningKeyIsNonExportable();
+            checks["matching_registered_binding_accepted"] = await BindingAcceptedAsync(
+                bindingContext,
+                signingKey,
+                new ExactTestDeviceKeyBindingVerifier(publicJwk),
+                cancellationToken);
+            checks["mismatched_registered_binding_requires_rotation"] = await BindingRejectedWithCodeAsync(
+                bindingContext,
+                signingKey,
+                new ExactTestDeviceKeyBindingVerifier(DifferentPublicKey(publicJwk)),
+                "DEVICE_KEY_ROTATION_REQUIRED",
+                cancellationToken);
+            checks["missing_registered_binding_requires_rebind"] = await BindingRejectedWithCodeAsync(
+                bindingContext,
+                signingKey,
+                new FixedTestDeviceKeyBindingVerifier(
+                    DriverDeviceKeyBindingDecision.RegisteredBindingMissing),
+                "DEVICE_KEY_REBIND_REQUIRED",
+                cancellationToken);
+            checks["unavailable_binding_verification_fails_closed"] = await BindingRejectedWithCodeAsync(
+                bindingContext,
+                signingKey,
+                new DriverClosedDeviceKeyBindingVerifier(),
+                "DEVICE_KEY_BINDING_VERIFICATION_REQUIRED",
+                cancellationToken);
             checks["offline_storage_still_absent"] = !OfflineStorageDirectoryExists();
 
             if (checks.Values.Any(value => !value))
                 return DriverDeviceTestResult.FromChecks("seed", checks);
 
+            failureCode = "SQLCIPHER_OUTBOX_INITIALIZATION_FAILED";
+            var outboxStore = new OfflineOperationStore(DeviceTestOutboxPath(), encryptionKeys);
+            await outboxStore.InitializeAsync(cancellationToken);
+            failureCode = "SQLCIPHER_OUTBOX_ENQUEUE_FAILED";
+            var queued = await outboxStore.EnqueueAsync(
+                OutboxTestTemplate(),
+                identity => TestOutboxPayload(identity.ClientOperationId),
+                cancellationToken);
+            checks["sqlcipher_outbox_initialized"] = File.Exists(DeviceTestOutboxPath());
+            checks["sqlcipher_outbox_enqueued_once"] =
+                queued.Created && queued.Operation.Status == OfflineOperationStatus.Queued;
+            checks["sqlcipher_outbox_payload_hash_created"] = string.Equals(
+                queued.Operation.PayloadHash,
+                ComputePayloadHash(TestOutboxPayload(queued.Operation.ClientOperationId)),
+                StringComparison.Ordinal);
+
+            failureCode = "DEVICE_TEST_STATE_BUILD_FAILED";
             var state = new DriverDeviceTestState(
                 SchemaVersion,
                 CreateSealedProbe(outboxKey),
                 CreateSealedProbe(readCacheKey),
                 publicJwk.X,
-                publicJwk.Y);
+                publicJwk.Y,
+                queued.Operation.LocalOperationId,
+                queued.Operation.ClientOperationId,
+                queued.Operation.OperationCorrelationId);
+            failureCode = "DEVICE_TEST_STATE_WRITE_FAILED";
             await WriteStateAtomicallyAsync(statePath, state, cancellationToken);
             checks["sealed_restart_state_written"] = File.Exists(statePath);
             return DriverDeviceTestResult.FromChecks("seed", checks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return DriverDeviceTestResult.Failure("seed", failureCode);
         }
         finally
         {
@@ -98,27 +175,69 @@ internal static class AndroidDriverRuntimeSelfTest
         }
     }
 
+    private static async Task<DriverDeviceTestResult> VerifyMissingSigningAliasFailsClosedAsync(
+        string statePath,
+        CancellationToken cancellationToken)
+    {
+        var failureCode = "SIGNING_ALIAS_LOSS_CHECK_FAILED";
+        try
+        {
+            var services = Services();
+            var signingKey = services.GetRequiredService<AndroidKeystoreDeviceSigningKey>();
+            var checks = ClosedRuntimeChecks();
+            checks["restart_state_was_cleaned"] = !File.Exists(statePath);
+            checks["sqlcipher_test_outbox_was_cleaned"] = !File.Exists(DeviceTestOutboxPath());
+            checks["signing_alias_existed_before_loss"] = SigningAliasExists();
+            DeleteSigningAlias();
+            checks["signing_alias_removed"] = !SigningAliasExists();
+            checks["missing_alias_reports_unavailable"] =
+                !await signingKey.IsNativeSigningKeyAvailableAsync(cancellationToken);
+            checks["missing_alias_requires_rebind"] = await MissingAliasRequiresRebindAsync(
+                signingKey,
+                cancellationToken);
+            checks["missing_alias_was_not_reprovisioned"] = !SigningAliasExists();
+            checks["offline_storage_still_absent"] = !OfflineStorageDirectoryExists();
+            return DriverDeviceTestResult.FromChecks("loss", checks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return DriverDeviceTestResult.Failure("loss", failureCode);
+        }
+    }
+
     private static async Task<DriverDeviceTestResult> VerifyNativeSecurityAfterRestartAsync(
         string statePath,
         CancellationToken cancellationToken)
     {
-        if (!File.Exists(statePath))
-            return DriverDeviceTestResult.Failure("verify", "TEST_STATE_MISSING");
-
-        var stateJson = await File.ReadAllTextAsync(statePath, cancellationToken);
-        var state = JsonSerializer.Deserialize<DriverDeviceTestState>(stateJson, JsonOptions);
-        if (state is null || state.SchemaVersion != SchemaVersion)
-            return DriverDeviceTestResult.Failure("verify", "TEST_STATE_INVALID");
-
-        var services = Services();
-        var encryptionKeys = services.GetRequiredService<AndroidSecureStorageEncryptionKeyProvider>();
-        var signingKey = services.GetRequiredService<AndroidKeystoreDeviceSigningKey>();
+        var failureCode = "DEVICE_TEST_STATE_READ_FAILED";
         byte[]? outboxKey = null;
         byte[]? readCacheKey = null;
         try
         {
+            if (!File.Exists(statePath))
+                return DriverDeviceTestResult.Failure("verify", "TEST_STATE_MISSING");
+
+            var stateJson = await File.ReadAllTextAsync(statePath, cancellationToken);
+            var state = JsonSerializer.Deserialize<DriverDeviceTestState>(stateJson, JsonOptions);
+            if (state is null || state.SchemaVersion != SchemaVersion)
+                return DriverDeviceTestResult.Failure("verify", "TEST_STATE_INVALID");
+
+            var services = Services();
+            var encryptionKeys = services.GetRequiredService<AndroidSecureStorageEncryptionKeyProvider>();
+            var signingKey = services.GetRequiredService<AndroidKeystoreDeviceSigningKey>();
+            failureCode = "NATIVE_SECURE_STORAGE_RESTART_INITIALIZATION_FAILED";
+            if (!await encryptionKeys.IsNativeSecureStorageAvailableAsync(cancellationToken))
+                return DriverDeviceTestResult.Failure("verify", failureCode);
+
+            failureCode = "NATIVE_SECURE_STORAGE_RESTART_OUTBOX_KEY_FAILED";
             outboxKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.WriteOutbox, cancellationToken);
+            failureCode = "NATIVE_SECURE_STORAGE_RESTART_READ_CACHE_KEY_FAILED";
             readCacheKey = await encryptionKeys.GetKeyAsync(LocalStorePurpose.ReadCache, cancellationToken);
+            failureCode = "NATIVE_SIGNING_KEY_RESTART_READ_FAILED";
             var publicJwk = await signingKey.GetPublicJwkAsync(cancellationToken);
             var checks = ClosedRuntimeChecks();
             checks["outbox_key_survived_restart"] = VerifySealedProbe(outboxKey, state.OutboxProbe);
@@ -133,10 +252,54 @@ internal static class AndroidDriverRuntimeSelfTest
             checks["private_key_still_non_exportable"] = PrivateSigningKeyIsNonExportable();
             checks["offline_storage_still_absent"] = !OfflineStorageDirectoryExists();
 
+            failureCode = "SQLCIPHER_OUTBOX_REOPEN_FAILED";
+            var reopenedStore = new OfflineOperationStore(DeviceTestOutboxPath(), encryptionKeys);
+            await reopenedStore.InitializeAsync(cancellationToken);
+            var persisted = await reopenedStore.GetAsync(
+                state.OutboxLocalOperationId,
+                OutboxTestScope(),
+                cancellationToken);
+            var expectedPayload = TestOutboxPayload(state.OutboxClientOperationId);
+            checks["sqlcipher_outbox_operation_survived_restart"] = persisted is not null;
+            checks["sqlcipher_outbox_identity_preserved"] = persisted is not null &&
+                persisted.LocalOperationId == state.OutboxLocalOperationId &&
+                string.Equals(persisted.ClientOperationId, state.OutboxClientOperationId,
+                    StringComparison.Ordinal) &&
+                persisted.OperationCorrelationId == state.OutboxOperationCorrelationId;
+            checks["sqlcipher_outbox_status_preserved"] =
+                persisted?.Status == OfflineOperationStatus.Queued;
+            checks["sqlcipher_outbox_payload_hash_preserved"] = persisted is not null &&
+                string.Equals(persisted.PayloadHash, ComputePayloadHash(expectedPayload),
+                    StringComparison.Ordinal) &&
+                string.Equals(persisted.PayloadJson, expectedPayload, StringComparison.Ordinal);
+
+            failureCode = "SQLCIPHER_OUTBOX_REPLAY_CHECK_FAILED";
+            var replay = await reopenedStore.EnqueueAsync(
+                OutboxTestTemplate(),
+                _ => throw new InvalidOperationException("Persisted identity must prevent payload regeneration."),
+                cancellationToken);
+            var listed = await reopenedStore.ListAsync(OutboxTestScope(), cancellationToken);
+            checks["sqlcipher_outbox_replay_did_not_duplicate"] =
+                !replay.Created &&
+                replay.Operation.LocalOperationId == state.OutboxLocalOperationId &&
+                listed.Count == 1 &&
+                listed[0].LocalOperationId == state.OutboxLocalOperationId;
+
             var result = DriverDeviceTestResult.FromChecks("verify", checks);
             if (result.Passed)
+            {
                 File.Delete(statePath);
+                DeleteDeviceTestOutbox();
+            }
             return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return DriverDeviceTestResult.Failure("verify", failureCode);
         }
         finally
         {
@@ -152,10 +315,13 @@ internal static class AndroidDriverRuntimeSelfTest
         var services = Services();
         var activation = services.GetRequiredService<DriverOfflineActivationService>();
         var featureGate = services.GetRequiredService<IDriverOfflineFeatureGate>();
+        var bindingVerifier = services.GetRequiredService<IDriverDeviceKeyBindingVerifier>();
         return new(StringComparer.Ordinal)
         {
             ["activation_is_inactive"] = activation.Active is null,
             ["default_feature_gate_is_closed"] = !featureGate.IsOfflineRuntimeAuthorized,
+            ["default_device_key_binding_verifier_is_closed"] =
+                bindingVerifier is DriverClosedDeviceKeyBindingVerifier,
             ["offline_storage_absent"] = !OfflineStorageDirectoryExists()
         };
     }
@@ -167,12 +333,73 @@ internal static class AndroidDriverRuntimeSelfTest
     private static bool OfflineStorageDirectoryExists() =>
         Directory.Exists(Path.Combine(FileSystem.AppDataDirectory, "offline-v1"));
 
+    private static string DeviceTestOutboxPath() =>
+        Path.Combine(FileSystem.AppDataDirectory, "device-tests", "t-sync-010-outbox.db");
+
+    private static OfflineOperationScope OutboxTestScope() => new(
+        OutboxTestCompanyId,
+        OutboxTestBranchId,
+        OutboxTestUserId,
+        OutboxTestRegisteredDeviceId);
+
+    private static OfflineOperationEnqueueTemplate OutboxTestTemplate() => new(
+        OutboxTestLocalIntentId,
+        OutboxTestCompanyId,
+        OutboxTestBranchId,
+        OutboxTestUserId,
+        OutboxTestRegisteredDeviceId,
+        "CreateOperationalParty",
+        "CREATE",
+        "OperationalParty",
+        null,
+        null,
+        OutboxTestOccurredAt);
+
+    private static string TestOutboxPayload(string clientOperationId) =>
+        $"{{\"clientOperationId\":\"{clientOperationId}\",\"nameAr\":\"{OutboxTestPayloadName}\"}}";
+
+    private static string ComputePayloadHash(string payload)
+    {
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        try
+        {
+            return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    private static void DeleteDeviceTestOutbox()
+    {
+        var path = DeviceTestOutboxPath();
+        File.Delete(path);
+        File.Delete(path + "-wal");
+        File.Delete(path + "-shm");
+        var directory = Path.GetDirectoryName(path);
+        if (directory is not null && Directory.Exists(directory) &&
+            !Directory.EnumerateFileSystemEntries(directory).Any())
+        {
+            Directory.Delete(directory);
+        }
+    }
+
     private static bool SigningAliasExists()
     {
         using var keyStore = KeyStore.GetInstance(AndroidKeyStore)
             ?? throw new InvalidOperationException("DEVICE_TEST_KEYSTORE_UNAVAILABLE");
         keyStore.Load(null);
         return keyStore.ContainsAlias(SigningKeyAlias);
+    }
+
+    private static void DeleteSigningAlias()
+    {
+        using var keyStore = KeyStore.GetInstance(AndroidKeyStore)
+            ?? throw new InvalidOperationException("DEVICE_TEST_KEYSTORE_UNAVAILABLE");
+        keyStore.Load(null);
+        if (keyStore.ContainsAlias(SigningKeyAlias))
+            keyStore.DeleteEntry(SigningKeyAlias);
     }
 
     private static bool PrivateSigningKeyIsNonExportable()
@@ -237,6 +464,86 @@ internal static class AndroidDriverRuntimeSelfTest
             CryptographicOperations.ZeroMemory(challenge);
             if (signature is not null)
                 CryptographicOperations.ZeroMemory(signature);
+        }
+    }
+
+    private static DriverDeviceKeyBindingContext TestBindingContext() => new(
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        "driver-device-test");
+
+    private static async Task<bool> BindingAcceptedAsync(
+        DriverDeviceKeyBindingContext context,
+        IDriverNativeDeviceSigningKey signingKey,
+        IDriverDeviceKeyBindingVerifier verifier,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DriverDeviceKeyBindingGuard.RequireMatchAsync(
+                context,
+                signingKey,
+                verifier,
+                cancellationToken);
+            return true;
+        }
+        catch (DriverOfflineUnavailableException)
+        {
+            return false;
+        }
+    }
+
+    private static async Task<bool> BindingRejectedWithCodeAsync(
+        DriverDeviceKeyBindingContext context,
+        IDriverNativeDeviceSigningKey signingKey,
+        IDriverDeviceKeyBindingVerifier verifier,
+        string expectedCode,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DriverDeviceKeyBindingGuard.RequireMatchAsync(
+                context,
+                signingKey,
+                verifier,
+                cancellationToken);
+            return false;
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return string.Equals(exception.Code, expectedCode, StringComparison.Ordinal);
+        }
+    }
+
+    private static async Task<bool> MissingAliasRequiresRebindAsync(
+        IDriverNativeDeviceSigningKey signingKey,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await signingKey.GetPublicJwkAsync(cancellationToken);
+            return false;
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return string.Equals(exception.Code, "DEVICE_KEY_REBIND_REQUIRED", StringComparison.Ordinal);
+        }
+    }
+
+    private static DevicePublicP256Jwk DifferentPublicKey(DevicePublicP256Jwk publicKey)
+    {
+        var x = DecodeBase64Url(publicKey.X);
+        try
+        {
+            x[0] ^= 0x01;
+            return new(EncodeBase64Url(x), publicKey.Y);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(x);
         }
     }
 
@@ -311,6 +618,9 @@ internal static class AndroidDriverRuntimeSelfTest
         return Convert.FromBase64String(normalized);
     }
 
+    private static string EncodeBase64Url(ReadOnlySpan<byte> value) =>
+        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
     private static bool Base64UrlEquals(string left, string right)
     {
         var leftBytes = DecodeBase64Url(left);
@@ -326,6 +636,36 @@ internal static class AndroidDriverRuntimeSelfTest
             CryptographicOperations.ZeroMemory(rightBytes);
         }
     }
+
+    private sealed class ExactTestDeviceKeyBindingVerifier(DevicePublicP256Jwk expected)
+        : IDriverDeviceKeyBindingVerifier
+    {
+        public ValueTask<DriverDeviceKeyBindingDecision> VerifyAsync(
+            DriverDeviceKeyBindingContext context,
+            DevicePublicP256Jwk currentPublicKey,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var matches = Base64UrlEquals(expected.X, currentPublicKey.X) &&
+                Base64UrlEquals(expected.Y, currentPublicKey.Y);
+            return ValueTask.FromResult(matches
+                ? DriverDeviceKeyBindingDecision.Match
+                : DriverDeviceKeyBindingDecision.Mismatch);
+        }
+    }
+
+    private sealed class FixedTestDeviceKeyBindingVerifier(DriverDeviceKeyBindingDecision decision)
+        : IDriverDeviceKeyBindingVerifier
+    {
+        public ValueTask<DriverDeviceKeyBindingDecision> VerifyAsync(
+            DriverDeviceKeyBindingContext context,
+            DevicePublicP256Jwk currentPublicKey,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(decision);
+        }
+    }
 }
 
 internal sealed record DriverDeviceTestState(
@@ -333,7 +673,10 @@ internal sealed record DriverDeviceTestState(
     DriverDeviceTestSealedProbe OutboxProbe,
     DriverDeviceTestSealedProbe ReadCacheProbe,
     string PublicKeyX,
-    string PublicKeyY);
+    string PublicKeyY,
+    Guid OutboxLocalOperationId,
+    string OutboxClientOperationId,
+    Guid OutboxOperationCorrelationId);
 
 internal sealed record DriverDeviceTestSealedProbe(
     string Nonce,

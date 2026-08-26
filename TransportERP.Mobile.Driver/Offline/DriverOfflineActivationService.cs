@@ -72,6 +72,7 @@ public sealed class DriverClosedOfflineFeatureGate : IDriverOfflineFeatureGate
 public sealed class DriverOfflineActivationService(
     IDriverNativeEncryptionKeyProvider encryptionKeys,
     IDriverNativeDeviceSigningKey signingKey,
+    IDriverDeviceKeyBindingVerifier deviceKeyBindingVerifier,
     DriverVolatileSessionProvider volatileSession,
     IDriverSyncNetworkProvider network,
     IDriverOfflineFeatureGate featureGate)
@@ -97,6 +98,18 @@ public sealed class DriverOfflineActivationService(
         {
             if (_active is not null)
                 throw new DriverOfflineUnavailableException("DRIVER_OFFLINE_ALREADY_ACTIVE");
+
+            await DriverDeviceKeyBindingGuard.RequireMatchAsync(
+                new(
+                    request.CompanyId,
+                    request.BranchId,
+                    request.UserId,
+                    request.RegisteredDeviceId,
+                    request.SessionId,
+                    request.DeviceId),
+                signingKey,
+                deviceKeyBindingVerifier,
+                cancellationToken);
 
             volatileSession.Set(request.SessionBearer);
             try

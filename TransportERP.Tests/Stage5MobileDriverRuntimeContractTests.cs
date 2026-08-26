@@ -84,9 +84,83 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase seed", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase verify", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase loss", workflow, StringComparison.Ordinal);
         Assert.Contains("offline_runtime_enabled=false", workflow, StringComparison.Ordinal);
         Assert.Contains("The test-only Android activity leaked into the Release APK", workflow,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Android_registered_device_key_binding_fails_closed_for_loss_mismatch_and_unverified_state()
+    {
+        var program = Read("TransportERP.Mobile.Driver", "MauiProgram.cs");
+        var activation = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineActivationService.cs");
+        var binding = Read("TransportERP.Mobile.Driver", "Offline", "DriverDeviceKeyBinding.cs");
+        var signer = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
+            "AndroidKeystoreDeviceSigningKey.cs");
+        var selfTest = Read("TransportERP.Mobile.Driver", "DeviceTesting",
+            "AndroidDriverRuntimeSelfTest.cs");
+
+        Assert.Contains(
+            "IDriverDeviceKeyBindingVerifier, DriverClosedDeviceKeyBindingVerifier",
+            program,
+            StringComparison.Ordinal);
+        Assert.Contains("DriverDeviceKeyBindingGuard.RequireMatchAsync", activation,
+            StringComparison.Ordinal);
+        Assert.True(
+            activation.IndexOf("DriverDeviceKeyBindingGuard.RequireMatchAsync", StringComparison.Ordinal) <
+            activation.IndexOf("volatileSession.Set(request.SessionBearer)", StringComparison.Ordinal));
+
+        Assert.Contains("DriverDeviceKeyBindingDecision.Match => null", binding,
+            StringComparison.Ordinal);
+        Assert.Contains("RegisteredBindingMissing => \"DEVICE_KEY_REBIND_REQUIRED\"", binding,
+            StringComparison.Ordinal);
+        Assert.Contains("Mismatch => \"DEVICE_KEY_ROTATION_REQUIRED\"", binding,
+            StringComparison.Ordinal);
+        Assert.Contains("VerificationUnavailable => \"DEVICE_KEY_BINDING_VERIFICATION_REQUIRED\"",
+            binding, StringComparison.Ordinal);
+        Assert.DoesNotContain("HttpClient", binding, StringComparison.Ordinal);
+        Assert.DoesNotContain("http://", binding, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://", binding, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("RequireExistingKeyAsync", signer, StringComparison.Ordinal);
+        Assert.Contains("DEVICE_KEY_REBIND_REQUIRED", signer, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureKeyAsync", signer, StringComparison.Ordinal);
+        Assert.Contains("#if TRANSPORTERP_DEVICE_TESTS", signer, StringComparison.Ordinal);
+        Assert.Contains("ProvisionFreshKeyForDeviceTestAsync", signer, StringComparison.Ordinal);
+        var testGateStart = signer.IndexOf("#if TRANSPORTERP_DEVICE_TESTS", StringComparison.Ordinal);
+        var generation = signer.IndexOf("GenerateKeyPair", StringComparison.Ordinal);
+        var testGateEnd = signer.IndexOf("#endif", testGateStart, StringComparison.Ordinal);
+        Assert.True(testGateStart >= 0 && generation > testGateStart && generation < testGateEnd);
+        Assert.DoesNotContain("GenerateKeyPair", signer[..testGateStart], StringComparison.Ordinal);
+
+        Assert.Contains("matching_registered_binding_accepted", selfTest, StringComparison.Ordinal);
+        Assert.Contains("mismatched_registered_binding_requires_rotation", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("missing_registered_binding_requires_rebind", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("missing_alias_was_not_reprovisioned", selfTest, StringComparison.Ordinal);
+        Assert.Contains("unavailable_binding_verification_fails_closed", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("default_device_key_binding_verifier_is_closed", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("IsNativeSecureStorageAvailableAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("new OfflineOperationStore(DeviceTestOutboxPath(), encryptionKeys)", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("sqlcipher_outbox_operation_survived_restart", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("sqlcipher_outbox_identity_preserved", selfTest, StringComparison.Ordinal);
+        Assert.Contains("sqlcipher_outbox_status_preserved", selfTest, StringComparison.Ordinal);
+        Assert.Contains("sqlcipher_outbox_payload_hash_preserved", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("sqlcipher_outbox_replay_did_not_duplicate", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("SQLCIPHER_OUTBOX_INITIALIZATION_FAILED", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("NATIVE_SIGNING_KEY_TEST_PROVISION_FAILED", selfTest,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
     }
 
     private static string Read(params string[] path) =>

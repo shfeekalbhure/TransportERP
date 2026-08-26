@@ -562,6 +562,7 @@ jobs:
           run_phase verify
           verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$verify_pid"
+          run_phase loss
           {
             echo 'process_stopped_before_restart=true'
             echo 'new_process_observed_after_restart=true'
@@ -614,6 +615,7 @@ jobs:
             ci-evidence/android-runtime/startup.json
             ci-evidence/android-runtime/seed.json
             ci-evidence/android-runtime/verify.json
+            ci-evidence/android-runtime/loss.json
             ci-evidence/android-runtime/restart-evidence.txt
           if-no-files-found: warn
           retention-days: 30
