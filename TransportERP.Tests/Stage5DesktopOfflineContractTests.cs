@@ -3,14 +3,23 @@ namespace TransportERP.Tests;
 public sealed class Stage5DesktopOfflineContractTests
 {
     [Fact]
-    public void Desktop_remains_a_library_and_references_the_encrypted_offline_core()
+    public void Desktop_is_an_executable_with_closed_default_startup_and_encrypted_offline_core()
     {
         var project = Read("TransportERP.Desktop", "TransportERP.Desktop.csproj");
+        var program = Read("TransportERP.Desktop", "Program.cs");
+        var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
+        var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
 
-        Assert.Contains("<HasDesktopEntryPoint Condition=\"Exists('Program.cs')\">", project, StringComparison.Ordinal);
-        Assert.Contains("<OutputType Condition=\"'$(HasDesktopEntryPoint)' != 'true'\">Library</OutputType>", project, StringComparison.Ordinal);
+        Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
         Assert.Contains("TransportERP.Offline\\TransportERP.Offline.csproj", project, StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(RepositoryRoot(), "TransportERP.Desktop", "Program.cs")));
+        Assert.Contains("[STAThread]", program, StringComparison.Ordinal);
+        Assert.Contains("--startup-smoke", program, StringComparison.Ordinal);
+        Assert.Contains("OfflineRuntimeAuthorizedByDefault ? 1 : 0", program, StringComparison.Ordinal);
+        Assert.Contains("OfflineRuntimeAuthorizedByDefault = false", context, StringComparison.Ordinal);
+        Assert.Contains("ActivateAuthenticatedOfflineRuntime", context, StringComparison.Ordinal);
+        Assert.Contains("RunSyncSupervisorAsync", context, StringComparison.Ordinal);
+        Assert.Contains("Enabled = false", shell, StringComparison.Ordinal);
+        Assert.Contains("AttachAuthenticatedRuntime", shell, StringComparison.Ordinal);
     }
 
     [Fact]

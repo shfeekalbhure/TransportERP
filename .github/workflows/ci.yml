@@ -127,7 +127,7 @@ jobs:
           retention-days: 30
 
   desktop-contract:
-    name: Required CI / Desktop RTL contract surface
+    name: Required CI / Desktop executable + RTL runtime
     runs-on: windows-latest
     steps:
       - name: Checkout exact PR head
@@ -157,8 +157,18 @@ jobs:
       - name: Restore Desktop
         run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
 
-      - name: Build Desktop contract surface
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore -p:OutputType=Library
+      - name: Build Desktop executable
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore
+
+      - name: Run Desktop closed-default startup smoke
+        shell: pwsh
+        run: |
+          $executable = 'TransportERP.Desktop/bin/Release/net10.0-windows/TransportERP.Desktop.exe'
+          $runtimeConfig = 'TransportERP.Desktop/bin/Release/net10.0-windows/TransportERP.Desktop.runtimeconfig.json'
+          if (-not (Test-Path $executable)) { throw 'Desktop WinExe artifact was not produced.' }
+          if (-not (Test-Path $runtimeConfig)) { throw 'Desktop runtime configuration was not produced.' }
+          & $executable --startup-smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop startup smoke did not remain fail-closed.' }
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
