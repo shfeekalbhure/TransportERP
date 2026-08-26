@@ -17,6 +17,20 @@ public sealed class Stage4SyncPopDeploymentProfileTests
         Assert.Equal("https://sync.example.test/api/v1/sync/operations:batch", profile.CanonicalHtu);
     }
 
+    [Fact]
+    public void Conflict_canonical_htu_uses_configured_public_origin_and_exact_route_not_request_host()
+    {
+        var values = RequiredSettings();
+        values["Sync:Proof:PublicOrigin"] = "https://sync.example.test:8443";
+        var profile = SyncPopDeploymentProfile.Load(Configuration(values));
+        var conflictId = Guid.Parse("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+
+        Assert.Equal(
+            $"https://sync.example.test:8443/api/v1/sync/conflicts/{conflictId:D}:resolve",
+            profile.CanonicalHtuForPath($"/api/v1/sync/conflicts/{conflictId:D}:resolve"));
+        Assert.Null(profile.CanonicalHtuForPath("/api/v1/sync/conflicts/x:resolve?host=attacker.invalid"));
+    }
+
     [Theory]
     [InlineData("Sync:Proof:MaximumPastSeconds")]
     [InlineData("Sync:Proof:MaximumFutureSeconds")]

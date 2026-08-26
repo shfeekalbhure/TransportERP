@@ -40,12 +40,24 @@ public sealed class SyncProofRuntimeException(string code) : InvalidOperationExc
     public string Code { get; } = code;
 }
 
+public interface ISyncProofRuntime
+{
+    Task<IssuedSyncNonce> IssueNonceAsync(
+        SyncProofSecurityContext security,
+        CancellationToken cancellationToken = default);
+
+    Task<AcceptedSyncProofContext> ClaimAsync(
+        SyncProofSecurityContext security,
+        VerifiedSyncProofMaterial proof,
+        CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// Shared PostgreSQL nonce and proof-replay boundary for TransportERP Sync-PoP v1.
 /// Raw nonces and jti values are never persisted. The endpoint's closed gate must be
 /// evaluated before invoking any method on this service.
 /// </summary>
-public sealed class SyncProofRuntimeService(TransportErpDbContext db, AuditEventService audit)
+public sealed class SyncProofRuntimeService(TransportErpDbContext db, AuditEventService audit) : ISyncProofRuntime
 {
     public static readonly TimeSpan NonceLifetime = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan ReplayRetention = TimeSpan.FromMinutes(10);

@@ -37,7 +37,8 @@ public sealed record SyncReapplyAsNewRequest(
     Guid? EntityId,
     long? BaseVersion,
     DateTimeOffset ClientOccurredAt,
-    string PayloadJson);
+    string PayloadJson,
+    string PayloadHash);
 
 public sealed record ResolveSyncConflictRequest(
     string Decision,
@@ -61,21 +62,24 @@ public interface ISyncConflictResolutionService
         Guid conflictCaseId,
         ResolveSyncConflictRequest request,
         SyncConflictResolutionContext context,
+        AcceptedSyncProofContext acceptedProof,
         CancellationToken cancellationToken = default);
 }
 
 public sealed class SyncConflictResolutionService(
     TransportErpDbContext db,
     AuditEventService audit,
-    IEffectivePermissionResolver permissions) : ISyncConflictResolutionService
+    IEffectivePermissionResolver permissions,
+    SyncOperationService syncOperations) : ISyncConflictResolutionService
 {
     public async Task<SyncConflictResolutionResult> ResolveAsync(
         Guid conflictCaseId,
         ResolveSyncConflictRequest request,
         SyncConflictResolutionContext context,
+        AcceptedSyncProofContext acceptedProof,
         CancellationToken cancellationToken = default)
     {
-        ValidateRequest(conflictCaseId, request, context);
+        ValidateRequest(conflictCaseId, request, context, acceptedProof);
         if (!db.Database.IsNpgsql())
             throw new SyncRuleException("CONFLICT_STORE_UNSUPPORTED", "PostgreSQL is required");
 
@@ -83,6 +87,20 @@ public sealed class SyncConflictResolutionService(
             IsolationLevel.ReadCommitted, cancellationToken);
         try
         {
+            var userLockKey = "user-scope|" + context.UserId;
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({userLockKey}, 0))", cancellationToken);
+            if (request.Decision == SyncConflictResolutionDecisions.ReapplyAsNew &&
+                !string.IsNullOrWhiteSpace(request.Reapply!.ClientOperationId) &&
+                request.Reapply.ClientOperationId.Trim().Length <= 120)
+            {
+                var replacementIdempotencyLockKey =
+                    $"sync-stage4|{context.CompanyId}|{context.RegisteredDeviceId}|{request.Reapply.ClientOperationId.Trim()}";
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtextextended({replacementIdempotencyLockKey}, 0))",
+                    cancellationToken);
+            }
+
             var conflicts = await db.ConflictCases.FromSqlInterpolated($$"""
                 SELECT c.* FROM transport_erp.conflict_cases AS c
                 WHERE c."Id"={{conflictCaseId}}
@@ -100,16 +118,62 @@ public sealed class SyncConflictResolutionService(
                 ?? throw new SyncRuleException("OPERATION_NOT_FOUND", conflict.SyncOperationId.ToString());
 
             await EnsureAuthorityAsync(conflict, operation, context, cancellationToken);
+            await EnsureFreshAcceptedProofAsync(acceptedProof, cancellationToken);
+            if (operation.AcceptedProofReplayId == acceptedProof.ReplayId)
+                throw new SyncRuleException("invalid_dpop_proof", conflictCaseId.ToString());
             if (conflict.Status != "OPEN" || operation.Status != "CONFLICT" ||
                 conflict.Resolution is not null || conflict.ResolvedAt.HasValue || conflict.ReplacedByOperationId.HasValue)
                 throw new SyncRuleException("CONFLICT_ALREADY_RESOLVED", conflictCaseId.ToString());
 
             if (request.Decision == SyncConflictResolutionDecisions.ReapplyAsNew)
             {
-                await ValidateReapplyAsync(operation, request.Reapply!, context, cancellationToken);
-                // A new Stage 4 row must point at a fresh, accepted PoP replay record. This endpoint
-                // has no such proof and must not reuse the original operation's proof provenance.
-                throw new SyncRuleException("REAPPLY_PROOF_REQUIRED", conflictCaseId.ToString());
+                var reapply = request.Reapply!;
+                var clientOperationId = reapply.ClientOperationId.Trim();
+                await ValidateReapplyAsync(operation, reapply, context, cancellationToken);
+
+                // Enqueue is deliberately the first state mutation. It shares this transaction,
+                // so the replacement and both resolution links either commit together or not at all.
+                var replacement = await syncOperations.EnqueueAcceptedSyncOperationAsync(
+                    new EnqueueAcceptedSyncOperationCommand(
+                        "sync-v1", reapply.ActionCode, reapply.OperationType, reapply.EntityType,
+                        reapply.EntityId, clientOperationId, reapply.PayloadJson,
+                        reapply.PayloadHash.ToLowerInvariant(), reapply.ClientOccurredAt,
+                        reapply.OperationCorrelationId, reapply.BaseVersion),
+                    acceptedProof, cancellationToken);
+                if (replacement.Id == operation.Id || replacement.CompanyId != operation.CompanyId ||
+                    replacement.BranchId != operation.BranchId || replacement.UserId != operation.UserId ||
+                    replacement.RegisteredDeviceId != operation.RegisteredDeviceId ||
+                    !string.Equals(replacement.DeviceId, operation.DeviceId, StringComparison.Ordinal) ||
+                    !string.Equals(replacement.ActionCode, operation.ActionCode, StringComparison.Ordinal) ||
+                    !string.Equals(replacement.OperationType, operation.OperationType, StringComparison.Ordinal) ||
+                    !string.Equals(replacement.EntityType, operation.EntityType, StringComparison.Ordinal) ||
+                    replacement.EntityId != operation.EntityId || replacement.Status != "QUEUED")
+                    throw new SyncRuleException("REAPPLY_SCOPE_MISMATCH", conflictCaseId.ToString());
+
+                var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
+                conflict.Status = "RESOLVED";
+                conflict.Resolution = SyncConflictResolutionDecisions.ReapplyAsNew;
+                conflict.ResolvedBy = context.UserId.ToString();
+                conflict.ResolvedAt = now;
+                conflict.ReplacedByOperationId = replacement.Id;
+                conflict.UpdatedAt = now;
+                conflict.RowVersion = Guid.NewGuid().ToByteArray();
+
+                operation.Status = "RESOLVED";
+                operation.ErrorCode = "SUPERSEDED";
+                operation.ResultEntityId = null;
+                operation.ResultVersion = null;
+                operation.NextRetryAt = null;
+                operation.ExecutionClaimToken = null;
+                operation.ExecutionAttemptStartedAt = null;
+                operation.ExecutionLeaseExpiresAt = null;
+                operation.UpdatedAt = now;
+                operation.RowVersion = Guid.NewGuid().ToByteArray();
+
+                await db.SaveChangesAsync(cancellationToken);
+                await AppendResolutionAuditAsync(conflict, operation, context, request.Reason, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return Result(conflict, operation, context.CorrelationId, now);
             }
 
             var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
@@ -133,25 +197,9 @@ public sealed class SyncConflictResolutionService(
             operation.RowVersion = Guid.NewGuid().ToByteArray();
 
             await db.SaveChangesAsync(cancellationToken);
-            await audit.AppendAuditEventAsync(new AuditEventDraft(
-                "SyncConflictResolved", "SUCCESS", nameof(ConflictCase), conflict.Id,
-                context.UserId, context.CompanyId, context.BranchId, context.CorrelationId,
-                context.DeviceId,
-                AfterJson: JsonSerializer.Serialize(new
-                {
-                    Decision = conflict.Resolution,
-                    conflict.SyncOperationId,
-                    OriginalStatus = operation.Status,
-                    OriginalErrorCode = operation.ErrorCode,
-                    conflict.ReplacedByOperationId
-                }),
-                Reason: request.Reason.Trim(),
-                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+            await AppendResolutionAuditAsync(conflict, operation, context, request.Reason, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-
-            return new SyncConflictResolutionResult(
-                conflict.Id, operation.Id, conflict.Resolution, conflict.Status, operation.Status,
-                operation.ErrorCode, conflict.ReplacedByOperationId, now, context.CorrelationId);
+            return Result(conflict, operation, context.CorrelationId, now);
         }
         catch
         {
@@ -206,6 +254,24 @@ public sealed class SyncConflictResolutionService(
             throw new SyncRuleException("PERMISSION_DENIED", definition.RequiredPermission);
     }
 
+    private async Task EnsureFreshAcceptedProofAsync(
+        AcceptedSyncProofContext proof,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var exists = await db.SyncProofReplays.AsNoTracking().AnyAsync(x =>
+            x.Id == proof.ReplayId && x.UserId == proof.UserId && x.CompanyId == proof.CompanyId &&
+            x.BranchId == proof.BranchId && x.RegisteredDeviceId == proof.RegisteredDeviceId &&
+            x.DeviceId == proof.DeviceId && x.ProofKeyVersion == proof.ProofKeyVersion &&
+            x.ProofKeyThumbprint == proof.ProofKeyThumbprint &&
+            x.AttemptCorrelationId == proof.AttemptCorrelationId && x.ExpiresAt > now,
+            cancellationToken);
+        var alreadyConsumed = await db.SyncOperations.AsNoTracking().AnyAsync(
+            x => x.AcceptedProofReplayId == proof.ReplayId, cancellationToken);
+        if (!exists || alreadyConsumed)
+            throw new SyncRuleException("invalid_dpop_proof", proof.ReplayId.ToString());
+    }
+
     private async Task ValidateReapplyAsync(
         SyncOperation original,
         SyncReapplyAsNewRequest reapply,
@@ -214,7 +280,8 @@ public sealed class SyncConflictResolutionService(
     {
         if (reapply is null || string.IsNullOrWhiteSpace(reapply.ClientOperationId) ||
             reapply.ClientOperationId.Trim().Length > 120 || reapply.OperationCorrelationId == Guid.Empty ||
-            string.IsNullOrWhiteSpace(reapply.PayloadJson) || reapply.ClientOccurredAt == default)
+            string.IsNullOrWhiteSpace(reapply.PayloadJson) || reapply.ClientOccurredAt == default ||
+            string.IsNullOrWhiteSpace(reapply.PayloadHash) || reapply.PayloadHash.Length != 64)
             throw new SyncRuleException("REAPPLY_REQUEST_INVALID", original.Id.ToString());
         if (string.Equals(reapply.ClientOperationId.Trim(), original.ClientOperationId, StringComparison.Ordinal) ||
             reapply.OperationCorrelationId == original.OperationCorrelationId)
@@ -237,6 +304,11 @@ public sealed class SyncConflictResolutionService(
 
         var payloadHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(reapply.PayloadJson)))
             .ToLowerInvariant();
+        byte[] suppliedHash;
+        try { suppliedHash = Convert.FromHexString(reapply.PayloadHash); }
+        catch (FormatException) { throw new SyncRuleException("REAPPLY_REQUEST_INVALID", original.Id.ToString()); }
+        if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(payloadHash), suppliedHash))
+            throw new SyncRuleException("HASH_MISMATCH", original.Id.ToString());
         try
         {
             _ = SyncOperationFingerprintV1.ComputeHash(new SyncOperationFingerprintV1Input(
@@ -255,12 +327,20 @@ public sealed class SyncConflictResolutionService(
     private static void ValidateRequest(
         Guid conflictCaseId,
         ResolveSyncConflictRequest request,
-        SyncConflictResolutionContext context)
+        SyncConflictResolutionContext context,
+        AcceptedSyncProofContext acceptedProof)
     {
         if (conflictCaseId == Guid.Empty || context.UserId == Guid.Empty || context.CompanyId == Guid.Empty ||
             context.BranchId == Guid.Empty || context.RegisteredDeviceId == Guid.Empty ||
             context.RegisteredDeviceCredentialVersion < 1 || string.IsNullOrWhiteSpace(context.DeviceId) ||
             context.CorrelationId == Guid.Empty)
+            throw new SyncRuleException("SCOPE_DENIED", conflictCaseId.ToString());
+        if (acceptedProof.ReplayId == Guid.Empty || acceptedProof.AttemptCorrelationId != context.CorrelationId ||
+            acceptedProof.UserId != context.UserId || acceptedProof.CompanyId != context.CompanyId ||
+            acceptedProof.BranchId != context.BranchId ||
+            acceptedProof.RegisteredDeviceId != context.RegisteredDeviceId ||
+            acceptedProof.DeviceCredentialVersion != context.RegisteredDeviceCredentialVersion ||
+            !string.Equals(acceptedProof.DeviceId, context.DeviceId, StringComparison.Ordinal))
             throw new SyncRuleException("SCOPE_DENIED", conflictCaseId.ToString());
         if (request is null || string.IsNullOrWhiteSpace(request.Decision) ||
             request.Decision is not (SyncConflictResolutionDecisions.KeepServerAndRejectLocal or
@@ -282,4 +362,33 @@ public sealed class SyncConflictResolutionService(
 
     private static string CanonicalTimestamp(DateTimeOffset value)
         => NormalizeTimestamp(value).ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFF'Z'", CultureInfo.InvariantCulture);
+
+    private async Task AppendResolutionAuditAsync(
+        ConflictCase conflict,
+        SyncOperation operation,
+        SyncConflictResolutionContext context,
+        string reason,
+        CancellationToken cancellationToken)
+        => await audit.AppendAuditEventAsync(new AuditEventDraft(
+            "SyncConflictResolved", "SUCCESS", nameof(ConflictCase), conflict.Id,
+            context.UserId, context.CompanyId, context.BranchId, context.CorrelationId,
+            context.DeviceId,
+            AfterJson: JsonSerializer.Serialize(new
+            {
+                Decision = conflict.Resolution,
+                conflict.SyncOperationId,
+                OriginalStatus = operation.Status,
+                OriginalErrorCode = operation.ErrorCode,
+                conflict.ReplacedByOperationId
+            }),
+            Reason: reason.Trim(),
+            OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+
+    private static SyncConflictResolutionResult Result(
+        ConflictCase conflict,
+        SyncOperation operation,
+        Guid correlationId,
+        DateTimeOffset resolvedAt)
+        => new(conflict.Id, operation.Id, conflict.Resolution!, conflict.Status, operation.Status,
+            operation.ErrorCode, conflict.ReplacedByOperationId, resolvedAt, correlationId);
 }

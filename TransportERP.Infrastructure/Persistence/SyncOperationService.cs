@@ -312,8 +312,10 @@ public sealed class SyncOperationService(
             throw new SyncRuleException("PAYLOAD_INVALID", exception.ParamName ?? command.ClientOperationId);
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted, cancellationToken);
+        var ownsTransaction = db.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
         try
         {
             var userLockKey = "user-scope|" + acceptedProof.UserId;
@@ -331,7 +333,7 @@ public sealed class SyncOperationService(
             if (existing is not null)
             {
                 EnsureAcceptedReplayMatches(existing, fingerprint, acceptedProof);
-                await transaction.CommitAsync(cancellationToken);
+                if (transaction is not null) await transaction.CommitAsync(cancellationToken);
                 return existing;
             }
 
@@ -376,17 +378,17 @@ public sealed class SyncOperationService(
                 operation.UserId, operation.CompanyId, operation.BranchId,
                 acceptedProof.AttemptCorrelationId, operation.DeviceId,
                 OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
             return operation;
         }
-        catch (DbUpdateException exception) when (
+        catch (DbUpdateException exception) when (ownsTransaction &&
             exception.GetBaseException() is PostgresException
             {
                 SqlState: PostgresErrorCodes.UniqueViolation,
                 ConstraintName: "ux_sync_op_registered_device_client"
             })
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction!.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
             var existing = await db.SyncOperations.Include(x => x.ConflictCase).SingleAsync(x =>
                 x.CompanyId == acceptedProof.CompanyId &&
@@ -396,21 +398,24 @@ public sealed class SyncOperationService(
             EnsureAcceptedReplayMatches(existing, fingerprint, acceptedProof);
             return existing;
         }
-        catch (DbUpdateException exception) when (
+        catch (DbUpdateException exception) when (ownsTransaction &&
             exception.GetBaseException() is PostgresException
             {
                 SqlState: PostgresErrorCodes.UniqueViolation,
                 ConstraintName: "ux_sync_op_legacy_company_device_client"
             })
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction!.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
             throw new SyncRuleException("LEGACY_IDEMPOTENCY_CONFLICT", command.ClientOperationId);
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
-            db.ChangeTracker.Clear();
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                db.ChangeTracker.Clear();
+            }
             throw;
         }
     }

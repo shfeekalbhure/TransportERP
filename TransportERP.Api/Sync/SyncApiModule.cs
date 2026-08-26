@@ -35,6 +35,15 @@ public sealed record SyncPopDeploymentProfile(
     IReadOnlyList<string> KnownNetworks,
     IReadOnlyList<string> AllowedHosts)
 {
+    public string? CanonicalHtuForPath(string absolutePath)
+    {
+        if (!IsValid || PublicHost is null || string.IsNullOrEmpty(absolutePath) ||
+            absolutePath[0] != '/' || absolutePath.Contains('?') || absolutePath.Contains('#'))
+            return null;
+        var portText = PublicPort == 443 ? string.Empty : $":{PublicPort}";
+        return $"https://{PublicHost}{portText}{absolutePath}";
+    }
+
     public static SyncPopDeploymentProfile Load(IConfiguration configuration)
     {
         var origin = configuration["Sync:Proof:PublicOrigin"] ??
@@ -126,92 +135,18 @@ public static class SyncApiModule
 
     private static async Task<IResult> HandleBatchAsync(
         HttpContext http,
-        ICurrentSecurityContext currentSecurity,
-        ISyncRuntimeGate runtimeGate,
-        SyncPopProofValidator proofValidator,
-        SyncProofRuntimeService proofRuntime,
+        ISyncPopHttpRequestAuthenticator authenticator,
         SyncOperationService sync,
-        SyncPopDeploymentProfile deployment,
         CancellationToken cancellationToken)
     {
-        var current = await currentSecurity.ResolveAsync(http.User, cancellationToken);
-        if (current is null) return Results.Unauthorized();
-        var attemptCorrelationId = ReadAttemptCorrelationId(http);
-        if (attemptCorrelationId is null)
-            return Results.BadRequest(new { ErrorCode = "ATTEMPT_CORRELATION_REQUIRED", CorrelationId = Guid.Empty });
-
-        // This is the production invariant until G4 evidence and the separate G5 owner decision.
-        // It intentionally precedes body reads, nonce issuance and jti persistence.
-        if (!await runtimeGate.IsOpenAsync(current.CompanyId, cancellationToken))
-            return Results.Json(new { ErrorCode = "OFFLINE_DISABLED", CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status403Forbidden);
-
-        if (!TrySecurityContext(current, out var proofSecurity))
-            return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status403Forbidden);
-
-        var requestLevelError = ValidateRequestMetadata(http.Request);
-        if (requestLevelError is not null) return RequestLevelError(requestLevelError, attemptCorrelationId.Value);
-        byte[] rawBody;
-        try { rawBody = await ReadBoundedBodyAsync(http.Request, cancellationToken); }
-        catch (SyncRequestException exception) { return RequestLevelError(exception.Code, attemptCorrelationId.Value); }
-
-        if (!deployment.IsValid || !RequestTopologyMatches(http.Request, deployment))
-            return Results.Json(new { ErrorCode = "SYNC_POP_CONFIGURATION_INVALID", CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status503ServiceUnavailable);
-
-        var proofHeaders = http.Request.Headers["DPoP"];
-        if (proofHeaders.Count == 0 || (proofHeaders.Count == 1 && string.IsNullOrEmpty(proofHeaders[0])))
-            return await NonceRequiredAsync(http, proofRuntime, proofSecurity, attemptCorrelationId.Value, cancellationToken);
-        if (proofHeaders.Count != 1) return InvalidProof(attemptCorrelationId.Value);
-        if (!TryReadBearer(http.Request, out var bearer))
-            return Results.Unauthorized();
-
-        VerifiedSyncProofMaterial verified;
-        try
-        {
-            verified = proofValidator.Validate(new SyncPopProofValidationInput(
-                proofHeaders[0]!, bearer, rawBody, deployment.CanonicalHtu!, attemptCorrelationId.Value,
-                DateTimeOffset.UtcNow));
-        }
-        catch (SyncPopNonceRequiredException)
-        {
-            return await NonceRequiredAsync(http, proofRuntime, proofSecurity,
-                attemptCorrelationId.Value, cancellationToken);
-        }
-        catch (SyncPopProofValidationException)
-        {
-            return InvalidProof(attemptCorrelationId.Value);
-        }
-
-        if (TryReadEnvelopeDeviceId(rawBody, out var envelopeDeviceId) &&
-            !string.Equals(envelopeDeviceId, current.DeviceId, StringComparison.Ordinal))
-            return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status403Forbidden);
-
-        AcceptedSyncProofContext acceptedProof;
-        try
-        {
-            acceptedProof = await proofRuntime.ClaimAsync(proofSecurity, verified, cancellationToken);
-        }
-        catch (SyncProofRuntimeException exception) when (exception.Code == "use_dpop_nonce")
-        {
-            return await NonceRequiredAsync(http, proofRuntime, proofSecurity, attemptCorrelationId.Value, cancellationToken);
-        }
-        catch (SyncProofRuntimeException exception) when (exception.Code == "invalid_dpop_proof")
-        {
-            return InvalidProof(attemptCorrelationId.Value);
-        }
-        catch (SyncProofRuntimeException exception) when (exception.Code == "DEVICE_PROOF_KEY_REQUIRED")
-        {
-            return Results.Json(new { ErrorCode = exception.Code, CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-        catch (SyncProofRuntimeException)
-        {
-            return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = attemptCorrelationId },
-                statusCode: StatusCodes.Status403Forbidden);
-        }
+        var authentication = await authenticator.AuthenticateAsync(
+            http, "/api/v1/sync/operations:batch", TryReadEnvelopeDeviceId, cancellationToken);
+        if (authentication.Failure is not null) return authentication.Failure;
+        var acceptedRequest = authentication.Accepted!;
+        var attemptCorrelationId = acceptedRequest.AttemptCorrelationId;
+        var proofSecurity = acceptedRequest.Security;
+        var acceptedProof = acceptedRequest.Proof;
+        var rawBody = acceptedRequest.RawBody;
 
         SyncBatchRequest? request;
         try { request = SyncBatchJsonContract.Deserialize(rawBody); }
@@ -255,7 +190,7 @@ public static class SyncApiModule
         }
 
         return Results.Ok(new SyncBatchResponse(
-            validRequest.ProtocolVersion, results, DateTimeOffset.UtcNow, attemptCorrelationId.Value));
+            validRequest.ProtocolVersion, results, DateTimeOffset.UtcNow, attemptCorrelationId));
     }
 
     private static string? ValidateOperation(SyncBatchOperationRequest? item)
@@ -280,44 +215,6 @@ public static class SyncApiModule
             item.EntityId, item.BaseVersion).ErrorCode;
     }
 
-    private static string? ValidateRequestMetadata(HttpRequest request)
-    {
-        if (request.ContentLength > MaximumRequestBodyBytes) return "REQUEST_BODY_TOO_LARGE";
-        if (request.ContentType is null ||
-            !request.ContentType.Split(';', 2)[0].Trim().Equals("application/json", StringComparison.OrdinalIgnoreCase))
-            return "CONTENT_TYPE_UNSUPPORTED";
-        var encoding = request.Headers["Content-Encoding"];
-        if (encoding.Count > 1 || (encoding.Count == 1 &&
-            !string.Equals(encoding[0], "identity", StringComparison.OrdinalIgnoreCase)))
-            return "CONTENT_ENCODING_UNSUPPORTED";
-        return null;
-    }
-
-    private static async Task<byte[]> ReadBoundedBodyAsync(HttpRequest request, CancellationToken cancellationToken)
-    {
-        await using var output = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        while (true)
-        {
-            var read = await request.Body.ReadAsync(buffer.AsMemory(), cancellationToken);
-            if (read == 0) break;
-            if (output.Length + read > MaximumRequestBodyBytes)
-                throw new SyncRequestException("REQUEST_BODY_TOO_LARGE");
-            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-        }
-        return output.ToArray();
-    }
-
-    private static bool TryReadBearer(HttpRequest request, out string bearer)
-    {
-        bearer = string.Empty;
-        var values = request.Headers["Authorization"];
-        if (values.Count != 1 || values[0] is null || !values[0]!.StartsWith("Bearer ", StringComparison.Ordinal))
-            return false;
-        bearer = values[0]!["Bearer ".Length..];
-        return bearer.Length > 0 && !bearer.Any(char.IsWhiteSpace);
-    }
-
     private static bool TryParseClientOccurredAt(string? value, out DateTimeOffset timestamp)
     {
         timestamp = default;
@@ -328,82 +225,8 @@ public static class SyncApiModule
                    out timestamp);
     }
 
-    private static Guid? ReadAttemptCorrelationId(HttpContext context)
-    {
-        var values = context.Request.Headers["X-Correlation-Id"];
-        return values.Count == 1 && Guid.TryParseExact(values[0], "D", out var value) && value != Guid.Empty
-            ? value : null;
-    }
-
-    private static bool TrySecurityContext(CurrentSecurityContext current, out SyncProofSecurityContext security)
-    {
-        security = null!;
-        if (!current.IsLocalSession || !current.BranchId.HasValue || !current.RegisteredDeviceId.HasValue ||
-            string.IsNullOrEmpty(current.DeviceId)) return false;
-        security = new SyncProofSecurityContext(current.UserId, current.CompanyId, current.BranchId.Value,
-            current.RegisteredDeviceId.Value, current.DeviceId);
-        return true;
-    }
-
     private static bool TryReadEnvelopeDeviceId(byte[] rawBody, out string? deviceId)
         => SyncBatchJsonContract.TryReadDeviceId(rawBody, out deviceId);
-
-    private static bool RequestTopologyMatches(HttpRequest request, SyncPopDeploymentProfile deployment)
-    {
-        if (!string.Equals(request.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
-        string host;
-        try { host = new System.Globalization.IdnMapping().GetAscii(request.Host.Host).ToLowerInvariant(); }
-        catch (ArgumentException) { return false; }
-        return string.Equals(host, deployment.PublicHost, StringComparison.Ordinal) &&
-               (request.Host.Port ?? 443) == deployment.PublicPort;
-    }
-
-    private static async Task<IResult> NonceRequiredAsync(HttpContext http,
-        SyncProofRuntimeService runtime, SyncProofSecurityContext security, Guid correlationId, CancellationToken ct)
-    {
-        try
-        {
-            var nonce = await runtime.IssueNonceAsync(security, ct);
-            http.Response.Headers.WWWAuthenticate = "DPoP error=\"use_dpop_nonce\"";
-            http.Response.Headers["DPoP-Nonce"] = nonce.Value;
-            http.Response.Headers.CacheControl = "no-store";
-            return Results.Json(new { ErrorCode = "use_dpop_nonce", CorrelationId = correlationId },
-                statusCode: StatusCodes.Status401Unauthorized);
-        }
-        catch (SyncProofRuntimeException exception) when (exception.Code == "DEVICE_PROOF_KEY_REQUIRED")
-        {
-            return Results.Json(new { ErrorCode = exception.Code, CorrelationId = correlationId },
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-        catch (SyncProofRuntimeException exception) when (exception.Code == "NONCE_GENERATION_FAILED")
-        {
-            return Results.Json(new { ErrorCode = "INTERNAL_ERROR", CorrelationId = correlationId },
-                statusCode: StatusCodes.Status500InternalServerError);
-        }
-        catch (SyncProofRuntimeException)
-        {
-            return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = correlationId },
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-    }
-
-    private static IResult InvalidProof(Guid correlationId)
-        => Results.Json(new { ErrorCode = "invalid_dpop_proof", CorrelationId = correlationId },
-            statusCode: StatusCodes.Status401Unauthorized);
-
-    private static IResult RequestLevelError(string code, Guid correlationId) => code switch
-    {
-        "REQUEST_BODY_TOO_LARGE" => Results.Json(new { ErrorCode = code, CorrelationId = correlationId },
-            statusCode: StatusCodes.Status413PayloadTooLarge),
-        "CONTENT_ENCODING_UNSUPPORTED" or "CONTENT_TYPE_UNSUPPORTED" => Results.Json(
-            new { ErrorCode = code, CorrelationId = correlationId }, statusCode: StatusCodes.Status415UnsupportedMediaType),
-        _ => Results.BadRequest(new { ErrorCode = code, CorrelationId = correlationId })
-    };
-
-    private sealed class SyncRequestException(string code) : InvalidOperationException(code)
-    {
-        public string Code { get; } = code;
-    }
 }
 
 /// <summary>

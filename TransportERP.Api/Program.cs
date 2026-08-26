@@ -66,6 +66,9 @@ builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();
 builder.Services.AddSyncBusinessExecution(syncRuntimePolicy.ServerExecutionEnabled == true);
+builder.Services.AddSyncConflictRuntime();
+builder.Services.AddScoped<SyncRetentionCleanupService>();
+builder.Services.AddHostedService<SyncRetentionCleanupWorker>();
 
 var configuredMode = builder.Configuration["Auth:Mode"] ?? "LocalSessions";
 if (!Enum.TryParse<TransportAuthMode>(configuredMode, true, out var authMode))
@@ -103,9 +106,12 @@ builder.Services.AddScoped<RegisteredDeviceService>();
 builder.Services.AddScoped<OfflineSyncPolicyService>();
 builder.Services.AddScoped<ISyncRuntimeGate, ClosedSyncRuntimeGate>();
 builder.Services.AddScoped<SyncProofRuntimeService>();
+builder.Services.AddScoped<ISyncProofRuntime>(services =>
+    services.GetRequiredService<SyncProofRuntimeService>());
 builder.Services.AddScoped<SyncProofCleanupService>();
 builder.Services.AddHostedService<SyncProofCleanupWorker>();
 builder.Services.AddSingleton<SyncPopProofValidator>();
+builder.Services.AddScoped<ISyncPopHttpRequestAuthenticator, SyncPopHttpRequestAuthenticator>();
 builder.Services.AddScoped<ProofKeyLifecycleService>();
 builder.Services.AddSingleton<ProofKeyChangeProofValidator>();
 var syncPopDeployment = SyncPopDeploymentProfile.Load(builder.Configuration);
@@ -171,6 +177,7 @@ app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
 app.MapTransportSync();
+app.MapSyncConflictRuntime();
 
 app.MapGet("/api/v1/audit/events", async (
     [AsParameters] AuditQueryRequest request,

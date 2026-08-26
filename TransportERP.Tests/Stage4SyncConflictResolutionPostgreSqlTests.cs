@@ -21,8 +21,7 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
         await using (var db = PostgreSqlTestEnvironment.CreateDbContext(connection))
         {
-            var result = await Service(db).ResolveAsync(scope.ConflictId,
-                KeepRequest("keep reviewed server value"), Context(scope));
+            var result = await ResolveAsync(Service(db), scope, KeepRequest("keep reviewed server value"));
             Assert.Equal("RESOLVED", result.ConflictStatus);
             Assert.Equal("REJECTED", result.OriginalOperationStatus);
             Assert.Equal("KEEP_SERVER", result.OriginalOperationErrorCode);
@@ -60,7 +59,7 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
             await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
             try
             {
-                _ = await Service(db).ResolveAsync(scope.ConflictId, KeepRequest("race decision"), Context(scope));
+                _ = await ResolveAsync(Service(db), scope, KeepRequest("race decision"));
                 return "SUCCESS";
             }
             catch (SyncRuleException exception)
@@ -87,32 +86,43 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         await db.Database.MigrateAsync();
         var scope = await SeedConflictAsync(db, "DENY");
 
-        var scopeError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest("reason"), Context(scope) with { BranchId = Guid.NewGuid() }));
+        var oldContext = Context(scope);
+        var oldProofError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
+            scope.ConflictId, KeepRequest("old proof must not resolve"), oldContext,
+            Proof(scope, oldContext) with { ReplayId = scope.OriginalReplayId }));
+        Assert.Equal("invalid_dpop_proof", oldProofError.Code);
+
+        var forgedProofError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
+            scope.ConflictId, KeepRequest("unpersisted proof must not resolve"), oldContext,
+            Proof(scope, oldContext) with { ReplayId = Guid.NewGuid() }));
+        Assert.Equal("invalid_dpop_proof", forgedProofError.Code);
+
+        var scopeError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db), scope, KeepRequest("reason"), Context(scope) with { BranchId = Guid.NewGuid() }));
         Assert.Equal("SCOPE_DENIED", scopeError.Code);
 
         db.ChangeTracker.Clear();
-        var permissionError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db, allowOriginal: false)
-            .ResolveAsync(scope.ConflictId, KeepRequest("reason"), Context(scope)));
+        var permissionError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db, allowOriginal: false), scope, KeepRequest("reason")));
         Assert.Equal("PERMISSION_DENIED", permissionError.Code);
 
-        var decisionError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, new ResolveSyncConflictRequest("USE_DEVICE_OVERWRITE", "reason"), Context(scope)));
+        var decisionError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db), scope, new ResolveSyncConflictRequest("USE_DEVICE_OVERWRITE", "reason")));
         Assert.Equal("RESOLUTION_INVALID", decisionError.Code);
-        var reasonError = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest(" "), Context(scope)));
+        var reasonError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db), scope, KeepRequest(" ")));
         Assert.Equal("REASON_REQUIRED", reasonError.Code);
 
-        _ = await Service(db).ResolveAsync(scope.ConflictId, KeepRequest("final reason"), Context(scope));
+        _ = await ResolveAsync(Service(db), scope, KeepRequest("final reason"));
         db.ChangeTracker.Clear();
-        var replay = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest("final reason"), Context(scope)));
+        var replay = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db), scope, KeepRequest("final reason")));
         Assert.Equal("CONFLICT_ALREADY_RESOLVED", replay.Code);
     }
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
-    public async Task Reapply_validates_new_identity_and_shape_then_requires_fresh_proof_without_mutation()
+    public async Task Reapply_enqueues_replacement_first_and_atomically_supersedes_original()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
         await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
@@ -123,9 +133,9 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
             "must use fresh client identity",
             new SyncReapplyAsNewRequest(
                 scope.ClientOperationId, scope.OperationCorrelationId, "UpdateWaybillDraft", "UPDATE", "Waybill",
-                scope.EntityId, 2, DateTimeOffset.UtcNow, "{\"FreightTotal\":100}"));
+                scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
         var identityError = await Assert.ThrowsAsync<SyncRuleException>(() =>
-            Service(db).ResolveAsync(scope.ConflictId, reusedIdentity, Context(scope)));
+            ResolveAsync(Service(db), scope, reusedIdentity));
         Assert.Equal("REAPPLY_ID_REUSE", identityError.Code);
 
         var crossEntity = new ResolveSyncConflictRequest(
@@ -133,30 +143,127 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
             "must preserve original entity",
             new SyncReapplyAsNewRequest(
                 $"replacement-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE", "Waybill",
-                Guid.NewGuid(), 2, DateTimeOffset.UtcNow, "{\"FreightTotal\":100}"));
+                Guid.NewGuid(), 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
         var scopeError = await Assert.ThrowsAsync<SyncRuleException>(() =>
-            Service(db).ResolveAsync(scope.ConflictId, crossEntity, Context(scope)));
+            ResolveAsync(Service(db), scope, crossEntity));
         Assert.Equal("REAPPLY_SCOPE_MISMATCH", scopeError.Code);
+
+        var hashMismatch = new ResolveSyncConflictRequest(
+            SyncConflictResolutionDecisions.ReapplyAsNew,
+            "reject mismatched payload hash",
+            new SyncReapplyAsNewRequest(
+                $"replacement-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE", "Waybill",
+                scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, new string('0', 64)));
+        var hashError = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            ResolveAsync(Service(db), scope, hashMismatch));
+        Assert.Equal("HASH_MISMATCH", hashError.Code);
+        Assert.Equal(1, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
 
         var request = new ResolveSyncConflictRequest(
             SyncConflictResolutionDecisions.ReapplyAsNew,
             "reapply reviewed draft",
             new SyncReapplyAsNewRequest(
                 $"replacement-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE", "Waybill",
-                scope.EntityId, 2, DateTimeOffset.UtcNow, "{\"FreightTotal\":100}"));
+                scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
 
-        var error = await Assert.ThrowsAsync<SyncRuleException>(() =>
-            Service(db).ResolveAsync(scope.ConflictId, request, Context(scope)));
-        Assert.Equal("REAPPLY_PROOF_REQUIRED", error.Code);
+        var result = await ResolveAsync(Service(db), scope, request);
+        Assert.Equal("RESOLVED", result.ConflictStatus);
+        Assert.Equal("RESOLVED", result.OriginalOperationStatus);
+        Assert.Equal("SUPERSEDED", result.OriginalOperationErrorCode);
+        Assert.NotNull(result.ReplacedByOperationId);
 
         db.ChangeTracker.Clear();
         var conflict = await db.ConflictCases.AsNoTracking().SingleAsync(x => x.Id == scope.ConflictId);
         var operation = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == scope.OperationId);
-        Assert.Equal("OPEN", conflict.Status);
-        Assert.Equal("CONFLICT", operation.Status);
-        Assert.Null(conflict.ReplacedByOperationId);
+        var replacement = await db.SyncOperations.AsNoTracking()
+            .SingleAsync(x => x.Id == conflict.ReplacedByOperationId);
+        Assert.Equal("RESOLVED", conflict.Status);
+        Assert.Equal("RESOLVED", operation.Status);
+        Assert.Equal("SUPERSEDED", operation.ErrorCode);
+        Assert.Equal("QUEUED", replacement.Status);
+        Assert.Equal(scope.CompanyId, replacement.CompanyId);
+        Assert.Equal(scope.BranchId, replacement.BranchId);
+        Assert.Equal(scope.UserId, replacement.UserId);
+        Assert.Equal(scope.RegisteredDeviceId, replacement.RegisteredDeviceId);
+        Assert.Equal(scope.ReplayId, replacement.AcceptedProofReplayId);
+        Assert.Equal(2, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
+        Assert.True(await db.AuditEvents.AnyAsync(x =>
+            x.Action == "SyncOperationQueued" && x.EntityId == replacement.Id));
+        var resolutionAudit = await db.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "SyncConflictResolved" && x.EntityId == scope.ConflictId);
+        Assert.DoesNotContain(Payload, resolutionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(PayloadHash, resolutionAudit.AfterJson ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Proof", resolutionAudit.AfterJson ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(scope.OperationCorrelationId, resolutionAudit.OperationCorrelationId);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Accepted_enqueue_inside_caller_transaction_neither_commits_nor_clears_caller_state()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedConflictAsync(db, "CALLER-TX");
+        var context = Context(scope);
+        var clientOperationId = $"caller-owned-{Guid.NewGuid():N}";
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        var replacement = await OperationService(db).EnqueueAcceptedSyncOperationAsync(
+            new EnqueueAcceptedSyncOperationCommand(
+                "sync-v1", "UpdateWaybillDraft", "UPDATE", "Waybill", scope.EntityId,
+                clientOperationId, Payload, PayloadHash, DateTimeOffset.UtcNow, Guid.NewGuid(), 2),
+            Proof(scope, context));
+
+        Assert.NotNull(db.Database.CurrentTransaction);
+        Assert.Equal("QUEUED", replacement.Status);
+        Assert.True(db.ChangeTracker.Entries<SyncOperation>().Any(x => x.Entity.Id == replacement.Id));
+        await transaction.RollbackAsync();
+        db.ChangeTracker.Clear();
+        Assert.False(await db.SyncOperations.AsNoTracking().AnyAsync(x => x.Id == replacement.Id));
         Assert.Equal(1, await db.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
-        Assert.False(await db.AuditEvents.AnyAsync(x =>
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Concurrent_reapply_resolvers_create_exactly_one_replacement_and_one_resolution_audit()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        ConflictScope scope;
+        await using (var seed = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            await seed.Database.MigrateAsync();
+            scope = await SeedConflictAsync(seed, "REAPPLY-RACE");
+        }
+
+        async Task<string> Resolve(string suffix)
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var request = new ResolveSyncConflictRequest(
+                SyncConflictResolutionDecisions.ReapplyAsNew, "concurrent reviewed reapply",
+                new SyncReapplyAsNewRequest(
+                    $"replacement-{suffix}-{Guid.NewGuid():N}", Guid.NewGuid(), "UpdateWaybillDraft",
+                    "UPDATE", "Waybill", scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
+            try
+            {
+                _ = await ResolveAsync(Service(db), scope, request);
+                return "SUCCESS";
+            }
+            catch (SyncRuleException exception)
+            {
+                return exception.Code;
+            }
+        }
+
+        var outcomes = await Task.WhenAll(Task.Run(() => Resolve("a")), Task.Run(() => Resolve("b")));
+        Assert.Single(outcomes, x => x == "SUCCESS");
+        Assert.Single(outcomes, x => x == "CONFLICT_ALREADY_RESOLVED");
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var conflict = await verify.ConflictCases.AsNoTracking().SingleAsync(x => x.Id == scope.ConflictId);
+        Assert.NotNull(conflict.ReplacedByOperationId);
+        Assert.Equal(2, await verify.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
+        Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
             x.Action == "SyncConflictResolved" && x.EntityId == scope.ConflictId));
     }
 
@@ -209,8 +316,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        var error = await Assert.ThrowsAsync<SyncRuleException>(() => Service(db).ResolveAsync(
-            scope.ConflictId, KeepRequest("must fail before mutation"), Context(scope)));
+        var error = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
+            Service(db), scope, KeepRequest("must fail before mutation")));
         Assert.Equal("DEVICE_NOT_REGISTERED", error.Code);
 
         db.ChangeTracker.Clear();
@@ -229,8 +336,32 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         => new(scope.UserId, scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId,
             1, scope.DeviceId, Guid.NewGuid());
 
+    private static AcceptedSyncProofContext Proof(ConflictScope scope, SyncConflictResolutionContext context)
+        => new(scope.ReplayId, context.UserId, context.CompanyId, context.BranchId,
+            context.RegisteredDeviceId, context.DeviceId, context.RegisteredDeviceCredentialVersion,
+            1, new string('t', 43), context.CorrelationId);
+
+    private static Task<SyncConflictResolutionResult> ResolveAsync(
+        SyncConflictResolutionService service,
+        ConflictScope scope,
+        ResolveSyncConflictRequest request,
+        SyncConflictResolutionContext? context = null)
+    {
+        var actualContext = context ?? Context(scope);
+        return service.ResolveAsync(scope.ConflictId, request, actualContext, Proof(scope, actualContext));
+    }
+
     private static SyncConflictResolutionService Service(TransportErpDbContext db, bool allowOriginal = true)
-        => new(db, new AuditEventService(db), new TestPermissionResolver(allowOriginal));
+        => new(db, new AuditEventService(db), new TestPermissionResolver(allowOriginal),
+            OperationService(db));
+
+    private static SyncOperationService OperationService(TransportErpDbContext db)
+        => new(db, new AuditEventService(db), new SyncRetryPolicy(5,
+            TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(5)));
+
+    private const string Payload = "{\"FreightTotal\":100}";
+    private static readonly string PayloadHash = Convert.ToHexString(
+        SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Payload))).ToLowerInvariant();
 
     private static async Task<ConflictScope> SeedConflictAsync(TransportErpDbContext db, string suffix)
     {
@@ -300,6 +431,16 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         };
         db.SyncProofReplays.Add(proof);
         await db.SaveChangesAsync();
+        var freshProof = new SyncProofReplay
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, RegisteredDeviceId = device.Id, DeviceId = deviceId,
+            DeviceAssignmentId = assignment.Id, UserId = user.Id, BranchId = branch.Id, ProofKeyVersion = 1,
+            ProofKeyThumbprint = new string('t', 43), JtiHash = RandomNumberGenerator.GetBytes(32),
+            HtuHash = RandomNumberGenerator.GetBytes(32), HttpMethod = "POST", NonceRecordId = nonce.Id,
+            IssuedAt = now, FirstSeenAt = now, ExpiresAt = now.AddMinutes(4), AttemptCorrelationId = Guid.NewGuid()
+        };
+        db.SyncProofReplays.Add(freshProof);
+        await db.SaveChangesAsync();
 
         var entityId = Guid.NewGuid();
         var operationCorrelationId = Guid.NewGuid();
@@ -327,7 +468,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         };
         db.ConflictCases.Add(conflict);
         await db.SaveChangesAsync();
-        return new(company.Id, branch.Id, user.Id, device.Id, assignment.Id, deviceId, operation.Id, conflict.Id,
+        return new(company.Id, branch.Id, user.Id, device.Id, assignment.Id, proof.Id, freshProof.Id,
+            deviceId, operation.Id, conflict.Id,
             entityId, operation.ClientOperationId, operationCorrelationId);
     }
 
@@ -345,6 +487,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         Guid UserId,
         Guid RegisteredDeviceId,
         Guid AssignmentId,
+        Guid OriginalReplayId,
+        Guid ReplayId,
         string DeviceId,
         Guid OperationId,
         Guid ConflictId,

@@ -40,6 +40,7 @@ public sealed class Stage4SyncConflictApiTests
         Assert.Equal(TestIdentity.UserId, capture.Context.UserId);
         Assert.Equal(TestIdentity.RegisteredDeviceId, capture.Context.RegisteredDeviceId);
         Assert.Equal(TestIdentity.DeviceId, capture.Context.DeviceId);
+        Assert.EndsWith($"/{conflictId:D}:resolve", capture.CanonicalPath, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -60,9 +61,9 @@ public sealed class Stage4SyncConflictApiTests
     }
 
     [Fact]
-    public async Task Endpoint_exposes_explicit_reapply_proof_blocker_without_creating_a_success_response()
+    public async Task Endpoint_forwards_fresh_attempt_proof_and_strict_reapply_payload()
     {
-        var capture = new CapturingConflictService { ErrorCode = "REAPPLY_PROOF_REQUIRED" };
+        var capture = new CapturingConflictService();
         await using var app = await StartAppAsync(capture, registered: true);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
@@ -70,11 +71,12 @@ public sealed class Stage4SyncConflictApiTests
         var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
             new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.ReapplyAsNew, "reason",
                 new SyncReapplyAsNewRequest("new-operation", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE",
-                    "Waybill", Guid.NewGuid(), 2, DateTimeOffset.UtcNow, "{}")));
+                    "Waybill", Guid.NewGuid(), 2, DateTimeOffset.UtcNow, "{}",
+                    Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("{}"u8)).ToLowerInvariant())));
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-        Assert.Equal("REAPPLY_PROOF_REQUIRED", body!.ErrorCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(capture.Proof);
+        Assert.Equal(capture.Context!.CorrelationId, capture.Proof!.AttemptCorrelationId);
     }
 
     [Theory]
@@ -96,9 +98,50 @@ public sealed class Stage4SyncConflictApiTests
         Assert.Equal("SCOPE_DENIED", body!.ErrorCode);
     }
 
+    [Theory]
+    [InlineData("OFFLINE_DISABLED", HttpStatusCode.Forbidden)]
+    [InlineData("invalid_dpop_proof", HttpStatusCode.Unauthorized)]
+    public async Task Gate_or_proof_failure_never_reaches_conflict_mutation(
+        string authenticationError,
+        HttpStatusCode expectedStatus)
+    {
+        var capture = new CapturingConflictService();
+        await using var app = await StartAppAsync(
+            capture, registered: true, authenticationError: authenticationError);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
+
+        var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
+            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason"));
+
+        Assert.Equal(expectedStatus, response.StatusCode);
+        Assert.Equal(0, capture.CallCount);
+    }
+
+    [Fact]
+    public async Task Strict_raw_body_codec_rejects_unknown_fields_after_proof_without_service_mutation()
+    {
+        var capture = new CapturingConflictService();
+        await using var app = await StartAppAsync(capture, registered: true);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
+        using var content = JsonContent.Create(new
+        {
+            decision = SyncConflictResolutionDecisions.KeepServerAndRejectLocal,
+            reason = "reviewed",
+            unexpected = "must fail"
+        });
+
+        var response = await client.PostAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, capture.CallCount);
+    }
+
     private static async Task<WebApplication> StartAppAsync(
         CapturingConflictService service,
-        bool registered)
+        bool registered,
+        string? authenticationError = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -107,7 +150,8 @@ public sealed class Stage4SyncConflictApiTests
         builder.Services.AddAuthorization(options => options.AddPolicy(
             SecurityPolicies.Permission(SyncConflictPermissionCodes.Resolve),
             policy => policy.RequireAuthenticatedUser().RequireClaim("permission", SyncConflictPermissionCodes.Resolve)));
-        builder.Services.AddSingleton<ICurrentSecurityContext>(new StaticCurrentSecurityContext(registered));
+        builder.Services.AddSingleton<ISyncPopHttpRequestAuthenticator>(
+            new FakeAuthenticator(registered, service, authenticationError));
         builder.Services.AddSingleton<ISyncConflictResolutionService>(service);
 
         var app = builder.Build();
@@ -123,15 +167,19 @@ public sealed class Stage4SyncConflictApiTests
         public int CallCount { get; private set; }
         public string? ErrorCode { get; init; }
         public SyncConflictResolutionContext? Context { get; private set; }
+        public AcceptedSyncProofContext? Proof { get; private set; }
+        public string? CanonicalPath { get; set; }
 
         public Task<SyncConflictResolutionResult> ResolveAsync(
             Guid conflictCaseId,
             ResolveSyncConflictRequest request,
             SyncConflictResolutionContext context,
+            AcceptedSyncProofContext acceptedProof,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
             Context = context;
+            Proof = acceptedProof;
             if (ErrorCode is not null) throw new SyncRuleException(ErrorCode, conflictCaseId.ToString());
             return Task.FromResult(new SyncConflictResolutionResult(
                 conflictCaseId, Guid.NewGuid(), request.Decision, "RESOLVED", "REJECTED", "KEEP_SERVER",
@@ -139,22 +187,46 @@ public sealed class Stage4SyncConflictApiTests
         }
     }
 
-    private sealed class StaticCurrentSecurityContext(bool registered) : ICurrentSecurityContext
+    private sealed class FakeAuthenticator(
+        bool registered,
+        CapturingConflictService capture,
+        string? authenticationError)
+        : ISyncPopHttpRequestAuthenticator
     {
-        public Task<CurrentSecurityContext?> ResolveAsync(
-            ClaimsPrincipal principal,
-            CancellationToken cancellationToken = default)
-            => Task.FromResult<CurrentSecurityContext?>(new CurrentSecurityContext(
+        public async Task<SyncHttpAuthenticationResult> AuthenticateAsync(
+            HttpContext http,
+            string canonicalPath,
+            TryReadSyncRequestDeviceId? tryReadBodyDeviceId,
+            CancellationToken cancellationToken)
+        {
+            capture.CanonicalPath = canonicalPath;
+            var correlationId = http.Request.Headers.TryGetValue("X-Correlation-Id", out var values) &&
+                                Guid.TryParseExact(values.SingleOrDefault(), "D", out var parsed)
+                ? parsed : Guid.NewGuid();
+            if (authenticationError is not null)
+            {
+                var status = authenticationError == "OFFLINE_DISABLED"
+                    ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized;
+                return new(null, Results.Json(new
+                    { ErrorCode = authenticationError, CorrelationId = correlationId }, statusCode: status));
+            }
+            if (!registered)
+                return new(null, Results.Json(new
+                    { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = correlationId },
+                    statusCode: StatusCodes.Status403Forbidden));
+            await using var body = new MemoryStream();
+            await http.Request.Body.CopyToAsync(body, cancellationToken);
+            var current = new CurrentSecurityContext(
                 TestIdentity.UserId, TestIdentity.CompanyId, TestIdentity.BranchId, Guid.NewGuid(),
-                TestIdentity.DeviceId, true,
-                registered ? TestIdentity.RegisteredDeviceId : null,
-                registered ? 1 : null));
-
-        public Task<bool> HasPermissionAsync(
-            CurrentSecurityContext context,
-            string permissionCode,
-            CancellationToken cancellationToken = default)
-            => Task.FromResult(true);
+                TestIdentity.DeviceId, true, TestIdentity.RegisteredDeviceId, 1);
+            var security = new SyncProofSecurityContext(
+                TestIdentity.UserId, TestIdentity.CompanyId, TestIdentity.BranchId,
+                TestIdentity.RegisteredDeviceId, TestIdentity.DeviceId);
+            var proof = new AcceptedSyncProofContext(
+                Guid.NewGuid(), TestIdentity.UserId, TestIdentity.CompanyId, TestIdentity.BranchId,
+                TestIdentity.RegisteredDeviceId, TestIdentity.DeviceId, 1, 1, new string('t', 43), correlationId);
+            return new(new AcceptedSyncHttpRequest(current, security, proof, body.ToArray(), correlationId), null);
+        }
     }
 
     private sealed class HeaderAuthenticationHandler(

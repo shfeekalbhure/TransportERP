@@ -3,8 +3,8 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Api.Sync;
 
 /// <summary>
-/// Registration-ready bounded retention worker. Registration is intentionally
-/// left to the composition root after review; this worker has no Offline gate.
+/// Bounded server-retention worker. It is independent of the Offline client gate
+/// and therefore remains active while production offline synchronization is closed.
 /// </summary>
 public sealed class SyncRetentionCleanupWorker(
     IServiceScopeFactory scopeFactory,
