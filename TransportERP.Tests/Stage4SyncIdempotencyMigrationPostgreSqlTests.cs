@@ -85,8 +85,12 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
             db.ChangeTracker.Clear();
 
             var persisted = await db.SyncOperations.SingleAsync(x => x.Id == firstOperation.Id);
+            var executionStartedAt = DateTimeOffset.UtcNow;
             persisted.Status = "SENDING";
-            persisted.UpdatedAt = DateTimeOffset.UtcNow;
+            persisted.ExecutionClaimToken = Guid.NewGuid();
+            persisted.ExecutionAttemptStartedAt = executionStartedAt;
+            persisted.ExecutionLeaseExpiresAt = executionStartedAt.AddMinutes(2);
+            persisted.UpdatedAt = executionStartedAt;
             persisted.RowVersion = RandomNumberGenerator.GetBytes(16);
             await db.SaveChangesAsync();
             persisted.ProofKeyVersion++;

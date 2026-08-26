@@ -24,7 +24,7 @@ public sealed record SyncRetryPolicy(
 {
     public SyncRetryPolicy Validate()
     {
-        if (MaxRetryCount < 1) throw new ArgumentOutOfRangeException(nameof(MaxRetryCount));
+        if (MaxRetryCount < 0) throw new ArgumentOutOfRangeException(nameof(MaxRetryCount));
         if (BaseDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(BaseDelay));
         if (MaxDelay < BaseDelay) throw new ArgumentOutOfRangeException(nameof(MaxDelay));
         return this;
@@ -60,6 +60,30 @@ public sealed record EnqueueAcceptedSyncOperationCommand(
 
 public sealed record TransitionSyncOperationCommand(Guid OperationId, string NewStatus, string? ErrorCode = null);
 
+public sealed record SyncOperationExecutionClaim(
+    Guid OperationId,
+    Guid ClaimToken,
+    DateTimeOffset AttemptStartedAt,
+    DateTimeOffset LeaseExpiresAt,
+    bool RecoveredStaleClaim,
+    Guid CompanyId,
+    Guid BranchId,
+    Guid UserId,
+    Guid RegisteredDeviceId,
+    string DeviceId,
+    string ProtocolVersion,
+    string ActionCode,
+    string OperationType,
+    string EntityType,
+    Guid? EntityId,
+    long? BaseVersion,
+    string PayloadJson,
+    string PayloadHash,
+    Guid OperationCorrelationId,
+    int ServerRetryCount);
+
+public sealed record SyncExecutionSuccess(Guid ResultEntityId, long ResultVersion);
+
 public sealed record ConflictCaseDraft(
     string DeviceSnapshot,
     string ServerSnapshot,
@@ -81,6 +105,179 @@ public sealed class SyncOperationService(
     SyncRetryPolicy retryPolicy)
 {
     private readonly SyncRetryPolicy _retryPolicy = retryPolicy.Validate();
+
+    /// <summary>
+    /// Atomically claims one due Stage 4 operation. The database row lock is held only until the
+    /// claim token and lease have been persisted; business execution happens after this method returns.
+    /// </summary>
+    public async Task<SyncOperationExecutionClaim?> ClaimNextExecutionAsync(
+        TimeSpan leaseDuration,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (leaseDuration < TimeSpan.FromSeconds(5) || leaseDuration > TimeSpan.FromMinutes(30))
+            throw new ArgumentOutOfRangeException(nameof(leaseDuration));
+        if (!db.Database.IsNpgsql())
+            throw new SyncRuleException("EXECUTION_STORE_UNSUPPORTED", "PostgreSQL is required");
+
+        var claimedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
+        var leaseExpiresAt = NormalizePostgreSqlTimestamp(claimedAt.Add(leaseDuration));
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            var candidates = await db.SyncOperations.FromSqlInterpolated($$"""
+                SELECT o.*
+                FROM transport_erp.sync_operations AS o
+                WHERE o."ActionCode" IS NOT NULL
+                  AND o."ProtocolVersion" = 'sync-v1'
+                  AND o."RegisteredDeviceId" IS NOT NULL
+                  AND o."BranchId" IS NOT NULL
+                  AND (
+                    o."Status" = 'QUEUED'
+                    OR (o."Status" = 'FAILED'
+                        AND o."NextRetryAt" IS NOT NULL
+                        AND o."NextRetryAt" <= {{claimedAt}}
+                        AND o."RetryCount" < {{_retryPolicy.MaxRetryCount}})
+                    OR (o."Status" = 'SENDING'
+                        AND o."ExecutionLeaseExpiresAt" IS NOT NULL
+                        AND o."ExecutionLeaseExpiresAt" <= {{claimedAt}})
+                  )
+                ORDER BY
+                  CASE WHEN o."Status" = 'SENDING' THEN 0
+                       WHEN o."Status" = 'FAILED' THEN 1 ELSE 2 END,
+                  o."ExecutionLeaseExpiresAt" NULLS LAST,
+                  o."NextRetryAt" NULLS LAST,
+                  o."CreatedAt",
+                  o."Id"
+                FOR UPDATE OF o SKIP LOCKED
+                LIMIT 1
+                """).AsTracking().ToListAsync(cancellationToken);
+
+            var operation = candidates.SingleOrDefault();
+            if (operation is null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+
+            var recoveredStaleClaim = operation.Status == "SENDING";
+            var claimToken = Guid.NewGuid();
+            operation.Status = "SENDING";
+            operation.ExecutionClaimToken = claimToken;
+            operation.ExecutionAttemptStartedAt = claimedAt;
+            operation.ExecutionLeaseExpiresAt = leaseExpiresAt;
+            operation.NextRetryAt = null;
+            operation.UpdatedAt = claimedAt;
+            operation.RowVersion = Guid.NewGuid().ToByteArray();
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                recoveredStaleClaim ? "SyncOperationExecutionReclaimed" : "SyncOperationExecutionClaimed",
+                "SUCCESS", nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                claimToken, operation.DeviceId,
+                Reason: $"LeaseExpiresAt={leaseExpiresAt:O}",
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+            var claim = ToExecutionClaim(operation, claimToken, claimedAt, leaseExpiresAt, recoveredStaleClaim);
+            await transaction.CommitAsync(cancellationToken);
+            return claim;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    public async Task<SyncOperation> CompleteExecutionSuccessAsync(
+        Guid operationId,
+        Guid claimToken,
+        SyncExecutionSuccess result,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (result.ResultEntityId == Guid.Empty)
+            throw new SyncRuleException("RESULT_ENTITY_INVALID", operationId.ToString());
+        if (result.ResultVersion <= 0)
+            throw new SyncRuleException("RESULT_VERSION_INVALID", operationId.ToString());
+
+        var completedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
+        return await CompleteClaimAsync(operationId, claimToken, completedAt, async operation =>
+        {
+            operation.ResultEntityId = result.ResultEntityId;
+            operation.ResultVersion = result.ResultVersion;
+            operation.Status = "SUCCEEDED";
+            operation.ErrorCode = null;
+            operation.NextRetryAt = null;
+            ClearExecutionClaim(operation);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationExecutionSucceeded", "SUCCESS", nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                claimToken, operation.DeviceId,
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Records an actual executor failure. Claiming, replaying enqueue, or recovering an expired
+    /// lease never calls this method and therefore never consumes the server retry counter.
+    /// </summary>
+    public async Task<SyncOperation> CompleteExecutionFailureAsync(
+        Guid operationId,
+        Guid claimToken,
+        string errorCode,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedError = errorCode.Trim().ToUpperInvariant();
+        if (normalizedError.Length is < 1 or > 80)
+            throw new SyncRuleException("ERROR_CODE_INVALID", operationId.ToString());
+
+        var failedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
+        return await CompleteClaimAsync(operationId, claimToken, failedAt, async operation =>
+        {
+            string auditAction;
+            string auditOutcome;
+            if (string.Equals(normalizedError, "RATE_LIMITED", StringComparison.Ordinal))
+            {
+                operation.RetryCount++;
+                if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
+                {
+                    operation.Status = "REJECTED";
+                    operation.ErrorCode = "RETRY_EXHAUSTED";
+                    operation.NextRetryAt = null;
+                    auditAction = "SyncOperationExecutionRetryExhausted";
+                    auditOutcome = "REJECTED";
+                }
+                else
+                {
+                    operation.Status = "FAILED";
+                    operation.ErrorCode = normalizedError;
+                    operation.NextRetryAt = NormalizePostgreSqlTimestamp(
+                        failedAt.Add(CalculateBackoff(operation.RetryCount)));
+                    auditAction = "SyncOperationExecutionFailed";
+                    auditOutcome = "FAILED";
+                }
+            }
+            else
+            {
+                operation.Status = "REJECTED";
+                operation.ErrorCode = normalizedError;
+                operation.NextRetryAt = null;
+                auditAction = "SyncOperationExecutionRejected";
+                auditOutcome = "REJECTED";
+            }
+
+            ClearExecutionClaim(operation);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                auditAction, auditOutcome, nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                claimToken, operation.DeviceId,
+                Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+        }, cancellationToken);
+    }
 
     public async Task<SyncOperation> EnqueueAcceptedSyncOperationAsync(
         EnqueueAcceptedSyncOperationCommand command,
@@ -307,16 +504,48 @@ public sealed class SyncOperationService(
             operation.NextRetryAt is not null && operation.NextRetryAt > DateTimeOffset.UtcNow)
             throw new SyncRuleException("RETRY_BACKOFF_ACTIVE", operation.ClientOperationId);
 
+        var transitionAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
         operation.Status = newStatus;
+        if (newStatus == "SENDING")
+        {
+            // Compatibility for the pre-worker transition API. The production worker uses
+            // ClaimNextExecutionAsync, whose SKIP LOCKED transaction is the authoritative claim path.
+            operation.ExecutionClaimToken = Guid.NewGuid();
+            operation.ExecutionAttemptStartedAt = transitionAt;
+            operation.ExecutionLeaseExpiresAt = transitionAt.AddMinutes(5);
+        }
+        else if (operation.ExecutionClaimToken is not null)
+        {
+            ClearExecutionClaim(operation);
+        }
         if (newStatus == "FAILED")
         {
             if (string.IsNullOrWhiteSpace(command.ErrorCode))
                 throw new SyncRuleException("ERROR_CODE_REQUIRED", operation.ClientOperationId);
             operation.ErrorCode = command.ErrorCode.Trim().ToUpperInvariant();
-            if (!IsRetryableErrorCode(operation.ErrorCode))
+            if (IsRetryableErrorCode(operation.ErrorCode))
+            {
+                // The legacy transition represents a completed SENDING attempt. It therefore
+                // follows the same actual-failure accounting as the claim-token completion path.
+                operation.RetryCount++;
+                if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
+                {
+                    operation.Status = "REJECTED";
+                    operation.ErrorCode = "RETRY_EXHAUSTED";
+                    operation.NextRetryAt = null;
+                }
+                else
+                {
+                    operation.NextRetryAt = NormalizePostgreSqlTimestamp(
+                        transitionAt.Add(CalculateBackoff(operation.RetryCount)));
+                }
+            }
+            else
+            {
                 operation.NextRetryAt = null;
+            }
         }
-        operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
+        operation.UpdatedAt = transitionAt;
         operation.RowVersion = Guid.NewGuid().ToByteArray();
         if (newStatus == "SUCCEEDED")
         {
@@ -329,7 +558,7 @@ public sealed class SyncOperationService(
             await audit.AppendAuditEventAsync(new AuditEventDraft(
                 "SyncOperationTransition", "SUCCESS", nameof(SyncOperation), operation.Id,
                 security.UserId, operation.CompanyId, operation.BranchId,
-                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: newStatus), cancellationToken);
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: operation.Status), cancellationToken);
             return operation;
         }, cancellationToken);
     }
@@ -382,11 +611,11 @@ public sealed class SyncOperationService(
             }, cancellationToken);
         }
 
+        // A manual retry request only schedules the next attempt. The counter is execution
+        // evidence and is incremented exclusively by CompleteExecutionFailureAsync.
         var retryNumber = operation.RetryCount + 1;
         var delay = CalculateBackoff(retryNumber);
-        operation.RetryCount = retryNumber;
         operation.NextRetryAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow.Add(delay));
-        operation.ErrorCode = null;
         operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
         operation.RowVersion = Guid.NewGuid().ToByteArray();
         return await ExecuteMutationAsync(async () =>
@@ -395,7 +624,8 @@ public sealed class SyncOperationService(
             await audit.AppendAuditEventAsync(new AuditEventDraft(
                 "SyncOperationRetry", "SUCCESS", nameof(SyncOperation), operation.Id,
                 security.UserId, operation.CompanyId, operation.BranchId,
-                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: $"RetryCount={retryNumber}"), cancellationToken);
+                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId,
+                Reason: $"ScheduledRetryNumber={retryNumber};RetryCount={operation.RetryCount}"), cancellationToken);
             return operation;
         }, cancellationToken);
     }
@@ -412,6 +642,7 @@ public sealed class SyncOperationService(
         var query = db.SyncOperations.AsNoTracking()
             .Where(x => x.CompanyId == security.CompanyId && x.Status == "FAILED" &&
                         x.NextRetryAt != null && x.NextRetryAt <= dueAt &&
+                        x.RetryCount < _retryPolicy.MaxRetryCount &&
                         (x.ErrorCode == null || x.ErrorCode == "RATE_LIMITED"));
         if (security.BranchId is not null)
             query = query.Where(x => x.BranchId == security.BranchId);
@@ -544,6 +775,86 @@ public sealed class SyncOperationService(
             }
             throw;
         }
+    }
+
+    private async Task<SyncOperation> CompleteClaimAsync(
+        Guid operationId,
+        Guid claimToken,
+        DateTimeOffset completedAt,
+        Func<SyncOperation, Task> mutateAndAudit,
+        CancellationToken cancellationToken)
+    {
+        if (claimToken == Guid.Empty)
+            throw new SyncRuleException("EXECUTION_CLAIM_INVALID", operationId.ToString());
+        if (!db.Database.IsNpgsql())
+            throw new SyncRuleException("EXECUTION_STORE_UNSUPPORTED", "PostgreSQL is required");
+
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            var rows = await db.SyncOperations.FromSqlInterpolated($$"""
+                SELECT o.*
+                FROM transport_erp.sync_operations AS o
+                WHERE o."Id" = {{operationId}}
+                FOR UPDATE OF o
+                """).AsTracking().ToListAsync(cancellationToken);
+            var operation = rows.SingleOrDefault()
+                ?? throw new SyncRuleException("OPERATION_NOT_FOUND", operationId.ToString());
+            if (operation.Status != "SENDING" ||
+                operation.ExecutionClaimToken != claimToken ||
+                operation.ExecutionLeaseExpiresAt is null ||
+                operation.ExecutionLeaseExpiresAt <= completedAt)
+                throw new SyncRuleException("EXECUTION_CLAIM_LOST", operationId.ToString());
+
+            operation.UpdatedAt = completedAt;
+            operation.RowVersion = Guid.NewGuid().ToByteArray();
+            await mutateAndAudit(operation);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return operation;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    private static SyncOperationExecutionClaim ToExecutionClaim(
+        SyncOperation operation,
+        Guid claimToken,
+        DateTimeOffset claimedAt,
+        DateTimeOffset leaseExpiresAt,
+        bool recoveredStaleClaim)
+        => new(
+            operation.Id,
+            claimToken,
+            claimedAt,
+            leaseExpiresAt,
+            recoveredStaleClaim,
+            operation.CompanyId,
+            operation.BranchId!.Value,
+            operation.UserId,
+            operation.RegisteredDeviceId!.Value,
+            operation.DeviceId,
+            operation.ProtocolVersion!,
+            operation.ActionCode!,
+            operation.OperationType,
+            operation.EntityType,
+            operation.EntityId,
+            operation.BaseVersion,
+            operation.PayloadJson,
+            operation.PayloadHash,
+            operation.OperationCorrelationId!.Value,
+            operation.RetryCount);
+
+    private static void ClearExecutionClaim(SyncOperation operation)
+    {
+        operation.ExecutionClaimToken = null;
+        operation.ExecutionAttemptStartedAt = null;
+        operation.ExecutionLeaseExpiresAt = null;
     }
 
     private async Task EnsureSecurityAsync(

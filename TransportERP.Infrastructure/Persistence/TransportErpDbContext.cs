@@ -579,6 +579,13 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_status", "\"Status\" IN ('QUEUED','SENDING','SUCCEEDED','FAILED','CONFLICT','REJECTED','RESOLVED')");
             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
+            t.HasCheckConstraint("ck_sync_execution_claim_bundle",
+                "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND " +
+                "\"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND " +
+                "\"ExecutionAttemptStartedAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" IS NOT NULL AND " +
+                "\"ExecutionLeaseExpiresAt\" > \"ExecutionAttemptStartedAt\") OR " +
+                "(\"Status\" <> 'SENDING' AND \"ExecutionClaimToken\" IS NULL AND " +
+                "\"ExecutionAttemptStartedAt\" IS NULL AND \"ExecutionLeaseExpiresAt\" IS NULL)");
             t.HasCheckConstraint("ck_sync_registered_device_binding",
                 "(\"RegisteredDeviceId\" IS NULL AND \"RegisteredDeviceCredentialVersion\" IS NULL) OR " +
                 "(\"RegisteredDeviceId\" IS NOT NULL AND \"RegisteredDeviceCredentialVersion\" >= 1 AND \"BranchId\" IS NOT NULL)");
@@ -621,6 +628,11 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         sync.HasIndex(x => new { x.DeviceId, x.CreatedAt });
         sync.HasIndex(x => new { x.RegisteredDeviceId, x.CompanyId, x.DeviceId });
         sync.HasIndex(x => x.PayloadHash);
+        sync.HasIndex(x => x.ExecutionClaimToken).IsUnique()
+            .HasFilter("\"ExecutionClaimToken\" IS NOT NULL")
+            .HasDatabaseName("ux_sync_operation_execution_claim");
+        sync.HasIndex(x => new { x.Status, x.NextRetryAt, x.ExecutionLeaseExpiresAt, x.CreatedAt })
+            .HasDatabaseName("ix_sync_operation_execution_queue");
         sync.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })

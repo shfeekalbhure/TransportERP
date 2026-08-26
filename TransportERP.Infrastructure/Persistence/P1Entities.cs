@@ -439,6 +439,9 @@ public sealed class SyncOperation : P1Entity
     public int RetryCount { get; set; }
     public DateTimeOffset? NextRetryAt { get; set; }
     public string? ErrorCode { get; set; }
+    public Guid? ExecutionClaimToken { get; set; }
+    public DateTimeOffset? ExecutionAttemptStartedAt { get; set; }
+    public DateTimeOffset? ExecutionLeaseExpiresAt { get; set; }
     public Guid? RegisteredDeviceId { get; set; }
     public int? RegisteredDeviceCredentialVersion { get; set; }
     public string? ActionCode { get; set; }

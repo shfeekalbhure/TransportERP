@@ -144,6 +144,179 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Execution_claim_race_allows_exactly_one_worker()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        Guid operationId;
+        await using (var setup = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            await setup.Database.MigrateAsync();
+            var scope = await SeedAsync(setup, "EXECUTION-RACE");
+            var runtime = new SyncProofRuntimeService(setup, new AuditEventService(setup));
+            var nonce = await runtime.IssueNonceAsync(scope.Security);
+            var proof = await runtime.ClaimAsync(scope.Security,
+                Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+            operationId = (await CreateOperationService(setup).EnqueueAcceptedSyncOperationAsync(
+                Command("execution-race-" + Guid.NewGuid().ToString("N"), "{}"), proof)).Id;
+            await RejectOtherExecutionCandidatesAsync(setup, operationId);
+        }
+
+        await using var firstDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await using var secondDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var claimAt = Normalize(DateTimeOffset.UtcNow);
+        var first = CreateOperationService(firstDb).ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), claimAt);
+        var second = CreateOperationService(secondDb).ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), claimAt);
+        var claims = await Task.WhenAll(first, second);
+
+        var winner = Assert.Single(claims, x => x is not null)!;
+        Assert.Equal(operationId, winner.OperationId);
+        Assert.Single(claims, x => x is null);
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var persisted = await verify.SyncOperations.SingleAsync(x => x.Id == operationId);
+        Assert.Equal("SENDING", persisted.Status);
+        Assert.Equal(winner.ClaimToken, persisted.ExecutionClaimToken);
+        Assert.Equal(0, persisted.RetryCount);
+        Assert.Single(await verify.AuditEvents.Where(x => x.EntityId == operationId &&
+            x.Action == "SyncOperationExecutionClaimed").ToListAsync());
+        await CreateOperationService(verify).CompleteExecutionFailureAsync(
+            operationId, winner.ClaimToken, "TEST_EXECUTION_COMPLETE", claimAt.AddSeconds(1));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Expired_sending_lease_is_recovered_after_restart_without_consuming_retry()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        Guid operationId;
+        SyncOperationExecutionClaim original;
+        SyncOperationExecutionClaim recovered;
+        var claimedAt = Normalize(DateTimeOffset.UtcNow.AddMinutes(1));
+        await using (var firstProcess = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            await firstProcess.Database.MigrateAsync();
+            var scope = await SeedAsync(firstProcess, "EXECUTION-RESTART");
+            var runtime = new SyncProofRuntimeService(firstProcess, new AuditEventService(firstProcess));
+            var nonce = await runtime.IssueNonceAsync(scope.Security);
+            var proof = await runtime.ClaimAsync(scope.Security,
+                Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+            operationId = (await CreateOperationService(firstProcess).EnqueueAcceptedSyncOperationAsync(
+                Command("execution-restart-" + Guid.NewGuid().ToString("N"), "{}"), proof)).Id;
+            await RejectOtherExecutionCandidatesAsync(firstProcess, operationId);
+            original = Assert.IsType<SyncOperationExecutionClaim>(await CreateOperationService(firstProcess)
+                .ClaimNextExecutionAsync(TimeSpan.FromMinutes(2), claimedAt));
+        }
+
+        await using (var beforeExpiryDb = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            var beforeExpiry = await CreateOperationService(beforeExpiryDb).ClaimNextExecutionAsync(
+                TimeSpan.FromMinutes(2), claimedAt.AddMinutes(1));
+            Assert.Null(beforeExpiry);
+        }
+
+        await using (var restartedDb = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            var restartedService = CreateOperationService(restartedDb);
+            recovered = Assert.IsType<SyncOperationExecutionClaim>(await restartedService
+                .ClaimNextExecutionAsync(TimeSpan.FromMinutes(2), claimedAt.AddMinutes(3)));
+            Assert.Equal(operationId, recovered.OperationId);
+            Assert.True(recovered.RecoveredStaleClaim);
+            Assert.NotEqual(original.ClaimToken, recovered.ClaimToken);
+            Assert.Equal(0, recovered.ServerRetryCount);
+            var staleOwner = await Assert.ThrowsAsync<SyncRuleException>(() => restartedService
+                .CompleteExecutionSuccessAsync(operationId, original.ClaimToken,
+                    new SyncExecutionSuccess(Guid.NewGuid(), 1), claimedAt.AddMinutes(3).AddSeconds(1)));
+            Assert.Equal("EXECUTION_CLAIM_LOST", staleOwner.Code);
+        }
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var persisted = await verify.SyncOperations.SingleAsync(x => x.Id == operationId);
+        Assert.Equal(0, persisted.RetryCount);
+        Assert.Equal(2, await verify.AuditEvents.CountAsync(x => x.EntityId == operationId &&
+            (x.Action == "SyncOperationExecutionClaimed" ||
+             x.Action == "SyncOperationExecutionReclaimed")));
+        await CreateOperationService(verify).CompleteExecutionFailureAsync(
+            operationId, recovered.ClaimToken, "TEST_EXECUTION_COMPLETE", claimedAt.AddMinutes(3).AddSeconds(1));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Actual_rate_limited_failures_alone_consume_budget_and_exhaustion_clears_claim()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "EXECUTION-EXHAUSTION");
+        var runtime = new SyncProofRuntimeService(db, new AuditEventService(db));
+        var nonce = await runtime.IssueNonceAsync(scope.Security);
+        var proof = await runtime.ClaimAsync(scope.Security,
+            Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var policy = new SyncRetryPolicy(2, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
+        var service = new SyncOperationService(db, new AuditEventService(db), policy);
+        var operation = await service.EnqueueAcceptedSyncOperationAsync(
+            Command("execution-exhaustion-" + Guid.NewGuid().ToString("N"), "{}"), proof);
+        await RejectOtherExecutionCandidatesAsync(db, operation.Id);
+        var attemptAt = Normalize(DateTimeOffset.UtcNow.AddMinutes(1));
+
+        var first = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), attemptAt));
+        Assert.Equal(0, first.ServerRetryCount);
+        operation = await service.CompleteExecutionFailureAsync(
+            operation.Id, first.ClaimToken, "RATE_LIMITED", attemptAt.AddSeconds(1));
+        Assert.Equal("FAILED", operation.Status);
+        Assert.Equal(1, operation.RetryCount);
+        Assert.Null(operation.ExecutionClaimToken);
+        Assert.Equal(attemptAt.AddSeconds(6), operation.NextRetryAt);
+
+        var secondDueAt = operation.NextRetryAt!.Value;
+        var second = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), secondDueAt));
+        Assert.Equal(1, second.ServerRetryCount);
+        operation = await service.CompleteExecutionFailureAsync(
+            operation.Id, second.ClaimToken, "RATE_LIMITED", secondDueAt.AddSeconds(1));
+        Assert.Equal("REJECTED", operation.Status);
+        Assert.Equal("RETRY_EXHAUSTED", operation.ErrorCode);
+        Assert.Equal(2, operation.RetryCount);
+        Assert.Null(operation.NextRetryAt);
+        Assert.Null(operation.ExecutionClaimToken);
+        Assert.Null(operation.ExecutionAttemptStartedAt);
+        Assert.Null(operation.ExecutionLeaseExpiresAt);
+        Assert.Null(await service.ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), secondDueAt.AddMinutes(10)));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Enqueue_proof_replay_does_not_consume_server_execution_retry_budget()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "EXECUTION-ENQUEUE-REPLAY");
+        var runtime = new SyncProofRuntimeService(db, new AuditEventService(db));
+        var firstNonce = await runtime.IssueNonceAsync(scope.Security);
+        var firstProof = await runtime.ClaimAsync(scope.Security,
+            Proof(firstNonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var secondNonce = await runtime.IssueNonceAsync(scope.Security);
+        var secondProof = await runtime.ClaimAsync(scope.Security,
+            Proof(secondNonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var command = Command("execution-enqueue-replay-" + Guid.NewGuid().ToString("N"), "{}");
+        var service = CreateOperationService(db);
+
+        var first = await service.EnqueueAcceptedSyncOperationAsync(command, firstProof);
+        var replay = await service.EnqueueAcceptedSyncOperationAsync(command, secondProof);
+
+        Assert.Equal(first.Id, replay.Id);
+        Assert.Equal(0, replay.RetryCount);
+        Assert.Equal("QUEUED", replay.Status);
+        Assert.Null(replay.ExecutionClaimToken);
+        Assert.Single(await db.SyncOperations.Where(x => x.Id == first.Id).ToListAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Nonce_and_claim_are_tenant_scoped_and_expiry_is_rechecked_under_lock()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -415,6 +588,23 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
 
     private static SyncOperationService CreateOperationService(TransportErpDbContext db)
         => new(db, new AuditEventService(db), new SyncRetryPolicy(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30)));
+
+    private static Task<int> RejectOtherExecutionCandidatesAsync(
+        TransportErpDbContext db,
+        Guid retainedOperationId)
+        => db.Database.ExecuteSqlInterpolatedAsync($$"""
+            UPDATE transport_erp.sync_operations
+            SET "Status"='REJECTED',
+                "ErrorCode"='TEST_EXECUTION_ISOLATION',
+                "NextRetryAt"=NULL,
+                "ExecutionClaimToken"=NULL,
+                "ExecutionAttemptStartedAt"=NULL,
+                "ExecutionLeaseExpiresAt"=NULL,
+                "UpdatedAt"={{Normalize(DateTimeOffset.UtcNow)}}
+            WHERE "Id"<>{{retainedOperationId}}
+              AND "ActionCode" IS NOT NULL
+              AND "Status" IN ('QUEUED','FAILED','SENDING')
+            """);
 
     private static EnqueueAcceptedSyncOperationCommand Command(string clientOperationId, string payload)
         => new("sync-v1", "CreateJournalEntry", "CREATE", "JournalEntry", null,

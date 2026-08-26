@@ -2275,6 +2275,15 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<DateTimeOffset?>("ExecutionAttemptStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ExecutionClaimToken")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ExecutionLeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("NextRetryAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2374,11 +2383,21 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EntityType", "EntityId", "CreatedAt");
 
+                    b.HasIndex("ExecutionClaimToken")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sync_operation_execution_claim")
+                        .HasFilter("\"ExecutionClaimToken\" IS NOT NULL");
+
                     b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
+
+                    b.HasIndex("Status", "NextRetryAt", "ExecutionLeaseExpiresAt", "CreatedAt")
+                        .HasDatabaseName("ix_sync_operation_execution_queue");
 
                     b.ToTable("sync_operations", "transport_erp", t =>
                         {
                             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
+
+                            t.HasCheckConstraint("ck_sync_execution_claim_bundle", "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND \"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"ExecutionAttemptStartedAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" > \"ExecutionAttemptStartedAt\") OR (\"Status\" <> 'SENDING' AND \"ExecutionClaimToken\" IS NULL AND \"ExecutionAttemptStartedAt\" IS NULL AND \"ExecutionLeaseExpiresAt\" IS NULL)");
 
                             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
 
