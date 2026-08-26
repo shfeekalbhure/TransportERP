@@ -3,6 +3,7 @@ using TransportERP.Application.Sync;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Geo;
 using TransportERP.Contracts.Waybills;
+using TransportERP.Application.Waybills;
 
 namespace TransportERP.Tests;
 
@@ -128,6 +129,20 @@ public sealed class Stage4SyncBusinessDispatcherTests
     }
 
     [Fact]
+    public async Task Domain_concurrency_is_returned_as_typed_conflict_not_rejection()
+    {
+        var definition = Definition(SyncActionCode.UpdateWaybillDraft);
+        var actor = Actor(definition.RequiredPermission);
+        var adapters = new FakeBusinessAdapters { ErrorCodeToThrow = "CONCURRENCY_CONFLICT" };
+
+        var result = await CreateDispatcher(adapters).DispatchAsync(actor, Command(actor, definition));
+
+        Assert.True(result.IsConflict);
+        Assert.Equal("CONFLICT", result.Status);
+        Assert.Equal("CONCURRENCY_CONFLICT", result.ErrorCode);
+    }
+
+    [Fact]
     public async Task Strict_payload_reader_rejects_unknown_fields_without_invoking_an_adapter()
     {
         var definition = Definition(SyncActionCode.CreateOperationalParty);
@@ -196,6 +211,7 @@ public sealed class Stage4SyncBusinessDispatcherTests
         public string? LastClientOperationId { get; private set; }
         public Guid? LastRegisteredDeviceId { get; private set; }
         public int AuditCount { get; private set; }
+        public string? ErrorCodeToThrow { get; init; }
 
         public Task<SyncBusinessActionResult> CreateDraftAsync(
             SyncBusinessExecutionContext context, CreateWaybillDraftRequest request, CancellationToken cancellationToken)
@@ -230,13 +246,15 @@ public sealed class Stage4SyncBusinessDispatcherTests
 
         private Task<SyncBusinessActionResult> Execute(string action, SyncBusinessExecutionContext context)
         {
+            if (ErrorCodeToThrow is not null)
+                throw new WaybillApplicationException(ErrorCodeToThrow);
             LastClientOperationId = context.ClientOperationId;
             LastRegisteredDeviceId = context.RegisteredDeviceId;
             var key = (action, context.ClientOperationId);
             if (!_results.TryGetValue(key, out var result))
             {
                 result = new SyncBusinessActionResult(Guid.NewGuid(),
-                    action == "LoadAllocatedQuantity" ? null : 1L);
+                    action is "LoadAllocatedQuantity" or "RecordCollection" ? null : 1L);
                 _results.Add(key, result);
                 EffectCount++;
             }

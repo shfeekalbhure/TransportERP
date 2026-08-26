@@ -10,6 +10,7 @@ namespace TransportERP.Tests;
 
 public sealed class Stage4SyncApiContractTests
 {
+    private const string ConflictPath = "/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve";
     [Fact]
     public void Envelope_codec_accepts_exact_web_camel_case_and_rejects_pascal_or_unknown_properties()
     {
@@ -58,7 +59,7 @@ public sealed class Stage4SyncApiContractTests
         var http = Request(body);
 
         var result = await authenticator.AuthenticateAsync(
-            http, "/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve", null, default);
+            http, ConflictPath, null, default);
 
         Assert.NotNull(result.Failure);
         Assert.Null(result.Accepted);
@@ -77,7 +78,7 @@ public sealed class Stage4SyncApiContractTests
         var http = Request(body);
 
         var result = await authenticator.AuthenticateAsync(
-            http, "/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve", null, default);
+            http, ConflictPath, null, default);
 
         Assert.NotNull(result.Failure);
         Assert.Equal((long)bytes.Length, body.Position);
@@ -96,10 +97,34 @@ public sealed class Stage4SyncApiContractTests
         http.Request.Host = new HostString("attacker.invalid");
 
         var result = await authenticator.AuthenticateAsync(
-            http, "/api/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve", null, default);
+            http, ConflictPath, null, default);
 
         Assert.NotNull(result.Failure);
         Assert.Equal(body.Length, body.Position);
+        Assert.Equal(0, runtime.IssueCount);
+        Assert.Equal(0, runtime.ClaimCount);
+    }
+
+    [Theory]
+    [InlineData(ConflictPath, "/API/v1/sync/conflicts/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee:resolve", "")]
+    [InlineData(ConflictPath, ConflictPath, "?override=true")]
+    [InlineData("/api/v1/sync/operations:batch", "/API/v1/sync/operations:batch", "")]
+    [InlineData("/api/v1/sync/operations:batch", "/api/v1/sync/operations:batch", "?override=true")]
+    public async Task Shared_authenticator_rejects_path_case_or_query_spoof_without_nonce_or_claim_state(
+        string canonicalPath,
+        string requestPath,
+        string query)
+    {
+        var runtime = new RecordingProofRuntime();
+        var authenticator = Authenticator(open: true, runtime: runtime);
+        var http = Request(new MemoryStream("{}"u8.ToArray()));
+        http.Request.Path = requestPath;
+        http.Request.QueryString = new QueryString(query);
+
+        var result = await authenticator.AuthenticateAsync(http, canonicalPath, null, default);
+
+        Assert.NotNull(result.Failure);
+        Assert.Null(result.Accepted);
         Assert.Equal(0, runtime.IssueCount);
         Assert.Equal(0, runtime.ClaimCount);
     }
@@ -122,6 +147,7 @@ public sealed class Stage4SyncApiContractTests
         http.User = new ClaimsPrincipal(new ClaimsIdentity("test"));
         http.Request.Scheme = "https";
         http.Request.Host = new HostString("sync.example.test");
+        http.Request.Path = ConflictPath;
         http.Request.ContentType = "application/json";
         http.Request.ContentLength = body.Length;
         http.Request.Headers["X-Correlation-Id"] = Guid.NewGuid().ToString("D");

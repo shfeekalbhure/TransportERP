@@ -90,7 +90,7 @@ public sealed class WaybillApplicationService(
             var persisted = await waybills.AddOrGetAsync(candidate, operationId, ct);
             if (persisted.Id == candidate.Id)
                 await audit.WriteAsync(context, "WaybillDraftCreate", "SUCCESS", "Waybill", persisted.Id,
-                    null, Snapshot(persisted), null, ct);
+                    null, null, $"Version={persisted.Version}", ct);
             return ToResponse(persisted, context.CorrelationId);
         }, cancellationToken);
     }
@@ -117,14 +117,13 @@ public sealed class WaybillApplicationService(
                     throw new WaybillApplicationException("IDEMPOTENCY_CONFLICT");
                 return ToResponse(aggregate, context.CorrelationId);
             }
-            var before = Snapshot(aggregate);
             aggregate.UpdateDraft(
                 request.WaybillDateTime, request.OriginId, request.DestinationId, request.CurrencyId,
                 request.ExchangeRate, request.FreightTotal, request.DiscountTotal, request.ServiceType,
                 request.Priority, domainParties, request.Items.Select(ToDomainItem));
             await waybills.SaveAsync(aggregate, request.ExpectedVersion, operationId, ct);
             await audit.WriteAsync(context, "WaybillDraftUpdate", "SUCCESS", "Waybill", aggregate.Id,
-                before, Snapshot(aggregate), null, ct);
+                null, null, $"BaseVersion={request.ExpectedVersion};ResultVersion={aggregate.Version}", ct);
             return ToResponse(aggregate, context.CorrelationId);
         }, cancellationToken);
     }
@@ -285,7 +284,7 @@ public sealed class WaybillApplicationService(
             }
             var created = await parties.CreateAsync(context.CompanyId, context.BranchId, NewPartyNo(), request, ct);
             await audit.WriteAsync(context, "OperationalPartyCreate", "SUCCESS", "OperationalParty", created.Id,
-                null, JsonSerializer.Serialize(new { created.PartyNo, created.Name, created.Mobile }), null, ct);
+                null, null, $"Version={created.Version}", ct);
             return ToPartyResponse(created);
         }, cancellationToken);
     }

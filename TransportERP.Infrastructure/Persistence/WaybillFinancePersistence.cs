@@ -141,7 +141,7 @@ public sealed class EfWaybillFinanceStore(TransportErpDbContext db, IWaybillAudi
             waybill.UpdatedAt = DateTimeOffset.UtcNow;
             await Save(cancellationToken);
             await audit.WriteAsync(context, "WaybillCollectionRecord", "SUCCESS", "CollectionTransaction", entity.Id,
-                null, CollectionAuditJson(entity), null, cancellationToken);
+                null, null, "CollectionRecorded", cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return CollectionResponseOf(context, entity);
         }

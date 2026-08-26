@@ -141,9 +141,9 @@ public sealed class SyncConflictResolutionService(
                         reapply.OperationCorrelationId, reapply.BaseVersion),
                     acceptedProof, cancellationToken);
                 if (replacement.Id == operation.Id || replacement.CompanyId != operation.CompanyId ||
-                    replacement.BranchId != operation.BranchId || replacement.UserId != operation.UserId ||
-                    replacement.RegisteredDeviceId != operation.RegisteredDeviceId ||
-                    !string.Equals(replacement.DeviceId, operation.DeviceId, StringComparison.Ordinal) ||
+                    replacement.BranchId != operation.BranchId || replacement.UserId != context.UserId ||
+                    replacement.RegisteredDeviceId != context.RegisteredDeviceId ||
+                    !string.Equals(replacement.DeviceId, context.DeviceId, StringComparison.Ordinal) ||
                     !string.Equals(replacement.ActionCode, operation.ActionCode, StringComparison.Ordinal) ||
                     !string.Equals(replacement.OperationType, operation.OperationType, StringComparison.Ordinal) ||
                     !string.Equals(replacement.EntityType, operation.EntityType, StringComparison.Ordinal) ||
@@ -216,8 +216,6 @@ public sealed class SyncConflictResolutionService(
         CancellationToken cancellationToken)
     {
         if (operation.CompanyId != context.CompanyId || operation.BranchId != context.BranchId ||
-            operation.UserId != context.UserId || operation.RegisteredDeviceId != context.RegisteredDeviceId ||
-            !string.Equals(operation.DeviceId, context.DeviceId, StringComparison.Ordinal) ||
             conflict.CompanyId != context.CompanyId || conflict.BranchId != context.BranchId)
             throw new SyncRuleException("SCOPE_DENIED", conflict.Id.ToString());
 

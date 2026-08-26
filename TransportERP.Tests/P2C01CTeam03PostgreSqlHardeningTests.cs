@@ -509,7 +509,7 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
             .OrderBy(x => x.Id)
             .Select(x => new ManifestLineResponse(
                 x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId,
-                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus))
+                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus, null))
             .ToListAsync();
         return new ManifestResponse(
             manifest.Id, manifest.TripId, manifest.ManifestNo, manifest.CreatedAt,

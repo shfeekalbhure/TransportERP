@@ -105,8 +105,9 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         Assert.Equal(1, await verifyDb.Set<FinancialLinkEntity>().CountAsync(x =>
             x.WaybillId == scope.WaybillId && x.DocumentId == scope.ReceiptVoucherId && x.LinkType == "COLLECTION"));
         Assert.Contains("PayerRole", planAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("PaymentMethodCode", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("CollectedById", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Null(collectionAudit.BeforeJson);
+        Assert.Null(collectionAudit.AfterJson);
+        Assert.Equal("CollectionRecorded", collectionAudit.Reason);
         Assert.Contains("ReversalOfId", reversalAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
         Assert.Equal(context.CorrelationId, collectionAudit.CorrelationId);
     }

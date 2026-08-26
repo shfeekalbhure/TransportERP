@@ -87,12 +87,26 @@ public sealed class SyncBusinessActionExecutor(
         {
             throw;
         }
+        catch (SyncBusinessDispatchAuditException)
+        {
+            return new SyncActionExecutionOutcome.CompletionPending();
+        }
+        catch (WaybillPersistenceException exception)
+        {
+            if (exception.Code is "CONCURRENCY_CONFLICT" or "BASE_VERSION_CONFLICT")
+                return new SyncActionExecutionOutcome.Conflict(exception.Code);
+            return new SyncActionExecutionOutcome.Failed(exception.Code);
+        }
         catch
         {
-            await RejectAuditOnlyAsync(claim, "ACTION_EXECUTION_FAILED", cancellationToken);
-            throw;
+            // An infrastructure fault may have happened after an idempotent business effect
+            // committed but before its result reached this process. Leave completion pending;
+            // lease recovery replays the same business key and obtains the persisted result.
+            return new SyncActionExecutionOutcome.CompletionPending();
         }
 
+        if (result.IsConflict)
+            return new SyncActionExecutionOutcome.Conflict(result.ErrorCode!);
         if (!result.IsSuccess)
             return new SyncActionExecutionOutcome.Failed(result.ErrorCode ?? "ACTION_EXECUTION_FAILED");
         if (!result.ResultEntityId.HasValue || result.ResultEntityId == Guid.Empty ||

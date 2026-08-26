@@ -6,6 +6,8 @@ public abstract record SyncActionExecutionOutcome
 
     public sealed record Succeeded(Guid ResultEntityId, long? ResultVersion) : SyncActionExecutionOutcome;
     public sealed record Failed(string ErrorCode) : SyncActionExecutionOutcome;
+    public sealed record Conflict(string ErrorCode) : SyncActionExecutionOutcome;
+    public sealed record CompletionPending : SyncActionExecutionOutcome;
 }
 
 /// <summary>
@@ -61,6 +63,7 @@ public sealed class SyncExecutionProcessor(
                     claim.OperationId,
                     claim.ClaimToken,
                     new SyncExecutionSuccess(succeeded.ResultEntityId, succeeded.ResultVersion),
+                    now: now,
                     cancellationToken: cancellationToken);
                 break;
             case SyncActionExecutionOutcome.Failed failed:
@@ -68,7 +71,21 @@ public sealed class SyncExecutionProcessor(
                     claim.OperationId,
                     claim.ClaimToken,
                     failed.ErrorCode,
+                    now: now,
                     cancellationToken: cancellationToken);
+                break;
+            case SyncActionExecutionOutcome.Conflict conflict:
+                await operations.CompleteExecutionConflictAsync(
+                    claim.OperationId,
+                    claim.ClaimToken,
+                    conflict.ErrorCode,
+                    now: now,
+                    cancellationToken: cancellationToken);
+                break;
+            case SyncActionExecutionOutcome.CompletionPending:
+                // The business adapter may already have committed its idempotent effect. Keep the
+                // operation SENDING so lease recovery can replay the same business key, recover the
+                // same result, and finish audit/status without producing a duplicate effect.
                 break;
             default:
                 throw new InvalidOperationException("Unsupported sync execution outcome.");

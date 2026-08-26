@@ -62,7 +62,7 @@ public sealed class SyncPopHttpRequestAuthenticator(
         }
 
         var canonicalHtu = deployment.CanonicalHtuForPath(canonicalPath);
-        if (canonicalHtu is null || !RequestTopologyMatches(http.Request, deployment))
+        if (canonicalHtu is null || !RequestTopologyMatches(http.Request, deployment, canonicalPath))
             return Failed(Error(StatusCodes.Status503ServiceUnavailable,
                 "SYNC_POP_CONFIGURATION_INVALID", correlationId.Value));
 
@@ -195,9 +195,15 @@ public sealed class SyncPopHttpRequestAuthenticator(
         return true;
     }
 
-    private static bool RequestTopologyMatches(HttpRequest request, SyncPopDeploymentProfile profile)
+    private static bool RequestTopologyMatches(
+        HttpRequest request,
+        SyncPopDeploymentProfile profile,
+        string canonicalPath)
     {
         if (!string.Equals(request.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.Equals(request.Path.Value, canonicalPath, StringComparison.Ordinal) ||
+            request.QueryString.HasValue)
+            return false;
         string host;
         try { host = new System.Globalization.IdnMapping().GetAscii(request.Host.Host).ToLowerInvariant(); }
         catch (ArgumentException) { return false; }

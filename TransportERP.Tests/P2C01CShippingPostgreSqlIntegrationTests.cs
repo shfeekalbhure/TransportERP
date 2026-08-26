@@ -75,12 +75,23 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         Assert.Single(manifest.Lines);
         Assert.Equal(10m, manifest.Lines[0].Quantity);
 
+        Guid loadMovementId;
+        var loadRequest = new LoadManifestLineRequest(
+            10m, DateTimeOffset.UtcNow, true, $"load-{Guid.NewGuid():N}");
         await using (var db = CreateP2Db(connection))
         {
             var line = await CreateService(db).LoadManifestLineAsync(context, manifest.Id, manifest.Lines[0].Id,
-                new LoadManifestLineRequest(10m, DateTimeOffset.UtcNow, true, $"load-{Guid.NewGuid():N}"));
+                loadRequest);
             Assert.Equal("LOADED", line.LoadStatus);
             Assert.Equal(10m, line.LoadedQuantity);
+            Assert.True(line.MovementEventId.HasValue);
+            loadMovementId = line.MovementEventId.Value;
+        }
+        await using (var db = CreateP2Db(connection))
+        {
+            var replay = await CreateService(db).LoadManifestLineAsync(
+                context, manifest.Id, manifest.Lines[0].Id, loadRequest);
+            Assert.Equal(loadMovementId, replay.MovementEventId);
         }
 
         await using (var db = CreateP2Db(connection))
@@ -113,7 +124,11 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemRelease"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemAllocate"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestGenerate"));
-        Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestLineLoad"));
+        var loadAudit = await verify.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "ManifestLineLoad" && x.EntityId == loadMovementId);
+        Assert.Null(loadAudit.BeforeJson);
+        Assert.Null(loadAudit.AfterJson);
+        Assert.Equal("QuantityLoaded", loadAudit.Reason);
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestFinalize"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestHandover"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "TripStart"));

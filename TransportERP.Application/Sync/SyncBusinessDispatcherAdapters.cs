@@ -44,9 +44,9 @@ public sealed class SyncFinanceBusinessAdapter(WaybillFinanceApplicationService 
         RecordCollectionRequest request,
         CancellationToken cancellationToken)
     {
-        _ = await service.RecordCollectionAsync(context.Operation, waybillId, request, cancellationToken);
-        var status = await service.GetFinancialStatusAsync(context.Operation, waybillId, cancellationToken);
-        return new(status.WaybillId, status.WaybillVersion);
+        var collection = await service.RecordCollectionAsync(
+            context.Operation, waybillId, request, cancellationToken);
+        return new(collection.Id, null);
     }
 }
 
@@ -60,6 +60,8 @@ public sealed class SyncShippingBusinessAdapter(ShippingExecutionApplicationServ
     {
         var result = await service.LoadManifestLineAsync(
             context.Operation, payload.ManifestId, manifestLineId, payload.Request, cancellationToken);
-        return new(result.Id, null);
+        if (!result.MovementEventId.HasValue || result.MovementEventId == Guid.Empty)
+            throw new ShippingExecutionApplicationException("BUSINESS_RESULT_INVALID");
+        return new(result.MovementEventId.Value, null);
     }
 }

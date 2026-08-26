@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -93,10 +94,6 @@ public sealed record ConflictCaseDraft(
     string ConflictReason,
     long? BaseVersion = null);
 
-public sealed record ResolveSyncConflictCommand(
-    string Resolution,
-    Guid? ReplacedByOperationId = null);
-
 public sealed class SyncRuleException(string code, string detail) : InvalidOperationException($"{code}: {detail}")
 {
     public string Code { get; } = code;
@@ -141,7 +138,7 @@ public sealed class SyncOperationService(
                     OR (o."Status" = 'FAILED'
                         AND o."NextRetryAt" IS NOT NULL
                         AND o."NextRetryAt" <= {{claimedAt}}
-                        AND o."RetryCount" < {{_retryPolicy.MaxRetryCount}})
+                        AND o."RetryCount" <= {{_retryPolicy.MaxRetryCount}})
                     OR (o."Status" = 'SENDING'
                         AND o."ExecutionLeaseExpiresAt" IS NOT NULL
                         AND o."ExecutionLeaseExpiresAt" <= {{claimedAt}})
@@ -249,7 +246,6 @@ public sealed class SyncOperationService(
             string auditOutcome;
             if (string.Equals(normalizedError, "RATE_LIMITED", StringComparison.Ordinal))
             {
-                operation.RetryCount++;
                 if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
                 {
                     operation.Status = "REJECTED";
@@ -260,6 +256,7 @@ public sealed class SyncOperationService(
                 }
                 else
                 {
+                    operation.RetryCount++;
                     operation.Status = "FAILED";
                     operation.ErrorCode = normalizedError;
                     operation.NextRetryAt = NormalizePostgreSqlTimestamp(
@@ -283,6 +280,81 @@ public sealed class SyncOperationService(
                 operation.UserId, operation.CompanyId, operation.BranchId,
                 claimToken, operation.DeviceId,
                 Reason: $"{operation.ErrorCode};RetryCount={operation.RetryCount}",
+                OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
+        }, cancellationToken);
+    }
+
+    public async Task<SyncOperation> CompleteExecutionConflictAsync(
+        Guid operationId,
+        Guid claimToken,
+        string errorCode,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedError = errorCode.Trim().ToUpperInvariant();
+        if (normalizedError is not ("CONCURRENCY_CONFLICT" or "BASE_VERSION_CONFLICT"))
+            throw new SyncRuleException("CONFLICT_CODE_INVALID", operationId.ToString());
+
+        var completedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
+        return await CompleteClaimAsync(operationId, claimToken, completedAt, async operation =>
+        {
+            if (await db.ConflictCases.AnyAsync(x => x.SyncOperationId == operation.Id, cancellationToken))
+                throw new SyncRuleException("CONFLICT_ALREADY_EXISTS", operationId.ToString());
+
+            long? currentServerVersion = null;
+            var serverEntityExists = false;
+            if (string.Equals(operation.EntityType, "Waybill", StringComparison.Ordinal) &&
+                operation.EntityId.HasValue)
+            {
+                var serverState = await db.Set<WaybillEntity>().AsNoTracking()
+                    .Where(x => x.Id == operation.EntityId.Value && x.CompanyId == operation.CompanyId &&
+                                x.BranchId == operation.BranchId)
+                    .Select(x => new { x.Version })
+                    .SingleOrDefaultAsync(cancellationToken);
+                serverEntityExists = serverState is not null;
+                currentServerVersion = serverState?.Version;
+            }
+
+            var conflict = new ConflictCase
+            {
+                Id = Guid.NewGuid(),
+                SyncOperationId = operation.Id,
+                CompanyId = operation.CompanyId,
+                BranchId = operation.BranchId,
+                BaseVersion = operation.BaseVersion,
+                // Typed decision metadata only: enough to compare the requested and current
+                // versions without copying payload, party, address, identity or contact fields.
+                DeviceSnapshot = JsonSerializer.Serialize(new
+                {
+                    operation.ActionCode,
+                    operation.EntityType,
+                    operation.EntityId,
+                    RequestedBaseVersion = operation.BaseVersion
+                }),
+                ServerSnapshot = JsonSerializer.Serialize(new
+                {
+                    operation.EntityType,
+                    operation.EntityId,
+                    Exists = serverEntityExists,
+                    CurrentVersion = currentServerVersion
+                }),
+                ConflictReason = normalizedError,
+                Status = "OPEN",
+                CreatedAt = completedAt,
+                UpdatedAt = completedAt,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.ConflictCases.Add(conflict);
+            operation.ConflictCase = conflict;
+            operation.Status = "CONFLICT";
+            operation.ErrorCode = normalizedError;
+            operation.NextRetryAt = null;
+            ClearExecutionClaim(operation);
+            await audit.AppendAuditEventAsync(new AuditEventDraft(
+                "SyncOperationExecutionConflict", "CONFLICT", nameof(SyncOperation), operation.Id,
+                operation.UserId, operation.CompanyId, operation.BranchId,
+                claimToken, operation.DeviceId,
+                Reason: $"{normalizedError};BaseVersion={operation.BaseVersion?.ToString() ?? "none"}",
                 OperationCorrelationId: operation.OperationCorrelationId), cancellationToken);
         }, cancellationToken);
     }
@@ -540,7 +612,6 @@ public sealed class SyncOperationService(
             {
                 // The legacy transition represents a completed SENDING attempt. It therefore
                 // follows the same actual-failure accounting as the claim-token completion path.
-                operation.RetryCount++;
                 if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
                 {
                     operation.Status = "REJECTED";
@@ -549,6 +620,7 @@ public sealed class SyncOperationService(
                 }
                 else
                 {
+                    operation.RetryCount++;
                     operation.NextRetryAt = NormalizePostgreSqlTimestamp(
                         transitionAt.Add(CalculateBackoff(operation.RetryCount)));
                 }
@@ -606,7 +678,7 @@ public sealed class SyncOperationService(
             }, cancellationToken);
         }
 
-        if (operation.RetryCount >= _retryPolicy.MaxRetryCount)
+        if (operation.RetryCount > _retryPolicy.MaxRetryCount)
         {
             operation.Status = "REJECTED";
             operation.ErrorCode = "RETRY_EXHAUSTED";
@@ -626,7 +698,7 @@ public sealed class SyncOperationService(
 
         // A manual retry request only schedules the next attempt. The counter is execution
         // evidence and is incremented exclusively by CompleteExecutionFailureAsync.
-        var retryNumber = operation.RetryCount + 1;
+        var retryNumber = Math.Max(1, operation.RetryCount);
         var delay = CalculateBackoff(retryNumber);
         operation.NextRetryAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow.Add(delay));
         operation.UpdatedAt = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
@@ -655,7 +727,7 @@ public sealed class SyncOperationService(
         var query = db.SyncOperations.AsNoTracking()
             .Where(x => x.CompanyId == security.CompanyId && x.Status == "FAILED" &&
                         x.NextRetryAt != null && x.NextRetryAt <= dueAt &&
-                        x.RetryCount < _retryPolicy.MaxRetryCount &&
+                        x.RetryCount <= _retryPolicy.MaxRetryCount &&
                         (x.ErrorCode == null || x.ErrorCode == "RATE_LIMITED"));
         if (security.BranchId is not null)
             query = query.Where(x => x.BranchId == security.BranchId);
@@ -708,54 +780,6 @@ public sealed class SyncOperationService(
                 "SyncOperationConflict", "CONFLICT", nameof(SyncOperation), operation.Id,
                 security.UserId, operation.CompanyId, operation.BranchId,
                 CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.ConflictReason), cancellationToken);
-            return conflict;
-        }, cancellationToken);
-    }
-
-    public async Task<ConflictCase> ResolveSyncConflictAsync(
-        Guid conflictCaseId,
-        ResolveSyncConflictCommand command,
-        SyncSecurityContext security,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(command.Resolution))
-            throw new SyncRuleException("RESOLUTION_REQUIRED", conflictCaseId.ToString());
-        var conflict = await db.ConflictCases.Include(x => x.SyncOperation)
-            .SingleOrDefaultAsync(x => x.Id == conflictCaseId, cancellationToken)
-            ?? throw new SyncRuleException("CONFLICT_NOT_FOUND", conflictCaseId.ToString());
-        var operation = conflict.SyncOperation ?? throw new SyncRuleException("OPERATION_NOT_FOUND", conflict.SyncOperationId.ToString());
-        EnsureTenantScope(operation, security);
-        await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
-        if (conflict.Status != "OPEN" || operation.Status != "CONFLICT")
-            throw new SyncRuleException("CONFLICT_ALREADY_RESOLVED", conflictCaseId.ToString());
-
-        if (command.ReplacedByOperationId is not null)
-        {
-            var replacement = await db.SyncOperations.AsNoTracking().SingleOrDefaultAsync(
-                x => x.Id == command.ReplacedByOperationId.Value, cancellationToken)
-                ?? throw new SyncRuleException("REPLACEMENT_NOT_FOUND", command.ReplacedByOperationId.Value.ToString());
-            EnsureTenantScope(replacement, security);
-        }
-
-        var now = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
-        conflict.Status = "RESOLVED";
-        conflict.Resolution = command.Resolution.Trim();
-        conflict.ResolvedBy = security.UserId.ToString();
-        conflict.ResolvedAt = now;
-        conflict.ReplacedByOperationId = command.ReplacedByOperationId;
-        conflict.UpdatedAt = now;
-        conflict.RowVersion = Guid.NewGuid().ToByteArray();
-        operation.Status = "RESOLVED";
-        operation.ErrorCode = null;
-        operation.UpdatedAt = now;
-        operation.RowVersion = Guid.NewGuid().ToByteArray();
-        return await ExecuteMutationAsync(async () =>
-        {
-            await db.SaveChangesAsync(cancellationToken);
-            await audit.AppendAuditEventAsync(new AuditEventDraft(
-                "SyncOperationConflictResolved", "SUCCESS", nameof(SyncOperation), operation.Id,
-                security.UserId, operation.CompanyId, operation.BranchId,
-                CorrelationId: Guid.NewGuid(), DeviceId: security.DeviceId, Reason: conflict.Resolution), cancellationToken);
             return conflict;
         }, cancellationToken);
     }

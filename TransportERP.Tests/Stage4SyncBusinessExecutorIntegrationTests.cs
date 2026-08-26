@@ -115,6 +115,31 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
     }
 
     [Fact]
+    public async Task Committed_effect_with_audit_failure_remains_pending_and_recovery_does_not_repeat_effect()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedDeviceAsync(db);
+        var adapters = new FakeBusinessAdapters();
+        var audit = new FailOnceAuditSink();
+        var executor = Executor(db, new FakePermissionResolver { Allowed = true }, adapters, audit);
+        var claim = Claim(fixture, clientOperationId: "committed-before-audit");
+
+        var interrupted = await executor.ExecuteAsync(claim);
+        var recovered = await executor.ExecuteAsync(claim with
+        {
+            ClaimToken = Guid.NewGuid(),
+            RecoveredStaleClaim = true,
+            AttemptStartedAt = DateTimeOffset.UtcNow,
+            LeaseExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2)
+        });
+
+        Assert.IsType<SyncActionExecutionOutcome.CompletionPending>(interrupted);
+        Assert.IsType<SyncActionExecutionOutcome.Succeeded>(recovered);
+        Assert.Equal(1, adapters.EffectCount);
+        Assert.Single(audit.Records);
+    }
+
+    [Fact]
     public async Task Audit_sink_persists_metadata_only_with_operation_correlation()
     {
         await using var db = CreateDb();
@@ -240,6 +265,22 @@ public sealed class Stage4SyncBusinessExecutorIntegrationTests
         public List<SyncBusinessDispatchAuditRecord> Records { get; } = [];
         public Task WriteAsync(SyncBusinessDispatchAuditRecord record, CancellationToken cancellationToken)
         {
+            Records.Add(record);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FailOnceAuditSink : ISyncBusinessDispatchAuditSink
+    {
+        private bool _failed;
+        public List<SyncBusinessDispatchAuditRecord> Records { get; } = [];
+        public Task WriteAsync(SyncBusinessDispatchAuditRecord record, CancellationToken cancellationToken)
+        {
+            if (!_failed)
+            {
+                _failed = true;
+                throw new InvalidOperationException("injected audit failure");
+            }
             Records.Add(record);
             return Task.CompletedTask;
         }

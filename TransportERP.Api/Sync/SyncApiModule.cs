@@ -133,10 +133,11 @@ public static class SyncApiModule
         return endpoints;
     }
 
-    private static async Task<IResult> HandleBatchAsync(
+    public static async Task<IResult> HandleBatchAsync(
         HttpContext http,
         ISyncPopHttpRequestAuthenticator authenticator,
         SyncOperationService sync,
+        IEffectivePermissionResolver permissions,
         CancellationToken cancellationToken)
     {
         var authentication = await authenticator.AuthenticateAsync(
@@ -170,6 +171,24 @@ public static class SyncApiModule
             try
             {
                 var validItem = item!;
+                var definition = SyncActionCatalog.Definitions.Single(x =>
+                    string.Equals(x.ActionCodeValue, validItem.ActionCode, StringComparison.Ordinal));
+                if (!await permissions.HasPermissionAsync(
+                        acceptedProof.UserId, acceptedProof.CompanyId, acceptedProof.BranchId,
+                        definition.RequiredPermission, cancellationToken))
+                {
+                    // Permission is checked before persistence so a denied item creates neither a
+                    // SyncOperation row nor a queued audit event. The response does not disclose
+                    // whether any target entity exists.
+                    results.Add(SyncBatchOperationResult.Rejected(item, "SCOPE_DENIED", serverTime));
+                    continue;
+                }
+                if (definition.RuntimeAvailability != SyncActionRuntimeAvailability.Available)
+                {
+                    results.Add(SyncBatchOperationResult.Rejected(
+                        item, "ACTION_RUNTIME_UNAVAILABLE", serverTime));
+                    continue;
+                }
                 _ = TryParseClientOccurredAt(validItem.ClientOccurredAt, out var clientOccurredAt);
                 var operation = await sync.EnqueueAcceptedSyncOperationAsync(
                     new EnqueueAcceptedSyncOperationCommand(
@@ -211,7 +230,7 @@ public static class SyncApiModule
             });
         }
         catch (JsonException) { return "PAYLOAD_INVALID"; }
-        return SyncActionCatalog.Validate(item.ActionCode, item.OperationType, item.EntityType,
+        return SyncActionCatalog.ValidateShape(item.ActionCode, item.OperationType, item.EntityType,
             item.EntityId, item.BaseVersion).ErrorCode;
     }
 

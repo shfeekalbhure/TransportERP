@@ -379,7 +379,7 @@ public sealed class P2C01CShippingApiContractTests
             Capture("LoadManifestLine", context);
             return Task.FromResult(new ManifestLineResponse(
                 lineId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), request.Quantity,
-                request.Quantity, 0m, 0m, "LOADED"));
+                request.Quantity, 0m, 0m, "LOADED", Guid.NewGuid()));
         }
 
         public Task<ManifestResponse> FinalizeManifestAsync(

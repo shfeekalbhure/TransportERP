@@ -33,12 +33,21 @@ public sealed record SyncBusinessDispatchResult(
     string? ErrorCode)
 {
     public bool IsSuccess => Status == "SUCCEEDED" && ErrorCode is null;
+    public bool IsConflict => Status == "CONFLICT" && ErrorCode is not null;
 
     public static SyncBusinessDispatchResult Succeeded(Guid entityId, long? version)
         => new("SUCCEEDED", entityId, version, null);
 
     public static SyncBusinessDispatchResult Rejected(string errorCode)
         => new("REJECTED", null, null, errorCode);
+
+    public static SyncBusinessDispatchResult Conflict(string errorCode)
+        => new("CONFLICT", null, null, errorCode);
+}
+
+public sealed class SyncBusinessDispatchAuditException(Exception innerException)
+    : InvalidOperationException("SYNC_BUSINESS_AUDIT_PENDING", innerException)
+{
 }
 
 public sealed record SyncBusinessExecutionContext(
@@ -94,9 +103,9 @@ public interface ISyncShippingBusinessAdapter
 }
 
 /// <summary>
-/// Server composition must implement this sink in the same transaction as the sync-operation
-/// terminal transition (or through a transactional outbox). This Application contract alone does
-/// not make an action runtime-available.
+/// Server composition persists metadata-only dispatch evidence. A sink failure is surfaced as
+/// completion-pending: the worker retains its lease state and later replays the business idempotency
+/// key to recover the same result before completing the sync-operation transition.
 /// </summary>
 public interface ISyncBusinessDispatchAuditSink
 {

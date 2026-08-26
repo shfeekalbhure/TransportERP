@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
+using TransportERP.Application.Waybills;
 
 namespace TransportERP.Application.Sync;
 
@@ -30,11 +31,22 @@ public sealed class SyncBusinessDispatcher(
         CancellationToken cancellationToken = default)
     {
         var result = await DispatchCoreAsync(actor, command, cancellationToken);
-        await audit.WriteAsync(new SyncBusinessDispatchAuditRecord(
-            actor.CompanyId, actor.BranchId, actor.UserId, actor.RegisteredDeviceId,
-            command.OperationCorrelationId, command.ClientOperationId, command.ActionCode,
-            command.EntityId, command.BaseVersion, result.Status, result.ResultEntityId,
-            result.ResultVersion, result.ErrorCode), cancellationToken);
+        try
+        {
+            await audit.WriteAsync(new SyncBusinessDispatchAuditRecord(
+                actor.CompanyId, actor.BranchId, actor.UserId, actor.RegisteredDeviceId,
+                command.OperationCorrelationId, command.ClientOperationId, command.ActionCode,
+                command.EntityId, command.BaseVersion, result.Status, result.ResultEntityId,
+                result.ResultVersion, result.ErrorCode), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new SyncBusinessDispatchAuditException(exception);
+        }
         return result;
     }
 
@@ -97,6 +109,18 @@ public sealed class SyncBusinessDispatcher(
         catch (SyncBusinessPayloadException exception)
         {
             return SyncBusinessDispatchResult.Rejected(exception.Code);
+        }
+        catch (WaybillApplicationException exception)
+        {
+            return MapBusinessError(exception.Code);
+        }
+        catch (WaybillFinanceApplicationException exception)
+        {
+            return MapBusinessError(exception.Code);
+        }
+        catch (ShippingExecutionApplicationException exception)
+        {
+            return MapBusinessError(exception.Code);
         }
     }
 
@@ -185,6 +209,11 @@ public sealed class SyncBusinessDispatcher(
     private static bool HasMatchingScope(SyncBusinessActorContext actor, SyncBusinessDispatchCommand command)
         => actor.CompanyId == command.CompanyId && actor.BranchId == command.BranchId &&
            actor.UserId == command.UserId && actor.RegisteredDeviceId == command.RegisteredDeviceId;
+
+    private static SyncBusinessDispatchResult MapBusinessError(string code)
+        => code is "CONCURRENCY_CONFLICT" or "BASE_VERSION_CONFLICT"
+            ? SyncBusinessDispatchResult.Conflict(code)
+            : SyncBusinessDispatchResult.Rejected(code);
 }
 
 internal sealed class SyncBusinessPayloadException(string code) : InvalidOperationException(code)

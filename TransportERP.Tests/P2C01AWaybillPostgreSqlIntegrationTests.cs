@@ -72,6 +72,8 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             .SingleAsync(x => x.WaybillId == draft.Id);
         var audit = await verifyDb.AuditEvents.AsNoTracking()
             .SingleAsync(x => x.EntityType == "Waybill" && x.EntityId == draft.Id && x.Action == "WaybillApprove");
+        var updateAudit = await verifyDb.AuditEvents.AsNoTracking()
+            .SingleAsync(x => x.EntityType == "Waybill" && x.EntityId == draft.Id && x.Action == "WaybillDraftUpdate");
 
         Assert.Equal("APPROVED", approved.Status);
         Assert.NotNull(approved.WaybillNo);
@@ -80,6 +82,12 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         Assert.Equal("COMMITTED", reservation.State);
         Assert.Equal(approved.WaybillNo, reservation.RenderedNumber);
         Assert.Equal(context.CorrelationId, audit.CorrelationId);
+        Assert.Null(updateAudit.BeforeJson);
+        Assert.Null(updateAudit.AfterJson);
+        var updateAuditText = updateAudit.Reason ?? string.Empty;
+        Assert.DoesNotContain("مرسل اختبار", updateAuditText, StringComparison.Ordinal);
+        Assert.DoesNotContain("777100001", updateAuditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(address.AddressLine!, updateAuditText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -162,8 +170,10 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         Assert.Equal(1, await verifyDb.Set<WaybillEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId &&
             x.CreateClientOperationId == createKey));
-        Assert.Equal(1, await verifyDb.AuditEvents.CountAsync(x =>
-            x.EntityType == "Waybill" && x.EntityId == results[0].Id && x.Action == "WaybillDraftCreate"));
+        var createAudit = await verifyDb.AuditEvents.SingleAsync(x =>
+            x.EntityType == "Waybill" && x.EntityId == results[0].Id && x.Action == "WaybillDraftCreate");
+        Assert.Null(createAudit.BeforeJson);
+        Assert.Null(createAudit.AfterJson);
     }
 
     [Fact]
@@ -199,8 +209,13 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         await using var verifyDb = CreateP2Db(connection);
         Assert.Equal(1, await verifyDb.Set<OperationalPartyEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.ClientOperationId == operationId));
-        Assert.Equal(1, await verifyDb.AuditEvents.CountAsync(x =>
-            x.EntityType == "OperationalParty" && x.EntityId == results[0].Id && x.Action == "OperationalPartyCreate"));
+        var partyAudit = await verifyDb.AuditEvents.SingleAsync(x =>
+            x.EntityType == "OperationalParty" && x.EntityId == results[0].Id && x.Action == "OperationalPartyCreate");
+        Assert.Null(partyAudit.BeforeJson);
+        Assert.Null(partyAudit.AfterJson);
+        Assert.DoesNotContain(request.Name, partyAudit.Reason ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(request.Mobile, partyAudit.Reason ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(request.Address.AddressLine!, partyAudit.Reason ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

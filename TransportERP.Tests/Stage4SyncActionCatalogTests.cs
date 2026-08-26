@@ -52,11 +52,13 @@ public sealed class Stage4SyncActionCatalogTests
                 definition.RuntimeAvailability));
         Assert.All(SyncActionCatalog.Definitions, definition =>
             Assert.False(string.IsNullOrWhiteSpace(definition.RequiredPermission)));
-        Assert.False(Assert.Single(SyncActionCatalog.Definitions,
-            x => x.ActionCode == SyncActionCode.LoadAllocatedQuantity).ResultVersionRequired);
+        Assert.All(SyncActionCatalog.Definitions.Where(x =>
+                x.ActionCode is SyncActionCode.LoadAllocatedQuantity or SyncActionCode.RecordCollection),
+            definition => Assert.False(definition.ResultVersionRequired));
         Assert.All(SyncActionCatalog.Definitions.Where(x =>
                 x.DispatcherSupport == SyncActionDispatcherSupport.Supported &&
-                x.ActionCode != SyncActionCode.LoadAllocatedQuantity),
+                x.ActionCode != SyncActionCode.LoadAllocatedQuantity &&
+                x.ActionCode != SyncActionCode.RecordCollection),
             definition => Assert.True(definition.ResultVersionRequired));
     }
 

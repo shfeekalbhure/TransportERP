@@ -86,7 +86,8 @@ public sealed record ManifestLineResponse(
     decimal LoadedQuantity,
     decimal Weight,
     decimal Volume,
-    string LoadStatus);
+    string LoadStatus,
+    Guid? MovementEventId = null);
 
 public sealed record ManifestResponse(
     Guid Id,

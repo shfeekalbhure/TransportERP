@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
+using TransportERP.Api.Sync;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
@@ -243,6 +247,46 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Committed_effect_with_pending_completion_is_reclaimed_and_finishes_success_without_repeat()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "EXECUTION-COMPLETION-RECOVERY");
+        var proofRuntime = new SyncProofRuntimeService(db, new AuditEventService(db));
+        var nonce = await proofRuntime.IssueNonceAsync(scope.Security);
+        var proof = await proofRuntime.ClaimAsync(scope.Security,
+            Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var service = CreateOperationService(db);
+        var operation = await service.EnqueueAcceptedSyncOperationAsync(
+            Command("completion-recovery-" + Guid.NewGuid().ToString("N"), "{}"), proof);
+        await RejectOtherExecutionCandidatesAsync(db, operation.Id);
+        var resultEntityId = Guid.NewGuid();
+        var executor = new PendingThenRecoveredExecutor(resultEntityId);
+        var processor = new SyncExecutionProcessor(service, executor);
+        var firstAt = Normalize(DateTimeOffset.UtcNow.AddMinutes(1));
+
+        Assert.True(await processor.ExecuteNextAsync(TimeSpan.FromSeconds(5), firstAt));
+        db.ChangeTracker.Clear();
+        var pending = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
+        Assert.Equal("SENDING", pending.Status);
+        Assert.Equal(0, pending.RetryCount);
+
+        Assert.True(await processor.ExecuteNextAsync(TimeSpan.FromSeconds(5), firstAt.AddSeconds(6)));
+        db.ChangeTracker.Clear();
+        var completed = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operation.Id);
+        Assert.Equal("SUCCEEDED", completed.Status);
+        Assert.Equal(resultEntityId, completed.ResultEntityId);
+        Assert.Equal(1, completed.ResultVersion);
+        Assert.Equal(1, executor.EffectCount);
+        Assert.True(await db.AuditEvents.AnyAsync(x => x.EntityId == operation.Id &&
+            x.Action == "SyncOperationExecutionReclaimed"));
+        Assert.True(await db.AuditEvents.AnyAsync(x => x.EntityId == operation.Id &&
+            x.Action == "SyncOperationExecutionSucceeded"));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Actual_rate_limited_failures_alone_consume_budget_and_exhaustion_clears_claim()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -253,38 +297,43 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         var nonce = await runtime.IssueNonceAsync(scope.Security);
         var proof = await runtime.ClaimAsync(scope.Security,
             Proof(nonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
-        var policy = new SyncRetryPolicy(2, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
+        var policy = new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(80));
         var service = new SyncOperationService(db, new AuditEventService(db), policy);
         var operation = await service.EnqueueAcceptedSyncOperationAsync(
             Command("execution-exhaustion-" + Guid.NewGuid().ToString("N"), "{}"), proof);
         await RejectOtherExecutionCandidatesAsync(db, operation.Id);
         var attemptAt = Normalize(DateTimeOffset.UtcNow.AddMinutes(1));
 
-        var first = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
-            TimeSpan.FromMinutes(2), attemptAt));
-        Assert.Equal(0, first.ServerRetryCount);
-        operation = await service.CompleteExecutionFailureAsync(
-            operation.Id, first.ClaimToken, "RATE_LIMITED", attemptAt.AddSeconds(1));
-        Assert.Equal("FAILED", operation.Status);
-        Assert.Equal(1, operation.RetryCount);
-        Assert.Null(operation.ExecutionClaimToken);
-        Assert.Equal(attemptAt.AddSeconds(6), operation.NextRetryAt);
+        var dueAt = attemptAt;
+        var expectedDelays = new[] { 5, 10, 20, 40, 80 };
+        for (var completedFailures = 0; completedFailures <= expectedDelays.Length; completedFailures++)
+        {
+            var claim = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
+                TimeSpan.FromMinutes(2), dueAt));
+            Assert.Equal(completedFailures, claim.ServerRetryCount);
+            var failedAt = dueAt.AddSeconds(1);
+            operation = await service.CompleteExecutionFailureAsync(
+                operation.Id, claim.ClaimToken, "RATE_LIMITED", failedAt);
 
-        var secondDueAt = operation.NextRetryAt!.Value;
-        var second = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
-            TimeSpan.FromMinutes(2), secondDueAt));
-        Assert.Equal(1, second.ServerRetryCount);
-        operation = await service.CompleteExecutionFailureAsync(
-            operation.Id, second.ClaimToken, "RATE_LIMITED", secondDueAt.AddSeconds(1));
+            if (completedFailures < expectedDelays.Length)
+            {
+                Assert.Equal("FAILED", operation.Status);
+                Assert.Equal(completedFailures + 1, operation.RetryCount);
+                Assert.Null(operation.ExecutionClaimToken);
+                Assert.Equal(failedAt.AddSeconds(expectedDelays[completedFailures]), operation.NextRetryAt);
+                dueAt = operation.NextRetryAt!.Value;
+            }
+        }
+
         Assert.Equal("REJECTED", operation.Status);
         Assert.Equal("RETRY_EXHAUSTED", operation.ErrorCode);
-        Assert.Equal(2, operation.RetryCount);
+        Assert.Equal(5, operation.RetryCount);
         Assert.Null(operation.NextRetryAt);
         Assert.Null(operation.ExecutionClaimToken);
         Assert.Null(operation.ExecutionAttemptStartedAt);
         Assert.Null(operation.ExecutionLeaseExpiresAt);
         Assert.Null(await service.ClaimNextExecutionAsync(
-            TimeSpan.FromMinutes(2), secondDueAt.AddMinutes(10)));
+            TimeSpan.FromMinutes(2), dueAt.AddMinutes(10)));
     }
 
     [Fact]
@@ -313,6 +362,115 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         Assert.Equal("QUEUED", replay.Status);
         Assert.Null(replay.ExecutionClaimToken);
         Assert.Single(await db.SyncOperations.Where(x => x.Id == first.Id).ToListAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Stale_base_version_becomes_atomic_typed_conflict_then_keep_server_resolves_it()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "EXECUTION-CONFLICT");
+        var proofRuntime = new SyncProofRuntimeService(db, new AuditEventService(db));
+        var firstNonce = await proofRuntime.IssueNonceAsync(scope.Security);
+        var firstProof = await proofRuntime.ClaimAsync(scope.Security,
+            Proof(firstNonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        const string privatePayload = "{\"name\":\"private-person\",\"mobile\":\"0500000000\"}";
+        var entityId = Guid.NewGuid();
+        var operationCorrelationId = Guid.NewGuid();
+        var service = CreateOperationService(db);
+        var operation = await service.EnqueueAcceptedSyncOperationAsync(
+            new EnqueueAcceptedSyncOperationCommand(
+                "sync-v1", "UpdateWaybillDraft", "UPDATE", "Waybill", entityId,
+                "stale-" + Guid.NewGuid().ToString("N"), privatePayload, Hash(privatePayload),
+                DateTimeOffset.UtcNow, operationCorrelationId, 7), firstProof);
+        await RejectOtherExecutionCandidatesAsync(db, operation.Id);
+        var claimAt = Normalize(DateTimeOffset.UtcNow);
+        var claim = Assert.IsType<SyncOperationExecutionClaim>(await service.ClaimNextExecutionAsync(
+            TimeSpan.FromMinutes(2), claimAt));
+
+        operation = await service.CompleteExecutionConflictAsync(
+            operation.Id, claim.ClaimToken, "CONCURRENCY_CONFLICT");
+
+        Assert.Equal("CONFLICT", operation.Status);
+        var conflict = await db.ConflictCases.SingleAsync(x => x.SyncOperationId == operation.Id);
+        Assert.Equal(7, conflict.BaseVersion);
+        Assert.Contains("RequestedBaseVersion", conflict.DeviceSnapshot, StringComparison.Ordinal);
+        Assert.Contains("CurrentVersion", conflict.ServerSnapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-person", conflict.DeviceSnapshot + conflict.ServerSnapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("0500000000", conflict.DeviceSnapshot + conflict.ServerSnapshot, StringComparison.Ordinal);
+        Assert.Single(await db.AuditEvents.Where(x => x.EntityId == operation.Id &&
+            x.Action == "SyncOperationExecutionConflict").ToListAsync());
+
+        var resolutionNonce = await proofRuntime.IssueNonceAsync(scope.Security);
+        var resolutionProof = await proofRuntime.ClaimAsync(scope.Security,
+            Proof(resolutionNonce.Value, Guid.NewGuid().ToString("D"), scope.Thumbprint));
+        var resolutionContext = new SyncConflictResolutionContext(
+            scope.Security.UserId, scope.Security.CompanyId, scope.Security.BranchId,
+            scope.Security.RegisteredDeviceId, 1, scope.Security.DeviceId,
+            resolutionProof.AttemptCorrelationId);
+        var resolved = await new SyncConflictResolutionService(
+            db, new AuditEventService(db), new AllowPermissionResolver(), service).ResolveAsync(
+            conflict.Id,
+            new ResolveSyncConflictRequest(
+                SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reviewed version conflict"),
+            resolutionContext, resolutionProof);
+
+        Assert.Equal("RESOLVED", resolved.ConflictStatus);
+        Assert.Equal("REJECTED", resolved.OriginalOperationStatus);
+        Assert.Equal("KEEP_SERVER", resolved.OriginalOperationErrorCode);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Batch_action_permission_is_denied_before_operation_or_queue_audit_is_persisted()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "ACTION-PERMISSION-DENY");
+        var payload = "{}";
+        var item = new SyncBatchOperationRequest(
+            "CreateOperationalParty", "CREATE", "OperationalParty", null,
+            "denied-" + Guid.NewGuid().ToString("N"), payload, Hash(payload),
+            DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'"), Guid.NewGuid());
+        var unavailable = new SyncBatchOperationRequest(
+            "CreateJournalEntry", "CREATE", "JournalEntry", null,
+            "denied-unavailable-" + Guid.NewGuid().ToString("N"), payload, Hash(payload),
+            DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'"), Guid.NewGuid());
+        var request = new SyncBatchRequest(scope.Security.DeviceId, "sync-v1", [item, unavailable]);
+        var body = JsonSerializer.SerializeToUtf8Bytes(request, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var http = new DefaultHttpContext();
+        http.Request.Body = new MemoryStream(body);
+        var accepted = new AcceptedSyncHttpRequest(
+            new TransportERP.Api.Security.CurrentSecurityContext(
+                scope.Security.UserId, scope.Security.CompanyId, scope.Security.BranchId,
+                Guid.NewGuid(), scope.Security.DeviceId, true, scope.Security.RegisteredDeviceId, 1),
+            scope.Security,
+            new AcceptedSyncProofContext(Guid.NewGuid(), scope.Security.UserId, scope.Security.CompanyId,
+                scope.Security.BranchId, scope.Security.RegisteredDeviceId, scope.Security.DeviceId,
+                1, 1, scope.Thumbprint, Guid.NewGuid()),
+            body,
+            Guid.NewGuid());
+        var rowsBefore = await db.SyncOperations.CountAsync();
+        var auditsBefore = await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued");
+
+        var httpResult = await SyncApiModule.HandleBatchAsync(
+            http, new AcceptedRequestAuthenticator(accepted), CreateOperationService(db),
+            new DenyPermissionResolver(), CancellationToken.None);
+
+        var response = Assert.IsType<SyncBatchResponse>(
+            Assert.IsAssignableFrom<IValueHttpResult>(httpResult).Value);
+        Assert.Equal(2, response.Results.Count);
+        Assert.All(response.Results, denied =>
+        {
+            Assert.Equal("REJECTED", denied.Status);
+            Assert.Equal("SCOPE_DENIED", denied.ErrorCode);
+            Assert.Null(denied.ServerOperationId);
+        });
+        Assert.Equal(rowsBefore, await db.SyncOperations.CountAsync());
+        Assert.Equal(auditsBefore, await db.AuditEvents.CountAsync(x => x.Action == "SyncOperationQueued"));
     }
 
     [Fact]
@@ -708,4 +866,50 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
     }
 
     private sealed record TestScope(Guid DeviceId, string Thumbprint, SyncProofSecurityContext Security);
+
+    private sealed class AcceptedRequestAuthenticator(AcceptedSyncHttpRequest accepted)
+        : ISyncPopHttpRequestAuthenticator
+    {
+        public Task<SyncHttpAuthenticationResult> AuthenticateAsync(
+            HttpContext http,
+            string canonicalPath,
+            TryReadSyncRequestDeviceId? tryReadBodyDeviceId,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new SyncHttpAuthenticationResult(accepted, null));
+    }
+
+    private sealed class DenyPermissionResolver : IEffectivePermissionResolver
+    {
+        public Task<bool> HasPermissionAsync(Guid userId, Guid companyId, Guid? branchId,
+            string permissionCode, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+    }
+
+    private sealed class AllowPermissionResolver : IEffectivePermissionResolver
+    {
+        public Task<bool> HasPermissionAsync(Guid userId, Guid companyId, Guid? branchId,
+            string permissionCode, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+    }
+
+    private sealed class PendingThenRecoveredExecutor(Guid resultEntityId) : ISyncActionExecutor
+    {
+        private bool _committed;
+        public int EffectCount { get; private set; }
+
+        public Task<SyncActionExecutionOutcome> ExecuteAsync(
+            SyncOperationExecutionClaim claim,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_committed)
+            {
+                _committed = true;
+                EffectCount++;
+                return Task.FromResult<SyncActionExecutionOutcome>(
+                    new SyncActionExecutionOutcome.CompletionPending());
+            }
+            return Task.FromResult<SyncActionExecutionOutcome>(
+                new SyncActionExecutionOutcome.Succeeded(resultEntityId, 1));
+        }
+    }
 }

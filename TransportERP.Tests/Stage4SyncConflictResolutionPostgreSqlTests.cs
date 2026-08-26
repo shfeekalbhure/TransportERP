@@ -8,6 +8,10 @@ namespace TransportERP.Tests;
 public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 {
     [Fact]
+    public void Sync_operation_service_exposes_no_legacy_conflict_resolution_bypass()
+        => Assert.Null(typeof(SyncOperationService).GetMethod("ResolveSyncConflictAsync"));
+
+    [Fact]
     [Trait("Category", "PostgreSQL")]
     public async Task Keep_server_atomically_rejects_original_resolves_conflict_and_writes_metadata_only_audit()
     {
@@ -48,18 +52,23 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
         ConflictScope scope;
+        ResolverFixture firstResolver;
+        ResolverFixture secondResolver;
         await using (var db = PostgreSqlTestEnvironment.CreateDbContext(connection))
         {
             await db.Database.MigrateAsync();
             scope = await SeedConflictAsync(db, "RACE");
+            firstResolver = await SeedFreshProofAsync(db, scope);
+            secondResolver = await SeedFreshProofAsync(db, scope);
         }
 
-        async Task<string> Resolve()
+        async Task<string> Resolve(ResolverFixture resolver)
         {
             await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
             try
             {
-                _ = await ResolveAsync(Service(db), scope, KeepRequest("race decision"));
+                _ = await Service(db).ResolveAsync(
+                    scope.ConflictId, KeepRequest("race decision"), resolver.Context, resolver.Proof);
                 return "SUCCESS";
             }
             catch (SyncRuleException exception)
@@ -68,7 +77,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
             }
         }
 
-        var outcomes = await Task.WhenAll(Task.Run(Resolve), Task.Run(Resolve));
+        var outcomes = await Task.WhenAll(
+            Task.Run(() => Resolve(firstResolver)), Task.Run(() => Resolve(secondResolver)));
         Assert.Single(outcomes, x => x == "SUCCESS");
         Assert.Single(outcomes, x => x == "CONFLICT_ALREADY_RESOLVED");
 
@@ -230,13 +240,17 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
         ConflictScope scope;
+        ResolverFixture firstResolver;
+        ResolverFixture secondResolver;
         await using (var seed = PostgreSqlTestEnvironment.CreateDbContext(connection))
         {
             await seed.Database.MigrateAsync();
             scope = await SeedConflictAsync(seed, "REAPPLY-RACE");
+            firstResolver = await SeedFreshProofAsync(seed, scope);
+            secondResolver = await SeedFreshProofAsync(seed, scope);
         }
 
-        async Task<string> Resolve(string suffix)
+        async Task<string> Resolve(string suffix, ResolverFixture resolver)
         {
             await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
             var request = new ResolveSyncConflictRequest(
@@ -246,7 +260,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
                     "UPDATE", "Waybill", scope.EntityId, 2, DateTimeOffset.UtcNow, Payload, PayloadHash));
             try
             {
-                _ = await ResolveAsync(Service(db), scope, request);
+                _ = await Service(db).ResolveAsync(
+                    scope.ConflictId, request, resolver.Context, resolver.Proof);
                 return "SUCCESS";
             }
             catch (SyncRuleException exception)
@@ -255,7 +270,9 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
             }
         }
 
-        var outcomes = await Task.WhenAll(Task.Run(() => Resolve("a")), Task.Run(() => Resolve("b")));
+        var outcomes = await Task.WhenAll(
+            Task.Run(() => Resolve("a", firstResolver)),
+            Task.Run(() => Resolve("b", secondResolver)));
         Assert.Single(outcomes, x => x == "SUCCESS");
         Assert.Single(outcomes, x => x == "CONFLICT_ALREADY_RESOLVED");
 
@@ -265,6 +282,36 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         Assert.Equal(2, await verify.SyncOperations.CountAsync(x => x.CompanyId == scope.CompanyId));
         Assert.Equal(1, await verify.AuditEvents.CountAsync(x =>
             x.Action == "SyncConflictResolved" && x.EntityId == scope.ConflictId));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Authorized_supervisor_on_live_second_device_can_resolve_conflict_from_revoked_origin_device()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedConflictAsync(db, "ORPHAN-SUPERVISOR");
+        var originDevice = await db.RegisteredDevices.SingleAsync(x => x.Id == scope.RegisteredDeviceId);
+        originDevice.Status = "REVOKED";
+        originDevice.RevokedAt = DateTimeOffset.UtcNow;
+        var originAssignment = await db.RegisteredDeviceAssignments.SingleAsync(x => x.Id == scope.AssignmentId);
+        originAssignment.Status = "REVOKED";
+        originAssignment.RemovedAt = DateTimeOffset.UtcNow;
+        originAssignment.RemovedByUserId = scope.UserId;
+        await db.SaveChangesAsync();
+        var resolver = await SeedResolverAsync(db, scope.CompanyId, scope.BranchId);
+        db.ChangeTracker.Clear();
+
+        var result = await Service(db).ResolveAsync(
+            scope.ConflictId, KeepRequest("supervisor kept current server state"),
+            resolver.Context, resolver.Proof);
+
+        Assert.Equal("RESOLVED", result.ConflictStatus);
+        Assert.Equal("REJECTED", result.OriginalOperationStatus);
+        db.ChangeTracker.Clear();
+        var persisted = await db.ConflictCases.AsNoTracking().SingleAsync(x => x.Id == scope.ConflictId);
+        Assert.Equal(resolver.Context.UserId.ToString(), persisted.ResolvedBy);
     }
 
     [Theory]
@@ -334,7 +381,7 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
     private static SyncConflictResolutionContext Context(ConflictScope scope)
         => new(scope.UserId, scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId,
-            1, scope.DeviceId, Guid.NewGuid());
+            1, scope.DeviceId, scope.FreshAttemptCorrelationId);
 
     private static AcceptedSyncProofContext Proof(ConflictScope scope, SyncConflictResolutionContext context)
         => new(scope.ReplayId, context.UserId, context.CompanyId, context.BranchId,
@@ -469,8 +516,103 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         db.ConflictCases.Add(conflict);
         await db.SaveChangesAsync();
         return new(company.Id, branch.Id, user.Id, device.Id, assignment.Id, proof.Id, freshProof.Id,
-            deviceId, operation.Id, conflict.Id,
+            freshProof.AttemptCorrelationId, deviceId, operation.Id, conflict.Id,
             entityId, operation.ClientOperationId, operationCorrelationId);
+    }
+
+    private static async Task<ResolverFixture> SeedResolverAsync(
+        TransportErpDbContext db,
+        Guid companyId,
+        Guid branchId)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var userName = $"supervisor-{Guid.NewGuid():N}";
+        var user = new User
+        {
+            Id = Guid.NewGuid(), UserName = userName, NormalizedUserName = userName.ToUpperInvariant(),
+            DisplayName = "Conflict supervisor", PasswordHash = "test", SecurityStamp = Guid.NewGuid().ToString("N"),
+            AuthVersion = 1, Status = "ACTIVE", CompanyId = companyId, BranchId = branchId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        var deviceId = $"supervisor-device-{Guid.NewGuid():N}";
+        var device = new RegisteredDevice
+        {
+            Id = Guid.NewGuid(), CompanyId = companyId, DeviceId = deviceId, DisplayName = "Supervisor device",
+            Platform = "TEST", AppVersion = "1", RegistrationRequestId = $"req-{Guid.NewGuid():N}",
+            CredentialHash = new string('s', 64), CredentialVersion = 1, Status = "ACTIVE",
+            RegisteredByUserId = user.Id, ApprovedByUserId = user.Id, ApprovedAt = now, LastSeenAt = now,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        var assignment = new RegisteredDeviceAssignment
+        {
+            Id = Guid.NewGuid(), RegisteredDeviceId = device.Id, UserId = user.Id, CompanyId = companyId,
+            BranchId = branchId, Status = "ACTIVE", AssignedByUserId = user.Id, AssignedAt = now,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        db.AddRange(user, device, assignment);
+        await db.SaveChangesAsync();
+        var nonce = new SyncProofNonce
+        {
+            Id = Guid.NewGuid(), CompanyId = companyId, RegisteredDeviceId = device.Id, DeviceId = deviceId,
+            ProofKeyVersion = 1, NonceHash = RandomNumberGenerator.GetBytes(32), IssuedAt = now,
+            ExpiresAt = now.AddMinutes(5)
+        };
+        db.SyncProofNonces.Add(nonce);
+        await db.SaveChangesAsync();
+        var correlationId = Guid.NewGuid();
+        var replay = new SyncProofReplay
+        {
+            Id = Guid.NewGuid(), CompanyId = companyId, RegisteredDeviceId = device.Id, DeviceId = deviceId,
+            DeviceAssignmentId = assignment.Id, UserId = user.Id, BranchId = branchId, ProofKeyVersion = 1,
+            ProofKeyThumbprint = new string('t', 43), JtiHash = RandomNumberGenerator.GetBytes(32),
+            HtuHash = RandomNumberGenerator.GetBytes(32), HttpMethod = "POST", NonceRecordId = nonce.Id,
+            IssuedAt = now, FirstSeenAt = now, ExpiresAt = now.AddMinutes(4), AttemptCorrelationId = correlationId
+        };
+        db.SyncProofReplays.Add(replay);
+        await db.SaveChangesAsync();
+        var context = new SyncConflictResolutionContext(
+            user.Id, companyId, branchId, device.Id, 1, deviceId, correlationId);
+        var proof = new AcceptedSyncProofContext(
+            replay.Id, user.Id, companyId, branchId, device.Id, deviceId, 1, 1,
+            new string('t', 43), correlationId);
+        return new ResolverFixture(context, proof);
+    }
+
+    private static async Task<ResolverFixture> SeedFreshProofAsync(
+        TransportErpDbContext db,
+        ConflictScope scope)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var nonce = new SyncProofNonce
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId,
+            RegisteredDeviceId = scope.RegisteredDeviceId, DeviceId = scope.DeviceId,
+            ProofKeyVersion = 1, NonceHash = RandomNumberGenerator.GetBytes(32),
+            IssuedAt = now, ExpiresAt = now.AddMinutes(5)
+        };
+        db.SyncProofNonces.Add(nonce);
+        await db.SaveChangesAsync();
+        var correlationId = Guid.NewGuid();
+        var replay = new SyncProofReplay
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId,
+            RegisteredDeviceId = scope.RegisteredDeviceId, DeviceId = scope.DeviceId,
+            DeviceAssignmentId = scope.AssignmentId, UserId = scope.UserId, BranchId = scope.BranchId,
+            ProofKeyVersion = 1, ProofKeyThumbprint = new string('t', 43),
+            JtiHash = RandomNumberGenerator.GetBytes(32), HtuHash = RandomNumberGenerator.GetBytes(32),
+            HttpMethod = "POST", NonceRecordId = nonce.Id, IssuedAt = now,
+            FirstSeenAt = now, ExpiresAt = now.AddMinutes(4), AttemptCorrelationId = correlationId
+        };
+        db.SyncProofReplays.Add(replay);
+        await db.SaveChangesAsync();
+        var context = new SyncConflictResolutionContext(
+            scope.UserId, scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId,
+            1, scope.DeviceId, correlationId);
+        var proof = new AcceptedSyncProofContext(
+            replay.Id, scope.UserId, scope.CompanyId, scope.BranchId,
+            scope.RegisteredDeviceId, scope.DeviceId, 1, 1,
+            new string('t', 43), correlationId);
+        return new ResolverFixture(context, proof);
     }
 
     private sealed class TestPermissionResolver(bool allowOriginal) : IEffectivePermissionResolver
@@ -489,10 +631,15 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         Guid AssignmentId,
         Guid OriginalReplayId,
         Guid ReplayId,
+        Guid FreshAttemptCorrelationId,
         string DeviceId,
         Guid OperationId,
         Guid ConflictId,
         Guid EntityId,
         string ClientOperationId,
         Guid OperationCorrelationId);
+
+    private sealed record ResolverFixture(
+        SyncConflictResolutionContext Context,
+        AcceptedSyncProofContext Proof);
 }

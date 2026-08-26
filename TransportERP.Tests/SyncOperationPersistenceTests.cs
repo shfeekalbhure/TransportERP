@@ -209,14 +209,9 @@ public sealed class SyncOperationPersistenceTests
         Assert.Equal(operation.Id, conflict.SyncOperationId);
         Assert.Equal("CONFLICT", await db.SyncOperations.Where(x => x.Id == operation.Id).Select(x => x.Status).SingleAsync());
 
-        var resolved = await service.ResolveSyncConflictAsync(conflict.Id,
-            new ResolveSyncConflictCommand("USE_SERVER_VALUE"), scope.Security);
-        Assert.Equal("RESOLVED", resolved.Status);
-        Assert.Equal("RESOLVED", await db.SyncOperations.Where(x => x.Id == operation.Id).Select(x => x.Status).SingleAsync());
-        Assert.True(await db.AuditEvents.AnyAsync(x => x.Action == "SyncOperationConflictResolved" && x.EntityId == operation.Id));
-
-        await Assert.ThrowsAsync<SyncRuleException>(() => service.ResolveSyncConflictAsync(conflict.Id,
-            new ResolveSyncConflictCommand("SECOND_ATTEMPT"), scope.Security));
+        // Resolution is intentionally absent from SyncOperationService. The only runtime path is
+        // SyncConflictResolutionService, which requires a fresh accepted PoP and resolve permission.
+        Assert.Equal("OPEN", conflict.Status);
     }
 
     [Fact]
