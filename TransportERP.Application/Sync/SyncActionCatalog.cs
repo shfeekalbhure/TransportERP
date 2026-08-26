@@ -89,9 +89,9 @@ public sealed record SyncActionValidationResult(
 }
 
 /// <summary>
-/// The single typed catalog for sync-v1 write actions. Runtime availability is
-/// deliberately explicit and remains closed until a separately reviewed
-/// dispatcher is installed for an action.
+/// The single typed catalog for sync-v1 write actions. Runtime availability is explicit per action:
+/// only actions backed by the typed dispatcher and server executor are available. This decision is
+/// separate from the owner-controlled Offline/HTTP gate and worker activation setting.
 /// </summary>
 public static class SyncActionCatalog
 {
@@ -185,7 +185,7 @@ public static class SyncActionCatalog
             requiredPermission,
             resultVersionRequired,
             supported ? SyncActionDispatcherSupport.Supported : SyncActionDispatcherSupport.Unavailable,
-            SyncActionRuntimeAvailability.Unavailable);
+            supported ? SyncActionRuntimeAvailability.Available : SyncActionRuntimeAvailability.Unavailable);
 
     private static bool Satisfies(SyncValueRequirement requirement, bool isPresent) => requirement switch
     {

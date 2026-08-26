@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using TransportERP.Api.Sync;
 using TransportERP.Application.Sync;
+using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
@@ -16,6 +19,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
 
         Assert.True(result.Succeeded);
         Assert.False(options.OfflineEnabled!.Value);
+        Assert.False(options.ServerExecutionEnabled!.Value);
         Assert.Equal(new[] { "sync-v1" }, options.AllowedProtocolVersions);
         Assert.Equal(SyncApiModule.MaximumBatchOperations, options.MaxBatchOperations);
         Assert.Equal(SyncApiModule.MaximumRequestBodyBytes, options.MaximumRequestBodyBytes);
@@ -24,6 +28,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
 
     [Theory]
     [InlineData("Sync:Offline:Enabled")]
+    [InlineData("Sync:ServerExecution:Enabled")]
     [InlineData("Sync:Protocol:AllowedVersions:0")]
     [InlineData("Sync:Batch:MaxOperations")]
     [InlineData("Sync:Retry:ServerExecution:MaxCount")]
@@ -51,6 +56,35 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, x => x.Contains("G5", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Server_execution_worker_is_disabled_by_default_but_composition_is_complete()
+    {
+        var options = SyncRuntimePolicyOptions.Load(Configuration(RequiredSettings()));
+        var services = new ServiceCollection();
+
+        services.AddSyncBusinessExecution(options.ServerExecutionEnabled == true);
+
+        Assert.DoesNotContain(services, descriptor =>
+            descriptor.ServiceType == typeof(IHostedService) &&
+            descriptor.ImplementationType == typeof(SyncExecutionWorker));
+        Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(ISyncActionExecutor));
+        Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(SyncExecutionProcessor));
+    }
+
+    [Fact]
+    public void Server_execution_worker_is_registered_only_for_explicit_true()
+    {
+        var disabled = new ServiceCollection();
+        var enabled = new ServiceCollection();
+
+        disabled.AddSyncBusinessExecution(false);
+        enabled.AddSyncBusinessExecution(true);
+
+        Assert.DoesNotContain(disabled, x => x.ServiceType == typeof(IHostedService));
+        Assert.Contains(enabled, x => x.ServiceType == typeof(IHostedService) &&
+            x.ImplementationType == typeof(SyncExecutionWorker));
     }
 
     [Theory]
@@ -189,6 +223,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
     private static SyncRuntimePolicyOptions ValidOptions(bool offlineEnabled = false) => new()
     {
         OfflineEnabled = offlineEnabled,
+        ServerExecutionEnabled = false,
         AllowedActions = SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue).ToArray(),
         AllowedProtocolVersions = ["sync-v1"],
         ClientTransportMaxRetryCount = 5,
@@ -212,6 +247,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         string[] actions) => new()
     {
         OfflineEnabled = source.OfflineEnabled,
+        ServerExecutionEnabled = source.ServerExecutionEnabled,
         AllowedActions = actions,
         AllowedProtocolVersions = source.AllowedProtocolVersions,
         ClientTransportMaxRetryCount = source.ClientTransportMaxRetryCount,
@@ -235,6 +271,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         var values = new Dictionary<string, string?>
         {
             ["Sync:Offline:Enabled"] = "false",
+            ["Sync:ServerExecution:Enabled"] = "false",
             ["Sync:Protocol:AllowedVersions:0"] = "sync-v1",
             ["Sync:Retry:ClientTransport:MaxCount"] = "5",
             ["Sync:Retry:ClientTransport:BaseSeconds"] = "5",

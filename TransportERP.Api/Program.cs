@@ -65,6 +65,7 @@ builder.Services.AddScoped<SyncOperationService>(services =>
 builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();
+builder.Services.AddSyncBusinessExecution(syncRuntimePolicy.ServerExecutionEnabled == true);
 
 var configuredMode = builder.Configuration["Auth:Mode"] ?? "LocalSessions";
 if (!Enum.TryParse<TransportAuthMode>(configuredMode, true, out var authMode))

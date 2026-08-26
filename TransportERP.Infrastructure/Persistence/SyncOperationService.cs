@@ -70,6 +70,8 @@ public sealed record SyncOperationExecutionClaim(
     Guid BranchId,
     Guid UserId,
     Guid RegisteredDeviceId,
+    int RegisteredDeviceCredentialVersion,
+    int ProofKeyVersion,
     string DeviceId,
     string ProtocolVersion,
     string ActionCode,
@@ -79,10 +81,11 @@ public sealed record SyncOperationExecutionClaim(
     long? BaseVersion,
     string PayloadJson,
     string PayloadHash,
+    string ClientOperationId,
     Guid OperationCorrelationId,
     int ServerRetryCount);
 
-public sealed record SyncExecutionSuccess(Guid ResultEntityId, long ResultVersion);
+public sealed record SyncExecutionSuccess(Guid ResultEntityId, long? ResultVersion);
 
 public sealed record ConflictCaseDraft(
     string DeviceSnapshot,
@@ -199,12 +202,17 @@ public sealed class SyncOperationService(
     {
         if (result.ResultEntityId == Guid.Empty)
             throw new SyncRuleException("RESULT_ENTITY_INVALID", operationId.ToString());
-        if (result.ResultVersion <= 0)
+        if (result.ResultVersion is <= 0)
             throw new SyncRuleException("RESULT_VERSION_INVALID", operationId.ToString());
 
         var completedAt = NormalizePostgreSqlTimestamp(now ?? DateTimeOffset.UtcNow);
         return await CompleteClaimAsync(operationId, claimToken, completedAt, async operation =>
         {
+            var definition = SyncActionCatalog.Definitions.SingleOrDefault(x =>
+                string.Equals(x.ActionCodeValue, operation.ActionCode, StringComparison.Ordinal));
+            if (definition is null ||
+                (definition.ResultVersionRequired && !result.ResultVersion.HasValue))
+                throw new SyncRuleException("RESULT_VERSION_REQUIRED", operationId.ToString());
             operation.ResultEntityId = result.ResultEntityId;
             operation.ResultVersion = result.ResultVersion;
             operation.Status = "SUCCEEDED";
@@ -838,6 +846,8 @@ public sealed class SyncOperationService(
             operation.BranchId!.Value,
             operation.UserId,
             operation.RegisteredDeviceId!.Value,
+            operation.RegisteredDeviceCredentialVersion!.Value,
+            operation.ProofKeyVersion!.Value,
             operation.DeviceId,
             operation.ProtocolVersion!,
             operation.ActionCode!,
@@ -847,6 +857,7 @@ public sealed class SyncOperationService(
             operation.BaseVersion,
             operation.PayloadJson,
             operation.PayloadHash,
+            operation.ClientOperationId,
             operation.OperationCorrelationId!.Value,
             operation.RetryCount);
 

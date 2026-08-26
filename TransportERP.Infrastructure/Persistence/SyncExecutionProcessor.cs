@@ -4,7 +4,7 @@ public abstract record SyncActionExecutionOutcome
 {
     private SyncActionExecutionOutcome() { }
 
-    public sealed record Succeeded(Guid ResultEntityId, long ResultVersion) : SyncActionExecutionOutcome;
+    public sealed record Succeeded(Guid ResultEntityId, long? ResultVersion) : SyncActionExecutionOutcome;
     public sealed record Failed(string ErrorCode) : SyncActionExecutionOutcome;
 }
 

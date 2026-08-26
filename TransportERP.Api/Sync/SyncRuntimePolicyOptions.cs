@@ -6,6 +6,7 @@ namespace TransportERP.Api.Sync;
 public sealed class SyncRuntimePolicyOptions
 {
     public bool? OfflineEnabled { get; init; }
+    public bool? ServerExecutionEnabled { get; init; }
     public string[] AllowedActions { get; init; } = [];
     public string[] AllowedProtocolVersions { get; init; } = [];
     public int? ClientTransportMaxRetryCount { get; init; }
@@ -26,6 +27,7 @@ public sealed class SyncRuntimePolicyOptions
     public static SyncRuntimePolicyOptions Load(IConfiguration configuration) => new()
     {
         OfflineEnabled = configuration.GetValue<bool?>("Sync:Offline:Enabled"),
+        ServerExecutionEnabled = configuration.GetValue<bool?>("Sync:ServerExecution:Enabled"),
         AllowedActions = configuration.GetSection("Sync:Offline:AllowedActions").Get<string[]>() ?? [],
         AllowedProtocolVersions = configuration.GetSection("Sync:Protocol:AllowedVersions").Get<string[]>() ?? [],
         ClientTransportMaxRetryCount = configuration.GetValue<int?>("Sync:Retry:ClientTransport:MaxCount"),
@@ -46,8 +48,8 @@ public sealed class SyncRuntimePolicyOptions
 }
 
 /// <summary>
-/// Validates the fixed Stage 4 global ceiling. Production remains explicitly
-/// closed until the owner-controlled G5 release changes the activation rule.
+/// Validates the fixed Stage 4 global ceiling. Offline remains explicitly closed until G5;
+/// server execution is an independent, explicitly configured worker switch.
 /// </summary>
 public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRuntimePolicyOptions>
 {
@@ -59,6 +61,8 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
         var errors = new List<string>();
         if (options.OfflineEnabled is not false)
             errors.Add("Sync:Offline:Enabled must be explicitly false until the owner grants G5.");
+        if (!options.ServerExecutionEnabled.HasValue)
+            errors.Add("Sync:ServerExecution:Enabled must be explicitly configured.");
         ValidateExactSet(options.AllowedProtocolVersions, ["sync-v1"], "Sync:Protocol:AllowedVersions", errors);
         ValidateActions(options.AllowedActions, errors);
         ValidateRange(options.ClientTransportMaxRetryCount, 0, 5, "Sync:Retry:ClientTransport:MaxCount", errors);
