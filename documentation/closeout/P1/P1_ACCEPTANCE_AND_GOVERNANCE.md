@@ -19,6 +19,7 @@
 | PR | [#69](https://github.com/shfeekalbhure/TransportERP/pull/69) — `OPEN`, `DRAFT`, `UNMERGED` |
 | base | `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5` |
 | مرشح تنفيذ المراحل 1–3 | [`5ca9a86acef4053cf731fb896ca0c77b17a575ae`](https://github.com/shfeekalbhure/TransportERP/commit/5ca9a86acef4053cf731fb896ca0c77b17a575ae) |
+| أول HEAD توثيقي للمرجع الموحد | `9d9ba3fe158eab6307ea0860e942d6cd56c273d2`؛ tree=`5c15cd219d55752eb78cf233f87cbcf3ff1b7df2`؛ CI أخضر |
 | النظير المحلي | `d0860d70d808374bd5582d2e71c14afa5429f8cd` |
 | tree المشترك | `9ce37459c22c6f4c47beee203af0fa9d0a167080`؛ تطابق remote/local حرفيًا |
 | نطاق التغيير | `6` commits بعيدة، `48` ملفًا؛ يعاد إنتاج manifest بالأمر `git diff --name-status 2ec6ccc..5ca9a86` |
@@ -61,6 +62,8 @@
 | P2 W0-3 contracts | [run 32908493452](https://github.com/shfeekalbhure/TransportERP/actions/runs/32908493452) | `SUCCESS`؛ job `97997619088` |
 | A/B/C/W0-5 | path-filtered | `SKIPPED` بحسب المسارات، وليس PASS مزعومًا |
 
+**التحقق التوثيقي اللاحق:** [CI run 32914032537](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537) على docs HEAD `9d9ba3...` نجح أيضًا: [Core job 98013809603](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537/job/98013809603)=`185/185`, و[Desktop job 98013809430](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032537/job/98013809430)=`SUCCESS`، و[P2 foundation 32914032608](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032608) و[W0-3 32914032504](https://github.com/shfeekalbhure/TransportERP/actions/runs/32914032504)=`SUCCESS`. لا يستبدل هذا مرشح التنفيذ المثبت أعلاه ولا يمحو أثر التشغيلات الفاشلة.
+
 الأثر التاريخي غير مطموس:
 
 - [`a08ee586` / run 32888563344](https://github.com/shfeekalbhure/TransportERP/actions/runs/32888563344): `159/160`؛ وفشل foundation وW0-3 لأن اختبار عقد HTTP حاول قراءة JSON من استجابة `403` فارغة.
@@ -99,7 +102,7 @@
 
 `PHASE 3 CLOSED IMPLEMENTATION` على المرشح أعلاه. `PHASE 4 WORK IN PROGRESS` عقديًا فقط وفق القرار `DEC-P1-SYNC-POP-20260826-01` والقسم 19 من `P1_SYNC_CONTRACT.md`. لا يبدأ runtime قبل إغلاق تعارضات المراجعة الحاكمة، ولا يبدأ Phase 5، ولا يتغير `sync.offline.enabled=false`، ولا تُفتح G4/G5 بهذا السجل.
 
-**حالة البوابة:** `STAGE4_CONTRACT_WIP — NOT READY FOR IMPLEMENTATION`. اتجاه السياسة معتمد، لكن التنفيذ محجوب حتى يثبت contract SHA يحتوي القرار نفسه، وتتطابق مفاتيح idempotency القديمة والجديدة مع نطاق الشركة، وتحسم دلالة `Down` عند وجود بيانات Stage 4، ويثبت عقد bind/rotate/recovery وترتيب linearization، ويجمد schema الدقيق للـnonce/replay/provenance والبصمة canonical مع golden vectors، ويفصل operation correlation عن attempt correlation، وتحدد حدود جسم الطلب والحمولة. هذه موانع تصميم حاكمة وليست عيوبًا مفتوحة في مرشح المراحل 1–3.
+**حالة البوابة:** `STAGE4_CONTRACT_PEER_REVIEWED — CONTRACT COMMIT PENDING — RUNTIME NOT STARTED`. حسم القرار المعدل `DEC-P1-SYNC-POP-AMEND-20260826-02` مفاتيح idempotency المعزولة بالشركة، وDown غير المدمر، وbind/rotate/recovery، ونقطة linearization وترتيب الأقفال، وschema والقيود والفهارس والمحفزات الدقيقة، وفصل operation/attempt correlation، و`fp-v1` byte layout، وحدود body/payload. طابقت ثلاثة مراجعات داخلية مستقلة النص مع EF/PostgreSQL والكود الحالي، وحُسب متجها `fp-v1` بأداتين مستقلتين وتطابقا. لا يبدأ runtime حتى يثبت commit الحاوي لهذا التعديل وتنجح CI عليه؛ وهذه مراجعة تنفيذية داخل الفريق لا تدعي `INDEPENDENTLY REVIEWED` من فريق الضمان المستقل ولا G4/G5.
 ## 1. نطاق السجل
 يغطي السجل كل عقود W1 السبعة عشر، وكل أفعال W2 الخمسة عشر، وكل شاشات W3 الاثنتي عشرة، إضافة إلى عشرة اختبارات حاكمة للمزامنة. كل اختبار مرتبط بمعرف عقد واضح، وله نتيجة مطلوبة ودليل تنفيذ يجب حفظه عند بدء الاختبار البرمجي.
 | الفئة | عدد الاختبارات | الغرض |
@@ -198,7 +201,7 @@
 | proof replay | `jti` واحد لكل جهاز/نسخة مفتاح؛ hash-only وunique ذري في PostgreSQL؛ retention `10m` |
 | request body | `tbh=BASE64URL(SHA256(raw body octets))`; JSON وidentity content encoding فقط |
 | target URI | HTTPS `sync.proof.public_origin` إلزامي + المسار الثابت؛ forwarded headers من KnownProxies/KnownNetworks فقط مع AllowedHosts |
-| business idempotency | `(RegisteredDeviceId, ClientOperationId)`؛ `ActionCode` وكل الحقول التجارية الثابتة داخل full canonical fingerprint |
+| business idempotency | `(CompanyId, RegisteredDeviceId, ClientOperationId)`؛ legacy=`(CompanyId, DeviceId, ClientOperationId)`؛ `ActionCode` و`OperationCorrelationId` وكل الحقول التجارية الثابتة داخل `fp-v1` |
 | legacy | لا backfill تخميني؛ partial legacy uniqueness؛ collision يرفض؛ migration additive مستقلة مع preflight وUp/Down/Up |
 | runtime gate | `sync.offline.enabled=false`; production يعيد `OFFLINE_DISABLED` حتى G4/G5 |
 
