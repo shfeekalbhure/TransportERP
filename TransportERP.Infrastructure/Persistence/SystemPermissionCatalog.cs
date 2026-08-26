@@ -11,6 +11,7 @@ public static class SystemPermissionCatalog
     [
         new("auth.scope.select", "auth.scope", "select", "PLATFORM", "اختيار نطاق التشغيل"),
         new("sync.operations.execute", "sync.operations", "execute", "BRANCH", "تنفيذ عمليات المزامنة"),
+        new(SyncConflictPermissionCodes.Resolve, "sync.conflicts", "resolve", "BRANCH", "حل تعارضات المزامنة"),
         new("audit.events.read", "audit.events", "read", "BRANCH", "قراءة أحداث التدقيق"),
         new("devices.register", "devices", "register", "COMPANY", "تسجيل جهاز"),
         new("devices.read", "devices", "read", "COMPANY", "عرض الأجهزة"),
