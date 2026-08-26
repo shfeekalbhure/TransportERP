@@ -55,8 +55,9 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
             var missingFingerprintError = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             var missingFingerprintDetail = Assert.IsType<Npgsql.PostgresException>(
                 missingFingerprintError.GetBaseException());
-            Assert.Equal("23514", missingFingerprintDetail.SqlState);
-            Assert.Equal("ck_sync_stage4_contract_bundle", missingFingerprintDetail.ConstraintName);
+            Assert.Equal("P0001", missingFingerprintDetail.SqlState);
+            Assert.Contains("new sync operation requires accepted Stage4 proof replay",
+                missingFingerprintDetail.Message, StringComparison.Ordinal);
             db.ChangeTracker.Clear();
 
             db.SyncOperations.Add(NewAcceptedOperation(first, Guid.NewGuid(), $"fake-{Guid.NewGuid():N}"));
@@ -420,6 +421,10 @@ public sealed class Stage4SyncIdempotencyMigrationPostgreSqlTests
         Assert.Contains("'fp-v1'", bundleDefinition, StringComparison.Ordinal);
         Assert.Contains("\"ProtocolVersion\"", bundleDefinition, StringComparison.Ordinal);
         Assert.Contains("'sync-v1'", bundleDefinition, StringComparison.Ordinal);
+        Assert.Contains("\"RequestFingerprintVersion\" IS NOT NULL", bundleDefinition,
+            StringComparison.Ordinal);
+        Assert.Contains("\"ProtocolVersion\" IS NOT NULL", bundleDefinition,
+            StringComparison.Ordinal);
         Assert.Contains("octet_length(\"RequestFingerprintHash\") = 32", bundleDefinition,
             StringComparison.Ordinal);
         Assert.Contains("length((\"ProofKeyThumbprint\")::text) = 43", bundleDefinition,

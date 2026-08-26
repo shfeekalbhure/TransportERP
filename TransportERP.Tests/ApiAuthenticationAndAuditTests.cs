@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -552,7 +553,7 @@ public sealed class ApiAuthenticationAndAuditTests
         {
             typ = "dpop+jwt", alg = "ES256",
             jwk = new { kty = "EC", crv = "P-256", x = Base64Url(parameters.Q.X!), y = Base64Url(parameters.Q.Y!) }
-        });
+        }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
         var jti = Guid.NewGuid().ToString("D");
         var payload = JsonSerializer.Serialize(new
         {

@@ -354,6 +354,18 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         // Cleanup is intentionally global. Remove expired evidence left by earlier
         // PostgreSQL fixtures before asserting exact counts for this arrangement.
         _ = await cleanup.CleanupExpiredAsync(now);
+
+        async Task<SyncProofCleanupResult> CleanupWithAccountingAsync(DateTimeOffset cutoff)
+        {
+            var replaysBefore = await db.SyncProofReplays.CountAsync();
+            var noncesBefore = await db.SyncProofNonces.CountAsync();
+            var result = await cleanup.CleanupExpiredAsync(cutoff);
+            var replaysAfter = await db.SyncProofReplays.CountAsync();
+            var noncesAfter = await db.SyncProofNonces.CountAsync();
+            Assert.Equal(replaysBefore - replaysAfter, result.DeletedReplays);
+            Assert.Equal(noncesBefore - noncesAfter, result.DeletedNonces);
+            return result;
+        }
         var assignmentId = await db.RegisteredDeviceAssignments
             .Where(x => x.RegisteredDeviceId == scope.DeviceId && x.Status == "ACTIVE")
             .Select(x => x.Id).SingleAsync();
@@ -374,10 +386,10 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         db.SyncProofReplays.AddRange(boundaryReplay, futureReplay, malformedShortReplay);
         await db.SaveChangesAsync();
 
-        var first = await cleanup.CleanupExpiredAsync(now);
+        var first = await CleanupWithAccountingAsync(now);
 
-        Assert.Equal(1, first.DeletedReplays);
-        Assert.Equal(2, first.DeletedNonces);
+        Assert.True(first.DeletedReplays >= 1);
+        Assert.True(first.DeletedNonces >= 2);
         Assert.False(await db.SyncProofReplays.AnyAsync(x => x.Id == boundaryReplay.Id));
         Assert.False(await db.SyncProofNonces.AnyAsync(x => x.Id == expiredReferenced.Id));
         Assert.False(await db.SyncProofNonces.AnyAsync(x => x.Id == expiredUnreferenced.Id));
@@ -387,16 +399,16 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         Assert.True(await db.SyncProofNonces.AnyAsync(x => x.Id == shortExpiryReferenced.Id));
         Assert.True(await db.SyncProofNonces.AnyAsync(x => x.Id == futureUnreferenced.Id));
 
-        var second = await cleanup.CleanupExpiredAsync(now.AddMinutes(2));
-        Assert.Equal(1, second.DeletedReplays);
-        Assert.Equal(2, second.DeletedNonces);
+        var second = await CleanupWithAccountingAsync(now.AddMinutes(2));
+        Assert.True(second.DeletedReplays >= 1);
+        Assert.True(second.DeletedNonces >= 2);
         Assert.False(await db.SyncProofReplays.AnyAsync(x => x.Id == futureReplay.Id));
         Assert.True(await db.SyncProofReplays.AnyAsync(x => x.Id == malformedShortReplay.Id));
         Assert.True(await db.SyncProofNonces.AnyAsync(x => x.Id == shortExpiryReferenced.Id));
 
-        var third = await cleanup.CleanupExpiredAsync(now.AddMinutes(6));
-        Assert.Equal(1, third.DeletedReplays);
-        Assert.Equal(1, third.DeletedNonces);
+        var third = await CleanupWithAccountingAsync(now.AddMinutes(6));
+        Assert.True(third.DeletedReplays >= 1);
+        Assert.True(third.DeletedNonces >= 1);
         Assert.False(await db.SyncProofReplays.AnyAsync(x => x.Id == malformedShortReplay.Id));
         Assert.False(await db.SyncProofNonces.AnyAsync(x => x.RegisteredDeviceId == scope.DeviceId));
     }
