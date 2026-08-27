@@ -69,10 +69,10 @@ internal static class AndroidDriverRuntimeSelfTest
             var queued = await activated.Runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
                 "Android CI E2E Party", "+967700000001", "Android emulator E2E address",
                 cancellationToken);
-            // Activation owns the one production drain supervisor. Starting a second manual
-            // transport pass here races the supervisor for the same durable lease and makes the
-            // caller's zero-claim result nondeterministic even though the supervisor is working.
-            // Observe the supervisor-owned acceptance and terminal transition instead.
+            // Request one bounded cycle from the already-active production supervisor. This API
+            // never calls the transport directly: it serializes the request behind any in-flight
+            // automatic cycle and therefore preserves the supervisor's single lease ownership.
+            await activated.Runtime.SynchronizeAsync(1, cancellationToken);
             var terminal = await WaitForOperationAsync(
                 activated.Runtime, queued.Operation.LocalOperationId, cancellationToken);
             var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)

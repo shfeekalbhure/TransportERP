@@ -67,12 +67,38 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             pfxPath, certificate.Export(X509ContentType.Pfx, pfxPassword), cancellationToken);
         Checkpoint("HOST_CERTIFICATE_WRITTEN");
         Checkpoint("HOST_CERTIFICATE_TRUST_STARTED");
-        using (var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
+        Checkpoint("HOST_ROOT_STORE_CREATE_STARTED");
+        var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
+        Checkpoint("HOST_ROOT_STORE_CREATED");
+        try
         {
+            Checkpoint("HOST_ROOT_STORE_OPEN_STARTED");
             root.Open(OpenFlags.ReadWrite);
-            using var publicCertificate = new X509Certificate2(
-                certificate.Export(X509ContentType.Cert));
-            root.Add(publicCertificate);
+            Checkpoint("HOST_ROOT_STORE_OPENED");
+            Checkpoint("HOST_PUBLIC_CERTIFICATE_EXPORT_STARTED");
+            var publicCertificateBytes = certificate.Export(X509ContentType.Cert);
+            Checkpoint("HOST_PUBLIC_CERTIFICATE_EXPORTED");
+            Checkpoint("HOST_PUBLIC_CERTIFICATE_CREATE_STARTED");
+            var publicCertificate = new X509Certificate2(publicCertificateBytes);
+            Checkpoint("HOST_PUBLIC_CERTIFICATE_CREATED");
+            try
+            {
+                Checkpoint("HOST_ROOT_STORE_ADD_STARTED");
+                root.Add(publicCertificate);
+                Checkpoint("HOST_ROOT_STORE_ADD_RETURNED");
+            }
+            finally
+            {
+                Checkpoint("HOST_PUBLIC_CERTIFICATE_DISPOSE_STARTED");
+                publicCertificate.Dispose();
+                Checkpoint("HOST_PUBLIC_CERTIFICATE_DISPOSED");
+            }
+        }
+        finally
+        {
+            Checkpoint("HOST_ROOT_STORE_DISPOSE_STARTED");
+            root.Dispose();
+            Checkpoint("HOST_ROOT_STORE_DISPOSED");
         }
         Checkpoint("HOST_CERTIFICATE_TRUSTED");
 
