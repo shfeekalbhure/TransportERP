@@ -23,8 +23,6 @@ public sealed class Stage5DesktopOfflineContractTests
         var sessions = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
-        var releaseHost = Read(
-            "TransportERP.Desktop.E2ETests", "DesktopReleaseKestrelApiHost.cs");
         var operations = Read("TransportERP.Desktop", "Offline", "SyncOperationsForm.cs");
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
@@ -62,6 +60,8 @@ public sealed class Stage5DesktopOfflineContractTests
         var context = Read("TransportERP.Desktop", "Application", "DesktopApplicationContext.cs");
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+        var releaseHost = Read(
+            "TransportERP.Desktop.E2ETests", "DesktopReleaseKestrelApiHost.cs");
 
         Assert.Contains("DesktopAuthenticatedSessionScope AuthenticatedScope", bridge, StringComparison.Ordinal);
         Assert.Contains("DesktopAuthenticatedSessionScope AuthorizedOfflineScope", bridge, StringComparison.Ordinal);
