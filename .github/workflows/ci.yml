@@ -803,18 +803,40 @@ jobs:
           mkdir -p ci-evidence/mobile
           cp -- "$release_apk" ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
           release_apk=ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
-          apkanalyzer=$(command -v apkanalyzer || find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -print -quit)
-          test -n "$apkanalyzer" && test -x "$apkanalyzer"
+          apkanalyzer=$(command -v apkanalyzer 2>/dev/null || true)
+          if [ -z "$apkanalyzer" ]; then
+            apkanalyzer=$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -print -quit)
+          fi
+          if [ -z "$apkanalyzer" ] || [ ! -x "$apkanalyzer" ]; then
+            echo 'Android apkanalyzer executable was not found.'
+            exit 1
+          fi
           apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
-          test -n "$apksigner" && test -x "$apksigner"
+          if [ -z "$apksigner" ] || [ ! -x "$apksigner" ]; then
+            echo 'Android apksigner executable was not found.'
+            exit 1
+          fi
+          signer_report="$RUNNER_TEMP/mobile-release-apksigner.txt"
+          if ! "$apksigner" verify --print-certs "$release_apk" > "$signer_report"; then
+            echo 'Android Release APK signature verification failed.'
+            exit 1
+          fi
           mapfile -t signer_digests < <(
-            "$apksigner" verify --print-certs "$release_apk" \
-              | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p'
+            sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*([0-9A-Fa-f]{64})[[:space:]]*$/\1/p' "$signer_report"
           )
-          test "${#signer_digests[@]}" -eq 1
+          if [ "${#signer_digests[@]}" -ne 1 ]; then
+            echo "Android Release APK must have exactly one signer digest; found ${#signer_digests[@]}."
+            exit 1
+          fi
           signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
-          [[ "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]
-          "$apkanalyzer" manifest print "$release_apk" > ci-evidence/mobile/release-manifest.xml
+          if [[ ! "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Android Release APK signer digest is not canonical SHA-256.'
+            exit 1
+          fi
+          if ! "$apkanalyzer" manifest print "$release_apk" > ci-evidence/mobile/release-manifest.xml; then
+            echo 'Android Release APK manifest inspection failed.'
+            exit 1
+          fi
           if grep -Fq 'com.transporterp.mobile.driver.DriverDeviceTestActivity' ci-evidence/mobile/release-manifest.xml; then
             echo 'The test-only Android activity leaked into the Release APK.'
             exit 1
@@ -1135,14 +1157,27 @@ jobs:
           cp -- "$test_apk" ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
           test_apk=ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
           apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
-          test -n "$apksigner" && test -x "$apksigner"
+          if [ -z "$apksigner" ] || [ ! -x "$apksigner" ]; then
+            echo 'Android apksigner executable was not found for the device-test APK.'
+            exit 1
+          fi
+          signer_report="$RUNNER_TEMP/android-device-test-apksigner.txt"
+          if ! "$apksigner" verify --print-certs "$test_apk" > "$signer_report"; then
+            echo 'Android device-test APK signature verification failed.'
+            exit 1
+          fi
           mapfile -t signer_digests < <(
-            "$apksigner" verify --print-certs "$test_apk" \
-              | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p'
+            sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*([0-9A-Fa-f]{64})[[:space:]]*$/\1/p' "$signer_report"
           )
-          test "${#signer_digests[@]}" -eq 1
+          if [ "${#signer_digests[@]}" -ne 1 ]; then
+            echo "Android device-test APK must have exactly one signer digest; found ${#signer_digests[@]}."
+            exit 1
+          fi
           signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
-          [[ "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]
+          if [[ ! "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Android device-test APK signer digest is not canonical SHA-256.'
+            exit 1
+          fi
           echo "$test_apk" > "$RUNNER_TEMP/android-device-test-apk.txt"
           printf '%s' "$signer_sha256" > "$RUNNER_TEMP/android-device-test-signer-sha256.txt"
           {

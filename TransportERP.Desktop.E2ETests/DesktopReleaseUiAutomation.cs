@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Automation;
 using TransportERP.Desktop.Application;
+using TransportERP.Desktop.Offline;
 
 namespace TransportERP.Desktop.E2ETests;
 
