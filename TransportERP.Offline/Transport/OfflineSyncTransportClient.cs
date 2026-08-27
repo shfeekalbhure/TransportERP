@@ -44,6 +44,7 @@ public sealed class OfflineSyncTransportClient
     private const string ProtocolVersion = "sync-v1";
     private const string CorrelationHeader = "X-Correlation-Id";
     private const string NonceHeader = "DPoP-Nonce";
+    private const string ClientLocalErrorPrefix = "CLIENT_";
     private readonly HttpClient _httpClient;
     private readonly OfflineOperationStore _store;
     private readonly IInMemoryBearerTokenProvider _bearerTokens;
@@ -156,21 +157,51 @@ public sealed class OfflineSyncTransportClient
         // below receives an independent wire AttemptCorrelationId and, when signed, matching cid.
         try
         {
-            var bearer = await _bearerTokens.GetBearerTokenAsync(cancellationToken);
-            ValidateBearer(bearer);
-            var nonceResult = await AcquireNonceAsync(body, bearer, cancellationToken);
-            if (nonceResult.ErrorCode is not null)
+            string? bearer = null;
+            try
             {
-                requestError = nonceResult.ErrorCode;
-                requestErrorRetryable = nonceResult.Retryable;
+                bearer = await _bearerTokens.GetBearerTokenAsync(cancellationToken);
+                ValidateBearer(bearer);
             }
-            else
+            catch (OperationCanceledException) { throw; }
+            catch (HttpRequestException) { throw; }
+            catch (SyncTransportException) { throw; }
+            catch (CryptographicException) { throw; }
+            catch
             {
-                var signedResult = await SendSignedAsync(
-                    body, bearer, nonceResult.Nonce!, cancellationToken);
-                response = signedResult.Response;
-                requestError = signedResult.ErrorCode;
-                requestErrorRetryable = signedResult.Retryable;
+                requestError = "CLIENT_BEARER_FAILURE";
+                requestErrorRetryable = true;
+            }
+
+            if (requestError is null)
+            {
+                (string? Nonce, string? ErrorCode, bool Retryable) nonceResult;
+                try
+                {
+                    nonceResult = await AcquireNonceAsync(body, bearer!, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (HttpRequestException) { throw; }
+                catch (SyncTransportException) { throw; }
+                catch (CryptographicException) { throw; }
+                catch
+                {
+                    nonceResult = (null, "CLIENT_NONCE_FAILURE", true);
+                }
+
+                if (nonceResult.ErrorCode is not null)
+                {
+                    requestError = nonceResult.ErrorCode;
+                    requestErrorRetryable = nonceResult.Retryable;
+                }
+                else
+                {
+                    var signedResult = await SendSignedAsync(
+                        body, bearer!, nonceResult.Nonce!, cancellationToken);
+                    response = signedResult.Response;
+                    requestError = signedResult.ErrorCode;
+                    requestErrorRetryable = signedResult.Retryable;
+                }
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -185,7 +216,7 @@ public sealed class OfflineSyncTransportClient
         }
         catch (JsonException)
         {
-            requestError = "INTERNAL_ERROR";
+            requestError = "CLIENT_SIGNED_JSON_INVALID";
             requestErrorRetryable = true;
         }
         catch (SyncTransportException exception)
@@ -203,7 +234,7 @@ public sealed class OfflineSyncTransportClient
             // A platform key/HTTP adapter may throw a provider-specific exception after the
             // durable claim. Never strand that row in SENDING until its lease expires, and never
             // copy the exception message or type into the encrypted status surface.
-            requestError = "INTERNAL_ERROR";
+            requestError = "CLIENT_PIPELINE_FAILURE";
             requestErrorRetryable = true;
         }
 
@@ -252,8 +283,8 @@ public sealed class OfflineSyncTransportClient
             return (null, "NONCE_CHALLENGE_INVALID", false);
         }
 
-        var errorCode = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
-        return (null, errorCode, IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
+        var error = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
+        return (null, error.ErrorCode, error.Retryable);
     }
 
     private async Task<(SyncV1BatchResponse? Response, string? ErrorCode, bool Retryable)> SendSignedAsync(
@@ -279,7 +310,7 @@ public sealed class OfflineSyncTransportClient
             catch (CryptographicException) { throw; }
             catch
             {
-                return (null, "INTERNAL_ERROR_PROOF_CREATE", true);
+                return (null, "CLIENT_PROOF_CREATE_FAILURE", true);
             }
             using var request = CreateRequest(body, bearer, attemptCorrelationId, proof);
             HttpResponseMessage response;
@@ -295,25 +326,34 @@ public sealed class OfflineSyncTransportClient
             catch (CryptographicException) { throw; }
             catch
             {
-                return (null, "INTERNAL_ERROR_SIGNED_SEND", true);
+                return (null, "CLIENT_SIGNED_SEND_FAILURE", true);
             }
 
             using (response)
             {
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                    var envelope = SyncV1Json.Deserialize<SyncV1BatchResponse>(responseBytes)
-                        ?? throw new JsonException("The sync response was empty.");
+                    SyncV1BatchResponse? envelope;
+                    try
+                    {
+                        var responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                        envelope = SyncV1Json.Deserialize<SyncV1BatchResponse>(responseBytes);
+                    }
+                    catch (JsonException)
+                    {
+                        return (null, "CLIENT_SIGNED_JSON_INVALID", true);
+                    }
+                    if (envelope is null)
+                        return (null, "CLIENT_SIGNED_JSON_INVALID", true);
                     if (!string.Equals(envelope.ProtocolVersion, ProtocolVersion, StringComparison.Ordinal) ||
                         envelope.AttemptCorrelationId != attemptCorrelationId || envelope.Results is null)
-                        throw new JsonException("The sync response envelope did not match the request.");
+                        return (null, "CLIENT_RESPONSE_ENVELOPE_INVALID", true);
                     return (envelope, null, false);
                 }
 
-                var errorCode = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
+                var error = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
                 if (signedAttempt == 0 && response.StatusCode == HttpStatusCode.Unauthorized &&
-                    string.Equals(errorCode, "use_dpop_nonce", StringComparison.Ordinal) &&
+                    string.Equals(error.ErrorCode, "use_dpop_nonce", StringComparison.Ordinal) &&
                     response.Headers.TryGetValues(NonceHeader, out var refreshValues))
                 {
                     var refreshed = refreshValues.ToArray();
@@ -323,8 +363,7 @@ public sealed class OfflineSyncTransportClient
                         continue;
                     }
                 }
-                return (null, errorCode,
-                    IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
+                return (null, error.ErrorCode, error.Retryable);
             }
         }
 
@@ -370,7 +409,8 @@ public sealed class OfflineSyncTransportClient
         }
 
         if (responseInvalid)
-            return await CompleteRequestFailureAsync(operations, "INTERNAL_ERROR", true, cancellationToken);
+            return await CompleteRequestFailureAsync(
+                operations, "CLIENT_RESULT_SET_INVALID", true, cancellationToken);
 
         var succeeded = 0;
         var conflicted = 0;
@@ -382,10 +422,12 @@ public sealed class OfflineSyncTransportClient
             if (!returned.TryGetValue((operation.ClientOperationId, operation.OperationCorrelationId), out var result))
             {
                 var missingResult = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                    operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                    operation.AttemptCorrelationId!.Value, true, "CLIENT_RESULT_MISSING",
+                    cancellationToken);
                 CountFailure(missingResult, ref retryScheduled, ref rejected);
                 continue;
             }
+            var remoteErrorCode = NormalizeRemoteErrorCode(result.ErrorCode);
 
             switch (result.Status)
             {
@@ -394,7 +436,8 @@ public sealed class OfflineSyncTransportClient
                     if (result.ServerOperationId is not { } serverOperationId || serverOperationId == Guid.Empty)
                     {
                         var malformedPending = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                            operation.AttemptCorrelationId!.Value, true,
+                            "CLIENT_PENDING_RESULT_INVALID", cancellationToken);
                         CountFailure(malformedPending, ref retryScheduled, ref rejected);
                         break;
                     }
@@ -407,7 +450,8 @@ public sealed class OfflineSyncTransportClient
                     if (result.ResultEntityId is not { } resultEntityId || resultEntityId == Guid.Empty)
                     {
                         var malformedSuccess = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                            operation.AttemptCorrelationId!.Value, true,
+                            "CLIENT_SUCCESS_RESULT_INVALID", cancellationToken);
                         CountFailure(malformedSuccess, ref retryScheduled, ref rejected);
                         break;
                     }
@@ -420,31 +464,37 @@ public sealed class OfflineSyncTransportClient
                     if (!TryCreateConflictReview(operation, result, out var conflictReview))
                     {
                         var malformedConflict = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                            operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                            operation.AttemptCorrelationId!.Value, true,
+                            "CLIENT_CONFLICT_RESULT_INVALID", cancellationToken);
                         CountFailure(malformedConflict, ref retryScheduled, ref rejected);
                         break;
                     }
                     await _store.MarkConflictAsync(operation.LocalOperationId,
                         operation.AttemptCorrelationId!.Value, conflictCaseId,
-                        result.ErrorCode ?? "BASE_VERSION_CONFLICT", conflictReview, result.ServerOperationId,
+                        remoteErrorCode, conflictReview, result.ServerOperationId,
                         cancellationToken);
                     conflicted++;
                     break;
                 case "CONFLICT":
                     var conflictFailure = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                        operation.AttemptCorrelationId!.Value, true, "INTERNAL_ERROR", cancellationToken);
+                        operation.AttemptCorrelationId!.Value, true,
+                        "CLIENT_CONFLICT_ID_MISSING", cancellationToken);
                     CountFailure(conflictFailure, ref retryScheduled, ref rejected);
                     break;
-                case "FAILED" when IsRetryableCode(result.ErrorCode):
-                case "REJECTED" when IsRetryableCode(result.ErrorCode):
+                case "FAILED" when IsRetryableRemoteCode(remoteErrorCode):
+                case "REJECTED" when IsRetryableRemoteCode(remoteErrorCode):
                     var retryFailure = await _store.MarkTransportFailureAsync(operation.LocalOperationId,
-                        operation.AttemptCorrelationId!.Value, true, result.ErrorCode!, cancellationToken);
+                        operation.AttemptCorrelationId!.Value, true, remoteErrorCode, cancellationToken);
                     CountFailure(retryFailure, ref retryScheduled, ref rejected);
                     break;
                 case "FAILED":
                 case "REJECTED":
                     await _store.MarkRejectedAsync(operation.LocalOperationId,
-                        operation.AttemptCorrelationId!.Value, result.ErrorCode ?? "SYNC_REJECTED", cancellationToken);
+                        operation.AttemptCorrelationId!.Value,
+                        string.Equals(remoteErrorCode, "HTTP_REJECTED", StringComparison.Ordinal)
+                            ? "SYNC_REJECTED"
+                            : remoteErrorCode,
+                        cancellationToken);
                     rejected++;
                     break;
                 default:
@@ -490,6 +540,7 @@ public sealed class OfflineSyncTransportClient
 
     private static bool IsSafeReviewCode(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= 120 &&
+        !value.StartsWith(ClientLocalErrorPrefix, StringComparison.Ordinal) &&
         value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
 
     private async Task<OfflineSyncTransportRunResult> CompleteRequestFailureAsync(
@@ -509,7 +560,7 @@ public sealed class OfflineSyncTransportClient
         return new(operations.Count, 0, 0, rejected, retryScheduled);
     }
 
-    private static async Task<string> ReadErrorCodeAsync(
+    private static async Task<(string ErrorCode, bool Retryable)> ReadErrorCodeAsync(
         HttpResponseMessage response,
         Guid expectedCorrelationId,
         CancellationToken cancellationToken)
@@ -519,20 +570,31 @@ public sealed class OfflineSyncTransportClient
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             var error = SyncV1Json.Deserialize<SyncV1ErrorResponse>(bytes);
             if (error?.CorrelationId is not null && error.CorrelationId != expectedCorrelationId)
-                return "INTERNAL_ERROR";
-            return string.IsNullOrEmpty(error?.ErrorCode) ? "HTTP_REJECTED" : error.ErrorCode;
+                return ("CLIENT_HTTP_CORRELATION_MISMATCH", true);
+            var errorCode = NormalizeRemoteErrorCode(error?.ErrorCode);
+            return (errorCode,
+                IsRetryableRemoteCode(errorCode) || IsRetryableStatus(response.StatusCode));
         }
         catch (JsonException)
         {
-            return response.StatusCode == HttpStatusCode.TooManyRequests ? "RATE_LIMITED" : "HTTP_REJECTED";
+            var errorCode = response.StatusCode == HttpStatusCode.TooManyRequests
+                ? "RATE_LIMITED"
+                : "HTTP_REJECTED";
+            return (errorCode,
+                IsRetryableRemoteCode(errorCode) || IsRetryableStatus(response.StatusCode));
         }
     }
 
-    private static bool IsRetryableCode(string? code) =>
+    private static string NormalizeRemoteErrorCode(string? code) =>
+        string.IsNullOrEmpty(code)
+            ? "HTTP_REJECTED"
+            : code.StartsWith(ClientLocalErrorPrefix, StringComparison.Ordinal)
+                ? "SERVER_ERROR_CODE_RESERVED"
+                : code;
+
+    private static bool IsRetryableRemoteCode(string? code) =>
         string.Equals(code, "INTERNAL_ERROR", StringComparison.Ordinal) ||
-        string.Equals(code, "RATE_LIMITED", StringComparison.Ordinal) ||
-        string.Equals(code, "TIMEOUT", StringComparison.Ordinal) ||
-        string.Equals(code, "NO_RESPONSE", StringComparison.Ordinal);
+        string.Equals(code, "RATE_LIMITED", StringComparison.Ordinal);
 
     private static bool IsRetryableStatus(HttpStatusCode statusCode) =>
         statusCode == HttpStatusCode.RequestTimeout ||

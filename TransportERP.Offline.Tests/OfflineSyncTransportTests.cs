@@ -589,6 +589,119 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Unexpected_bearer_provider_failure_is_retryable_and_exposes_only_a_fixed_stage_code()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\bearer";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            calls++;
+            throw new InvalidOperationException("HTTP must not run after bearer access fails.");
+        }));
+        var client = new OfflineSyncTransportClient(
+            http, store, new ThrowingBearerProvider(new InvalidOperationException(secret)), key,
+            new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
+                CompanyId, BranchId, UserId, "test-worker", BuildIdentity: TestBuildIdentity), clock);
+
+        var outcome = await client.ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(0, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_BEARER_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unexpected_nonce_http_adapter_failure_is_retryable_and_exposes_only_a_fixed_stage_code()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-send";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            calls++;
+            throw new InvalidOperationException(secret);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_NONCE_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Invalid_success_response_json_is_retryable_with_a_fixed_stage_code()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++calls == 1)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                    captured.AttemptCorrelationId);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("not-json", Encoding.UTF8, "application/json")
+            };
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(2, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_SIGNED_JSON_INVALID", persisted.ResultCode);
+    }
+
+    [Fact]
+    public async Task Error_response_correlation_mismatch_is_retryable_with_a_fixed_stage_code()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++calls == 1)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                    captured.AttemptCorrelationId);
+            return Json(HttpStatusCode.Forbidden, new
+            {
+                ErrorCode = "SCOPE_DENIED",
+                CorrelationId = Guid.NewGuid()
+            });
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(2, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_HTTP_CORRELATION_MISMATCH", persisted.ResultCode);
+    }
+
+    [Fact]
     public async Task Unexpected_platform_signing_failure_releases_the_claim_and_schedules_retry()
     {
         const string secret = "fake-bearer|fake-pfx-password|D:\\private\\device-key";
@@ -612,7 +725,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.Claimed);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
-        Assert.Equal("INTERNAL_ERROR_PROOF_CREATE", persisted.ResultCode);
+        Assert.Equal("CLIENT_PROOF_CREATE_FAILURE", persisted.ResultCode);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
         Assert.NotNull(persisted.NextRetryAt);
         Assert.Null(persisted.LeaseOwner);
@@ -708,7 +821,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.Claimed);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
-        Assert.Equal("INTERNAL_ERROR_SIGNED_SEND", persisted.ResultCode);
+        Assert.Equal("CLIENT_SIGNED_SEND_FAILURE", persisted.ResultCode);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
         Assert.NotNull(persisted.NextRetryAt);
         Assert.Null(persisted.LeaseOwner);
@@ -789,7 +902,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(0, outcome.Succeeded);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted.Status);
-        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Equal("CLIENT_SUCCESS_RESULT_INVALID", persisted.ResultCode);
         Assert.Null(persisted.ResultEntityId);
     }
 
@@ -818,7 +931,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(0, outcome.Conflicted);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted.Status);
-        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Equal("CLIENT_CONFLICT_RESULT_INVALID", persisted.ResultCode);
         Assert.Null(persisted.ConflictCaseId);
         Assert.Null(persisted.ConflictReview);
     }
@@ -968,6 +1081,99 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
         Assert.Equal(errorCode, persisted.ResultCode);
+    }
+
+    [Theory]
+    [InlineData("CLIENT_PROOF_CREATE_FAILURE", "SERVER_ERROR_CODE_RESERVED")]
+    [InlineData("CLIENT_SIGNED_SEND_FAILURE", "SERVER_ERROR_CODE_RESERVED")]
+    [InlineData("NO_RESPONSE", "NO_RESPONSE")]
+    [InlineData("TIMEOUT", "TIMEOUT")]
+    public async Task Remote_operation_codes_cannot_impersonate_client_failures_or_force_retry(
+        string remoteCode,
+        string expectedStoredCode)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var call = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++call == 1)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                    captured.AttemptCorrelationId);
+            return Success(captured, "FAILED", remoteCode);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(0, outcome.RetryScheduled);
+        Assert.Equal(1, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
+        Assert.Equal(expectedStoredCode, persisted.ResultCode);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, false)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
+    public async Task Remote_top_level_client_code_is_reserved_and_http_status_alone_controls_retry(
+        HttpStatusCode statusCode,
+        bool expectedRetry)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            return Json(statusCode, new
+            {
+                ErrorCode = "CLIENT_NONCE_FAILURE",
+                CorrelationId = captured.AttemptCorrelationId
+            });
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(expectedRetry ? 1 : 0, outcome.RetryScheduled);
+        Assert.Equal(expectedRetry ? 0 : 1, outcome.Rejected);
+        Assert.Equal(
+            expectedRetry ? OfflineOperationStatus.Failed : OfflineOperationStatus.Rejected,
+            persisted!.Status);
+        Assert.Equal("SERVER_ERROR_CODE_RESERVED", persisted.ResultCode);
+    }
+
+    [Fact]
+    public void Client_local_diagnostic_codes_are_unique_safe_and_bounded()
+    {
+        var codes = new[]
+        {
+            "CLIENT_BEARER_FAILURE",
+            "CLIENT_NONCE_FAILURE",
+            "CLIENT_PIPELINE_FAILURE",
+            "CLIENT_PROOF_CREATE_FAILURE",
+            "CLIENT_SIGNED_SEND_FAILURE",
+            "CLIENT_SIGNED_JSON_INVALID",
+            "CLIENT_RESPONSE_ENVELOPE_INVALID",
+            "CLIENT_RESULT_SET_INVALID",
+            "CLIENT_RESULT_MISSING",
+            "CLIENT_PENDING_RESULT_INVALID",
+            "CLIENT_SUCCESS_RESULT_INVALID",
+            "CLIENT_CONFLICT_RESULT_INVALID",
+            "CLIENT_CONFLICT_ID_MISSING",
+            "CLIENT_HTTP_CORRELATION_MISMATCH"
+        };
+
+        Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(codes, code =>
+        {
+            Assert.InRange(code.Length, 1, 40);
+            Assert.Matches("^[A-Z0-9_]+$", code);
+        });
     }
 
     [Fact]
@@ -1376,6 +1582,12 @@ public sealed class OfflineSyncTransportTests : IDisposable
     {
         public ValueTask<string> GetBearerTokenAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(bearer);
+    }
+
+    private sealed class ThrowingBearerProvider(Exception failure) : IInMemoryBearerTokenProvider
+    {
+        public ValueTask<string> GetBearerTokenAsync(CancellationToken cancellationToken = default) =>
+            throw failure;
     }
 
     private sealed class FixedKeyProvider(byte[] outboxKey, byte[] cacheKey) : ILocalEncryptionKeyProvider

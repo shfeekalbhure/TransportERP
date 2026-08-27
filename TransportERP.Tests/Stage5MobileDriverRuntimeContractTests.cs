@@ -88,6 +88,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             Assert.Contains($"\"{automationId}\"", page, StringComparison.Ordinal);
 
         Assert.Contains("android.intent.category.LAUNCHER", script, StringComparison.Ordinal);
+        Assert.Contains("\"--components\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"--brief\"", script, StringComparison.Ordinal);
         Assert.Contains("INSTALLED_PACKAGE_IS_DEBUGGABLE", script, StringComparison.Ordinal);
         Assert.Contains("uiautomator", script, StringComparison.Ordinal);
         Assert.Contains("ordinary-launcher", script, StringComparison.Ordinal);

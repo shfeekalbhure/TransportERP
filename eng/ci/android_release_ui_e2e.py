@@ -67,7 +67,7 @@ class Driver:
             "cmd",
             "package",
             "resolve-activity",
-            "--brief",
+            "--components",
             "-a",
             "android.intent.action.MAIN",
             "-c",
