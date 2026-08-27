@@ -134,6 +134,47 @@ public sealed class Stage5DesktopOfflineContractTests
     }
 
     [Fact]
+    public void Desktop_release_host_classifies_startup_stderr_without_retaining_raw_output()
+    {
+        var releaseHost = Read(
+            "TransportERP.Desktop.E2ETests", "DesktopReleaseKestrelApiHost.cs");
+
+        Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("process.StandardError, startupFailureClassifier.Observe", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("var stdoutDrain = DrainAsync(process.StandardOutput, drainCancellation.Token)",
+            releaseHost, StringComparison.Ordinal);
+        Assert.Contains("private int _kind", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("Volatile.Read(ref _kind)", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.CompareExchange(", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("const string prefix = \"Unhandled exception. \"", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("StringComparison.Ordinal", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_POSTGRESQL", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_UNCLASSIFIED", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("await _stderrDrain.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken)", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)",
+            releaseHost, StringComparison.Ordinal);
+        Assert.Contains("StartupFailureKind.ObservedUnclassified", releaseHost,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(".Message", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(".StackTrace", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReadToEnd", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("StringBuilder", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Console.Write", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Trace.Write", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Debug.Write", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteLine(line)", releaseHost, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Desktop_online_producer_authorizes_before_local_storage_or_signing_key_and_keeps_secrets_volatile()
     {
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");

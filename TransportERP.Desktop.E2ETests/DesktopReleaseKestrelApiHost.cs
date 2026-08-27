@@ -19,6 +19,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
     private readonly Task _stdoutDrain;
     private readonly Task _stderrDrain;
     private readonly CancellationTokenSource _drainCancellation;
+    private readonly StartupFailureClassifier _startupFailureClassifier;
     private readonly X509Certificate2 _certificate;
     private readonly string _temporaryRoot;
 
@@ -27,6 +28,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         Task stdoutDrain,
         Task stderrDrain,
         CancellationTokenSource drainCancellation,
+        StartupFailureClassifier startupFailureClassifier,
         X509Certificate2 certificate,
         string temporaryRoot)
     {
@@ -34,6 +36,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         _stdoutDrain = stdoutDrain;
         _stderrDrain = stderrDrain;
         _drainCancellation = drainCancellation;
+        _startupFailureClassifier = startupFailureClassifier;
         _certificate = certificate;
         _temporaryRoot = temporaryRoot;
     }
@@ -151,11 +154,14 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         // Drain both streams continuously. The test never forwards process logs because they are
         // not needed as acceptance evidence and may contain environment-specific paths.
         var drainCancellation = new CancellationTokenSource();
+        var startupFailureClassifier = new StartupFailureClassifier();
         var stdoutDrain = DrainAsync(process.StandardOutput, drainCancellation.Token);
-        var stderrDrain = DrainAsync(process.StandardError, drainCancellation.Token);
+        var stderrDrain = DrainAsync(
+            process.StandardError, startupFailureClassifier.Observe, drainCancellation.Token);
         Checkpoint("HOST_DRAINS_STARTED");
         var host = new DesktopReleaseKestrelApiHost(
-            process, stdoutDrain, stderrDrain, drainCancellation, certificate, temporaryRoot);
+            process, stdoutDrain, stderrDrain, drainCancellation, startupFailureClassifier,
+            certificate, temporaryRoot);
         try
         {
             Checkpoint("HOST_WAIT_READY");
@@ -200,7 +206,24 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
             await Task.Delay(100, cancellationToken);
         }
-        throw new InvalidOperationException($"DESKTOP_E2E_API_EXITED_{_process.ExitCode}");
+        cancellationToken.ThrowIfCancellationRequested();
+        var startupFailureCode = await GetStartupFailureCodeAsync(cancellationToken);
+        throw new InvalidOperationException(
+            $"DESKTOP_E2E_API_EXITED_{_process.ExitCode}_{startupFailureCode}");
+    }
+
+    private async Task<string> GetStartupFailureCodeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _stderrDrain.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch { return "DESKTOP_E2E_API_STARTUP_UNCLASSIFIED"; }
+        return _startupFailureClassifier.Code;
     }
 
     private static async Task VerifyHostnameMismatchRejectedAsync(
@@ -257,6 +280,95 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
     private static async Task DrainAsync(StreamReader reader, CancellationToken cancellationToken)
     {
         while (await reader.ReadLineAsync(cancellationToken) is not null) { }
+    }
+
+    private static async Task DrainAsync(
+        StreamReader reader,
+        Action<string> observe,
+        CancellationToken cancellationToken)
+    {
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            observe(line);
+    }
+
+    internal sealed class StartupFailureClassifier
+    {
+        private int _kind;
+
+        internal string Code => (StartupFailureKind)Volatile.Read(ref _kind) switch
+        {
+            StartupFailureKind.OptionsValidation => "DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION",
+            StartupFailureKind.InvalidOperation => "DESKTOP_E2E_API_STARTUP_INVALID_OPERATION",
+            StartupFailureKind.TypeInitialization => "DESKTOP_E2E_API_STARTUP_TYPE_INITIALIZATION",
+            StartupFailureKind.Cryptographic => "DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC",
+            StartupFailureKind.Io => "DESKTOP_E2E_API_STARTUP_IO",
+            StartupFailureKind.UnauthorizedAccess => "DESKTOP_E2E_API_STARTUP_UNAUTHORIZED_ACCESS",
+            StartupFailureKind.Socket => "DESKTOP_E2E_API_STARTUP_SOCKET",
+            StartupFailureKind.PostgreSql => "DESKTOP_E2E_API_STARTUP_POSTGRESQL",
+            StartupFailureKind.Argument => "DESKTOP_E2E_API_STARTUP_ARGUMENT",
+            StartupFailureKind.Format => "DESKTOP_E2E_API_STARTUP_FORMAT",
+            StartupFailureKind.FileNotFound => "DESKTOP_E2E_API_STARTUP_FILE_NOT_FOUND",
+            _ => "DESKTOP_E2E_API_STARTUP_UNCLASSIFIED"
+        };
+
+        internal void Observe(string line)
+        {
+            var kind = ClassifyTopLevel(line);
+            if (kind != StartupFailureKind.Unobserved)
+                Interlocked.CompareExchange(ref _kind, (int)kind, 0);
+        }
+
+        private static StartupFailureKind ClassifyTopLevel(string line)
+        {
+            const string prefix = "Unhandled exception. ";
+            if (!line.StartsWith(prefix, StringComparison.Ordinal))
+                return StartupFailureKind.Unobserved;
+            var exception = line.AsSpan(prefix.Length);
+            if (exception.StartsWith(
+                    "Microsoft.Extensions.Options.OptionsValidationException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.OptionsValidation;
+            if (exception.StartsWith("System.InvalidOperationException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.InvalidOperation;
+            if (exception.StartsWith("System.TypeInitializationException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.TypeInitialization;
+            if (exception.StartsWith(
+                    "System.Security.Cryptography.CryptographicException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.Cryptographic;
+            if (exception.StartsWith("System.IO.FileNotFoundException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.FileNotFound;
+            if (exception.StartsWith("System.IO.IOException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.Io;
+            if (exception.StartsWith("System.UnauthorizedAccessException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.UnauthorizedAccess;
+            if (exception.StartsWith("System.Net.Sockets.SocketException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.Socket;
+            if (exception.StartsWith("Npgsql.NpgsqlException:".AsSpan(),
+                    StringComparison.Ordinal) ||
+                exception.StartsWith("Npgsql.PostgresException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.PostgreSql;
+            if (exception.StartsWith("System.ArgumentException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.Argument;
+            if (exception.StartsWith("System.FormatException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.Format;
+            return StartupFailureKind.ObservedUnclassified;
+        }
+
+        private enum StartupFailureKind
+        {
+            Unobserved,
+            ObservedUnclassified,
+            OptionsValidation,
+            InvalidOperation,
+            TypeInitialization,
+            Cryptographic,
+            Io,
+            UnauthorizedAccess,
+            Socket,
+            PostgreSql,
+            Argument,
+            Format,
+            FileNotFound
+        }
     }
 
     private static X509Certificate2 CreateServerCertificate(string host)
