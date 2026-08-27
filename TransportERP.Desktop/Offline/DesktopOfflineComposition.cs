@@ -246,11 +246,32 @@ public sealed class DesktopOfflineRuntime : IDisposable
 
 public static class DesktopOfflineComposition
 {
-    public static async Task<DesktopOfflineRuntime> CreateAsync(
+    public static Task<DesktopOfflineRuntime> CreateAsync(
         DesktopOfflineCompositionOptions options,
         DesktopOfflineDependencies dependencies,
         TimeProvider? timeProvider = null,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(options, dependencies, diagnosticCheckpoint: null, timeProvider, cancellationToken);
+
+    // CI-only physical-boundary diagnostics use fixed numeric checkpoints. The production entry
+    // point above never receives an observer and retains its single fail-closed reason code.
+    internal static Task<DesktopOfflineRuntime> CreateForPlatformProbeAsync(
+        DesktopOfflineCompositionOptions options,
+        DesktopOfflineDependencies dependencies,
+        Action<int> diagnosticCheckpoint,
+        TimeProvider? timeProvider = null,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticCheckpoint);
+        return CreateCoreAsync(options, dependencies, diagnosticCheckpoint, timeProvider, cancellationToken);
+    }
+
+    private static async Task<DesktopOfflineRuntime> CreateCoreAsync(
+        DesktopOfflineCompositionOptions options,
+        DesktopOfflineDependencies dependencies,
+        Action<int>? diagnosticCheckpoint,
+        TimeProvider? timeProvider,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(dependencies);
@@ -265,22 +286,29 @@ public static class DesktopOfflineComposition
         {
             // The OS handle is opened and bound to the exact server-authorized JWK before DPAPI,
             // SQLCipher files or any local offline state can be created.
+            diagnosticCheckpoint?.Invoke(32);
             signingKey = await new WindowsCertificateDeviceProofSigningKeyStore()
                 .OpenAsync(options.DeviceSigningCertificateThumbprint, cancellationToken);
+            diagnosticCheckpoint?.Invoke(33);
             VerifyProofBinding(options.ProofBinding, signingKey.PublicKey);
             var keys = new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory);
             var outbox = new OfflineOperationStore(options.OutboxDatabasePath, keys, timeProvider, options.RetryPolicy);
             var scope = new OfflineOperationScope(
                 options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
             var readCache = new OfflineReadCacheStore(options.ReadCacheDatabasePath, keys, scope, timeProvider);
+            diagnosticCheckpoint?.Invoke(34);
             await outbox.InitializeAsync(cancellationToken);
+            diagnosticCheckpoint?.Invoke(35);
             await readCache.InitializeAsync(cancellationToken);
+            diagnosticCheckpoint?.Invoke(36);
             var transport = new OfflineSyncTransportClient(
                 dependencies.Network.SyncHttpClient, outbox, dependencies.VolatileSession,
                 signingKey, options.TransportOptions, timeProvider);
+            diagnosticCheckpoint?.Invoke(37);
             var conflicts = new OfflineSyncConflictClient(
                 dependencies.Network.SyncHttpClient, outbox, dependencies.VolatileSession,
                 signingKey, options.TransportOptions, timeProvider);
+            diagnosticCheckpoint?.Invoke(38);
             var supervisor = new OfflineSyncSupervisor(
                 outbox, transport, new DesktopSyncConnectivity(dependencies.Network),
                 new OfflineSyncSupervisorOptions(
@@ -288,6 +316,7 @@ public static class DesktopOfflineComposition
                     RetentionPolicy: new OfflineRetentionPolicy(
                         options.EffectivePolicy.LocalSuccessRetention,
                         options.EffectivePolicy.LocalRejectedRetention)));
+            diagnosticCheckpoint?.Invoke(39);
             return new DesktopOfflineRuntime(options, dependencies,
                 new(DesktopOfflineRuntimeMode.Ready, "READY", true, true, true),
                 outbox, readCache, transport, conflicts, supervisor, signingKey);

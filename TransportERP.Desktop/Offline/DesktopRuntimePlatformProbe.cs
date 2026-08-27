@@ -52,9 +52,10 @@ internal static class DesktopRuntimePlatformProbe
             var dependencies = Dependencies(peer.Client);
             Guid localOperationId;
             checkpoint = 30;
-            using (var first = await DesktopOfflineComposition.CreateAsync(options, dependencies))
+            using (var first = await DesktopOfflineComposition.CreateForPlatformProbeAsync(
+                       options, dependencies, value => checkpoint = value))
             {
-                if (first.Status.Mode != DesktopOfflineRuntimeMode.Ready) return 31;
+                if (first.Status.Mode != DesktopOfflineRuntimeMode.Ready) return checkpoint;
                 checkpoint = 40;
                 var queued = await first.CreateBusinessProducer().QueueOperationalPartyAsync(
                     "Windows platform probe", "700000000", "DPAPI CNG SQLCipher probe");
@@ -66,7 +67,8 @@ internal static class DesktopRuntimePlatformProbe
 
             // A separately composed runtime reopens DPAPI material, the CNG handle and SQLCipher.
             checkpoint = 60;
-            using var reopened = await DesktopOfflineComposition.CreateAsync(options, Dependencies(peer.Client));
+            using var reopened = await DesktopOfflineComposition.CreateForPlatformProbeAsync(
+                options, Dependencies(peer.Client), value => checkpoint = value);
             var persisted = await reopened.GetOperationAsync(localOperationId);
             return reopened.Status.Mode == DesktopOfflineRuntimeMode.Ready &&
                 persisted is { Status: OfflineOperationStatus.Succeeded, PayloadJson: not null }
