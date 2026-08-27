@@ -15,6 +15,8 @@ internal static class DesktopStartupPolicy
 /// </summary>
 internal sealed class DesktopApplicationContext : System.Windows.Forms.ApplicationContext
 {
+    private enum DisposeState { NotStarted, InProgress, Completed, Failed }
+
     private readonly DesktopShellForm _shell;
     private readonly IDesktopAuthenticatedSessionSource _authenticatedSessions;
     private readonly CancellationTokenSource _applicationCancellation = new();
@@ -25,12 +27,12 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
     private Guid? _activeSessionId;
     private bool _activationAttempted;
     private bool _shutdownStarted;
+    private DisposeState _disposeState;
 
     internal DesktopApplicationContext(IDesktopAuthenticatedSessionSource authenticatedSessions)
     {
         _authenticatedSessions = authenticatedSessions ?? throw new ArgumentNullException(nameof(authenticatedSessions));
         _shell = new DesktopShellForm();
-        _shell.FormClosed += (_, _) => ExitThread();
         _authenticatedSessions.SessionAuthenticated += OnSessionAuthenticated;
         _authenticatedSessions.SessionEnded += OnSessionEnded;
         MainForm = _shell;
@@ -115,7 +117,26 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (!disposing)
+        {
+            base.Dispose(false);
+            return;
+        }
+        if (_disposeState == DisposeState.Completed)
+            return;
+        if (_disposeState == DisposeState.InProgress)
+            return;
+        if (_disposeState == DisposeState.Failed)
+            throw new InvalidOperationException("DESKTOP_SHUTDOWN_INCOMPLETE");
+
+        // Application.Run owns and disposes its ApplicationContext when the main loop ends. The
+        // executable also keeps a using-scope as a fallback for startup failures, so this override
+        // must be idempotent. Publish InProgress before cancellation callbacks: a reentrant call
+        // cannot repeat cleanup. Completed makes the normal second call a no-op. Failed preserves
+        // a fixed, metadata-only failure on that second call because WinForms catches exceptions
+        // from its framework-owned first disposal.
+        _disposeState = DisposeState.InProgress;
+        try
         {
             _shutdownStarted = true;
             _applicationCancellation.Cancel();
@@ -130,8 +151,14 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
             _runtime?.Dispose();
             _applicationCancellation.Dispose();
             _shell.Dispose();
+            base.Dispose(true);
+            _disposeState = DisposeState.Completed;
         }
-        base.Dispose(disposing);
+        catch
+        {
+            _disposeState = DisposeState.Failed;
+            throw new InvalidOperationException("DESKTOP_SHUTDOWN_INCOMPLETE");
+        }
     }
 
     private async Task RunSupervisorAsync(DesktopOfflineRuntime runtime, CancellationToken cancellationToken)

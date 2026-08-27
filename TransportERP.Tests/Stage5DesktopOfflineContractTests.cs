@@ -86,10 +86,20 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("Task.Run(() => RunSupervisorAsync(runtime, supervisorToken))", context,
             StringComparison.Ordinal);
         Assert.DoesNotContain("_supervisor = RunSupervisorAsync(", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("_shell.FormClosed +=", context, StringComparison.Ordinal);
+        Assert.Contains("if (_disposeState == DisposeState.Completed)", context, StringComparison.Ordinal);
+        Assert.Contains("if (_disposeState == DisposeState.Failed)", context, StringComparison.Ordinal);
+        Assert.Contains("throw new InvalidOperationException(\"DESKTOP_SHUTDOWN_INCOMPLETE\")", context,
+            StringComparison.Ordinal);
+        var disposeGuard = context.IndexOf("_disposeState = DisposeState.InProgress;", StringComparison.Ordinal);
         var cancelSupervisor = context.IndexOf("_supervisorCancellation?.Cancel()", StringComparison.Ordinal);
         var waitSupervisor = context.IndexOf("WaitForSupervisor();", cancelSupervisor, StringComparison.Ordinal);
         var disposeRuntime = context.IndexOf("_runtime?.Dispose()", waitSupervisor, StringComparison.Ordinal);
-        Assert.True(cancelSupervisor >= 0 && waitSupervisor > cancelSupervisor && disposeRuntime > waitSupervisor);
+        var disposeCompleted = context.IndexOf("_disposeState = DisposeState.Completed;", disposeRuntime,
+            StringComparison.Ordinal);
+        Assert.True(disposeGuard >= 0 && cancelSupervisor > disposeGuard &&
+            waitSupervisor > cancelSupervisor && disposeRuntime > waitSupervisor &&
+            disposeCompleted > disposeRuntime);
         Assert.Contains("_runtime?.Dispose()", context, StringComparison.Ordinal);
         Assert.Contains("_shell.CloseForSessionEnd(reasonCode)", context, StringComparison.Ordinal);
         Assert.Contains("Close();", shell, StringComparison.Ordinal);
