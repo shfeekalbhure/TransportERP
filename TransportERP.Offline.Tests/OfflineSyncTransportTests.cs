@@ -750,8 +750,10 @@ public sealed class OfflineSyncTransportTests : IDisposable
             var captured = await CaptureAsync(request, cancellationToken);
             if (++calls == 1)
             {
-                challengeContent = new DisposeRequiresReadContent(SyncV1Json.Serialize(
-                    new SyncV1ErrorResponse("use_dpop_nonce", captured.AttemptCorrelationId)));
+                challengeContent = new DisposeRequiresReadContent(
+                    JsonSerializer.SerializeToUtf8Bytes(
+                        new SyncV1ErrorResponse("use_dpop_nonce", captured.AttemptCorrelationId),
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web)));
                 var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized)
                 {
                     Content = challengeContent
