@@ -171,6 +171,7 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
                 db, accepted, "SUCCEEDED", Normalize(DateTimeOffset.UtcNow.AddDays(-91)));
             var conflictId = Guid.NewGuid();
             var resolvedAt = Normalize(DateTimeOffset.UtcNow.AddDays(-91));
+            const string redactedJson = "{}";
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO transport_erp.conflict_cases
                   ("Id","SyncOperationId","CompanyId","BranchId","BaseVersion","DeviceSnapshot",
@@ -182,12 +183,13 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
                 """);
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE transport_erp.sync_operations
-                SET "PayloadJson"='{}',"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
+                SET "PayloadJson"={redactedJson},"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
                 WHERE "Id"={operationId}
                 """);
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE transport_erp.conflict_cases
-                SET "DeviceSnapshot"='{}',"ServerSnapshot"='{}',"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
+                SET "DeviceSnapshot"={redactedJson},"ServerSnapshot"={redactedJson},
+                    "RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
                 WHERE "Id"={conflictId}
                 """);
 

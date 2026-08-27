@@ -20,18 +20,23 @@ internal static class DesktopRuntimePlatformProbe
     private static readonly Uri Endpoint = new(
         "https://sync.example.test/api/v1/sync/operations:batch");
 
-    internal static async Task<bool> RunAsync()
+    // Exit codes identify only a fixed probe checkpoint. They deliberately exclude exception text,
+    // paths, key references, payloads and tokens so CI can locate a platform failure safely.
+    internal static async Task<int> RunAsync()
     {
-        if (!OperatingSystem.IsWindows() || SyncClientDeploymentAuthority.ImplementationSha is not { } sha)
-            return false;
+        if (!OperatingSystem.IsWindows()) return 2;
+        if (SyncClientDeploymentAuthority.ImplementationSha is not { } sha) return 3;
 
         var root = Path.Combine(Path.GetTempPath(), "transporterp-desktop-runtime-probe-" + Guid.NewGuid().ToString("N"));
         var keyName = "TransportERP.Desktop.Probe." + Guid.NewGuid().ToString("N");
         string? thumbprint = null;
+        var checkpoint = 10;
         try
         {
             Directory.CreateDirectory(root);
+            checkpoint = 20;
             thumbprint = CreateProbeCertificate(keyName);
+            checkpoint = 21;
             var publicKey = await new WindowsCertificateDeviceProofSigningKeyStore().OpenAsync(thumbprint);
             DesktopDeviceProofBinding binding;
             try
@@ -46,25 +51,31 @@ internal static class DesktopRuntimePlatformProbe
             var options = Options(root, scope, thumbprint, binding, sha);
             var dependencies = Dependencies(peer.Client);
             Guid localOperationId;
+            checkpoint = 30;
             using (var first = await DesktopOfflineComposition.CreateAsync(options, dependencies))
             {
-                if (first.Status.Mode != DesktopOfflineRuntimeMode.Ready) return false;
+                if (first.Status.Mode != DesktopOfflineRuntimeMode.Ready) return 31;
+                checkpoint = 40;
                 var queued = await first.CreateBusinessProducer().QueueOperationalPartyAsync(
                     "Windows platform probe", "700000000", "DPAPI CNG SQLCipher probe");
                 localOperationId = queued.Operation.LocalOperationId;
+                checkpoint = 50;
                 var sent = await first.SynchronizeAsync();
-                if (sent.Succeeded != 1 || peer.SignedRequests != 1) return false;
+                if (sent.Succeeded != 1 || peer.SignedRequests != 1) return 51;
             }
 
             // A separately composed runtime reopens DPAPI material, the CNG handle and SQLCipher.
+            checkpoint = 60;
             using var reopened = await DesktopOfflineComposition.CreateAsync(options, Dependencies(peer.Client));
             var persisted = await reopened.GetOperationAsync(localOperationId);
             return reopened.Status.Mode == DesktopOfflineRuntimeMode.Ready &&
-                persisted is { Status: OfflineOperationStatus.Succeeded, PayloadJson: not null };
+                persisted is { Status: OfflineOperationStatus.Succeeded, PayloadJson: not null }
+                ? 0
+                : 61;
         }
         catch
         {
-            return false;
+            return checkpoint;
         }
         finally
         {

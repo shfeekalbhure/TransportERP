@@ -11,7 +11,7 @@ internal static class Program
         if (args.Contains("--startup-smoke", StringComparer.Ordinal))
             return DesktopStartupContractProbe.VerifyClosedDefault() ? 0 : 1;
         if (args.Contains("--runtime-platform-smoke", StringComparer.Ordinal))
-            return DesktopRuntimePlatformProbe.RunAsync().GetAwaiter().GetResult() ? 0 : 1;
+            return DesktopRuntimePlatformProbe.RunAsync().GetAwaiter().GetResult();
 
         ApplicationConfiguration.Initialize();
         // The producer calls the governed HTTPS sign-in/device/sync authorization APIs. It starts

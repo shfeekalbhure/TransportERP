@@ -260,7 +260,7 @@ jobs:
           if (-not (Test-Path $buildIdentity)) { throw 'Desktop build identity evidence was not produced.' }
           $process = Start-Process -FilePath $executable -ArgumentList '--runtime-platform-smoke' -PassThru -Wait
           if ($process.ExitCode -ne 0) {
-            throw 'Desktop CNG/DPAPI/SQLCipher/restart runtime platform smoke failed.'
+            throw "Desktop CNG/DPAPI/SQLCipher/restart runtime platform smoke failed at checkpoint $($process.ExitCode)."
           }
           'runtime_platform_smoke=PASS' | Add-Content -Encoding utf8 $buildIdentity
 
