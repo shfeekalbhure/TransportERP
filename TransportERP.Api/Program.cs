@@ -13,6 +13,7 @@ using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
 using TransportERP.Api.Waybills;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 var bootstrapRequested = args.Any(x => string.Equals(x, "--bootstrap-admin", StringComparison.Ordinal));
@@ -66,6 +67,7 @@ builder.Services.AddSingleton<SyncEffectivePolicyResolver>();
 builder.Services.AddSingleton(effectivePolicyConfiguration);
 builder.Services.AddScoped<IEffectiveSyncPolicyProvider, EffectiveSyncPolicyProvider>();
 builder.Services.AddSingleton<ISyncRetryPolicyResolver, EffectiveSyncRetryPolicyResolver>();
+builder.Services.AddSingleton<IEffectiveSyncRetentionPolicyProvider, EffectiveSyncRetentionPolicyProvider>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),

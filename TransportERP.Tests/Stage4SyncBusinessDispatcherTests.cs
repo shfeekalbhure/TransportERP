@@ -129,6 +129,55 @@ public sealed class Stage4SyncBusinessDispatcherTests
     }
 
     [Fact]
+    public async Task Business_idempotency_is_device_scoped_while_protocol_and_audit_keep_the_original_id()
+    {
+        var definition = Definition(SyncActionCode.CreateOperationalParty);
+        var firstDevice = Actor(definition.RequiredPermission);
+        var secondDevice = firstDevice with { RegisteredDeviceId = Guid.NewGuid() };
+        var operationId = "shared-client-operation";
+        var firstCommand = Command(firstDevice, definition, operationId);
+        var secondCommand = Command(secondDevice, definition, operationId);
+        var adapters = new FakeBusinessAdapters();
+        var dispatcher = CreateDispatcher(adapters);
+
+        var first = await dispatcher.DispatchAsync(firstDevice, firstCommand);
+        var firstReplay = await dispatcher.DispatchAsync(firstDevice, firstCommand);
+        var second = await dispatcher.DispatchAsync(secondDevice, secondCommand);
+
+        Assert.True(first.IsSuccess);
+        Assert.Equal(first.ResultEntityId, firstReplay.ResultEntityId);
+        Assert.True(second.IsSuccess);
+        Assert.NotEqual(first.ResultEntityId, second.ResultEntityId);
+        Assert.Equal(2, adapters.EffectCount);
+        Assert.Equal(2, adapters.BusinessIdempotencyKeys.Count);
+        Assert.All(adapters.BusinessIdempotencyKeys, key =>
+        {
+            Assert.StartsWith("sync-device-v1:", key, StringComparison.Ordinal);
+            Assert.Equal(79, key.Length);
+            Assert.DoesNotContain(operationId, key, StringComparison.Ordinal);
+        });
+        Assert.Equal(3, adapters.AuditRecords.Count);
+        Assert.All(adapters.AuditRecords,
+            record => Assert.Equal(operationId, record.ClientOperationId));
+    }
+
+    [Fact]
+    public void Device_scoped_key_is_deterministic_and_changes_for_every_scope_component()
+    {
+        var company = Guid.NewGuid();
+        var branch = Guid.NewGuid();
+        var device = Guid.NewGuid();
+        const string operation = "operation-X";
+        var key = SyncBusinessIdempotencyKey.Create(company, branch, device, operation);
+
+        Assert.Equal(key, SyncBusinessIdempotencyKey.Create(company, branch, device, $" {operation} "));
+        Assert.NotEqual(key, SyncBusinessIdempotencyKey.Create(Guid.NewGuid(), branch, device, operation));
+        Assert.NotEqual(key, SyncBusinessIdempotencyKey.Create(company, Guid.NewGuid(), device, operation));
+        Assert.NotEqual(key, SyncBusinessIdempotencyKey.Create(company, branch, Guid.NewGuid(), operation));
+        Assert.NotEqual(key, SyncBusinessIdempotencyKey.Create(company, branch, device, operation + "-changed"));
+    }
+
+    [Fact]
     public async Task Domain_concurrency_is_returned_as_typed_conflict_not_rejection()
     {
         var definition = Definition(SyncActionCode.UpdateWaybillDraft);
@@ -172,9 +221,10 @@ public sealed class Stage4SyncBusinessDispatcherTests
 
     private static SyncBusinessDispatchCommand Command(
         SyncBusinessActorContext actor,
-        SyncActionDefinition definition)
+        SyncActionDefinition definition,
+        string? suppliedOperationId = null)
     {
-        var operationId = $"dispatch-{Guid.NewGuid():N}";
+        var operationId = suppliedOperationId ?? $"dispatch-{Guid.NewGuid():N}";
         Guid? entityId = definition.EntityId == SyncValueRequirement.Required ? Guid.NewGuid() : null;
         long? baseVersion = definition.BaseVersion == SyncValueRequirement.Required ? 7L : null;
         var payload = definition.ActionCode switch
@@ -211,6 +261,8 @@ public sealed class Stage4SyncBusinessDispatcherTests
         public string? LastClientOperationId { get; private set; }
         public Guid? LastRegisteredDeviceId { get; private set; }
         public int AuditCount { get; private set; }
+        public List<string> BusinessIdempotencyKeys { get; } = [];
+        public List<SyncBusinessDispatchAuditRecord> AuditRecords { get; } = [];
         public string? ErrorCodeToThrow { get; init; }
 
         public Task<SyncBusinessActionResult> CreateDraftAsync(
@@ -241,6 +293,7 @@ public sealed class Stage4SyncBusinessDispatcherTests
             CancellationToken cancellationToken)
         {
             AuditCount++;
+            AuditRecords.Add(record);
             return Task.CompletedTask;
         }
 
@@ -250,13 +303,14 @@ public sealed class Stage4SyncBusinessDispatcherTests
                 throw new WaybillApplicationException(ErrorCodeToThrow);
             LastClientOperationId = context.ClientOperationId;
             LastRegisteredDeviceId = context.RegisteredDeviceId;
-            var key = (action, context.ClientOperationId);
+            var key = (action, context.BusinessIdempotencyKey);
             if (!_results.TryGetValue(key, out var result))
             {
                 result = new SyncBusinessActionResult(Guid.NewGuid(),
                     action is "LoadAllocatedQuantity" or "RecordCollection" ? null : 1L);
                 _results.Add(key, result);
                 EffectCount++;
+                BusinessIdempotencyKeys.Add(context.BusinessIdempotencyKey);
             }
             return Task.FromResult(result);
         }

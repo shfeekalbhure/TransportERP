@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -406,11 +407,70 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.Equal("PROOF_KEY_BINDING_REQUIRED", root.GetProperty("closedReason").GetString());
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Batch_handler_reapplies_narrowed_effective_body_limit_before_envelope_processing()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var scope = await SeedAsync(seedDb, proofKey, "NARROW-BODY");
+        const int narrowedLimit = 1_024;
+        var marker = "must-not-enter-audit-" + Guid.NewGuid().ToString("N");
+        var body = "{\"padding\":\"" + marker + new string('x', narrowedLimit) + "\"}";
+        Assert.True(Encoding.UTF8.GetByteCount(body) > narrowedLimit);
+        Assert.True(Encoding.UTF8.GetByteCount(body) < SyncApiModule.MaximumRequestBodyBytes);
+
+        using var factory = CreateFactory(connection).WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISyncPopHttpRequestAuthenticator>();
+                services.AddSingleton<ISyncPopHttpRequestAuthenticator>(
+                    new AcceptedRawBodyAuthenticator(scope, NarrowedBodyPolicy(narrowedLimit)));
+            }));
+        using var client = CreateClient(factory, scope.Bearer);
+        using var request = new HttpRequestMessage(HttpMethod.Post, BatchPath)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString("D"));
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("REQUEST_BODY_TOO_LARGE",
+            document.RootElement.GetProperty("errorCode").GetString());
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.SyncOperations.AsNoTracking()
+            .AnyAsync(x => x.CompanyId == scope.CompanyId));
+        var rejection = Assert.Single(await verify.AuditEvents.AsNoTracking().Where(x =>
+            x.CompanyId == scope.CompanyId && x.Action == "SyncOperationRejected" &&
+            x.Reason == "REQUEST_BODY_TOO_LARGE").ToListAsync());
+        Assert.Null(rejection.OperationCorrelationId);
+        Assert.Null(rejection.BeforeJson);
+        Assert.Null(rejection.AfterJson);
+        Assert.DoesNotContain(marker, JsonSerializer.Serialize(rejection), StringComparison.Ordinal);
+    }
+
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, string bearer)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = PublicOrigin });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
         return client;
+    }
+
+    private static EffectiveSyncPolicy NarrowedBodyPolicy(int maximumRequestBodyBytes)
+    {
+        var actions = SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue)
+            .ToHashSet(StringComparer.Ordinal);
+        return new EffectiveSyncPolicy(
+            true, actions, new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
+            25, maximumRequestBodyBytes, Math.Min(512, maximumRequestBodyBytes),
+            2, 5, 10, 5, 20, 30, 12, 4, 45, 8,
+            null, "device-narrow-body-v1", new string('b', 64));
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connection)
@@ -817,6 +877,39 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         string DeviceId,
         Guid CurrencyId,
         string Bearer);
+
+    private sealed class AcceptedRawBodyAuthenticator(
+        TestScope scope,
+        EffectiveSyncPolicy effectivePolicy) : ISyncPopHttpRequestAuthenticator
+    {
+        public async Task<SyncHttpAuthenticationResult> AuthenticateAsync(
+            HttpContext http,
+            string canonicalPath,
+            TryReadSyncRequestDeviceId? tryReadBodyDeviceId,
+            CancellationToken cancellationToken)
+        {
+            await using var buffer = new MemoryStream();
+            await http.Request.Body.CopyToAsync(buffer, cancellationToken);
+            var attemptCorrelationId = Guid.TryParse(
+                http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var supplied)
+                ? supplied
+                : Guid.NewGuid();
+            var current = new CurrentSecurityContext(
+                scope.UserId, scope.CompanyId, scope.BranchId, scope.SessionId,
+                scope.DeviceId, true, scope.RegisteredDeviceId, 1);
+            var security = new SyncProofSecurityContext(
+                scope.UserId, scope.CompanyId, scope.BranchId,
+                scope.RegisteredDeviceId, scope.DeviceId);
+            var proof = new AcceptedSyncProofContext(
+                Guid.NewGuid(), scope.UserId, scope.CompanyId, scope.BranchId,
+                scope.RegisteredDeviceId, scope.DeviceId, 1, 1,
+                new string('t', 43), attemptCorrelationId);
+            return new SyncHttpAuthenticationResult(
+                new AcceptedSyncHttpRequest(
+                    current, security, proof, buffer.ToArray(), attemptCorrelationId, effectivePolicy),
+                null);
+        }
+    }
 
     private sealed class IsolatedOpenEffectivePolicyProvider : IEffectiveSyncPolicyProvider
     {

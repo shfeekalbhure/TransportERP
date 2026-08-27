@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TransportERP.Api.Sync;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
@@ -44,13 +45,14 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
 
         try
         {
-            var first = await new SyncRetentionCleanupService(db, new AuditEventService(db))
+            var first = await RetentionService(db)
                 .CleanupBatchAsync();
             db.ChangeTracker.Clear();
 
             var redacted = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == eligible.Id);
             Assert.Equal("{}", redacted.PayloadJson);
             Assert.NotNull(redacted.RedactedAt);
+            Assert.Equal(90, redacted.RetentionDaysApplied);
             Assert.Equal(originalPayloadHash, redacted.PayloadHash);
             Assert.Equal(Convert.ToHexString(eligible.RequestFingerprintHash!),
                 Convert.ToHexString(redacted.RequestFingerprintHash!));
@@ -66,6 +68,7 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
             Assert.Equal("{}", conflict.DeviceSnapshot);
             Assert.Equal("{}", conflict.ServerSnapshot);
             Assert.NotNull(conflict.RedactedAt);
+            Assert.Equal(90, conflict.RetentionDaysApplied);
             var recentConflict = await db.ConflictCases.AsNoTracking()
                 .SingleAsync(x => x.Id == recentResolutionConflict.Id);
             Assert.Null(recentConflict.RedactedAt);
@@ -79,12 +82,15 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
                 .SingleAsync(x => x.CorrelationId == first.AuditCorrelationId);
             Assert.Null(audit.BeforeJson);
             Assert.Null(audit.AfterJson);
-            Assert.Contains("RetentionDays=90", audit.Reason, StringComparison.Ordinal);
+            Assert.Contains("RetentionPolicy=EFFECTIVE", audit.Reason, StringComparison.Ordinal);
+            Assert.Contains("PolicySourceVersion=retention-test-policy-v1", audit.Reason, StringComparison.Ordinal);
+            Assert.Contains($"PolicySourceFingerprint={new string('a', 64)}", audit.Reason, StringComparison.Ordinal);
+            Assert.Contains("RetentionDaysRange=90-90", audit.Reason, StringComparison.Ordinal);
             Assert.DoesNotContain("eligible-operation", audit.Reason, StringComparison.Ordinal);
             Assert.DoesNotContain("eligible", JsonSerializer.Serialize(audit), StringComparison.OrdinalIgnoreCase);
 
             var firstRedactedAt = redacted.RedactedAt;
-            var rerun = await new SyncRetentionCleanupService(db, new AuditEventService(db))
+            var rerun = await RetentionService(db)
                 .CleanupBatchAsync();
             db.ChangeTracker.Clear();
             var rerunRow = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == eligible.Id);
@@ -96,6 +102,111 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         finally
         {
             await DeleteScopeEvidenceAsync(db, scope.CompanyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Effective_device_retention_redacts_failed_terminal_content_and_honors_both_legal_holds()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db);
+        var now = DateTimeOffset.UtcNow;
+        var succeeded = await AddOperationAsync(db, scope, "SUCCEEDED", now.AddDays(-40),
+            now.AddDays(-31), "{\"effective\":\"succeeded\"}");
+        var failed = await AddOperationAsync(db, scope, "FAILED", now.AddDays(-40),
+            now.AddDays(-31), "{\"effective\":\"failed\"}");
+        var tooRecent = await AddOperationAsync(db, scope, "FAILED", now.AddDays(-40),
+            now.AddDays(-29), "{\"effective\":\"recent\"}");
+        var heldOperation = await AddOperationAsync(db, scope, "FAILED", now.AddDays(-100),
+            now.AddDays(-91), "{\"effective\":\"held-operation\"}");
+        heldOperation.LegalHold = true;
+        var heldOperationConflict = await AddConflictAsync(
+            db, scope, heldOperation, now.AddDays(-100), now.AddDays(-91),
+            "{\"held\":\"device\"}", "{\"held\":\"server\"}");
+        var conflictOperation = await AddOperationAsync(db, scope, "RESOLVED", now.AddDays(-100),
+            now.AddDays(-91), "{\"effective\":\"conflict-parent\"}");
+        var heldConflict = await AddConflictAsync(
+            db, scope, conflictOperation, now.AddDays(-100), now.AddDays(-91),
+            "{\"heldConflict\":\"device\"}", "{\"heldConflict\":\"server\"}");
+        heldConflict.LegalHold = true;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var result = await RetentionService(db, serverPayloadDays: 30).CleanupBatchAsync();
+            db.ChangeTracker.Clear();
+
+            Assert.Equal(3, result.RedactedOperations);
+            Assert.Equal(0, result.RedactedConflictCases);
+            foreach (var operationId in new[] { succeeded.Id, failed.Id, conflictOperation.Id })
+            {
+                var redacted = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operationId);
+                Assert.Equal("{}", redacted.PayloadJson);
+                Assert.Equal(30, redacted.RetentionDaysApplied);
+                Assert.NotNull(redacted.RedactedAt);
+            }
+            await AssertOperationNotRedactedAsync(db, tooRecent.Id, "recent");
+            await AssertOperationNotRedactedAsync(db, heldOperation.Id, "held-operation");
+
+            var operationHold = await db.ConflictCases.AsNoTracking()
+                .SingleAsync(x => x.Id == heldOperationConflict.Id);
+            var conflictHold = await db.ConflictCases.AsNoTracking()
+                .SingleAsync(x => x.Id == heldConflict.Id);
+            Assert.Null(operationHold.RedactedAt);
+            Assert.Null(conflictHold.RedactedAt);
+            Assert.Contains("held", operationHold.DeviceSnapshot, StringComparison.Ordinal);
+            Assert.Contains("heldConflict", conflictHold.DeviceSnapshot, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await DeleteScopeEvidenceAsync(db, scope.CompanyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Scope_cursor_does_not_starve_eligible_rows_behind_null_policy_and_recent_pages()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..10];
+        var nullPolicyCompany = Guid.Parse($"00000000-0000-0000-0000-{suffix}01");
+        var recentCompany = Guid.Parse($"00000000-0000-0000-0000-{suffix}02");
+        var eligibleCompany = Guid.Parse($"00000000-0000-0000-0000-{suffix}03");
+        var nullPolicyScope = await SeedScopeAsync(db, nullPolicyCompany);
+        var recentScope = await SeedScopeAsync(db, recentCompany);
+        var eligibleScope = await SeedScopeAsync(db, eligibleCompany);
+        var now = DateTimeOffset.UtcNow;
+        var nullPolicy = await AddOperationAsync(db, nullPolicyScope, "FAILED", now.AddDays(-100),
+            now.AddDays(-91), "{\"cursor\":\"null-policy\"}");
+        var recent = await AddOperationAsync(db, recentScope, "FAILED", now.AddDays(-40),
+            now.AddDays(-29), "{\"cursor\":\"recent\"}");
+        var eligible = await AddOperationAsync(db, eligibleScope, "FAILED", now.AddDays(-40),
+            now.AddDays(-31), "{\"cursor\":\"eligible\"}");
+
+        try
+        {
+            var result = await RetentionService(
+                db, serverPayloadDays: 30, deniedCompanyId: nullPolicyCompany,
+                allowedCompanyIds: new HashSet<Guid> { recentCompany, eligibleCompany })
+                .CleanupBatchAsync(1);
+            db.ChangeTracker.Clear();
+
+            Assert.Equal(1, result.RedactedOperations);
+            Assert.Equal("{}", (await db.SyncOperations.AsNoTracking()
+                .SingleAsync(x => x.Id == eligible.Id)).PayloadJson);
+            await AssertOperationNotRedactedAsync(db, nullPolicy.Id, "null-policy");
+            await AssertOperationNotRedactedAsync(db, recent.Id, "recent");
+        }
+        finally
+        {
+            await DeleteScopeEvidenceAsync(db, nullPolicyCompany);
+            await DeleteScopeEvidenceAsync(db, recentCompany);
+            await DeleteScopeEvidenceAsync(db, eligibleCompany);
         }
     }
 
@@ -149,7 +260,7 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
                 WHERE "Id"={{recentConflict.Id}}
                 """), "resolution retention timestamp is immutable");
 
-            _ = await new SyncRetentionCleanupService(db, new AuditEventService(db)).CleanupBatchAsync();
+            _ = await RetentionService(db).CleanupBatchAsync();
             db.ChangeTracker.Clear();
             Assert.NotNull((await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == eligible.Id)).RedactedAt);
             Assert.NotNull((await db.ConflictCases.AsNoTracking().SingleAsync(x => x.Id == conflict.Id)).RedactedAt);
@@ -206,8 +317,8 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
             await using var firstDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
             await using var secondDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
             var results = await Task.WhenAll(
-                new SyncRetentionCleanupService(firstDb, new AuditEventService(firstDb)).CleanupBatchAsync(1),
-                new SyncRetentionCleanupService(secondDb, new AuditEventService(secondDb)).CleanupBatchAsync(1));
+                RetentionService(firstDb).CleanupBatchAsync(1),
+                RetentionService(secondDb).CleanupBatchAsync(1));
 
             Assert.Equal(2, results.Sum(x => x.RedactedOperations));
             await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
@@ -262,7 +373,8 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
             SELECT pg_get_functiondef('transport_erp.enforce_sync_conflict_redaction()'::regprocedure) AS "Value"
             """).SingleAsync();
         Assert.Contains("ResolvedAt", conflictGuard, StringComparison.Ordinal);
-        Assert.Contains("90 days", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("RetentionDaysApplied", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("LegalHold", conflictGuard, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -290,6 +402,35 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         var operation = await db.SyncOperations.AsNoTracking().SingleAsync(x => x.Id == operationId);
         Assert.Null(operation.RedactedAt);
         Assert.Contains(retainedMarker, operation.PayloadJson, StringComparison.Ordinal);
+    }
+
+    private static SyncRetentionCleanupService RetentionService(
+        TransportErpDbContext db,
+        int serverPayloadDays = 90,
+        Guid? deniedCompanyId = null,
+        IReadOnlySet<Guid>? allowedCompanyIds = null)
+        => new(db, new AuditEventService(db),
+            new FixedRetentionPolicyProvider(serverPayloadDays, deniedCompanyId, allowedCompanyIds));
+
+    private sealed class FixedRetentionPolicyProvider(
+        int serverPayloadDays,
+        Guid? deniedCompanyId,
+        IReadOnlySet<Guid>? allowedCompanyIds)
+        : IEffectiveSyncRetentionPolicyProvider
+    {
+        public ValueTask<EffectiveSyncRetentionPolicy?> ResolveAsync(
+            Guid companyId,
+            Guid? branchId,
+            Guid? registeredDeviceId,
+            string? deviceId,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(
+                companyId != Guid.Empty && companyId != deniedCompanyId &&
+                (allowedCompanyIds is null || allowedCompanyIds.Contains(companyId)) &&
+                branchId.HasValue && registeredDeviceId.HasValue &&
+                !string.IsNullOrWhiteSpace(deviceId)
+                    ? new(serverPayloadDays, "retention-test-policy-v1", new string('a', 64))
+                    : null);
     }
 
     private static async Task AssertDeniedAsync(Func<Task<int>> action, string message)
@@ -350,7 +491,9 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         return conflict;
     }
 
-    private static async Task<RetentionScope> SeedScopeAsync(TransportErpDbContext db)
+    private static async Task<RetentionScope> SeedScopeAsync(
+        TransportErpDbContext db,
+        Guid? companyId = null)
     {
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
@@ -361,7 +504,7 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         };
         var company = new Company
         {
-            Id = Guid.NewGuid(), Code = $"RET-{Guid.NewGuid():N}"[..18], LegalNameAr = "شركة retention",
+            Id = companyId ?? Guid.NewGuid(), Code = $"RET-{Guid.NewGuid():N}"[..18], LegalNameAr = "شركة retention",
             BaseCurrencyId = currency.Id, DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
         };

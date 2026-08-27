@@ -353,6 +353,56 @@ public sealed class EffectiveSyncRetryPolicyResolver(
         decision.WithPolicySource(configuration.SourceVersion, configuration.SourceFingerprint);
 }
 
+/// <summary>
+/// Retention projection of the same immutable effective-policy source used by
+/// HTTP acceptance and worker execution. It deliberately resolves while the
+/// Offline gate is closed: retention is a server data-lifecycle obligation,
+/// not permission to execute offline writes.
+/// </summary>
+public sealed class EffectiveSyncRetentionPolicyProvider(
+    EffectivePolicyConfiguration configuration,
+    SyncEffectivePolicyResolver resolver,
+    IOptions<SyncRuntimePolicyOptions> global) : IEffectiveSyncRetentionPolicyProvider
+{
+    public ValueTask<EffectiveSyncRetentionPolicy?> ResolveAsync(
+        Guid companyId,
+        Guid? branchId,
+        Guid? registeredDeviceId,
+        string? deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (companyId == Guid.Empty || !branchId.HasValue || branchId == Guid.Empty ||
+            !registeredDeviceId.HasValue || registeredDeviceId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(deviceId))
+            return ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(null);
+
+        SyncPolicyRestriction? company = configuration.TryGetCompany(
+            companyId, out var configuredCompany) ? configuredCompany : null;
+        SyncPolicyRestriction? branch = configuration.TryGetBranch(
+            companyId, branchId.Value, out var configuredBranch) ? configuredBranch : null;
+        var globalActions = global.Value.AllowedActions;
+        IReadOnlyCollection<string> deviceActions = globalActions;
+        SyncPolicyRestriction? deviceRestriction = null;
+        if (configuration.TryGetDevice(registeredDeviceId.Value, out var device))
+        {
+            if (device.CompanyId != companyId || device.BranchId != branchId ||
+                !string.Equals(device.DeviceId, deviceId, StringComparison.Ordinal))
+                return ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(null);
+            deviceActions = device.AllowedActions;
+            deviceRestriction = device.Restriction;
+        }
+        var effective = resolver.Resolve(
+            company, branch, deviceActions, globalActions, deviceRestriction);
+        if (effective.ClosedReason == "INVALID_SCOPE_OVERRIDE" || effective.ServerPayloadDays < 1)
+            return ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(null);
+
+        return ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(new(
+            effective.ServerPayloadDays,
+            configuration.SourceVersion,
+            configuration.SourceFingerprint));
+    }
+}
+
 public sealed class EffectivePolicySyncRuntimeGate(IEffectiveSyncPolicyProvider provider) : ISyncRuntimeGate
 {
     public Task<EffectiveSyncPolicy> ResolveAsync(

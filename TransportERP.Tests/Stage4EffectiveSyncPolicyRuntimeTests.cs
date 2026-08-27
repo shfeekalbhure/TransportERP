@@ -262,6 +262,44 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
     }
 
     [Fact]
+    public async Task Retention_projection_uses_effective_device_days_even_while_offline_is_closed()
+    {
+        var scope = Scope();
+        var configuration = EffectivePolicyConfiguration.Create(
+            new Dictionary<Guid, SyncPolicyRestriction>
+            {
+                [scope.CompanyId] = new(ServerPayloadDays: 60)
+            },
+            new Dictionary<(Guid, Guid), SyncPolicyRestriction>
+            {
+                [(scope.CompanyId, scope.BranchId)] = new(ServerPayloadDays: 45)
+            },
+            [new ConfiguredDeviceSyncPolicy(
+                scope.RegisteredDeviceId, scope.CompanyId, scope.BranchId, scope.DeviceId,
+                new HashSet<string>(["CreateWaybillDraft"], StringComparer.Ordinal),
+                new SyncPolicyRestriction(ServerPayloadDays: 30))],
+            sourceVersion: "retention-policy-v3");
+        var options = Options.Create(Global(offlineEnabled: false));
+        var provider = new EffectiveSyncRetentionPolicyProvider(
+            configuration, new SyncEffectivePolicyResolver(options), options);
+
+        var effective = await provider.ResolveAsync(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, scope.DeviceId);
+        var wrongBinding = await provider.ResolveAsync(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, "wrong-device-id");
+        var unconfiguredDevice = await provider.ResolveAsync(
+            scope.CompanyId, scope.BranchId, Guid.NewGuid(), "retired-device");
+
+        Assert.NotNull(effective);
+        Assert.Equal(30, effective!.ServerPayloadDays);
+        Assert.Equal("retention-policy-v3", effective.SourceVersion);
+        Assert.Matches("^[0-9a-f]{64}$", effective.SourceFingerprint);
+        Assert.Null(wrongBinding);
+        Assert.NotNull(unconfiguredDevice);
+        Assert.Equal(45, unconfiguredDevice!.ServerPayloadDays);
+    }
+
+    [Fact]
     public async Task Worker_reapplies_enabled_and_action_hierarchy_before_execution()
     {
         var scope = Scope();

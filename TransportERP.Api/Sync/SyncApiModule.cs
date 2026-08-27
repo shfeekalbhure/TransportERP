@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
 using TransportERP.Application.Sync;
@@ -173,6 +174,7 @@ public static class SyncApiModule
         TransportErpDbContext db,
         SyncPopDeploymentProfile deployment,
         ProofKeyChangeProofValidator proofKeyValidator,
+        IOptions<SyncRuntimePolicyOptions> runtimePolicy,
         CancellationToken cancellationToken)
     {
         var current = await security.ResolveAsync(http.User, cancellationToken);
@@ -240,6 +242,17 @@ public static class SyncApiModule
             proofKey,
             canManageKeys && device.ProofKeyVersion is null,
             canManageKeys && device.ProofKeyVersion is not null,
+            policy.MaxBatchOperations,
+            policy.MaximumRequestBodyBytes,
+            policy.MaximumPayloadBytes,
+            policy.ClientTransportMaxRetryCount,
+            policy.ClientTransportBaseSeconds,
+            policy.ClientTransportMaxDelayMinutes,
+            policy.LocalSuccessHours,
+            policy.LocalRejectedDays,
+            policy.ServerPayloadDays,
+            policy.CacheMaxAgeHours,
+            runtimePolicy.Value.OfflineActivationImplementationSha,
             policy.SourceVersion,
             policy.SourceFingerprint,
             closedReason));
@@ -264,6 +277,14 @@ public static class SyncApiModule
         if (acceptedRequest.EffectivePolicy is not { Enabled: true } effectivePolicy)
             return Results.Json(new { ErrorCode = "OFFLINE_DISABLED", CorrelationId = attemptCorrelationId },
                 statusCode: StatusCodes.Status403Forbidden);
+        if (rawBody.Length > effectivePolicy.MaximumRequestBodyBytes)
+        {
+            await rejectionAudit.WriteAsync(
+                acceptedProof, null, "REQUEST_BODY_TOO_LARGE", cancellationToken);
+            return Results.Json(
+                new { ErrorCode = "REQUEST_BODY_TOO_LARGE", CorrelationId = attemptCorrelationId },
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+        }
 
         SyncBatchRequest? request;
         try { request = SyncBatchJsonContract.Deserialize(rawBody); }
@@ -437,6 +458,17 @@ public sealed record SyncActivationResponse(
     SyncActivationProofPublicJwk? ProofPublicJwk,
     bool KeyEnrollmentAllowed,
     bool KeyRecoveryAllowed,
+    int MaxBatchOperations,
+    int MaximumRequestBodyBytes,
+    int MaximumPayloadBytes,
+    int ClientTransportMaxRetryCount,
+    int ClientTransportBaseSeconds,
+    int ClientTransportMaxDelayMinutes,
+    int LocalSuccessHours,
+    int LocalRejectedDays,
+    int ServerPayloadDays,
+    int CacheMaxAgeHours,
+    string? ActivationImplementationSha,
     string? PolicySourceVersion,
     string? PolicySourceFingerprint,
     string? ClosedReason);

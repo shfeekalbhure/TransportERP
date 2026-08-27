@@ -12,7 +12,10 @@ public sealed class SyncWaybillBusinessAdapter(WaybillApplicationService service
     public async Task<SyncBusinessActionResult> CreateDraftAsync(
         SyncBusinessExecutionContext context, CreateWaybillDraftRequest request, CancellationToken cancellationToken)
     {
-        var result = await service.CreateDraftAsync(context.Operation, request, cancellationToken);
+        var result = await service.CreateDraftAsync(
+            context.Operation,
+            request with { ClientOperationId = context.BusinessIdempotencyKey },
+            cancellationToken);
         return new(result.Id, result.Version);
     }
 
@@ -22,7 +25,11 @@ public sealed class SyncWaybillBusinessAdapter(WaybillApplicationService service
         UpdateWaybillDraftRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await service.UpdateDraftAsync(context.Operation, waybillId, request, cancellationToken);
+        var result = await service.UpdateDraftAsync(
+            context.Operation,
+            waybillId,
+            request with { ClientOperationId = context.BusinessIdempotencyKey },
+            cancellationToken);
         return new(result.Id, result.Version);
     }
 
@@ -31,7 +38,10 @@ public sealed class SyncWaybillBusinessAdapter(WaybillApplicationService service
         OperationalPartyCreateRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await service.CreatePartyAsync(context.Operation, request, cancellationToken);
+        var result = await service.CreatePartyAsync(
+            context.Operation,
+            request with { ClientOperationId = context.BusinessIdempotencyKey },
+            cancellationToken);
         return new(result.Id, result.Version);
     }
 }
@@ -45,7 +55,10 @@ public sealed class SyncFinanceBusinessAdapter(WaybillFinanceApplicationService 
         CancellationToken cancellationToken)
     {
         var collection = await service.RecordCollectionAsync(
-            context.Operation, waybillId, request, cancellationToken);
+            context.Operation,
+            waybillId,
+            request with { ClientOperationId = context.BusinessIdempotencyKey },
+            cancellationToken);
         return new(collection.Id, null);
     }
 }
@@ -59,7 +72,11 @@ public sealed class SyncShippingBusinessAdapter(ShippingExecutionApplicationServ
         CancellationToken cancellationToken)
     {
         var result = await service.LoadManifestLineAsync(
-            context.Operation, payload.ManifestId, manifestLineId, payload.Request, cancellationToken);
+            context.Operation,
+            payload.ManifestId,
+            manifestLineId,
+            payload.Request with { ClientOperationId = context.BusinessIdempotencyKey },
+            cancellationToken);
         if (!result.MovementEventId.HasValue || result.MovementEventId == Guid.Empty)
             throw new ShippingExecutionApplicationException("BUSINESS_RESULT_INVALID");
         return new(result.MovementEventId.Value, null);

@@ -75,9 +75,12 @@ public sealed class SyncBusinessDispatcher(
             return SyncBusinessDispatchResult.Rejected("ACTION_RUNTIME_UNAVAILABLE");
 
         var operationId = command.ClientOperationId.Trim();
+        var businessIdempotencyKey = SyncBusinessIdempotencyKey.Create(
+            actor.CompanyId, actor.BranchId, actor.RegisteredDeviceId, operationId);
         var execution = new SyncBusinessExecutionContext(
             new OperationContext(actor.UserId, actor.CompanyId, actor.BranchId, actor.CorrelationId),
-            actor.RegisteredDeviceId, operationId, command.OperationCorrelationId);
+            actor.RegisteredDeviceId, operationId, businessIdempotencyKey,
+            command.OperationCorrelationId);
 
         try
         {
