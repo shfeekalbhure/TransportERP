@@ -1076,8 +1076,8 @@ jobs:
           verify_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$verify_pid"
           run_phase loss
-          adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" sh -c \
-            'cat > files/driver-device-e2e-input.json' \
+          adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" dd \
+            of=files/driver-device-e2e-input.json status=none \
             < "$RUNNER_TEMP/android-e2e-input.json"
           adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" chmod 600 \
             files/driver-device-e2e-input.json
