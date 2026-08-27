@@ -162,6 +162,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", network,
             StringComparison.Ordinal);
         Assert.Contains("adb_bounded exec-out run-as", workflow, StringComparison.Ordinal);
+        Assert.Contains("adb_bounded shell run-as \"$ANDROID_TEST_PACKAGE\" sh -c", workflow,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("--es password", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--es deviceCredential", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("GetStringExtra(\"password\")", activity, StringComparison.Ordinal);
