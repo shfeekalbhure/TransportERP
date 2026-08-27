@@ -133,13 +133,19 @@ public sealed class OfflineSyncConflictClient
         using var request = Request(endpoint, body, bearer, correlationId, proof: null);
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
+        var error = await ErrorAsync(response, correlationId, cancellationToken);
         if (response.StatusCode == HttpStatusCode.Unauthorized &&
-            response.Headers.TryGetValues("DPoP-Nonce", out var values))
+            string.Equals(error.Code, "use_dpop_nonce", StringComparison.Ordinal))
         {
-            var nonceValues = values.ToArray();
-            if (nonceValues.Length == 1 && !string.IsNullOrEmpty(nonceValues[0])) return nonceValues[0];
+            if (response.Headers.TryGetValues("DPoP-Nonce", out var values))
+            {
+                var nonceValues = values.ToArray();
+                if (nonceValues.Length == 1 && !string.IsNullOrEmpty(nonceValues[0]))
+                    return nonceValues[0];
+            }
+            throw new SyncTransportException("NONCE_CHALLENGE_INVALID", retryable: false);
         }
-        throw await ErrorAsync(response, cancellationToken);
+        throw error;
     }
 
     private async Task<(SyncV1ConflictResolutionResponse Response, Guid CorrelationId)> SendSignedAsync(
@@ -161,7 +167,7 @@ public sealed class OfflineSyncConflictClient
                 return (parsed, correlationId);
             }
 
-            var error = await ErrorAsync(response, cancellationToken);
+            var error = await ErrorAsync(response, correlationId, cancellationToken);
             if (attempt == 0 && response.StatusCode == HttpStatusCode.Unauthorized &&
                 string.Equals(error.Code, "use_dpop_nonce", StringComparison.Ordinal) &&
                 response.Headers.TryGetValues("DPoP-Nonce", out var refreshed))
@@ -215,12 +221,17 @@ public sealed class OfflineSyncConflictClient
     }
 
     private static async Task<SyncTransportException> ErrorAsync(
-        HttpResponseMessage response, CancellationToken cancellationToken)
+        HttpResponseMessage response, Guid expectedCorrelationId,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var bytes = await SyncV1Json.ReadBoundedErrorBytesAsync(
+                response.Content, cancellationToken);
             var error = SyncV1Json.Deserialize<SyncV1ErrorResponse>(bytes);
+            if (error?.CorrelationId != expectedCorrelationId)
+                return new SyncTransportException(
+                    "CLIENT_HTTP_CORRELATION_MISMATCH", retryable: true);
             var code = string.IsNullOrEmpty(error?.ErrorCode) ? "HTTP_REJECTED" : error.ErrorCode;
             return new SyncTransportException(code, retryable:
                 code is "INTERNAL_ERROR" or "RATE_LIMITED" or "TIMEOUT" or "NO_RESPONSE" ||
@@ -230,6 +241,7 @@ public sealed class OfflineSyncConflictClient
         }
         catch (JsonException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return new SyncTransportException("HTTP_REJECTED", retryable:
                 response.StatusCode == HttpStatusCode.RequestTimeout ||
                 response.StatusCode == HttpStatusCode.TooManyRequests ||

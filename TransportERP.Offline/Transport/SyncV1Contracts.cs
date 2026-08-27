@@ -97,6 +97,8 @@ public sealed record SyncV1ConflictResolutionResponse(
 
 internal static class SyncV1Json
 {
+    private const int MaximumErrorResponseBytes = 65_536;
+
     internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = false,
@@ -112,4 +114,33 @@ internal static class SyncV1Json
 
     internal static T? Deserialize<T>(ReadOnlySpan<byte> utf8Json) =>
         JsonSerializer.Deserialize<T>(utf8Json, Options);
+
+    internal static async Task<byte[]> ReadBoundedErrorBytesAsync(
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (content.Headers.ContentLength is > MaximumErrorResponseBytes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new JsonException("SYNC_ERROR_RESPONSE_TOO_LARGE");
+        }
+
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var bounded = new MemoryStream();
+        var buffer = new byte[4096];
+        while (true)
+        {
+            var read = await stream.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+                break;
+            if (bounded.Length + read > MaximumErrorResponseBytes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw new JsonException("SYNC_ERROR_RESPONSE_TOO_LARGE");
+            }
+            await bounded.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+        return bounded.ToArray();
+    }
 }

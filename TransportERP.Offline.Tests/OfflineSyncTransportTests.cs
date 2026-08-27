@@ -737,6 +737,138 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Initial_nonce_challenge_reads_and_binds_the_error_envelope_before_disposal()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        DisposeRequiresReadContent? challengeContent = null;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++calls == 1)
+            {
+                challengeContent = new DisposeRequiresReadContent(SyncV1Json.Serialize(
+                    new SyncV1ErrorResponse("use_dpop_nonce", captured.AttemptCorrelationId)));
+                var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                {
+                    Content = challengeContent
+                };
+                challenge.Headers.TryAddWithoutValidation(
+                    "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+                return challenge;
+            }
+            return Success(captured, "SUCCEEDED");
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(2, calls);
+        Assert.True(challengeContent!.WasRead);
+        Assert.Equal(1, outcome.Succeeded);
+        Assert.Equal(OfflineOperationStatus.Succeeded, persisted!.Status);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Initial_nonce_header_without_the_exact_correlation_is_never_signed(
+        bool correlationMissing)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            var challenge = Json(HttpStatusCode.Unauthorized, new
+            {
+                ErrorCode = "use_dpop_nonce",
+                CorrelationId = correlationMissing
+                    ? (Guid?)null
+                    : DifferentGuid(captured.AttemptCorrelationId)
+            });
+            challenge.Headers.TryAddWithoutValidation(
+                "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return challenge;
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_HTTP_CORRELATION_MISMATCH", persisted.ResultCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Initial_nonce_challenge_rejects_declared_and_streamed_oversized_error_bodies(
+        bool declaresLength)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            calls++;
+            var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new OversizedErrorContent(declaresLength)
+            };
+            challenge.Headers.TryAddWithoutValidation(
+                "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return Task.FromResult(challenge);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
+        Assert.Equal("HTTP_REJECTED", persisted.ResultCode);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_precedes_a_declared_oversized_nonce_error_body()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var cancellation = new CancellationTokenSource();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            cancellation.Cancel();
+            var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new OversizedErrorContent(declaresLength: true)
+            };
+            challenge.Headers.TryAddWithoutValidation(
+                "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return Task.FromResult(challenge);
+        }));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            Client(http, store, key, clock, "token").ProcessNextBatchAsync(
+                cancellationToken: cancellation.Token));
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Null(persisted!.ResultCode);
+    }
+
+    [Fact]
     public async Task Caller_cancellation_precedes_a_nonce_response_disposal_failure()
     {
         const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-dispose-cancel";
@@ -1452,6 +1584,53 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Conflict_nonce_header_without_the_exact_correlation_is_never_signed(
+        bool correlationMissing)
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        var claimed = await store.ClaimNextAsync("worker", TimeSpan.FromMinutes(1), Scope());
+        var conflictCaseId = Guid.NewGuid();
+        await store.MarkConflictAsync(claimed!.LocalOperationId, claimed.AttemptCorrelationId!.Value,
+            conflictCaseId, "BASE_VERSION_CONFLICT", ConflictReview(claimed),
+            StableServerOperationId(queued.Operation.ClientOperationId));
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            var challenge = Json(HttpStatusCode.Unauthorized, new
+            {
+                ErrorCode = "use_dpop_nonce",
+                CorrelationId = correlationMissing
+                    ? (Guid?)null
+                    : DifferentGuid(captured.AttemptCorrelationId)
+            });
+            challenge.Headers.TryAddWithoutValidation(
+                "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return challenge;
+        }));
+        var options = new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
+            queued.Operation.CompanyId, queued.Operation.BranchId, queued.Operation.UserId, "test-worker",
+            BuildIdentity: TestBuildIdentity);
+        var client = new OfflineSyncConflictClient(
+            http, store, new FixedBearerProvider("token"), key, options, clock);
+
+        var error = await Assert.ThrowsAsync<SyncTransportException>(() => client.ResolveAsync(
+            queued.Operation.LocalOperationId, OfflineConflictDecision.Reapply,
+            "إعادة تطبيق بعد مراجعة الإصدار الحالي", 12));
+
+        Assert.Equal(1, calls);
+        Assert.Equal("CLIENT_HTTP_CORRELATION_MISMATCH", error.Code);
+        Assert.Equal(OfflineOperationStatus.Conflict,
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!.Status);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("contains access_token=secret")]
     [InlineData("line\nbreak")]
@@ -1697,6 +1876,13 @@ public sealed class OfflineSyncTransportTests : IDisposable
     private static string Base64Url(ReadOnlySpan<byte> value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    private static Guid DifferentGuid(Guid value)
+    {
+        var bytes = value.ToByteArray();
+        bytes[0] ^= 1;
+        return new Guid(bytes);
+    }
+
     private static byte[] DecodeBase64Url(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
@@ -1750,6 +1936,44 @@ public sealed class OfflineSyncTransportTests : IDisposable
                 beforeThrow?.Invoke();
                 throw failure;
             }
+        }
+    }
+
+    private sealed class DisposeRequiresReadContent(byte[] bytes) : HttpContent
+    {
+        public bool WasRead { get; private set; }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            WasRead = true;
+            await stream.WriteAsync(bytes);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = bytes.Length;
+            return true;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !WasRead)
+                throw new InvalidOperationException("UNREAD_RESPONSE_DISPOSED");
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class OversizedErrorContent(bool declaresLength) : HttpContent
+    {
+        private static readonly byte[] Bytes = new byte[65_537];
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            stream.WriteAsync(Bytes).AsTask();
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = declaresLength ? Bytes.Length : 0;
+            return declaresLength;
         }
     }
 

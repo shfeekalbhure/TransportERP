@@ -309,17 +309,22 @@ public sealed class OfflineSyncTransportClient
             {
                 using (response)
                 {
-                    if (response.StatusCode == HttpStatusCode.Unauthorized &&
-                        response.Headers.TryGetValues(NonceHeader, out var values))
-                    {
-                        var nonces = values.ToArray();
-                        if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0]))
-                            return (nonces[0], null, false);
-                        return (null, "NONCE_CHALLENGE_INVALID", false);
-                    }
-
+                    // A nonce header is not authority on its own. Bind the challenge to the exact
+                    // wire attempt by consuming and validating the bounded error envelope before
+                    // accepting the header and before response disposal.
                     var error = await ReadErrorCodeAsync(
                         response, attemptCorrelationId, cancellationToken);
+                    if (response.StatusCode == HttpStatusCode.Unauthorized &&
+                        string.Equals(error.ErrorCode, "use_dpop_nonce", StringComparison.Ordinal))
+                    {
+                        if (response.Headers.TryGetValues(NonceHeader, out var values))
+                        {
+                            var nonces = values.ToArray();
+                            if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0]))
+                                return (nonces[0], null, false);
+                        }
+                        return (null, "NONCE_CHALLENGE_INVALID", false);
+                    }
                     return (null, error.ErrorCode, error.Retryable);
                 }
             }
@@ -622,9 +627,10 @@ public sealed class OfflineSyncTransportClient
     {
         try
         {
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var bytes = await SyncV1Json.ReadBoundedErrorBytesAsync(
+                response.Content, cancellationToken);
             var error = SyncV1Json.Deserialize<SyncV1ErrorResponse>(bytes);
-            if (error?.CorrelationId is not null && error.CorrelationId != expectedCorrelationId)
+            if (error?.CorrelationId != expectedCorrelationId)
                 return ("CLIENT_HTTP_CORRELATION_MISMATCH", true);
             var errorCode = NormalizeRemoteErrorCode(error?.ErrorCode);
             return (errorCode,
@@ -632,6 +638,7 @@ public sealed class OfflineSyncTransportClient
         }
         catch (JsonException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var errorCode = response.StatusCode == HttpStatusCode.TooManyRequests
                 ? "RATE_LIMITED"
                 : "HTTP_REJECTED";
