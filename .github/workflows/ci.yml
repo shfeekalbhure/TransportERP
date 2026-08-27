@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - codex/p1-security-device-sync-offline-20260825
   pull_request:
     branches:
       - master
@@ -161,6 +162,11 @@ jobs:
     # master ruleset. Changing it requires a coordinated ruleset update.
     name: Required CI / Desktop RTL contract surface
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -187,6 +193,11 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
       - name: Restore Desktop
         run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
 
@@ -200,7 +211,8 @@ jobs:
             --no-restore `
             -p:ContinuousIntegrationBuild=true `
             -p:SourceRevisionId="$env:EXPECTED_SHA" `
-            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA" `
+            -p:TransportERPClientPublicOrigin=https://127.0.0.1:55443/
 
       - name: Bind Desktop binary evidence to exact source SHA
         shell: pwsh
@@ -240,6 +252,37 @@ jobs:
             "assembly_sha256=$((Get-FileHash -Algorithm SHA256 $assembly).Hash.ToLowerInvariant())"
             "application_assembly_sha256=$((Get-FileHash -Algorithm SHA256 $applicationAssembly).Hash.ToLowerInvariant())"
           ) | Set-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+
+      - name: Measure the exact Desktop deployment with the candidate WinExe
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path 'TransportERP.Desktop/bin/Release/net10.0-windows/TransportERP.Desktop.exe').Path
+          $identityPath = Join-Path (Resolve-Path 'ci-evidence/desktop').Path 'runtime-build-identity.json'
+          if (Test-Path $identityPath) { throw 'Desktop runtime build identity output already exists.' }
+          $process = Start-Process -FilePath $executable `
+            -ArgumentList @('--print-build-identity', $identityPath) `
+            -PassThru -Wait
+          if ($process.ExitCode -ne 0 -or -not (Test-Path $identityPath)) {
+            throw 'The candidate WinExe did not measure its own deployment successfully.'
+          }
+          $identity = Get-Content -Raw $identityPath | ConvertFrom-Json
+          if ($identity.platform -ne 'desktop-windows' -or
+              $identity.artifactSha256 -notmatch '^[0-9a-f]{64}$' -or
+              ($null -ne $identity.signerCertificateSha256 -and
+               $identity.signerCertificateSha256 -notmatch '^[0-9a-f]{64}$')) {
+            throw 'The candidate WinExe returned an invalid build identity.'
+          }
+          $independentDigest = (python eng/ci/verify_desktop_build_identity.py `
+            --root 'TransportERP.Desktop/bin/Release/net10.0-windows' `
+            --identity $identityPath).Trim()
+          if ($LASTEXITCODE -ne 0 -or $independentDigest -ne $identity.artifactSha256) {
+            throw 'Independent Desktop deployment-tree verification failed.'
+          }
+          @(
+            "deployment_tree_sha256=$($identity.artifactSha256)"
+            "independent_deployment_tree_sha256=$independentDigest"
+            "signer_certificate_sha256=$($identity.signerCertificateSha256)"
+          ) | Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
       - name: Run Desktop closed-default startup smoke
         shell: pwsh
@@ -327,7 +370,36 @@ jobs:
             --no-restore `
             -p:ContinuousIntegrationBuild=true `
             -p:SourceRevisionId="$env:EXPECTED_SHA" `
-            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA" `
+            -p:TransportERPClientPublicOrigin=https://127.0.0.1:55443/
+
+      - name: Freeze the Desktop deployment identity after the final build
+        shell: pwsh
+        run: |
+          $deployment = 'TransportERP.Desktop/bin/Release/net10.0-windows'
+          $executable = (Resolve-Path (Join-Path $deployment 'TransportERP.Desktop.exe')).Path
+          $identityPath = Join-Path (Resolve-Path 'ci-evidence/desktop').Path 'runtime-build-identity-final.json'
+          if (Test-Path $identityPath) { throw 'Final Desktop runtime build identity already exists.' }
+          $process = Start-Process -FilePath $executable `
+            -ArgumentList @('--print-build-identity', $identityPath) `
+            -PassThru -Wait
+          if ($process.ExitCode -ne 0 -or -not (Test-Path $identityPath)) {
+            throw 'The final candidate WinExe did not measure its deployment.'
+          }
+          $identity = Get-Content -Raw $identityPath | ConvertFrom-Json
+          $independentDigest = (python eng/ci/verify_desktop_build_identity.py `
+            --root $deployment --identity $identityPath).Trim()
+          if ($LASTEXITCODE -ne 0 -or $independentDigest -ne $identity.artifactSha256) {
+            throw 'Final Desktop deployment-tree verification failed.'
+          }
+          $initial = Get-Content -Raw 'ci-evidence/desktop/runtime-build-identity.json' | ConvertFrom-Json
+          if ($initial.platform -ne $identity.platform -or
+              $initial.artifactSha256 -ne $identity.artifactSha256 -or
+              $initial.signerCertificateSha256 -ne $identity.signerCertificateSha256) {
+            throw 'The Desktop deployment changed after its initial identity measurement.'
+          }
+          "final_deployment_tree_sha256=$independentDigest" |
+            Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
       - name: Run true Desktop CNG DPAPI SQLCipher HTTP PostgreSQL E2E
         shell: pwsh
@@ -353,10 +425,130 @@ jobs:
           $passed = [int]$counters.passed
           $failed = [int]$counters.failed
           $notExecuted = [int]$counters.notExecuted
-          if ($total -ne 1 -or $passed -ne 1 -or $failed -ne 0 -or $notExecuted -ne 0) {
-            throw "Desktop E2E did not execute exactly once and pass: total=$total passed=$passed failed=$failed skipped=$notExecuted."
+          if ($total -ne 5 -or $passed -ne 5 -or $failed -ne 0 -or $notExecuted -ne 0) {
+            throw "Desktop E2E did not execute exactly five tests and pass: total=$total passed=$passed failed=$failed skipped=$notExecuted."
           }
           'desktop_e2e=PASS' | Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+
+      - name: Reverify the Desktop deployment after E2E
+        shell: pwsh
+        run: |
+          $deployment = 'TransportERP.Desktop/bin/Release/net10.0-windows'
+          $executable = (Resolve-Path (Join-Path $deployment 'TransportERP.Desktop.exe')).Path
+          $identityPath = Join-Path (Resolve-Path 'ci-evidence/desktop').Path 'runtime-build-identity-posttest.json'
+          if (Test-Path $identityPath) { throw 'Post-test Desktop runtime build identity already exists.' }
+          $process = Start-Process -FilePath $executable `
+            -ArgumentList @('--print-build-identity', $identityPath) `
+            -PassThru -Wait
+          if ($process.ExitCode -ne 0 -or -not (Test-Path $identityPath)) {
+            throw 'The tested candidate WinExe did not remeasure its deployment.'
+          }
+          $postTest = Get-Content -Raw $identityPath | ConvertFrom-Json
+          $frozen = Get-Content -Raw 'ci-evidence/desktop/runtime-build-identity-final.json' |
+            ConvertFrom-Json
+          $independentDigest = (python eng/ci/verify_desktop_build_identity.py `
+            --root $deployment --identity $identityPath).Trim()
+          if ($LASTEXITCODE -ne 0 -or $independentDigest -ne $postTest.artifactSha256 -or
+              $postTest.platform -ne $frozen.platform -or
+              $postTest.artifactSha256 -ne $frozen.artifactSha256 -or
+              $postTest.signerCertificateSha256 -ne $frozen.signerCertificateSha256) {
+            throw 'The Desktop deployment changed while its E2E tests executed.'
+          }
+          "posttest_deployment_tree_sha256=$independentDigest" |
+            Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+
+      - name: Package the exact Desktop deployment subject
+        id: package-desktop
+        shell: pwsh
+        run: |
+          $output = 'TransportERP.Desktop/bin/Release/net10.0-windows'
+          $package = 'ci-evidence/desktop/TransportERP.Desktop-candidate.zip'
+          if (-not (Test-Path $output)) { throw 'Desktop deployment output is missing.' }
+          if (Test-Path $package) { Remove-Item -LiteralPath $package -Force }
+          Compress-Archive -Path (Join-Path $output '*') -DestinationPath $package -CompressionLevel Optimal
+          if (-not (Test-Path $package)) { throw 'Desktop deployment package was not produced.' }
+          $digest = (Get-FileHash -Algorithm SHA256 $package).Hash.ToLowerInvariant()
+          if ($digest -notmatch '^[0-9a-f]{64}$') { throw 'Desktop deployment digest is invalid.' }
+          "deployment_bundle_sha256=$digest" | Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+
+          $runtimeIdentity = Get-Content -Raw 'ci-evidence/desktop/runtime-build-identity-posttest.json' |
+            ConvertFrom-Json
+          $extracted = Join-Path $env:RUNNER_TEMP 'transporterp-desktop-candidate-extracted'
+          if (Test-Path $extracted) { throw 'Desktop package verification directory already exists.' }
+          Expand-Archive -LiteralPath $package -DestinationPath $extracted
+          $packagedTreeDigest = (python eng/ci/verify_desktop_build_identity.py `
+            --root $extracted `
+            --identity 'ci-evidence/desktop/runtime-build-identity-posttest.json').Trim()
+          if ($LASTEXITCODE -ne 0 -or $packagedTreeDigest -ne $runtimeIdentity.artifactSha256) {
+            throw 'The Desktop deployment package content does not match the tested tree.'
+          }
+          "packaged_deployment_tree_sha256=$packagedTreeDigest" |
+            Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+          $predicate = [ordered]@{
+            schemaVersion = 1
+            sourceSha = '${{ github.event.pull_request.head.sha || github.sha }}'
+            treeSha = ((& git rev-parse 'HEAD^{tree}').Trim())
+            platform = 'desktop-windows'
+            artifactSha256 = $runtimeIdentity.artifactSha256
+            deploymentBundleSha256 = $digest
+            signerCertificateSha256 = $runtimeIdentity.signerCertificateSha256
+          }
+          $predicate | ConvertTo-Json -Compress |
+            Set-Content -Encoding utf8 'ci-evidence/desktop/build-identity-predicate.json'
+
+      - name: Attest exact Desktop deployment provenance
+        id: attest-desktop
+        if: github.event_name == 'push'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ci-evidence/desktop/TransportERP.Desktop-candidate.zip
+          predicate-type: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+          predicate-path: ci-evidence/desktop/build-identity-predicate.json
+
+      - name: Persist Desktop attestation evidence
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+          PREDICATE_TYPE: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+        run: |
+          $bundle = '${{ steps.attest-desktop.outputs.bundle-path }}'
+          if ([string]::IsNullOrWhiteSpace($bundle) -or -not (Test-Path $bundle)) {
+            throw 'Desktop provenance attestation bundle is missing.'
+          }
+          Copy-Item -LiteralPath $bundle -Destination 'ci-evidence/desktop/provenance-attestation.json'
+          gh attestation verify 'ci-evidence/desktop/TransportERP.Desktop-candidate.zip' `
+            --bundle $bundle `
+            --repo $env:GITHUB_REPOSITORY `
+            --predicate-type $env:PREDICATE_TYPE `
+            --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/ci.yml" `
+            --source-digest $env:EXPECTED_SHA `
+            --source-ref $env:GITHUB_REF `
+            --format json `
+            | Set-Content -Encoding utf8 'ci-evidence/desktop/provenance-verification.json'
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop provenance verification failed.' }
+          @'
+          import json, pathlib, sys
+          expected_sha, predicate_type, predicate_path, verification_path = sys.argv[1:]
+          expected = json.loads(pathlib.Path(predicate_path).read_text(encoding="utf-8-sig"))
+          results = json.loads(pathlib.Path(verification_path).read_text(encoding="utf-8-sig"))
+          matches = [entry for entry in results
+                     if entry.get("verificationResult", {}).get("statement", {}).get("predicateType") == predicate_type
+                     and entry.get("verificationResult", {}).get("statement", {}).get("predicate") == expected]
+          if len(matches) != 1 or expected.get("sourceSha") != expected_sha:
+              raise SystemExit("Verified Desktop attestation is not bound to the exact candidate predicate.")
+          '@ | python - $env:EXPECTED_SHA $env:PREDICATE_TYPE `
+            'ci-evidence/desktop/build-identity-predicate.json' `
+            'ci-evidence/desktop/provenance-verification.json'
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop predicate verification failed.' }
+          'attestation_verification=PASS' |
+            Set-Content -Encoding utf8 'ci-evidence/desktop/provenance-verification.txt'
+          @(
+            'attestation_provider=github-oidc-sigstore'
+            'attestation_id=${{ steps.attest-desktop.outputs.attestation-id }}'
+            'attestation_url=${{ steps.attest-desktop.outputs.attestation-url }}'
+          ) | Set-Content -Encoding utf8 'ci-evidence/desktop/provenance-attestation.txt'
 
       - name: Stop Desktop E2E PostgreSQL
         if: ${{ always() }}
@@ -412,6 +604,15 @@ jobs:
           path: |
             ci-evidence/desktop/exact-head-manifest.txt
             ci-evidence/desktop/build-identity.txt
+            ci-evidence/desktop/runtime-build-identity.json
+            ci-evidence/desktop/runtime-build-identity-final.json
+            ci-evidence/desktop/runtime-build-identity-posttest.json
+            ci-evidence/desktop/build-identity-predicate.json
+            ci-evidence/desktop/TransportERP.Desktop-candidate.zip
+            ci-evidence/desktop/provenance-attestation.json
+            ci-evidence/desktop/provenance-attestation.txt
+            ci-evidence/desktop/provenance-verification.txt
+            ci-evidence/desktop/provenance-verification.json
             ci-evidence/desktop/postgresql-identity.txt
             ci-evidence/desktop/postgresql.log
             TransportERP.Desktop.E2ETests/TestResults/**/*.trx
@@ -496,6 +697,11 @@ jobs:
   mobile-contract:
     name: Required CI / Android Driver executable + mobile contracts
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -538,18 +744,26 @@ jobs:
           test "$actual" = "$EXPECTED_SHA"
           dotnet build TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
           dotnet build TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
-          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
+          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA" -p:TransportERPClientPublicOrigin=https://10.0.2.2:8443/
           release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*-Signed.apk' -print -quit)
           if [ -z "$release_apk" ]; then
-            release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*.apk' -print -quit)
-          fi
-          if [ -z "$release_apk" ]; then
-            echo 'Android Driver APK artifact was not produced.'
+            echo 'Signed Android Driver APK artifact was not produced.'
             exit 1
           fi
+          mkdir -p ci-evidence/mobile
+          cp -- "$release_apk" ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
+          release_apk=ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
           apkanalyzer=$(command -v apkanalyzer || find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -print -quit)
           test -n "$apkanalyzer" && test -x "$apkanalyzer"
-          mkdir -p ci-evidence/mobile
+          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
+          test -n "$apksigner" && test -x "$apksigner"
+          mapfile -t signer_digests < <(
+            "$apksigner" verify --print-certs "$release_apk" \
+              | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p'
+          )
+          test "${#signer_digests[@]}" -eq 1
+          signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
+          [[ "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]
           "$apkanalyzer" manifest print "$release_apk" > ci-evidence/mobile/release-manifest.xml
           if grep -Fq 'com.transporterp.mobile.driver.DriverDeviceTestActivity' ci-evidence/mobile/release-manifest.xml; then
             echo 'The test-only Android activity leaked into the Release APK.'
@@ -561,7 +775,24 @@ jobs:
             echo "tree_sha=$(git rev-parse 'HEAD^{tree}')"
             echo "apk_path=$release_apk"
             echo "apk_sha256=$(sha256sum "$release_apk" | awk '{print $1}')"
+            echo "signer_certificate_sha256=$signer_sha256"
           } > ci-evidence/mobile/build-identity.txt
+
+          python3 - "$actual" "$(git rev-parse 'HEAD^{tree}')" "$release_apk" "$signer_sha256" <<'PY'
+          import hashlib, json, pathlib, sys
+          source_sha, tree_sha, artifact_path, signer_sha = sys.argv[1:]
+          artifact = pathlib.Path(artifact_path)
+          predicate = {
+              "schemaVersion": 1,
+              "sourceSha": source_sha,
+              "treeSha": tree_sha,
+              "platform": "android",
+              "artifactSha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+              "signerCertificateSha256": signer_sha,
+          }
+          pathlib.Path("ci-evidence/mobile/build-identity-predicate.json").write_text(
+              json.dumps(predicate, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+          PY
 
       - name: Verify Mobile governed implementation identity
         shell: pwsh
@@ -579,6 +810,67 @@ jobs:
           }
           Add-Content -Encoding utf8 'ci-evidence/mobile/build-identity.txt' "implementation_sha=$implementationSha"
           Add-Content -Encoding utf8 'ci-evidence/mobile/build-identity.txt' "application_assembly_sha256=$((Get-FileHash -Algorithm SHA256 $applicationAssembly).Hash.ToLowerInvariant())"
+
+      - name: Upload the exact Android Release runtime candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
+            ci-evidence/mobile/build-identity.txt
+            ci-evidence/mobile/build-identity-predicate.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attest exact Android Release APK provenance
+        id: attest-mobile
+        if: github.event_name == 'push'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
+          predicate-type: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+          predicate-path: ci-evidence/mobile/build-identity-predicate.json
+
+      - name: Persist Android Release attestation evidence
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+          PREDICATE_TYPE: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+        run: |
+          set -euo pipefail
+          bundle='${{ steps.attest-mobile.outputs.bundle-path }}'
+          test -n "$bundle" && test -f "$bundle"
+          cp -- "$bundle" ci-evidence/mobile/provenance-attestation.json
+          gh attestation verify ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk \
+            --bundle "$bundle" \
+            --repo "$GITHUB_REPOSITORY" \
+            --predicate-type "$PREDICATE_TYPE" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --source-digest "$EXPECTED_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --format json \
+            > ci-evidence/mobile/provenance-verification.json
+          python3 - "$EXPECTED_SHA" "$PREDICATE_TYPE" \
+            ci-evidence/mobile/build-identity-predicate.json \
+            ci-evidence/mobile/provenance-verification.json <<'PY'
+          import json, pathlib, sys
+          expected_sha, predicate_type, predicate_path, verification_path = sys.argv[1:]
+          expected = json.loads(pathlib.Path(predicate_path).read_text(encoding="utf-8"))
+          results = json.loads(pathlib.Path(verification_path).read_text(encoding="utf-8"))
+          matches = [entry for entry in results
+                     if entry.get("verificationResult", {}).get("statement", {}).get("predicateType") == predicate_type
+                     and entry.get("verificationResult", {}).get("statement", {}).get("predicate") == expected]
+          if len(matches) != 1 or expected.get("sourceSha") != expected_sha:
+              raise SystemExit("Verified Android Release attestation is not bound to the exact candidate predicate.")
+          PY
+          echo 'attestation_verification=PASS' > ci-evidence/mobile/provenance-verification.txt
+          {
+            echo 'attestation_provider=github-oidc-sigstore'
+            echo 'attestation_id=${{ steps.attest-mobile.outputs.attestation-id }}'
+            echo 'attestation_url=${{ steps.attest-mobile.outputs.attestation-url }}'
+          } > ci-evidence/mobile/provenance-attestation.txt
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -612,15 +904,27 @@ jobs:
           path: |
             ci-evidence/mobile/exact-head-manifest.txt
             ci-evidence/mobile/build-identity.txt
+            ci-evidence/mobile/build-identity-predicate.json
             ci-evidence/mobile/release-manifest.xml
+            ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
+            ci-evidence/mobile/provenance-attestation.json
+            ci-evidence/mobile/provenance-attestation.txt
+            ci-evidence/mobile/provenance-verification.txt
+            ci-evidence/mobile/provenance-verification.json
             TransportERP.Mobile.Driver/bin/Release/net10.0-android/**/*.apk
           if-no-files-found: warn
           retention-days: 30
 
   android-device-runtime:
     name: Required CI / Android native security runtime
+    needs: mobile-contract
     runs-on: ubuntu-24.04
     timeout-minutes: 55
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     services:
       postgres:
         image: postgres:18.6-bookworm
@@ -657,6 +961,43 @@ jobs:
           echo "actual=$actual"
           echo "expected=$expected"
           test "$actual" = "$expected" || { echo 'Android runtime job is not running on the exact PR head.'; exit 1; }
+
+      - name: Download the exact Android Release runtime candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-release-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ci-input/android-release
+
+      - name: Verify downloaded Android Release candidate identity
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          release_apk=ci-input/android-release/TransportERP.Mobile.Driver.Release.apk
+          identity=ci-input/android-release/build-identity.txt
+          predicate=ci-input/android-release/build-identity-predicate.json
+          test -f "$release_apk" && test -f "$identity" && test -f "$predicate"
+          grep -Fx "source_sha=$EXPECTED_SHA" "$identity"
+          expected_apk_sha=$(sed -n 's/^apk_sha256=//p' "$identity")
+          test "$(printf '%s' "$expected_apk_sha" | wc -l)" -eq 0
+          [[ "$expected_apk_sha" =~ ^[0-9a-f]{64}$ ]]
+          test "$(sha256sum "$release_apk" | awk '{print $1}')" = "$expected_apk_sha"
+          python3 - "$EXPECTED_SHA" "$release_apk" "$predicate" <<'PY'
+          import hashlib, json, pathlib, sys
+          expected_sha, apk_path, predicate_path = sys.argv[1:]
+          apk = pathlib.Path(apk_path)
+          predicate = json.loads(pathlib.Path(predicate_path).read_text(encoding="utf-8"))
+          if predicate.get("sourceSha") != expected_sha:
+              raise SystemExit("Android Release predicate source SHA mismatch.")
+          if predicate.get("artifactSha256") != hashlib.sha256(apk.read_bytes()).hexdigest():
+              raise SystemExit("Android Release predicate artifact digest mismatch.")
+          PY
+          mkdir -p ci-evidence/android-runtime
+          cp -- "$release_apk" ci-evidence/android-runtime/TransportERP.Mobile.Driver.Release.apk
+          cp -- "$identity" ci-evidence/android-runtime/release-build-identity.txt
+          cp -- "$predicate" ci-evidence/android-runtime/release-build-identity-predicate.json
+          printf '%s' "$release_apk" > "$RUNNER_TEMP/android-release-apk.txt"
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -736,17 +1077,47 @@ jobs:
             -p:TransportERPDeviceTestServerCertificateSha256="$certificate_sha"
           test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*-Signed.apk' -print -quit)
           if [ -z "$test_apk" ]; then
-            test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*.apk' -print -quit)
+            echo 'Signed Android device-test APK artifact was not produced.'
+            exit 1
           fi
           test -n "$test_apk"
-          echo "$test_apk" > "$RUNNER_TEMP/android-device-test-apk.txt"
           mkdir -p ci-evidence/android-runtime
+          cp -- "$test_apk" ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
+          test_apk=ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
+          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
+          test -n "$apksigner" && test -x "$apksigner"
+          mapfile -t signer_digests < <(
+            "$apksigner" verify --print-certs "$test_apk" \
+              | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p'
+          )
+          test "${#signer_digests[@]}" -eq 1
+          signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
+          [[ "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]
+          echo "$test_apk" > "$RUNNER_TEMP/android-device-test-apk.txt"
+          printf '%s' "$signer_sha256" > "$RUNNER_TEMP/android-device-test-signer-sha256.txt"
           {
             echo 'schema_version=1'
             echo "source_sha=$actual"
             echo "tree_sha=$(git rev-parse 'HEAD^{tree}')"
             echo "test_apk_sha256=$(sha256sum "$test_apk" | awk '{print $1}')"
+            echo "signer_certificate_sha256=$signer_sha256"
           } > ci-evidence/android-runtime/device-test-build-identity.txt
+
+          python3 - "$actual" "$(git rev-parse 'HEAD^{tree}')" "$test_apk" "$signer_sha256" <<'PY'
+          import hashlib, json, pathlib, sys
+          source_sha, tree_sha, artifact_path, signer_sha = sys.argv[1:]
+          artifact = pathlib.Path(artifact_path)
+          predicate = {
+              "schemaVersion": 1,
+              "sourceSha": source_sha,
+              "treeSha": tree_sha,
+              "platform": "android",
+              "artifactSha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+              "signerCertificateSha256": signer_sha,
+          }
+          pathlib.Path("ci-evidence/android-runtime/build-identity-predicate.json").write_text(
+              json.dumps(predicate, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+          PY
 
       - name: Verify Android device-test governed implementation identity
         shell: pwsh
@@ -777,10 +1148,13 @@ jobs:
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
           admin_password=$(openssl rand -hex 24)
           device_credential=$(openssl rand -base64 32)
+          release_device_credential=$(openssl rand -base64 32)
           echo "::add-mask::$admin_password"
           echo "::add-mask::$device_credential"
+          echo "::add-mask::$release_device_credential"
           export ANDROID_E2E_ADMIN_PASSWORD="$admin_password"
           export ANDROID_E2E_DEVICE_CREDENTIAL="$device_credential"
+          export ANDROID_E2E_RELEASE_DEVICE_CREDENTIAL="$release_device_credential"
           api_content_root="$PWD/TransportERP.Api/bin/Release/net10.0"
           common_environment=(
             "TRANSPORTERP_CONNECTION_STRING=$connection"
@@ -909,6 +1283,55 @@ jobs:
             "https://localhost:8443/api/v1/devices/$registered_device_id/assignments" \
             > /dev/null
 
+          python3 > "$RUNNER_TEMP/android-release-device-registration.json" <<'PY'
+          import json, os, sys
+          json.dump({
+              "deviceId": "android-ci-release-device",
+              "displayName": "Android CI Release Emulator",
+              "platform": "Android",
+              "appVersion": "1.0-ci-release",
+              "deviceModel": "API 35 Emulator",
+              "osVersion": "35",
+              "registrationRequestId": "android-ci-release-device-registration-v1",
+              "credential": os.environ["ANDROID_E2E_RELEASE_DEVICE_CREDENTIAL"],
+          }, sys.stdout)
+          PY
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/android-release-device-registration.json" \
+            https://localhost:8443/api/v1/devices \
+            > "$RUNNER_TEMP/android-release-device-registration-response.json"
+          release_registered_device_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' \
+            "$RUNNER_TEMP/android-release-device-registration-response.json")
+          test -n "$release_registered_device_id"
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -X POST \
+            "https://localhost:8443/api/v1/devices/$release_registered_device_id:approve" \
+            > /dev/null
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/android-device-assignment.json" \
+            "https://localhost:8443/api/v1/devices/$release_registered_device_id/assignments" \
+            > /dev/null
+
+          authorized_apk=$(cat "$RUNNER_TEMP/android-device-test-apk.txt")
+          authorized_artifact_sha=$(sha256sum "$authorized_apk" | awk '{print $1}')
+          authorized_signer_sha=$(cat "$RUNNER_TEMP/android-device-test-signer-sha256.txt")
+          [[ "$authorized_artifact_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$authorized_signer_sha" =~ ^[0-9a-f]{64}$ ]]
+          release_apk=ci-evidence/android-runtime/TransportERP.Mobile.Driver.Release.apk
+          release_artifact_sha=$(sha256sum "$release_apk" | awk '{print $1}')
+          release_signer_sha=$(sed -n 's/^signer_certificate_sha256=//p' \
+            ci-evidence/android-runtime/release-build-identity.txt)
+          [[ "$release_artifact_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$release_signer_sha" =~ ^[0-9a-f]{64}$ ]]
+
           kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")"
           wait "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" || true
           nohup env "${common_environment[@]}" \
@@ -916,6 +1339,9 @@ jobs:
             'Sync__ServerExecution__Enabled=true' \
             'Sync__Offline__ActivationDecisionId=DEC-G5-PR69-ANDROID-E2E' \
             "Sync__Offline__ActivationImplementationSha=$EXPECTED_SHA" \
+            'Sync__Offline__AuthorizedBuilds__0__Platform=android' \
+            "Sync__Offline__AuthorizedBuilds__0__ArtifactSha256=$authorized_artifact_sha" \
+            "Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256=$authorized_signer_sha" \
             'Sync__EffectivePolicy__SourceVersion=android-ci-e2e-v1' \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__CompanyId=$company_id" \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__BranchId=$branch_id" \
@@ -930,6 +1356,19 @@ jobs:
             "Sync__EffectivePolicy__Devices__${registered_device_id}__LocalRejectedDays=3" \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__ServerPayloadDays=30" \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__CacheMaxAgeHours=1" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__CompanyId=$company_id" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__BranchId=$branch_id" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__DeviceId=android-ci-release-device" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__AllowedActions__0=CreateOperationalParty" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__MaxBatchOperations=1" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__MaximumRequestBodyBytes=4096" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__MaximumPayloadBytes=1024" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__ClientTransportMaxRetryCount=2" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__ClientTransportBaseSeconds=9" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__LocalSuccessHours=12" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__LocalRejectedDays=3" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__ServerPayloadDays=30" \
+            "Sync__EffectivePolicy__Devices__${release_registered_device_id}__CacheMaxAgeHours=1" \
             dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
             > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
@@ -956,13 +1395,36 @@ jobs:
           }, sys.stdout)
           PY
           chmod 600 "$input"
+          release_input="$RUNNER_TEMP/android-release-e2e-input.json"
+          python3 - "$company_id" "$branch_id" > "$release_input" <<'PY'
+          import json, os, sys
+          json.dump({
+              "userName": "android-ci-admin",
+              "password": os.environ["ANDROID_E2E_ADMIN_PASSWORD"],
+              "companyId": sys.argv[1],
+              "branchId": sys.argv[2],
+              "deviceId": "android-ci-release-device",
+              "deviceCredential": os.environ["ANDROID_E2E_RELEASE_DEVICE_CREDENTIAL"],
+          }, sys.stdout)
+          PY
+          chmod 600 "$release_input"
+          {
+            echo "ANDROID_E2E_COMPANY_ID=$company_id"
+            echo "ANDROID_E2E_BRANCH_ID=$branch_id"
+            echo "ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID=$release_registered_device_id"
+            echo "ANDROID_E2E_RELEASE_ARTIFACT_SHA=$release_artifact_sha"
+            echo "ANDROID_E2E_RELEASE_SIGNER_SHA=$release_signer_sha"
+          } >> "$GITHUB_ENV"
           rm -f "$RUNNER_TEMP/android-bootstrap-login.json" \
             "$RUNNER_TEMP/android-bootstrap-session.json" \
             "$RUNNER_TEMP/android-device-registration.json" \
             "$RUNNER_TEMP/android-device-registration-response.json" \
+            "$RUNNER_TEMP/android-release-device-registration.json" \
+            "$RUNNER_TEMP/android-release-device-registration-response.json" \
             "$RUNNER_TEMP/android-device-assignment.json" \
             "$authorization_header"
-          unset ANDROID_E2E_ADMIN_PASSWORD ANDROID_E2E_DEVICE_CREDENTIAL
+          unset ANDROID_E2E_ADMIN_PASSWORD ANDROID_E2E_DEVICE_CREDENTIAL \
+            ANDROID_E2E_RELEASE_DEVICE_CREDENTIAL
 
       - name: Start API 35 emulator
         shell: bash
@@ -976,6 +1438,7 @@ jobs:
             -no-boot-anim \
             -no-snapshot \
             -wipe-data \
+            -writable-system \
             -gpu swiftshader_indirect \
             > "$RUNNER_TEMP/android-emulator.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/android-emulator.pid"
@@ -989,10 +1452,37 @@ jobs:
             sleep 2
           done
           test "$booted" = true
+
+          tls_dir="$RUNNER_TEMP/android-e2e-tls"
+          certificate_hash=$(openssl x509 -in "$tls_dir/server.crt" -subject_hash_old -noout | head -n 1)
+          [[ "$certificate_hash" =~ ^[0-9a-f]{8}$ ]]
+          adb root
+          adb wait-for-device
+          adb remount
+          adb push "$tls_dir/server.crt" "/system/etc/security/cacerts/${certificate_hash}.0"
+          adb shell chmod 644 "/system/etc/security/cacerts/${certificate_hash}.0"
+          adb reboot
+          adb wait-for-device
+          booted=false
+          for attempt in $(seq 1 150); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; then
+              booted=true
+              break
+            fi
+            sleep 2
+          done
+          test "$booted" = true
+          adb shell test -r "/system/etc/security/cacerts/${certificate_hash}.0"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           adb shell getprop ro.build.version.sdk | tr -d '\r' | grep -Fx '35'
+          {
+            echo 'tls_validation=android-system-trust-store'
+            echo "tls_certificate_sha256=$(cat "$tls_dir/server-cert-sha256.txt")"
+            echo "tls_system_alias=${certificate_hash}.0"
+            echo 'application_certificate_bypass=false'
+          } > ci-evidence/android-runtime/tls-trust-evidence.txt
 
       - name: Run closed startup and native security restart proof
         timeout-minutes: 12
@@ -1094,7 +1584,6 @@ jobs:
             < "$RUNNER_TEMP/android-e2e-input.json"
           adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" chmod 600 \
             files/driver-device-e2e-input.json
-          rm -f "$RUNNER_TEMP/android-e2e-input.json"
           run_phase e2e-submit
           e2e_submit_pid=$(app_pid)
           test -n "$e2e_submit_pid"
@@ -1123,6 +1612,115 @@ jobs:
           adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
 
+      - name: Switch the API allowlist to the exact Android Release candidate
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          connection='Host=127.0.0.1;Port=5432;Database=transporter_android_ci;Username=transporter_android_ci;Password=android-ci-database-password;Include Error Detail=false'
+          tls_dir="$RUNNER_TEMP/android-e2e-tls"
+          api_content_root="$PWD/TransportERP.Api/bin/Release/net10.0"
+          kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")"
+          wait "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" || true
+          nohup env \
+            "TRANSPORTERP_CONNECTION_STRING=$connection" \
+            "ASPNETCORE_CONTENTROOT=$api_content_root" \
+            'Auth__Mode=LocalSessions' \
+            'Auth__Issuer=transporter-android-ci' \
+            'Auth__Audience=transporter-android-ci' \
+            'Auth__SigningKeyId=android-ci-current' \
+            'Auth__SigningKey=android-ci-signing-key-at-least-thirty-two-characters' \
+            'AllowedHosts=localhost;127.0.0.1;10.0.2.2' \
+            'Sync__Proof__PublicOrigin=https://10.0.2.2:8443' \
+            'ASPNETCORE_ENVIRONMENT=Development' \
+            'ASPNETCORE_URLS=https://0.0.0.0:8443' \
+            "ASPNETCORE_Kestrel__Certificates__Default__Path=$tls_dir/server.pfx" \
+            'ASPNETCORE_Kestrel__Certificates__Default__Password=android-ci-tls-password' \
+            'Sync__Offline__Enabled=true' \
+            'Sync__ServerExecution__Enabled=true' \
+            'Sync__Offline__ActivationDecisionId=DEC-G5-PR69-ANDROID-RELEASE-E2E' \
+            "Sync__Offline__ActivationImplementationSha=$EXPECTED_SHA" \
+            'Sync__Offline__AuthorizedBuilds__0__Platform=android' \
+            "Sync__Offline__AuthorizedBuilds__0__ArtifactSha256=$ANDROID_E2E_RELEASE_ARTIFACT_SHA" \
+            "Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256=$ANDROID_E2E_RELEASE_SIGNER_SHA" \
+            'Sync__EffectivePolicy__SourceVersion=android-release-ci-e2e-v1' \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__CompanyId=$ANDROID_E2E_COMPANY_ID" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__BranchId=$ANDROID_E2E_BRANCH_ID" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__DeviceId=android-ci-release-device" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__AllowedActions__0=CreateOperationalParty" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__MaxBatchOperations=1" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__MaximumRequestBodyBytes=4096" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__MaximumPayloadBytes=1024" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__ClientTransportMaxRetryCount=2" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__ClientTransportBaseSeconds=9" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__LocalSuccessHours=12" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__LocalRejectedDays=3" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__ServerPayloadDays=30" \
+            "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__CacheMaxAgeHours=1" \
+            dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
+            > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
+          ready=false
+          for attempt in $(seq 1 90); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --cacert "$tls_dir/server.crt" \
+              https://localhost:8443/api/v1/sync/activation || true)
+            if [ "$status" = 401 ]; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+
+      - name: Run ordinary Android Release UI E2E and same-binary restart proof
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_apk=ci-evidence/android-runtime/TransportERP.Mobile.Driver.Release.apk
+          release_input="$RUNNER_TEMP/android-release-e2e-input.json"
+          evidence=ci-evidence/android-runtime/release-ui-e2e.json
+          test -f "$release_apk" && test -f "$release_input"
+          expected_sha=$(sha256sum "$release_apk" | awk '{print $1}')
+          test "$expected_sha" = "$ANDROID_E2E_RELEASE_ARTIFACT_SHA"
+          adb uninstall "$ANDROID_TEST_PACKAGE" >/dev/null
+          adb install "$release_apk"
+          installed_path=$(adb shell pm path "$ANDROID_TEST_PACKAGE" | tr -d '\r' | sed -n 's/^package://p')
+          test -n "$installed_path"
+          installed_sha=$(adb exec-out cat "$installed_path" | sha256sum | awk '{print $1}')
+          test "$installed_sha" = "$expected_sha"
+          python3 eng/ci/android_release_ui_e2e.py \
+            --input "$release_input" \
+            --evidence "$evidence" \
+            --package "$ANDROID_TEST_PACKAGE" \
+            --timeout-seconds 300
+          python3 - "$evidence" <<'PY'
+          import json, sys
+          result = json.load(open(sys.argv[1], encoding="utf-8"))
+          expected = {
+              "schemaVersion": 1,
+              "activity": "ordinary-launcher",
+              "nonDebuggableRelease": True,
+              "closedDefault": True,
+              "authenticatedActivation": True,
+              "businessOperationQueued": True,
+              "businessOperationSucceeded": True,
+              "persistedAfterReleaseRestart": True,
+              "signedOutClosed": True,
+          }
+          if result != expected:
+              raise SystemExit("Android Release UI evidence is incomplete or unexpected.")
+          PY
+          installed_path_after=$(adb shell pm path "$ANDROID_TEST_PACKAGE" | tr -d '\r' | sed -n 's/^package://p')
+          test "$installed_path_after" = "$installed_path"
+          test "$(adb exec-out cat "$installed_path_after" | sha256sum | awk '{print $1}')" = "$expected_sha"
+          {
+            echo "release_apk_sha256=$expected_sha"
+            echo "installed_apk_sha256=$installed_sha"
+            echo 'release_ui_e2e=PASS'
+            echo 'same_release_binary_after_restart=true'
+            echo 'application_certificate_bypass=false'
+          } > ci-evidence/android-runtime/release-runtime-identity.txt
+
       - name: Capture sanitized Android PostgreSQL diagnostics
         if: ${{ always() }}
         shell: bash
@@ -1143,17 +1741,17 @@ jobs:
           fi
           {
             echo 'schema_version=1'
-            echo 'scope=device:android-ci-device;action:CreateOperationalParty'
+            echo 'scope=devices:android-ci-device,android-ci-release-device;action:CreateOperationalParty'
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-              "WITH buckets(status) AS (VALUES ('QUEUED'),('SENDING'),('FAILED'),('REJECTED'),('SUCCEEDED')), scoped AS (SELECT o.\"Status\" FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\"='android-ci-device')) SELECT 'status_bucket=' || b.status || ';count=' || count(s.\"Status\") FROM buckets b LEFT JOIN scoped s ON s.\"Status\"=b.status GROUP BY b.status ORDER BY b.status"
+              "WITH buckets(status) AS (VALUES ('QUEUED'),('SENDING'),('FAILED'),('REJECTED'),('SUCCEEDED')), scoped AS (SELECT o.\"Status\" FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\" IN ('android-ci-device','android-ci-release-device'))) SELECT 'status_bucket=' || b.status || ';count=' || count(s.\"Status\") FROM buckets b LEFT JOIN scoped s ON s.\"Status\"=b.status GROUP BY b.status ORDER BY b.status"
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-              "SELECT 'status_bucket=ABSENT;count=' || CASE WHEN EXISTS (SELECT 1 FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\"='android-ci-device')) THEN 0 ELSE 1 END"
+              "SELECT 'status_bucket=ABSENT;count=' || CASE WHEN EXISTS (SELECT 1 FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\" IN ('android-ci-device','android-ci-release-device'))) THEN 0 ELSE 1 END"
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-              "SELECT 'nonce_count=' || count(*) FROM transport_erp.sync_proof_nonces WHERE \"DeviceId\" = 'android-ci-device'"
+              "SELECT 'nonce_count=' || count(*) FROM transport_erp.sync_proof_nonces WHERE \"DeviceId\" IN ('android-ci-device','android-ci-release-device')"
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-              "SELECT 'replay_count=' || count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n.\"Id\" = r.\"NonceRecordId\" WHERE r.\"DeviceId\" = 'android-ci-device'"
+              "SELECT 'replay_count=' || count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n.\"Id\" = r.\"NonceRecordId\" WHERE r.\"DeviceId\" IN ('android-ci-device','android-ci-release-device')"
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-              "SELECT 'audit_action=' || \"Action\" || ';count=' || count(*) FROM transport_erp.audit_events WHERE \"OperationCorrelationId\" IN (SELECT \"OperationCorrelationId\" FROM transport_erp.sync_operations WHERE \"ActionCode\" = 'CreateOperationalParty' AND \"RegisteredDeviceId\" IN (SELECT \"Id\" FROM transport_erp.registered_devices WHERE \"DeviceId\" = 'android-ci-device')) GROUP BY \"Action\" ORDER BY \"Action\""
+              "SELECT 'audit_action=' || \"Action\" || ';count=' || count(*) FROM transport_erp.audit_events WHERE \"OperationCorrelationId\" IN (SELECT \"OperationCorrelationId\" FROM transport_erp.sync_operations WHERE \"ActionCode\" = 'CreateOperationalParty' AND \"RegisteredDeviceId\" IN (SELECT \"Id\" FROM transport_erp.registered_devices WHERE \"DeviceId\" IN ('android-ci-device','android-ci-release-device'))) GROUP BY \"Action\" ORDER BY \"Action\""
           } > "$diagnostic"
 
       - name: Verify Android business result in PostgreSQL 18.6
@@ -1167,30 +1765,38 @@ jobs:
           server_version_num=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
             'SHOW server_version_num')
           test "$server_version_num" = '180006'
-          sync_succeeded=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'' AND "Status" = '\''SUCCEEDED'\''')
-          party_created=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+          native_sync_succeeded=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d."Id"=o."RegisteredDeviceId" WHERE d."DeviceId"='\''android-ci-device'\'' AND o."ActionCode"='\''CreateOperationalParty'\'' AND o."Status"='\''SUCCEEDED'\''')
+          release_sync_succeeded=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d."Id"=o."RegisteredDeviceId" WHERE d."DeviceId"='\''android-ci-release-device'\'' AND o."ActionCode"='\''CreateOperationalParty'\'' AND o."Status"='\''SUCCEEDED'\''')
+          native_party_created=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
             'SELECT count(*) FROM transport_erp.operational_parties WHERE "Name" = '\''Android CI E2E Party'\''')
-          proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.registered_devices WHERE "DeviceId" = '\''android-ci-device'\'' AND "ProofKeyVersion" = 1 AND "ProofKeyThumbprint" IS NOT NULL')
-          nonce_proof_accepted=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n."Id" = r."NonceRecordId" WHERE r."DeviceId" = '\''android-ci-device'\'' AND r."ProofKeyVersion" = 1')
-          operation_proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'' AND "ProofKeyVersion" = 1 AND "ProofKeyThumbprint" IS NOT NULL AND "AcceptedProofReplayId" IS NOT NULL')
-          queued_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncOperationQueued'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
-          dispatch_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncBusinessDispatchAttempt'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
-          succeeded_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
-            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncOperationExecutionSucceeded'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
-          test "$sync_succeeded" = 1
-          test "$party_created" = 1
-          test "$proof_bound" = 1
-          test "$nonce_proof_accepted" -ge 1
-          test "$operation_proof_bound" = 1
-          test "$queued_audit" = 1
-          test "$dispatch_audit" = 1
-          test "$succeeded_audit" = 1
+          release_party_created=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.operational_parties WHERE "Name" LIKE '\''UIE2E-%'\''')
+          for device_id in android-ci-device android-ci-release-device; do
+            proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.registered_devices WHERE \"DeviceId\"='$device_id' AND \"ProofKeyVersion\"=1 AND \"ProofKeyThumbprint\" IS NOT NULL")
+            nonce_proof_accepted=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.sync_proof_replays r WHERE r.\"DeviceId\"='$device_id' AND r.\"ProofKeyVersion\"=1")
+            operation_proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d.\"Id\"=o.\"RegisteredDeviceId\" WHERE d.\"DeviceId\"='$device_id' AND o.\"ActionCode\"='CreateOperationalParty' AND o.\"ProofKeyVersion\"=1 AND o.\"ProofKeyThumbprint\" IS NOT NULL AND o.\"AcceptedProofReplayId\" IS NOT NULL")
+            queued_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.audit_events WHERE \"Action\"='SyncOperationQueued' AND \"OperationCorrelationId\" IN (SELECT o.\"OperationCorrelationId\" FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d.\"Id\"=o.\"RegisteredDeviceId\" WHERE d.\"DeviceId\"='$device_id' AND o.\"ActionCode\"='CreateOperationalParty')")
+            dispatch_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.audit_events WHERE \"Action\"='SyncBusinessDispatchAttempt' AND \"OperationCorrelationId\" IN (SELECT o.\"OperationCorrelationId\" FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d.\"Id\"=o.\"RegisteredDeviceId\" WHERE d.\"DeviceId\"='$device_id' AND o.\"ActionCode\"='CreateOperationalParty')")
+            succeeded_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT count(*) FROM transport_erp.audit_events WHERE \"Action\"='SyncOperationExecutionSucceeded' AND \"OperationCorrelationId\" IN (SELECT o.\"OperationCorrelationId\" FROM transport_erp.sync_operations o JOIN transport_erp.registered_devices d ON d.\"Id\"=o.\"RegisteredDeviceId\" WHERE d.\"DeviceId\"='$device_id' AND o.\"ActionCode\"='CreateOperationalParty')")
+            test "$proof_bound" = 1
+            test "$nonce_proof_accepted" -ge 1
+            test "$operation_proof_bound" = 1
+            test "$queued_audit" = 1
+            test "$dispatch_audit" = 1
+            test "$succeeded_audit" = 1
+          done
+          test "$native_sync_succeeded" = 1
+          test "$release_sync_succeeded" = 1
+          test "$native_party_created" = 1
+          test "$release_party_created" = 1
           python3 - <<'PY'
           import json
           with open('TransportERP.Api/appsettings.json', encoding='utf-8') as stream:
@@ -1209,9 +1815,60 @@ jobs:
             echo 'sync_dispatch_audit_persisted=true'
             echo 'sync_succeeded_audit_persisted=true'
             echo 'sync_operation_succeeded=true'
-            echo 'operational_party_created=true'
+            echo 'native_operational_party_created=true'
+            echo 'release_operational_party_created=true'
             echo 'production_offline_default=false'
           } > ci-evidence/android-runtime/business-postgresql-evidence.txt
+
+      - name: Attest exact Android device-test APK provenance
+        id: attest-android-runtime
+        if: github.event_name == 'push'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
+          predicate-type: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+          predicate-path: ci-evidence/android-runtime/build-identity-predicate.json
+
+      - name: Persist Android device-test attestation evidence
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+          PREDICATE_TYPE: https://github.com/shfeekalbhure/TransportERP/attestations/build-identity/v1
+        run: |
+          set -euo pipefail
+          bundle='${{ steps.attest-android-runtime.outputs.bundle-path }}'
+          test -n "$bundle" && test -f "$bundle"
+          cp -- "$bundle" ci-evidence/android-runtime/provenance-attestation.json
+          gh attestation verify ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk \
+            --bundle "$bundle" \
+            --repo "$GITHUB_REPOSITORY" \
+            --predicate-type "$PREDICATE_TYPE" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --source-digest "$EXPECTED_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --format json \
+            > ci-evidence/android-runtime/provenance-verification.json
+          python3 - "$EXPECTED_SHA" "$PREDICATE_TYPE" \
+            ci-evidence/android-runtime/build-identity-predicate.json \
+            ci-evidence/android-runtime/provenance-verification.json <<'PY'
+          import json, pathlib, sys
+          expected_sha, predicate_type, predicate_path, verification_path = sys.argv[1:]
+          expected = json.loads(pathlib.Path(predicate_path).read_text(encoding="utf-8"))
+          results = json.loads(pathlib.Path(verification_path).read_text(encoding="utf-8"))
+          matches = [entry for entry in results
+                     if entry.get("verificationResult", {}).get("statement", {}).get("predicateType") == predicate_type
+                     and entry.get("verificationResult", {}).get("statement", {}).get("predicate") == expected]
+          if len(matches) != 1 or expected.get("sourceSha") != expected_sha:
+              raise SystemExit("Verified Android device-test attestation is not bound to the exact candidate predicate.")
+          PY
+          echo 'attestation_verification=PASS' > ci-evidence/android-runtime/provenance-verification.txt
+          {
+            echo 'attestation_provider=github-oidc-sigstore'
+            echo 'attestation_id=${{ steps.attest-android-runtime.outputs.attestation-id }}'
+            echo 'attestation_url=${{ steps.attest-android-runtime.outputs.attestation-url }}'
+          } > ci-evidence/android-runtime/provenance-attestation.txt
 
       - name: Capture sanitized Android crash diagnostics
         if: ${{ failure() }}
@@ -1272,10 +1929,13 @@ jobs:
         shell: bash
         run: |
           rm -f "$RUNNER_TEMP/android-e2e-input.json" \
+            "$RUNNER_TEMP/android-release-e2e-input.json" \
             "$RUNNER_TEMP/android-bootstrap-login.json" \
             "$RUNNER_TEMP/android-bootstrap-session.json" \
             "$RUNNER_TEMP/android-device-registration.json" \
             "$RUNNER_TEMP/android-device-registration-response.json" \
+            "$RUNNER_TEMP/android-release-device-registration.json" \
+            "$RUNNER_TEMP/android-release-device-registration-response.json" \
             "$RUNNER_TEMP/android-device-assignment.json" \
             "$RUNNER_TEMP/android-bootstrap-authorization.header"
           adb shell am force-stop "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
@@ -1294,6 +1954,18 @@ jobs:
           path: |
             ci-evidence/android-runtime/exact-head-manifest.txt
             ci-evidence/android-runtime/device-test-build-identity.txt
+            ci-evidence/android-runtime/build-identity-predicate.json
+            ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
+            ci-evidence/android-runtime/TransportERP.Mobile.Driver.Release.apk
+            ci-evidence/android-runtime/release-build-identity.txt
+            ci-evidence/android-runtime/release-build-identity-predicate.json
+            ci-evidence/android-runtime/tls-trust-evidence.txt
+            ci-evidence/android-runtime/release-ui-e2e.json
+            ci-evidence/android-runtime/release-runtime-identity.txt
+            ci-evidence/android-runtime/provenance-attestation.json
+            ci-evidence/android-runtime/provenance-attestation.txt
+            ci-evidence/android-runtime/provenance-verification.txt
+            ci-evidence/android-runtime/provenance-verification.json
             ci-evidence/android-runtime/emulator-version.txt
             ci-evidence/android-runtime/startup.json
             ci-evidence/android-runtime/seed.json
