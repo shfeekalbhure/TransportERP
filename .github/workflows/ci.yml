@@ -398,6 +398,41 @@ jobs:
             -p:TransportERPImplementationSha="$env:EXPECTED_SHA" `
             -p:TransportERPClientPublicOrigin=https://127.0.0.1:55443/
 
+      - name: Run and verify Desktop startup classifier tests
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $resultsRoot = 'TransportERP.Desktop.E2ETests/TestResults/ci-startup-classifier'
+          if (Test-Path $resultsRoot) {
+            throw 'The Desktop startup classifier results directory already exists.'
+          }
+          dotnet test TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj `
+            --configuration Release `
+            --no-build `
+            --filter 'FullyQualifiedName~DesktopStartupFailureClassifierTests' `
+            --logger 'trx;LogFileName=ci-desktop-startup-classifier.trx' `
+            --results-directory $resultsRoot `
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Desktop startup classifier tests failed.'
+          }
+
+          $reports = @(Get-ChildItem $resultsRoot -Recurse -Filter 'ci-desktop-startup-classifier.trx')
+          if ($reports.Count -ne 1) {
+            throw "Expected one Desktop startup classifier TRX; found $($reports.Count)."
+          }
+          [xml]$trx = Get-Content -Raw $reports[0].FullName
+          $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
+          if ($null -eq $counters) { throw 'Desktop startup classifier TRX has no counters.' }
+          $total = [int]$counters.total
+          $passed = [int]$counters.passed
+          $failed = [int]$counters.failed
+          $notExecuted = [int]$counters.notExecuted
+          if ($total -ne 61 -or $passed -ne 61 -or $failed -ne 0 -or $notExecuted -ne 0) {
+            throw "Desktop startup classifier execution mismatch: total=$total passed=$passed failed=$failed skipped=$notExecuted."
+          }
+
       - name: Freeze the Desktop deployment identity after the final build
         shell: pwsh
         run: |

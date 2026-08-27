@@ -49,6 +49,168 @@ public sealed class DesktopStartupFailureClassifierTests
     }
 
     [Theory]
+    [InlineData(
+        "Sync:Offline:Enabled must be explicitly configured.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F01_OFFLINE_ENABLED_REQUIRED")]
+    [InlineData(
+        "Sync:ServerExecution:Enabled must be explicitly configured.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F02_SERVER_EXECUTION_REQUIRED")]
+    [InlineData(
+        "Offline activation evidence must be absent while Sync:Offline:Enabled is false.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F03_ACTIVATION_EVIDENCE_WHILE_CLOSED")]
+    [InlineData(
+        "Sync:ServerExecution:Enabled must be true before Offline can be activated.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F04_SERVER_EXECUTION_DISABLED")]
+    [InlineData(
+        "Sync:Offline:ActivationDecisionId must be an explicit safe G5 decision identifier.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F05_ACTIVATION_DECISION_INVALID")]
+    [InlineData(
+        "Sync:Offline:ActivationImplementationSha must bind G5 activation to an exact 40-character commit SHA.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F06_ACTIVATION_SHA_INVALID")]
+    [InlineData(
+        "Sync:Offline:ActivationImplementationSha must match the exact running API build.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH")]
+    [InlineData(
+        "Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID")]
+    [InlineData(
+        "Sync:Protocol:AllowedVersions must contain only sync-v1.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F09_PROTOCOL_INVALID")]
+    [InlineData(
+        "Sync:Offline:AllowedActions must be a non-empty, unique subset of the typed sync action catalog.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F10_ACTIONS_INVALID")]
+    [InlineData(
+        "Sync:Retry:ClientTransport:MaxCount must be between 0 and 5.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F11_CLIENT_RETRY_COUNT_INVALID")]
+    [InlineData(
+        "Sync:Retry:ClientTransport:BaseSeconds must be explicitly set to 5.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F12_CLIENT_RETRY_BASE_INVALID")]
+    [InlineData(
+        "Sync:Retry:ClientTransport:MaxDelayMinutes must be explicitly set to 30.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F13_CLIENT_RETRY_DELAY_INVALID")]
+    [InlineData(
+        "Sync:Retry:ServerExecution:MaxCount must be between 0 and 5.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F14_SERVER_RETRY_COUNT_INVALID")]
+    [InlineData(
+        "Sync:Retry:ServerExecution:BaseSeconds must be explicitly set to 5.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F15_SERVER_RETRY_BASE_INVALID")]
+    [InlineData(
+        "Sync:Retry:ServerExecution:MaxDelayMinutes must be explicitly set to 30.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F16_SERVER_RETRY_DELAY_INVALID")]
+    [InlineData(
+        "Sync:Batch:MaxOperations must be explicitly set to 100.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F17_BATCH_SIZE_INVALID")]
+    [InlineData(
+        "Sync:Conflict:AutoMerge must be explicitly false.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F18_AUTO_MERGE_INVALID")]
+    [InlineData(
+        "Sync:Retention:LocalSuccessHours must be explicitly set to 24.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F19_LOCAL_SUCCESS_RETENTION_INVALID")]
+    [InlineData(
+        "Sync:Retention:LocalRejectedDays must be explicitly set to 7.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F20_LOCAL_REJECTED_RETENTION_INVALID")]
+    [InlineData(
+        "Sync:Retention:ServerPayloadDays must be explicitly set to 90.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F21_SERVER_PAYLOAD_RETENTION_INVALID")]
+    [InlineData(
+        "Sync:Cache:MaxAgeHours must be explicitly set to 24.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F22_CACHE_AGE_INVALID")]
+    [InlineData(
+        "Sync:Proof:MaximumRequestBodyBytes must be explicitly set to 2097152.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F23_REQUEST_BODY_LIMIT_INVALID")]
+    [InlineData(
+        "Sync:Proof:MaximumPayloadBytes must be explicitly set to 16384.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F24_PAYLOAD_LIMIT_INVALID")]
+    [InlineData(
+        "Sync payload limit cannot exceed the request body limit.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_F25_PAYLOAD_EXCEEDS_REQUEST")]
+    public void Exact_governed_sync_failure_maps_to_fixed_allowlisted_code(
+        string failure,
+        string expected)
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe($"Unhandled exception. {SyncRuntimePolicyException}: {failure}");
+
+        Assert.Equal(expected, classifier.Code);
+    }
+
+    [Fact]
+    public void Ordered_known_sync_failures_map_to_a_bounded_allowlisted_combination()
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe(
+            $"Unhandled exception. {SyncRuntimePolicyException}: " +
+            "Sync:Offline:Enabled must be explicitly configured.; " +
+            "Sync:ServerExecution:Enabled must be explicitly configured.; " +
+            "Sync:Conflict:AutoMerge must be explicitly false.");
+
+        Assert.Equal(
+            "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_" +
+            "F01_OFFLINE_ENABLED_REQUIRED_F02_SERVER_EXECUTION_REQUIRED_F18_AUTO_MERGE_INVALID",
+            classifier.Code);
+    }
+
+    [Fact]
+    public void Real_options_validation_exception_first_line_uses_the_governed_delimiter()
+    {
+        var exceptionType = typeof(TransportERP.Api.Sync.SyncRuntimePolicyOptions).Assembly.GetType(
+            SyncRuntimePolicyException, throwOnError: true)!;
+        var failures = new[]
+        {
+            "Sync:Offline:Enabled must be explicitly configured.",
+            "Sync:ServerExecution:Enabled must be explicitly configured."
+        };
+        var exception = (Exception)Activator.CreateInstance(
+            exceptionType,
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            args: [failures],
+            culture: null)!;
+        var firstLine = exception.ToString().Split(Environment.NewLine, 2)[0];
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe("Unhandled exception. " + firstLine);
+
+        Assert.Equal(
+            "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_" +
+            "F01_OFFLINE_ENABLED_REQUIRED_F02_SERVER_EXECUTION_REQUIRED",
+            classifier.Code);
+    }
+
+    [Theory]
+    [InlineData(
+        "Sync:Offline:Enabled must be explicitly configured.; Sync:Offline:Enabled must be explicitly configured.")]
+    [InlineData(
+        "Sync:Conflict:AutoMerge must be explicitly false.; Sync:Offline:Enabled must be explicitly configured.")]
+    [InlineData("Sync:Offline:Enabled must be explicitly configured.; ")]
+    [InlineData("Sync:Offline:Enabled must be explicitly configured.; UNKNOWN")]
+    public void Duplicate_reversed_empty_or_unknown_sync_failure_stays_general(string failures)
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe($"Unhandled exception. {SyncRuntimePolicyException}: {failures}");
+
+        Assert.Equal("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", classifier.Code);
+        Assert.DoesNotContain(failures, classifier.Code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Oversized_sync_failure_line_stays_general_without_retaining_input()
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+        var oversized = new string('S', 4097);
+
+        classifier.Observe($"Unhandled exception. {SyncRuntimePolicyException}: {oversized}");
+
+        Assert.Equal("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", classifier.Code);
+        Assert.DoesNotContain(oversized, classifier.Code, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("; OTHER_FAILURE")]
     [InlineData(" fake-bearer|fake-pfx-password|D:\\private\\api")]
     public void Sync_deployment_failure_with_any_suffix_stays_at_the_general_category(string suffix)

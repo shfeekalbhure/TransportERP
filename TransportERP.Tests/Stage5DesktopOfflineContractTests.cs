@@ -141,14 +141,15 @@ public sealed class Stage5DesktopOfflineContractTests
         var apiProgram = Read("TransportERP.Api", "Program.cs");
         var startupExceptions = Read(
             "TransportERP.Api", "Startup", "StartupOptionsValidationExceptions.cs");
+        var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
         Assert.Contains("process.StandardError, startupFailureClassifier.Observe", releaseHost,
             StringComparison.Ordinal);
         Assert.Contains("var stdoutDrain = DrainAsync(process.StandardOutput, drainCancellation.Token)",
             releaseHost, StringComparison.Ordinal);
-        Assert.Contains("private int _kind", releaseHost, StringComparison.Ordinal);
-        Assert.Contains("Volatile.Read(ref _kind)", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("private string? _code", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("Volatile.Read(ref _code)", releaseHost, StringComparison.Ordinal);
         Assert.Contains("Interlocked.CompareExchange(", releaseHost, StringComparison.Ordinal);
         Assert.Contains("const string prefix = \"Unhandled exception. \"", releaseHost,
             StringComparison.Ordinal);
@@ -160,6 +161,12 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH", releaseHost,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("F01_OFFLINE_ENABLED_REQUIRED", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("F25_PAYLOAD_EXCEEDS_REQUEST", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("MaximumGovernedFailureLineLength", releaseHost,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION", releaseHost,
             StringComparison.Ordinal);
@@ -177,6 +184,11 @@ public sealed class Stage5DesktopOfflineContractTests
             startupExceptions, StringComparison.Ordinal);
         Assert.Contains(": OptionsValidationException(\"Auth\", typeof(TransportSecurityOptions), failures)",
             startupExceptions, StringComparison.Ordinal);
+        Assert.Contains("Run and verify Desktop startup classifier tests", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("FullyQualifiedName~DesktopStartupFailureClassifierTests", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("$total -ne 61", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("override string Message", startupExceptions,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,

@@ -293,117 +293,144 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
     internal sealed class StartupFailureClassifier
     {
-        private int _kind;
+        private const string GeneralSyncPolicyCode =
+            "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION";
+        private const string SyncPolicyPrefix =
+            "Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: ";
+        private const int MaximumGovernedFailureLineLength = 4096;
+        private static readonly (string Message, string Code)[] GovernedSyncPolicyFailures =
+        [
+            ("Sync:Offline:Enabled must be explicitly configured.", "F01_OFFLINE_ENABLED_REQUIRED"),
+            ("Sync:ServerExecution:Enabled must be explicitly configured.", "F02_SERVER_EXECUTION_REQUIRED"),
+            ("Offline activation evidence must be absent while Sync:Offline:Enabled is false.", "F03_ACTIVATION_EVIDENCE_WHILE_CLOSED"),
+            ("Sync:ServerExecution:Enabled must be true before Offline can be activated.", "F04_SERVER_EXECUTION_DISABLED"),
+            ("Sync:Offline:ActivationDecisionId must be an explicit safe G5 decision identifier.", "F05_ACTIVATION_DECISION_INVALID"),
+            ("Sync:Offline:ActivationImplementationSha must bind G5 activation to an exact 40-character commit SHA.", "F06_ACTIVATION_SHA_INVALID"),
+            ("Sync:Offline:ActivationImplementationSha must match the exact running API build.", "F07_IMPLEMENTATION_MISMATCH"),
+            ("Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.", "F08_AUTHORIZED_BUILD_INVALID"),
+            ("Sync:Protocol:AllowedVersions must contain only sync-v1.", "F09_PROTOCOL_INVALID"),
+            ("Sync:Offline:AllowedActions must be a non-empty, unique subset of the typed sync action catalog.", "F10_ACTIONS_INVALID"),
+            ("Sync:Retry:ClientTransport:MaxCount must be between 0 and 5.", "F11_CLIENT_RETRY_COUNT_INVALID"),
+            ("Sync:Retry:ClientTransport:BaseSeconds must be explicitly set to 5.", "F12_CLIENT_RETRY_BASE_INVALID"),
+            ("Sync:Retry:ClientTransport:MaxDelayMinutes must be explicitly set to 30.", "F13_CLIENT_RETRY_DELAY_INVALID"),
+            ("Sync:Retry:ServerExecution:MaxCount must be between 0 and 5.", "F14_SERVER_RETRY_COUNT_INVALID"),
+            ("Sync:Retry:ServerExecution:BaseSeconds must be explicitly set to 5.", "F15_SERVER_RETRY_BASE_INVALID"),
+            ("Sync:Retry:ServerExecution:MaxDelayMinutes must be explicitly set to 30.", "F16_SERVER_RETRY_DELAY_INVALID"),
+            ("Sync:Batch:MaxOperations must be explicitly set to 100.", "F17_BATCH_SIZE_INVALID"),
+            ("Sync:Conflict:AutoMerge must be explicitly false.", "F18_AUTO_MERGE_INVALID"),
+            ("Sync:Retention:LocalSuccessHours must be explicitly set to 24.", "F19_LOCAL_SUCCESS_RETENTION_INVALID"),
+            ("Sync:Retention:LocalRejectedDays must be explicitly set to 7.", "F20_LOCAL_REJECTED_RETENTION_INVALID"),
+            ("Sync:Retention:ServerPayloadDays must be explicitly set to 90.", "F21_SERVER_PAYLOAD_RETENTION_INVALID"),
+            ("Sync:Cache:MaxAgeHours must be explicitly set to 24.", "F22_CACHE_AGE_INVALID"),
+            ("Sync:Proof:MaximumRequestBodyBytes must be explicitly set to 2097152.", "F23_REQUEST_BODY_LIMIT_INVALID"),
+            ("Sync:Proof:MaximumPayloadBytes must be explicitly set to 16384.", "F24_PAYLOAD_LIMIT_INVALID"),
+            ("Sync payload limit cannot exceed the request body limit.", "F25_PAYLOAD_EXCEEDS_REQUEST")
+        ];
+        private string? _code;
 
-        internal string Code => (StartupFailureKind)Volatile.Read(ref _kind) switch
-        {
-            StartupFailureKind.SyncImplementationMismatch =>
-                "DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH",
-            StartupFailureKind.SyncAuthorizedBuildInvalid =>
-                "DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID",
-            StartupFailureKind.SyncRuntimePolicyValidation =>
-                "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION",
-            StartupFailureKind.EffectivePolicyValidation =>
-                "DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION",
-            StartupFailureKind.AuthValidation =>
-                "DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION",
-            StartupFailureKind.OptionsValidation => "DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION",
-            StartupFailureKind.InvalidOperation => "DESKTOP_E2E_API_STARTUP_INVALID_OPERATION",
-            StartupFailureKind.TypeInitialization => "DESKTOP_E2E_API_STARTUP_TYPE_INITIALIZATION",
-            StartupFailureKind.Cryptographic => "DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC",
-            StartupFailureKind.Io => "DESKTOP_E2E_API_STARTUP_IO",
-            StartupFailureKind.UnauthorizedAccess => "DESKTOP_E2E_API_STARTUP_UNAUTHORIZED_ACCESS",
-            StartupFailureKind.Socket => "DESKTOP_E2E_API_STARTUP_SOCKET",
-            StartupFailureKind.PostgreSql => "DESKTOP_E2E_API_STARTUP_POSTGRESQL",
-            StartupFailureKind.Argument => "DESKTOP_E2E_API_STARTUP_ARGUMENT",
-            StartupFailureKind.Format => "DESKTOP_E2E_API_STARTUP_FORMAT",
-            StartupFailureKind.FileNotFound => "DESKTOP_E2E_API_STARTUP_FILE_NOT_FOUND",
-            _ => "DESKTOP_E2E_API_STARTUP_UNCLASSIFIED"
-        };
+        internal string Code => Volatile.Read(ref _code) ??
+            "DESKTOP_E2E_API_STARTUP_UNCLASSIFIED";
 
         internal void Observe(string line)
         {
-            var kind = ClassifyTopLevel(line);
-            if (kind != StartupFailureKind.Unobserved)
-                Interlocked.CompareExchange(ref _kind, (int)kind, 0);
+            var code = ClassifyTopLevel(line);
+            if (code is not null)
+                Interlocked.CompareExchange(ref _code, code, null);
         }
 
-        private static StartupFailureKind ClassifyTopLevel(string line)
+        private static string? ClassifyTopLevel(string line)
         {
             const string prefix = "Unhandled exception. ";
             if (!line.StartsWith(prefix, StringComparison.Ordinal))
-                return StartupFailureKind.Unobserved;
-            if (string.Equals(
-                    line,
-                    "Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: Sync:Offline:ActivationImplementationSha must match the exact running API build.",
-                    StringComparison.Ordinal))
-                return StartupFailureKind.SyncImplementationMismatch;
-            if (string.Equals(
-                    line,
-                    "Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.",
-                    StringComparison.Ordinal))
-                return StartupFailureKind.SyncAuthorizedBuildInvalid;
+                return null;
+            if (line.StartsWith(SyncPolicyPrefix, StringComparison.Ordinal))
+                return ClassifyGovernedSyncPolicyFailures(line);
             var exception = line.AsSpan(prefix.Length);
             if (exception.StartsWith(
                     "TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException:"
                         .AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.SyncRuntimePolicyValidation;
+                    StringComparison.Ordinal)) return GeneralSyncPolicyCode;
             if (exception.StartsWith(
                     "TransportERP.Api.Startup.EffectivePolicyStartupOptionsValidationException:"
                         .AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.EffectivePolicyValidation;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION";
             if (exception.StartsWith(
                     "TransportERP.Api.Startup.AuthStartupOptionsValidationException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.AuthValidation;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION";
             if (exception.StartsWith(
                     "Microsoft.Extensions.Options.OptionsValidationException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.OptionsValidation;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION";
             if (exception.StartsWith("System.InvalidOperationException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.InvalidOperation;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_INVALID_OPERATION";
             if (exception.StartsWith("System.TypeInitializationException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.TypeInitialization;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_TYPE_INITIALIZATION";
             if (exception.StartsWith(
                     "System.Security.Cryptography.CryptographicException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.Cryptographic;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC";
             if (exception.StartsWith("System.IO.FileNotFoundException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.FileNotFound;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_FILE_NOT_FOUND";
             if (exception.StartsWith("System.IO.IOException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.Io;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_IO";
             if (exception.StartsWith("System.UnauthorizedAccessException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.UnauthorizedAccess;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_UNAUTHORIZED_ACCESS";
             if (exception.StartsWith("System.Net.Sockets.SocketException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.Socket;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_SOCKET";
             if (exception.StartsWith("Npgsql.NpgsqlException:".AsSpan(),
                     StringComparison.Ordinal) ||
                 exception.StartsWith("Npgsql.PostgresException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.PostgreSql;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_POSTGRESQL";
             if (exception.StartsWith("System.ArgumentException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.Argument;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_ARGUMENT";
             if (exception.StartsWith("System.FormatException:".AsSpan(),
-                    StringComparison.Ordinal)) return StartupFailureKind.Format;
-            return StartupFailureKind.ObservedUnclassified;
+                    StringComparison.Ordinal)) return "DESKTOP_E2E_API_STARTUP_FORMAT";
+            return "DESKTOP_E2E_API_STARTUP_UNCLASSIFIED";
         }
 
-        private enum StartupFailureKind
+        private static string ClassifyGovernedSyncPolicyFailures(string line)
         {
-            Unobserved,
-            ObservedUnclassified,
-            SyncImplementationMismatch,
-            SyncAuthorizedBuildInvalid,
-            SyncRuntimePolicyValidation,
-            EffectivePolicyValidation,
-            AuthValidation,
-            OptionsValidation,
-            InvalidOperation,
-            TypeInitialization,
-            Cryptographic,
-            Io,
-            UnauthorizedAccess,
-            Socket,
-            PostgreSql,
-            Argument,
-            Format,
-            FileNotFound
+            if (line.Length > MaximumGovernedFailureLineLength)
+                return GeneralSyncPolicyCode;
+
+            var remaining = line.AsSpan(SyncPolicyPrefix.Length);
+            var codes = new StringBuilder("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY");
+            var previousIndex = -1;
+            var count = 0;
+            while (!remaining.IsEmpty)
+            {
+                var delimiter = remaining.IndexOf("; ".AsSpan(), StringComparison.Ordinal);
+                var token = delimiter < 0 ? remaining : remaining[..delimiter];
+                if (token.IsEmpty)
+                    return GeneralSyncPolicyCode;
+
+                var currentIndex = -1;
+                for (var index = 0; index < GovernedSyncPolicyFailures.Length; index++)
+                {
+                    if (token.Equals(GovernedSyncPolicyFailures[index].Message.AsSpan(),
+                            StringComparison.Ordinal))
+                    {
+                        currentIndex = index;
+                        break;
+                    }
+                }
+                if (currentIndex <= previousIndex)
+                    return GeneralSyncPolicyCode;
+
+                codes.Append('_').Append(GovernedSyncPolicyFailures[currentIndex].Code);
+                previousIndex = currentIndex;
+                count++;
+                if (delimiter < 0) break;
+                if (delimiter + 2 == remaining.Length)
+                    return GeneralSyncPolicyCode;
+                remaining = remaining[(delimiter + 2)..];
+            }
+
+            if (count == 0)
+                return GeneralSyncPolicyCode;
+            if (count == 1 && previousIndex == 6)
+                return "DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH";
+            if (count == 1 && previousIndex == 7)
+                return "DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID";
+            return codes.ToString();
         }
     }
 
