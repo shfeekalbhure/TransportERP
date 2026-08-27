@@ -137,6 +137,8 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(process);
         if (closeTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(closeTimeout));
+        if (parentCancellation.IsCancellationRequested)
+            throw new InvalidOperationException("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED");
         if (process.HasExited)
         {
             EnsureNormalExit(process);
@@ -313,6 +315,9 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
             try { await _process.WaitForExitAsync(killTimeout.Token); }
             catch (OperationCanceledException)
             {
+                _process.Refresh();
+                if (_process.HasExited)
+                    return;
                 throw new InvalidOperationException("DESKTOP_E2E_PROCESS_KILL_TIMEOUT");
             }
         }

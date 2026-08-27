@@ -429,7 +429,7 @@ jobs:
           $passed = [int]$counters.passed
           $failed = [int]$counters.failed
           $notExecuted = [int]$counters.notExecuted
-          if ($total -ne 66 -or $passed -ne 66 -or $failed -ne 0 -or $notExecuted -ne 0) {
+          if ($total -ne 67 -or $passed -ne 67 -or $failed -ne 0 -or $notExecuted -ne 0) {
             throw "Desktop startup classifier execution mismatch: total=$total passed=$passed failed=$failed skipped=$notExecuted."
           }
 
@@ -1838,11 +1838,11 @@ jobs:
         run: |
           adb_root_bounded() {
             local attempt
-            for attempt in $(seq 1 10); do
-              timeout 30s adb wait-for-device >/dev/null 2>&1 || true
-              if timeout 30s adb root >/dev/null 2>&1 \
-                && timeout 30s adb wait-for-device >/dev/null 2>&1 \
-                && [ "$(timeout 30s adb shell id -u 2>/dev/null | tr -d '\r')" = '0' ]; then
+            for attempt in $(seq 1 6); do
+              timeout 10s adb wait-for-device >/dev/null 2>&1 || true
+              if timeout 10s adb root >/dev/null 2>&1 \
+                && timeout 10s adb wait-for-device >/dev/null 2>&1 \
+                && [ "$(timeout 10s adb shell id -u 2>/dev/null | tr -d '\r')" = '0' ]; then
                 return 0
               fi
               sleep 2

@@ -378,6 +378,21 @@ public sealed class DesktopStartupFailureClassifierTests
         Assert.Equal("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE", failure.Message);
     }
 
+    [Fact]
+    public async Task Parent_budget_exhaustion_precedes_an_already_exited_process()
+    {
+        using var process = StartCommand("exit 0");
+        await process.WaitForExitAsync();
+        using var parent = new CancellationTokenSource();
+        parent.Cancel();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            DesktopReleaseUiAutomation.WaitForNormalExitAsync(
+                process, TimeSpan.FromSeconds(5), parent.Token));
+
+        Assert.Equal("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED", failure.Message);
+    }
+
     private static Process StartCommand(string command)
     {
         var start = new ProcessStartInfo

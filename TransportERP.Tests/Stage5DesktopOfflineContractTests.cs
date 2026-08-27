@@ -192,7 +192,7 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("FullyQualifiedName~DesktopStartupFailureClassifierTests", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("$total -ne 66", workflow, StringComparison.Ordinal);
+        Assert.Contains("$total -ne 67", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("override string Message", startupExceptions,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,
