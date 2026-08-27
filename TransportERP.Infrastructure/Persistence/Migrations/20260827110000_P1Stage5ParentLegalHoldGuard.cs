@@ -72,6 +72,12 @@ public partial class P1Stage5ParentLegalHoldGuard : Migration
             RETURN NEW;
           END IF;
 
+          IF OLD."SyncOperationId" IS DISTINCT FROM NEW."SyncOperationId" OR
+             OLD."CompanyId" IS DISTINCT FROM NEW."CompanyId" OR
+             OLD."BranchId" IS DISTINCT FROM NEW."BranchId" THEN
+            RAISE EXCEPTION 'sync conflict parent operation scope is immutable';
+          END IF;
+
           IF OLD."ParentLegalHold" IS DISTINCT FROM NEW."ParentLegalHold" THEN
             SELECT o."LegalHold" INTO current_parent_hold
             FROM transport_erp.sync_operations o
@@ -103,6 +109,9 @@ public partial class P1Stage5ParentLegalHoldGuard : Migration
               NEW."RedactedAt"<=clock_timestamp() AND
               EXISTS (SELECT 1 FROM transport_erp.sync_operations o
                 WHERE o."Id"=OLD."SyncOperationId"
+                  AND o."CompanyId"=OLD."CompanyId"
+                  AND o."BranchId"=OLD."BranchId"
+                  AND NOT o."LegalHold"
                   AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
                        (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                   AND clock_timestamp()>=o."UpdatedAt"+make_interval(days => NEW."RetentionDaysApplied")) AND

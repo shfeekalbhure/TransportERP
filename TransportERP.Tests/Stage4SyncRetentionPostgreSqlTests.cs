@@ -399,6 +399,60 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Conflict_parent_relation_is_immutable_and_held_parent_blocks_direct_redaction()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db);
+        var old = DateTimeOffset.UtcNow.AddDays(-91);
+        var originalParent = await AddOperationAsync(
+            db, scope, "RESOLVED", old, old, "{\"parent\":\"original\"}");
+        var conflict = await AddConflictAsync(
+            db, scope, originalParent, old, old,
+            "{\"device\":\"original\"}", "{\"server\":\"original\"}");
+        var heldParent = await AddOperationAsync(
+            db, scope, "RESOLVED", old, old, "{\"parent\":\"held\"}");
+        heldParent.LegalHold = true;
+        await db.SaveChangesAsync();
+        var heldConflict = await AddConflictAsync(
+            db, scope, heldParent, old, old,
+            "{\"device\":\"held\"}", "{\"server\":\"held\"}");
+
+        try
+        {
+            await AssertDeniedAsync(() => db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.conflict_cases
+                SET "SyncOperationId"={{heldParent.Id}}
+                WHERE "Id"={{conflict.Id}}
+                """), "parent operation scope is immutable");
+            await AssertDeniedAsync(() => db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.conflict_cases
+                SET "DeviceSnapshot"='{}',"ServerSnapshot"='{}',
+                    "RetentionDaysApplied"=90,"RedactedAt"=clock_timestamp()
+                WHERE "Id"={{heldConflict.Id}}
+                """), "conflict redaction transition denied");
+
+            db.ChangeTracker.Clear();
+            var original = await db.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == conflict.Id);
+            var held = await db.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == heldConflict.Id);
+            Assert.Equal(originalParent.Id, original.SyncOperationId);
+            Assert.False(original.ParentLegalHold);
+            Assert.Equal(heldParent.Id, held.SyncOperationId);
+            Assert.True(held.ParentLegalHold);
+            Assert.Null(held.RedactedAt);
+            Assert.Contains("held", held.DeviceSnapshot, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await DeleteScopeEvidenceAsync(db, scope.CompanyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Operation_legal_hold_committing_first_makes_parallel_conflict_cleanup_skip_without_deadlock()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -562,6 +616,8 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         Assert.Contains("RetentionDaysApplied", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("LegalHold", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("ParentLegalHold", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("parent operation scope is immutable", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("NOT o.\"LegalHold\"", conflictGuard, StringComparison.Ordinal);
         var propagationGuard = await db.Database.SqlQuery<string>($"""
             SELECT pg_get_functiondef('transport_erp.propagate_sync_operation_legal_hold()'::regprocedure) AS "Value"
             """).SingleAsync();
