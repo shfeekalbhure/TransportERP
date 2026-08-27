@@ -31,6 +31,8 @@ internal static class AndroidDriverRuntimeSelfTest
     internal static async Task<DriverDeviceTestResult> RunAsync(
         string phase,
         string statePath,
+        string e2eStatePath,
+        DriverDeviceE2eConfiguration e2eConfiguration,
         CancellationToken cancellationToken)
     {
         return phase switch
@@ -38,9 +40,145 @@ internal static class AndroidDriverRuntimeSelfTest
             "startup" => await VerifyClosedStartupAsync(statePath, cancellationToken),
             "seed" => await SeedNativeSecurityAsync(statePath, cancellationToken),
             "verify" => await VerifyNativeSecurityAfterRestartAsync(statePath, cancellationToken),
+            "e2e-submit" => await SubmitBusinessOperationEndToEndAsync(
+                e2eStatePath, e2eConfiguration, cancellationToken),
+            "e2e-verify" => await VerifyBusinessOperationAfterRestartAsync(
+                e2eStatePath, e2eConfiguration, cancellationToken),
             "loss" => await VerifyMissingSigningAliasFailsClosedAsync(statePath, cancellationToken),
             _ => DriverDeviceTestResult.Failure(phase, "UNKNOWN_PHASE")
         };
+    }
+
+    private static async Task<DriverDeviceTestResult> SubmitBusinessOperationEndToEndAsync(
+        string e2eStatePath,
+        DriverDeviceE2eConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        if (!configuration.IsValid || File.Exists(e2eStatePath))
+            return DriverDeviceTestResult.Failure("e2e-submit", "E2E_CONFIGURATION_INVALID");
+
+        var coordinator = Services().GetRequiredService<DriverAuthenticatedActivationCoordinator>();
+        try
+        {
+            var activated = await coordinator.SignInAndActivateAsync(
+                configuration.ToSignInRequest(), cancellationToken);
+            var queued = await activated.Runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
+                "Android CI E2E Party", "+967700000001", "Android emulator E2E address",
+                cancellationToken);
+            var terminal = await WaitForOperationAsync(
+                activated.Runtime, queued.Operation.LocalOperationId, cancellationToken);
+            var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)
+            {
+                ["authenticated_activation_ready"] = activated.Runtime.Status.Mode == DriverOfflineRuntimeMode.Ready,
+                ["keystore_bound_sync_operation_queued"] = queued.Created,
+                ["server_operation_succeeded"] = terminal?.Status == OfflineOperationStatus.Succeeded,
+                ["server_result_code_cleared_on_success"] = terminal?.ResultCode is null
+            };
+            if (checks.Values.Any(value => !value))
+                return DriverDeviceTestResult.FromChecks("e2e-submit", checks);
+
+            var state = new DriverDeviceE2eState(
+                SchemaVersion,
+                queued.Operation.LocalOperationId);
+            await WriteE2eStateAtomicallyAsync(e2eStatePath, state, cancellationToken);
+            checks["encrypted_local_success_state_written"] = File.Exists(e2eStatePath);
+            return DriverDeviceTestResult.FromChecks("e2e-submit", checks);
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return DriverDeviceTestResult.Failure("e2e-submit", exception.Code);
+        }
+        catch (OfflineStoreException exception)
+        {
+            return DriverDeviceTestResult.Failure("e2e-submit", exception.Code);
+        }
+        catch
+        {
+            return DriverDeviceTestResult.Failure("e2e-submit", "E2E_SUBMISSION_FAILED");
+        }
+        finally
+        {
+            try { await coordinator.SignOutAsync(CancellationToken.None); }
+            catch { /* Local teardown is performed by the coordinator before surfacing failure. */ }
+        }
+    }
+
+    private static async Task<DriverDeviceTestResult> VerifyBusinessOperationAfterRestartAsync(
+        string e2eStatePath,
+        DriverDeviceE2eConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        if (!configuration.IsValid || !File.Exists(e2eStatePath))
+            return DriverDeviceTestResult.Failure("e2e-verify", "E2E_STATE_MISSING");
+
+        var coordinator = Services().GetRequiredService<DriverAuthenticatedActivationCoordinator>();
+        try
+        {
+            var json = await File.ReadAllTextAsync(e2eStatePath, cancellationToken);
+            var state = JsonSerializer.Deserialize<DriverDeviceE2eState>(json, JsonOptions);
+            if (state is null || state.SchemaVersion != SchemaVersion ||
+                state.LocalOperationId == Guid.Empty)
+                return DriverDeviceTestResult.Failure("e2e-verify", "E2E_STATE_INVALID");
+
+            var activated = await coordinator.SignInAndActivateAsync(
+                configuration.ToSignInRequest(), cancellationToken);
+            var persisted = await activated.Runtime.GetOperationStatusAsync(
+                state.LocalOperationId, cancellationToken);
+            var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)
+            {
+                ["process_restart_reauthenticated"] = activated.Runtime.Status.Mode == DriverOfflineRuntimeMode.Ready,
+                ["encrypted_outbox_reopened"] = persisted is not null,
+                ["local_succeeded_survived_restart"] = persisted?.Status == OfflineOperationStatus.Succeeded,
+                ["success_result_remains_terminal_after_restart"] = persisted?.ResultCode is null
+            };
+            var result = DriverDeviceTestResult.FromChecks("e2e-verify", checks);
+            if (result.Passed) File.Delete(e2eStatePath);
+            return result;
+        }
+        catch (DriverOfflineUnavailableException exception)
+        {
+            return DriverDeviceTestResult.Failure("e2e-verify", exception.Code);
+        }
+        catch (JsonException)
+        {
+            return DriverDeviceTestResult.Failure("e2e-verify", "E2E_STATE_INVALID");
+        }
+        catch
+        {
+            return DriverDeviceTestResult.Failure("e2e-verify", "E2E_RESTART_VERIFICATION_FAILED");
+        }
+        finally
+        {
+            try { await coordinator.SignOutAsync(CancellationToken.None); }
+            catch { /* Local teardown is performed by the coordinator before surfacing failure. */ }
+        }
+    }
+
+    private static async Task<DriverOfflineOperationStatusView?> WaitForOperationAsync(
+        DriverOfflineRuntime runtime,
+        Guid localOperationId,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 90; attempt++)
+        {
+            var status = await runtime.GetOperationStatusAsync(localOperationId, cancellationToken);
+            if (status?.Status is OfflineOperationStatus.Succeeded or OfflineOperationStatus.Failed or
+                OfflineOperationStatus.Conflict or OfflineOperationStatus.Rejected)
+                return status;
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+        return await runtime.GetOperationStatusAsync(localOperationId, cancellationToken);
+    }
+
+    private static async Task WriteE2eStateAtomicallyAsync(
+        string path,
+        DriverDeviceE2eState state,
+        CancellationToken cancellationToken)
+    {
+        var temporary = path + ".tmp";
+        await File.WriteAllTextAsync(
+            temporary, JsonSerializer.Serialize(state, JsonOptions), cancellationToken);
+        File.Move(temporary, path, overwrite: true);
     }
 
     private static async Task<DriverDeviceTestResult> VerifyClosedStartupAsync(
@@ -720,6 +858,30 @@ internal sealed record DriverDeviceTestState(
     Guid OutboxLocalOperationId,
     string OutboxClientOperationId,
     Guid OutboxOperationCorrelationId);
+
+internal sealed class DriverDeviceE2eConfiguration
+{
+    public string UserName { get; init; } = string.Empty;
+    public string Password { get; init; } = string.Empty;
+    public Guid CompanyId { get; init; }
+    public Guid BranchId { get; init; }
+    public string DeviceId { get; init; } = string.Empty;
+    public string DeviceCredential { get; init; } = string.Empty;
+
+    internal static DriverDeviceE2eConfiguration Invalid { get; } = new();
+
+    internal bool IsValid =>
+        !string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrEmpty(Password) &&
+        CompanyId != Guid.Empty && BranchId != Guid.Empty &&
+        !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrEmpty(DeviceCredential);
+
+    internal DriverInteractiveSignInRequest ToSignInRequest() => new(
+        UserName, Password, CompanyId, BranchId, DeviceId, DeviceCredential);
+}
+
+internal sealed record DriverDeviceE2eState(
+    int SchemaVersion,
+    Guid LocalOperationId);
 
 internal sealed record DriverDeviceTestSealedProbe(
     string Nonce,

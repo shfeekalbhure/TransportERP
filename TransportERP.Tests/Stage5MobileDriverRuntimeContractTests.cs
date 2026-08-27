@@ -114,6 +114,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             "AndroidDriverRuntimeSelfTest.cs");
         var signer = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
             "AndroidKeystoreDeviceSigningKey.cs");
+        var network = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
+            "AndroidDriverSyncNetworkProvider.cs");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("Condition=\"'$(TransportERPDeviceTests)' == 'true'\"", project,
@@ -132,7 +134,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("rawSigner.InitSign(privateKey)", signer, StringComparison.Ordinal);
         Assert.Contains("verifier.InitVerify(publicKey)", signer, StringComparison.Ordinal);
         Assert.Contains("VerifySealedProbe", selfTest, StringComparison.Ordinal);
-        Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("SubmitBusinessOperationEndToEndAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("SignInAndActivateAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("QueueOperationalPartyAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("local_succeeded_survived_restart", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
 
         Assert.Contains("runs-on: ubuntu-24.04", workflow, StringComparison.Ordinal);
@@ -142,8 +147,25 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase seed", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase verify", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase e2e-submit", workflow, StringComparison.Ordinal);
+        Assert.Contains("run_phase e2e-verify", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase loss", workflow, StringComparison.Ordinal);
-        Assert.Contains("offline_runtime_enabled=false", workflow, StringComparison.Ordinal);
+        Assert.Contains("image: postgres:18.6-bookworm", workflow, StringComparison.Ordinal);
+        Assert.Contains("Verify Android business result in PostgreSQL 18.6", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("TransportERPDeviceTestServerCertificateSha256", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("ValidatePinnedDeviceTestCertificate", network, StringComparison.Ordinal);
+        Assert.Contains("#if TRANSPORTERP_DEVICE_TESTS", network, StringComparison.Ordinal);
+        Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", network,
+            StringComparison.Ordinal);
+        Assert.Contains("adb exec-out run-as", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("--es password", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("--es deviceCredential", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetStringExtra(\"password\")", activity, StringComparison.Ordinal);
+        Assert.Contains("File.Delete(e2eInputPath)", activity, StringComparison.Ordinal);
+        Assert.Contains("production_offline_default=false", workflow, StringComparison.Ordinal);
+        Assert.Contains("ci_test_runtime_activated=true", workflow, StringComparison.Ordinal);
         Assert.Contains("The test-only Android activity leaked into the Release APK", workflow,
             StringComparison.Ordinal);
     }
@@ -213,7 +235,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("NATIVE_SIGNING_KEY_TEST_PROVISION_FAILED", selfTest,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("ActivateAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("SignInAndActivateAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("process_restart_reauthenticated", selfTest, StringComparison.Ordinal);
     }
 
     [Fact]

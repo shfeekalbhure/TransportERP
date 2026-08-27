@@ -17,6 +17,8 @@ public sealed class DriverDeviceTestActivity : Activity
     private const string PhaseExtra = "phase";
     private const string ResultFileName = "driver-device-test-result.json";
     private const string StateFileName = "driver-device-test-state.json";
+    private const string E2eStateFileName = "driver-device-e2e-state.json";
+    private const string E2eInputFileName = "driver-device-e2e-input.json";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     protected override async void OnCreate(Bundle? savedInstanceState)
@@ -35,10 +37,16 @@ public sealed class DriverDeviceTestActivity : Activity
         try
         {
             File.Delete(resultPath);
+            var e2eInputPath = Path.Combine(filesDirectory, E2eInputFileName);
+            var e2eConfiguration = await ReadE2eConfigurationAsync(e2eInputPath);
             var result = await AndroidDriverRuntimeSelfTest.RunAsync(
                 phase,
                 statePath,
+                Path.Combine(filesDirectory, E2eStateFileName),
+                e2eConfiguration,
                 CancellationToken.None);
+            if (phase == "e2e-verify" && result.Passed)
+                File.Delete(e2eInputPath);
             await WriteResultAtomicallyAsync(resultPath, result);
         }
         catch
@@ -51,6 +59,21 @@ public sealed class DriverDeviceTestActivity : Activity
         finally
         {
             FinishAndRemoveTask();
+        }
+    }
+
+    private static async Task<DriverDeviceE2eConfiguration> ReadE2eConfigurationAsync(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return DriverDeviceE2eConfiguration.Invalid;
+            return JsonSerializer.Deserialize<DriverDeviceE2eConfiguration>(
+                       await File.ReadAllTextAsync(path), JsonOptions)
+                   ?? DriverDeviceE2eConfiguration.Invalid;
+        }
+        catch (JsonException)
+        {
+            return DriverDeviceE2eConfiguration.Invalid;
         }
     }
 

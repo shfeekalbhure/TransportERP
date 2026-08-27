@@ -19,7 +19,12 @@
   <PropertyGroup Condition="'$(TransportERPDeviceTests)' == 'true'">
     <DefineConstants>$(DefineConstants);TRANSPORTERP_DEVICE_TESTS</DefineConstants>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <TransportERPDeviceTestServerCertificateSha256 Condition="'$(TransportERPDeviceTestServerCertificateSha256)' == ''">UNBOUND</TransportERPDeviceTestServerCertificateSha256>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(TransportERPDeviceTests)' == 'true'">
+    <AssemblyMetadata Include="TransportERPDeviceTestServerCertificateSha256" Value="$(TransportERPDeviceTestServerCertificateSha256)" />
+  </ItemGroup>
 
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0B3A53" />
