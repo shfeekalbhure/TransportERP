@@ -17,9 +17,14 @@ public sealed record PermissionRequirement(string PermissionCode) : IAuthorizati
 public sealed class SecurityAuthorizationHandler(ICurrentSecurityContext security)
     : IAuthorizationHandler
 {
+    internal const string ActiveContextInvalidItem = "TransportERP.Security.ActiveContextInvalid";
+
     public async Task HandleAsync(AuthorizationHandlerContext context)
     {
         var current = await security.ResolveAsync(context.User);
+        if (current is null && context.User.Identity?.IsAuthenticated == true &&
+            context.Resource is HttpContext http)
+            http.Items[ActiveContextInvalidItem] = true;
         foreach (var requirement in context.PendingRequirements.ToArray())
         {
             if (requirement is ActiveSecurityContextRequirement && current is not null)
@@ -64,6 +69,12 @@ public sealed class TransportAuthorizationMiddlewareResultHandler : IAuthorizati
         if (!authorizeResult.Forbidden)
         {
             await fallback.HandleAsync(next, context, policy, authorizeResult);
+            return;
+        }
+
+        if (context.Items.ContainsKey(SecurityAuthorizationHandler.ActiveContextInvalidItem))
+        {
+            await fallback.HandleAsync(next, context, policy, PolicyAuthorizationResult.Challenge());
             return;
         }
 
