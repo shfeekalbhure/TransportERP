@@ -427,6 +427,7 @@ jobs:
             Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
       - name: Run true Desktop CNG DPAPI SQLCipher HTTP PostgreSQL E2E
+        timeout-minutes: 15
         shell: pwsh
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -805,30 +806,56 @@ jobs:
           release_apk=ci-evidence/mobile/TransportERP.Mobile.Driver.Release.apk
           apkanalyzer=$(command -v apkanalyzer 2>/dev/null || true)
           if [ -z "$apkanalyzer" ]; then
-            apkanalyzer=$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer -print -quit)
+            apkanalyzer=$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer \
+              -print -quit 2>/dev/null || true)
           fi
           if [ -z "$apkanalyzer" ] || [ ! -x "$apkanalyzer" ]; then
             echo 'Android apkanalyzer executable was not found.'
             exit 1
           fi
-          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
+          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print \
+            2>/dev/null | sort -V | tail -n 1 || true)
           if [ -z "$apksigner" ] || [ ! -x "$apksigner" ]; then
             echo 'Android apksigner executable was not found.'
             exit 1
           fi
-          signer_report="$RUNNER_TEMP/mobile-release-apksigner.txt"
-          if ! "$apksigner" verify --print-certs "$release_apk" > "$signer_report"; then
+          signer_stdout="$RUNNER_TEMP/mobile-release-apksigner.stdout"
+          signer_stderr="$RUNNER_TEMP/mobile-release-apksigner.stderr"
+          if ! "$apksigner" verify --print-certs "$release_apk" \
+              > "$signer_stdout" 2> "$signer_stderr"; then
             echo 'Android Release APK signature verification failed.'
             exit 1
           fi
-          mapfile -t signer_digests < <(
-            sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*([0-9A-Fa-f]{64})[[:space:]]*$/\1/p' "$signer_report"
-          )
-          if [ "${#signer_digests[@]}" -ne 1 ]; then
-            echo "Android Release APK must have exactly one signer digest; found ${#signer_digests[@]}."
+          if ! signer_sha256=$(python3 - "$signer_stdout" "$signer_stderr" <<'PY'
+          import pathlib, re, sys
+
+          prefix = re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:")
+          field = re.compile(
+              r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
+              r"([0-9A-Fa-f]{64})[ \t]*$")
+          matches = []
+          for name in sys.argv[1:]:
+              path = pathlib.Path(name)
+              for line_number, line in enumerate(
+                      path.read_text(encoding="utf-8", errors="strict").splitlines(), 1):
+                  if not prefix.match(line):
+                      continue
+                  match = field.fullmatch(line)
+                  if match is None:
+                      raise SystemExit(
+                          f"Recognized signer SHA-256 field is malformed in "
+                          f"{path.name}:{line_number}.")
+                  matches.append(match.group(1).lower())
+          if len(matches) != 1:
+              raise SystemExit(
+                  "Expected exactly one signer SHA-256 field across apksigner "
+                  f"stdout/stderr; found {len(matches)}.")
+          print(matches[0], end="")
+          PY
+          ); then
+            echo 'Android Release APK signer digest extraction failed closed.'
             exit 1
           fi
-          signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
           if [[ ! "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]; then
             echo 'Android Release APK signer digest is not canonical SHA-256.'
             exit 1
@@ -1156,24 +1183,49 @@ jobs:
           mkdir -p ci-evidence/android-runtime
           cp -- "$test_apk" ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
           test_apk=ci-evidence/android-runtime/TransportERP.Mobile.Driver.DeviceTests.apk
-          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)
+          apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print \
+            2>/dev/null | sort -V | tail -n 1 || true)
           if [ -z "$apksigner" ] || [ ! -x "$apksigner" ]; then
             echo 'Android apksigner executable was not found for the device-test APK.'
             exit 1
           fi
-          signer_report="$RUNNER_TEMP/android-device-test-apksigner.txt"
-          if ! "$apksigner" verify --print-certs "$test_apk" > "$signer_report"; then
+          signer_stdout="$RUNNER_TEMP/android-device-test-apksigner.stdout"
+          signer_stderr="$RUNNER_TEMP/android-device-test-apksigner.stderr"
+          if ! "$apksigner" verify --print-certs "$test_apk" \
+              > "$signer_stdout" 2> "$signer_stderr"; then
             echo 'Android device-test APK signature verification failed.'
             exit 1
           fi
-          mapfile -t signer_digests < <(
-            sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*([0-9A-Fa-f]{64})[[:space:]]*$/\1/p' "$signer_report"
-          )
-          if [ "${#signer_digests[@]}" -ne 1 ]; then
-            echo "Android device-test APK must have exactly one signer digest; found ${#signer_digests[@]}."
+          if ! signer_sha256=$(python3 - "$signer_stdout" "$signer_stderr" <<'PY'
+          import pathlib, re, sys
+
+          prefix = re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:")
+          field = re.compile(
+              r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
+              r"([0-9A-Fa-f]{64})[ \t]*$")
+          matches = []
+          for name in sys.argv[1:]:
+              path = pathlib.Path(name)
+              for line_number, line in enumerate(
+                      path.read_text(encoding="utf-8", errors="strict").splitlines(), 1):
+                  if not prefix.match(line):
+                      continue
+                  match = field.fullmatch(line)
+                  if match is None:
+                      raise SystemExit(
+                          f"Recognized signer SHA-256 field is malformed in "
+                          f"{path.name}:{line_number}.")
+                  matches.append(match.group(1).lower())
+          if len(matches) != 1:
+              raise SystemExit(
+                  "Expected exactly one signer SHA-256 field across apksigner "
+                  f"stdout/stderr; found {len(matches)}.")
+          print(matches[0], end="")
+          PY
+          ); then
+            echo 'Android device-test APK signer digest extraction failed closed.'
             exit 1
           fi
-          signer_sha256=$(printf '%s' "${signer_digests[0]}" | tr 'A-F' 'a-f')
           if [[ ! "$signer_sha256" =~ ^[0-9a-f]{64}$ ]]; then
             echo 'Android device-test APK signer digest is not canonical SHA-256.'
             exit 1
