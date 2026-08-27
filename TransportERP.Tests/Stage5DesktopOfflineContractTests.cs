@@ -83,6 +83,13 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("_activeSessionId != sessionId", context, StringComparison.Ordinal);
         Assert.Contains("_activationCancellation?.Cancel()", context, StringComparison.Ordinal);
         Assert.Contains("_supervisorCancellation?.Cancel()", context, StringComparison.Ordinal);
+        Assert.Contains("Task.Run(() => RunSupervisorAsync(runtime, supervisorToken))", context,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("_supervisor = RunSupervisorAsync(", context, StringComparison.Ordinal);
+        var cancelSupervisor = context.IndexOf("_supervisorCancellation?.Cancel()", StringComparison.Ordinal);
+        var waitSupervisor = context.IndexOf("WaitForSupervisor();", cancelSupervisor, StringComparison.Ordinal);
+        var disposeRuntime = context.IndexOf("_runtime?.Dispose()", waitSupervisor, StringComparison.Ordinal);
+        Assert.True(cancelSupervisor >= 0 && waitSupervisor > cancelSupervisor && disposeRuntime > waitSupervisor);
         Assert.Contains("_runtime?.Dispose()", context, StringComparison.Ordinal);
         Assert.Contains("_shell.CloseForSessionEnd(reasonCode)", context, StringComparison.Ordinal);
         Assert.Contains("Close();", shell, StringComparison.Ordinal);

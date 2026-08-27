@@ -90,8 +90,15 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
 
         _runtime = runtime;
         _shell.AttachAuthenticatedRuntime(runtime);
-        _supervisorCancellation = new CancellationTokenSource();
-        _supervisor = RunSupervisorAsync(runtime, _supervisorCancellation.Token);
+        var supervisorCancellation = new CancellationTokenSource();
+        _supervisorCancellation = supervisorCancellation;
+        var supervisorToken = supervisorCancellation.Token;
+        // Activation is delivered on the WinForms thread. Keep the long-running supervisor off
+        // that SynchronizationContext so normal WM_CLOSE can synchronously cancel and join it
+        // after Application.Run returns, without waiting for a continuation queued to the stopped
+        // UI message loop. Do not use the supervisor token as Task.Run's scheduling token: once
+        // published, the delegate must run and settle the owned lifetime even if close races it.
+        _supervisor = Task.Run(() => RunSupervisorAsync(runtime, supervisorToken));
     }
 
     private async Task EndAuthenticatedSessionAsync(Guid sessionId)
