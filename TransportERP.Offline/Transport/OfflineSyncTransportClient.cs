@@ -272,19 +272,56 @@ public sealed class OfflineSyncTransportClient
         CancellationToken cancellationToken)
     {
         var attemptCorrelationId = Guid.NewGuid();
-        using var request = CreateRequest(body, bearer, attemptCorrelationId, proof: null);
-        using var response = await _httpClient.SendAsync(
-            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.Unauthorized &&
-            response.Headers.TryGetValues(NonceHeader, out var values))
+        HttpRequestMessage request;
+        try
         {
-            var nonces = values.ToArray();
-            if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0])) return (nonces[0], null, false);
-            return (null, "NONCE_CHALLENGE_INVALID", false);
+            request = CreateRequest(body, bearer, attemptCorrelationId, proof: null);
+        }
+        catch (Exception)
+        {
+            return (null, "CLIENT_NONCE_REQUEST_FAILURE", true);
         }
 
-        var error = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
-        return (null, error.ErrorCode, error.Retryable);
+        using (request)
+        {
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (HttpRequestException) { throw; }
+            catch (Exception)
+            {
+                return (null, "CLIENT_NONCE_SEND_FAILURE", true);
+            }
+
+            try
+            {
+                using (response)
+                {
+                    if (response.StatusCode == HttpStatusCode.Unauthorized &&
+                        response.Headers.TryGetValues(NonceHeader, out var values))
+                    {
+                        var nonces = values.ToArray();
+                        if (nonces.Length == 1 && !string.IsNullOrEmpty(nonces[0]))
+                            return (nonces[0], null, false);
+                        return (null, "NONCE_CHALLENGE_INVALID", false);
+                    }
+
+                    var error = await ReadErrorCodeAsync(
+                        response, attemptCorrelationId, cancellationToken);
+                    return (null, error.ErrorCode, error.Retryable);
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (HttpRequestException) { throw; }
+            catch (Exception)
+            {
+                return (null, "CLIENT_NONCE_RESPONSE_FAILURE", true);
+            }
+        }
     }
 
     private async Task<(SyncV1BatchResponse? Response, string? ErrorCode, bool Retryable)> SendSignedAsync(

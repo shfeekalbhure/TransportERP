@@ -618,7 +618,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
-    public async Task Unexpected_nonce_http_adapter_failure_is_retryable_and_exposes_only_a_fixed_stage_code()
+    public async Task Unexpected_nonce_send_failure_is_retryable_and_exposes_only_a_fixed_boundary_code()
     {
         const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-send";
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
@@ -638,7 +638,77 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, calls);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
-        Assert.Equal("CLIENT_NONCE_FAILURE", persisted.ResultCode);
+        Assert.Equal("CLIENT_NONCE_SEND_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Governed_exception_from_nonce_adapter_cannot_spoof_a_persisted_code()
+    {
+        const string secret = "CLIENT_fake-bearer|fake-pfx-password|D:\\private\\nonce-code";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+            throw new SyncTransportException(secret, retryable: false)));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_NONCE_SEND_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unexpected_nonce_error_body_failure_is_retryable_and_exposes_only_a_fixed_boundary_code()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-read";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.Forbidden)
+            {
+                Content = new ThrowingReadContent(new InvalidOperationException(secret))
+            })));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_NONCE_RESPONSE_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unexpected_nonce_response_disposal_failure_stays_inside_the_response_boundary()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-dispose";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((request, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new ThrowingDisposeContent(new InvalidOperationException(secret))
+            };
+            response.Headers.TryAddWithoutValidation("DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return Task.FromResult(response);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_NONCE_RESPONSE_FAILURE", persisted.ResultCode);
         Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
     }
 
@@ -1207,6 +1277,9 @@ public sealed class OfflineSyncTransportTests : IDisposable
         {
             "CLIENT_BEARER_FAILURE",
             "CLIENT_NONCE_FAILURE",
+            "CLIENT_NONCE_REQUEST_FAILURE",
+            "CLIENT_NONCE_SEND_FAILURE",
+            "CLIENT_NONCE_RESPONSE_FAILURE",
             "CLIENT_PIPELINE_FAILURE",
             "CLIENT_PROOF_CREATE_FAILURE",
             "CLIENT_SIGNED_SEND_FAILURE",
@@ -1591,6 +1664,36 @@ public sealed class OfflineSyncTransportTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken) => callback(request, cancellationToken);
+    }
+
+    private sealed class ThrowingReadContent(Exception failure) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            Task.FromException(failure);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    private sealed class ThrowingDisposeContent(Exception failure) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            Task.CompletedTask;
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return true;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing) throw failure;
+        }
     }
 
     private sealed class TestSigningKey : IDeviceProofSigningKey, IDisposable
