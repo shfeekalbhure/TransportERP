@@ -9,12 +9,16 @@ internal static class AndroidBuildIdentityProbe
     internal static async Task<BuildIdentityV1> MeasureAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var context = Application.Context;
+        var context = global::Android.App.Application.Context;
         var sourcePath = context.ApplicationInfo?.SourceDir;
         if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
             throw new InvalidOperationException("BUILD_IDENTITY_UNAVAILABLE");
         string artifactDigest;
-        await using (var stream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        await using (var stream = new global::System.IO.FileStream(
+            sourcePath,
+            global::System.IO.FileMode.Open,
+            global::System.IO.FileAccess.Read,
+            global::System.IO.FileShare.Read))
             artifactDigest = BuildIdentityV1.Sha256LowerHex(stream);
 
         Signature[]? signers;

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace TransportERP.Application.Sync;
 
@@ -20,6 +21,7 @@ public sealed record BuildIdentityV1(
     public const string ArtifactSha256Header = "X-TransportERP-Build-Artifact-SHA256";
     public const string SignerCertificateSha256Header = "X-TransportERP-Build-Signer-SHA256";
 
+    [JsonIgnore]
     public bool IsValid => Platform switch
     {
         DesktopWindowsPlatform => IsLowerHexSha256(ArtifactSha256) &&
