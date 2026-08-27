@@ -781,8 +781,11 @@ jobs:
           echo "::add-mask::$device_credential"
           export ANDROID_E2E_ADMIN_PASSWORD="$admin_password"
           export ANDROID_E2E_DEVICE_CREDENTIAL="$device_credential"
+          api_content_root="$PWD/TransportERP.Api/bin/Release/net10.0"
+          test -f "$api_content_root/appsettings.json"
           common_environment=(
             "TRANSPORTERP_CONNECTION_STRING=$connection"
+            "ASPNETCORE_CONTENTROOT=$api_content_root"
             'Auth__Mode=LocalSessions'
             'Auth__Issuer=transporter-android-ci'
             'Auth__Audience=transporter-android-ci'
