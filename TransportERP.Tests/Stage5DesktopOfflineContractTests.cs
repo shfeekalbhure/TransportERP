@@ -233,8 +233,19 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("LOCAL_SECURE_STORAGE_UNAVAILABLE", source, StringComparison.Ordinal);
         Assert.Contains("DataProtectionScope.CurrentUser", source, StringComparison.Ordinal);
         Assert.Contains("platformProbeCheckpoint: null", source, StringComparison.Ordinal);
-        Assert.Contains("stream.Flush(flushToDisk: true);\n            }\n            File.Move", source,
+        var usingDeclaration = source.IndexOf("using (var stream = new FileStream(", StringComparison.Ordinal);
+        Assert.True(usingDeclaration >= 0, "The protected-blob write must own a disposing stream scope.");
+        var usingOpenBrace = source.IndexOf('{', usingDeclaration);
+        Assert.True(usingOpenBrace > usingDeclaration, "The disposing stream scope must have a block.");
+        var usingCloseBrace = FindMatchingBrace(source, usingOpenBrace);
+        Assert.True(usingCloseBrace > usingOpenBrace, "The disposing stream scope must close before publication.");
+        var flush = source.IndexOf("stream.Flush(flushToDisk: true);", usingOpenBrace,
             StringComparison.Ordinal);
+        var atomicMove = source.IndexOf("File.Move(temporaryPath, path, overwrite: false);", usingCloseBrace,
+            StringComparison.Ordinal);
+        Assert.True(usingDeclaration >= 0 && usingOpenBrace > usingDeclaration &&
+            flush > usingOpenBrace && flush < usingCloseBrace && atomicMove > usingCloseBrace,
+            "The write must flush inside a disposing using block and publish only after the handle closes.");
         Assert.DoesNotContain("exception.Message", source, StringComparison.Ordinal);
         Assert.DoesNotContain("return new byte[", source, StringComparison.Ordinal);
     }
@@ -359,6 +370,20 @@ public sealed class Stage5DesktopOfflineContractTests
 
     private static string Read(params string[] path) =>
         File.ReadAllText(Path.Combine([RepositoryRoot(), .. path]));
+
+    private static int FindMatchingBrace(string source, int openBrace)
+    {
+        if (openBrace < 0 || openBrace >= source.Length || source[openBrace] != '{') return -1;
+        var depth = 0;
+        for (var index = openBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{') depth++;
+            if (source[index] != '}') continue;
+            depth--;
+            if (depth == 0) return index;
+        }
+        return -1;
+    }
 
     private static string RepositoryRoot()
     {
