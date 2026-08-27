@@ -2,6 +2,9 @@ namespace TransportERP.Desktop.E2ETests;
 
 public sealed class DesktopStartupFailureClassifierTests
 {
+    private const string SyncRuntimePolicyException =
+        "TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException";
+
     [Theory]
     [InlineData("TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException", "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION")]
     [InlineData("TransportERP.Api.Startup.EffectivePolicyStartupOptionsValidationException", "DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION")]
@@ -25,6 +28,51 @@ public sealed class DesktopStartupFailureClassifierTests
         classifier.Observe($"Unhandled exception. {type}: synthetic message");
 
         Assert.Equal(expected, classifier.Code);
+    }
+
+    [Theory]
+    [InlineData(
+        "Sync:Offline:ActivationImplementationSha must match the exact running API build.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH")]
+    [InlineData(
+        "Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.",
+        "DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID")]
+    public void Exact_single_sync_deployment_failure_maps_to_fixed_code(
+        string failure,
+        string expected)
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe($"Unhandled exception. {SyncRuntimePolicyException}: {failure}");
+
+        Assert.Equal(expected, classifier.Code);
+    }
+
+    [Theory]
+    [InlineData("; OTHER_FAILURE")]
+    [InlineData(" fake-bearer|fake-pfx-password|D:\\private\\api")]
+    public void Sync_deployment_failure_with_any_suffix_stays_at_the_general_category(string suffix)
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+        var failure =
+            "Sync:Offline:ActivationImplementationSha must match the exact running API build.";
+
+        classifier.Observe(
+            $"Unhandled exception. {SyncRuntimePolicyException}: {failure}{suffix}");
+
+        Assert.Equal("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", classifier.Code);
+        Assert.DoesNotContain(suffix, classifier.Code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Fixed_sync_failure_text_under_an_unknown_type_remains_unclassified()
+    {
+        var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
+
+        classifier.Observe(
+            "Unhandled exception. Example.UnknownException: Sync:Offline:ActivationImplementationSha must match the exact running API build.");
+
+        Assert.Equal("DESKTOP_E2E_API_STARTUP_UNCLASSIFIED", classifier.Code);
     }
 
     [Theory]

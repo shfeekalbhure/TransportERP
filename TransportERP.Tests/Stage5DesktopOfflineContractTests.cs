@@ -157,6 +157,10 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", releaseHost,
             StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID", releaseHost,
+            StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION", releaseHost,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION", releaseHost,

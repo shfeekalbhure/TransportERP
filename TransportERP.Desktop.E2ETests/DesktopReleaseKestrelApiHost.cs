@@ -297,6 +297,10 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
         internal string Code => (StartupFailureKind)Volatile.Read(ref _kind) switch
         {
+            StartupFailureKind.SyncImplementationMismatch =>
+                "DESKTOP_E2E_API_STARTUP_SYNC_IMPLEMENTATION_MISMATCH",
+            StartupFailureKind.SyncAuthorizedBuildInvalid =>
+                "DESKTOP_E2E_API_STARTUP_SYNC_AUTHORIZED_BUILD_INVALID",
             StartupFailureKind.SyncRuntimePolicyValidation =>
                 "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION",
             StartupFailureKind.EffectivePolicyValidation =>
@@ -329,6 +333,16 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             const string prefix = "Unhandled exception. ";
             if (!line.StartsWith(prefix, StringComparison.Ordinal))
                 return StartupFailureKind.Unobserved;
+            if (string.Equals(
+                    line,
+                    "Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: Sync:Offline:ActivationImplementationSha must match the exact running API build.",
+                    StringComparison.Ordinal))
+                return StartupFailureKind.SyncImplementationMismatch;
+            if (string.Equals(
+                    line,
+                    "Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.",
+                    StringComparison.Ordinal))
+                return StartupFailureKind.SyncAuthorizedBuildInvalid;
             var exception = line.AsSpan(prefix.Length);
             if (exception.StartsWith(
                     "TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException:"
@@ -374,6 +388,8 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         {
             Unobserved,
             ObservedUnclassified,
+            SyncImplementationMismatch,
+            SyncAuthorizedBuildInvalid,
             SyncRuntimePolicyValidation,
             EffectivePolicyValidation,
             AuthValidation,
