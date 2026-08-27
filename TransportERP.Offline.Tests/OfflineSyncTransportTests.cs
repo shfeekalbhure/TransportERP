@@ -464,7 +464,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
-    public async Task Supervisor_recovers_after_unexpected_transport_failure_and_drains_the_leased_operation()
+    public async Task Supervisor_recovers_after_unexpected_iteration_failure_and_drains_the_operation()
     {
         var store = await CreateStoreAsync(TimeProvider.System);
         var queued = await EnqueueRequestAsync(store, Request());
@@ -473,9 +473,6 @@ public sealed class OfflineSyncTransportTests : IDisposable
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
         {
             calls++;
-            if (calls == 1)
-                throw new InvalidOperationException("simulated one-shot transport infrastructure failure");
-
             var captured = await CaptureAsync(request, cancellationToken);
             return captured.Proof is null
                 ? Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId)
@@ -494,15 +491,12 @@ public sealed class OfflineSyncTransportTests : IDisposable
                 BranchId,
                 UserId,
                 "resilient-worker",
-                // The lease is certainly expired before the supervisor's delayed recovery.
-                // A fresh attempt must recover the same durable operation exactly once.
-                LeaseDuration: TimeSpan.FromTicks(1),
                 BuildIdentity: TestBuildIdentity),
             TimeProvider.System);
         var supervisor = new OfflineSyncSupervisor(
             store,
             transport,
-            new AlwaysOnlineSyncConnectivity(),
+            new OneShotFailingConnectivity(),
             new OfflineSyncSupervisorOptions(
                 MaximumBatchOperations: 1,
                 IdleWakeInterval: TimeSpan.FromMilliseconds(20),
@@ -519,7 +513,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
 
         var completed = (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))!;
-        Assert.Equal(3, calls);
+        Assert.Equal(2, calls);
         Assert.Equal(0, completed.ClientTransportRetryCount);
         Assert.Equal("SUPERVISOR_ITERATION_FAILED", supervisor.LastObservedFailure?.Code);
         Assert.Equal(1, supervisor.LastObservedFailure?.ConsecutiveFailureCount);
@@ -592,6 +586,36 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
         Assert.Equal("NO_RESPONSE", persisted.ResultCode);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
+    }
+
+    [Fact]
+    public async Task Unexpected_platform_signing_failure_releases_the_claim_and_schedules_retry()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var failingKey = new FailingSigningKey(key);
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+        }));
+
+        var outcome = await Client(http, store, failingKey, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.Claimed);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Equal(1, persisted.ClientTransportRetryCount);
+        Assert.NotNull(persisted.NextRetryAt);
+        Assert.Null(persisted.LeaseOwner);
+        Assert.Null(persisted.LeaseExpiresAt);
     }
 
     [Theory]
@@ -1236,6 +1260,18 @@ public sealed class OfflineSyncTransportTests : IDisposable
         public void Dispose() => _key.Dispose();
     }
 
+    private sealed class FailingSigningKey(IDeviceProofSigningKey inner) : IDeviceProofSigningKey
+    {
+        public ValueTask<DevicePublicP256Jwk> GetPublicJwkAsync(
+            CancellationToken cancellationToken = default) =>
+            inner.GetPublicJwkAsync(cancellationToken);
+
+        public ValueTask<byte[]> SignEs256Async(
+            ReadOnlyMemory<byte> signingInput,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("simulated platform signing adapter failure");
+    }
+
     private sealed class FixedBearerProvider(string bearer) : IInMemoryBearerTokenProvider
     {
         public ValueTask<string> GetBearerTokenAsync(CancellationToken cancellationToken = default) =>
@@ -1270,6 +1306,22 @@ public sealed class OfflineSyncTransportTests : IDisposable
 
         private static TaskCompletionSource NewSignal() =>
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class OneShotFailingConnectivity : IOfflineSyncConnectivity
+    {
+        private int _checks;
+
+        public ValueTask<bool> IsOnlineAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _checks) == 1)
+                throw new InvalidOperationException("simulated one-shot connectivity adapter failure");
+            return ValueTask.FromResult(true);
+        }
+
+        public Task WaitUntilOnlineAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset initial) : TimeProvider

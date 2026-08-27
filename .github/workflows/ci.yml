@@ -546,20 +546,9 @@ jobs:
             'HOST_CERTIFICATE_CREATED'
             'HOST_CERTIFICATE_WRITTEN'
             'HOST_CERTIFICATE_TRUST_STARTED'
-            'HOST_ROOT_STORE_CREATE_STARTED'
-            'HOST_ROOT_STORE_CREATED'
-            'HOST_ROOT_STORE_OPEN_STARTED'
-            'HOST_ROOT_STORE_OPENED'
-            'HOST_PUBLIC_CERTIFICATE_EXPORT_STARTED'
-            'HOST_PUBLIC_CERTIFICATE_EXPORTED'
-            'HOST_PUBLIC_CERTIFICATE_CREATE_STARTED'
-            'HOST_PUBLIC_CERTIFICATE_CREATED'
-            'HOST_ROOT_STORE_ADD_STARTED'
-            'HOST_ROOT_STORE_ADD_RETURNED'
-            'HOST_PUBLIC_CERTIFICATE_DISPOSE_STARTED'
-            'HOST_PUBLIC_CERTIFICATE_DISPOSED'
-            'HOST_ROOT_STORE_DISPOSE_STARTED'
-            'HOST_ROOT_STORE_DISPOSED'
+            'HOST_CERTIFICATE_IMPORT_STARTED'
+            'HOST_CERTIFICATE_IMPORT_RETURNED'
+            'HOST_CERTIFICATE_IMPORT_VERIFIED'
             'HOST_CERTIFICATE_TRUSTED'
             'HOST_PROCESS_START_STARTED'
             'HOST_PROCESS_STARTED'
@@ -1948,15 +1937,30 @@ jobs:
           }
 
           adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
-          adb_bounded shell monkey \
-            -p "$ANDROID_TEST_PACKAGE" \
-            -c android.intent.category.LAUNCHER \
-            1 >/dev/null
+          mapfile -t launcher_candidates < <(
+            adb_bounded shell cmd package resolve-activity --brief \
+              -a android.intent.action.MAIN \
+              -c android.intent.category.LAUNCHER \
+              "$ANDROID_TEST_PACKAGE" | tr -d '\r'
+          )
+          test "${#launcher_candidates[@]}" -eq 1
+          launcher_component="${launcher_candidates[0]}"
+          [[ "$launcher_component" =~ ^com\.transporterp\.mobile\.driver/[A-Za-z0-9._$]+$ ]]
+          launch_result=$(adb_bounded shell am start -W -n "$launcher_component" | tr -d '\r')
+          grep -Fx 'Status: ok' <<< "$launch_result" >/dev/null
+          observed_pid=''
+          stable_pid=false
           for attempt in $(seq 1 30); do
-            test -n "$(app_pid)" && break
+            current_pid=$(app_pid)
+            if [[ "$current_pid" =~ ^[0-9]+$ ]] && [ "$current_pid" = "$observed_pid" ]; then
+              stable_pid=true
+              break
+            fi
+            observed_pid="$current_pid"
             sleep 1
           done
-          test -n "$(app_pid)"
+          test "$stable_pid" = true
+          echo 'android_closed_startup_launcher_verified=true'
 
           run_phase startup
           run_phase seed

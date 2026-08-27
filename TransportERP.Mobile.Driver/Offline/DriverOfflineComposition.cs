@@ -250,6 +250,8 @@ public sealed class DriverOfflineRuntime
     public DriverOfflineRuntimeStatus Status { get; }
     public DriverOfflineOperationPermissions OperationPermissions { get; }
     public SyncClientEffectivePolicy EffectivePolicy => _effectivePolicy;
+    public OfflineSyncSupervisorFailure? LastSyncSupervisorFailure =>
+        _supervisor?.LastObservedFailure;
     public bool CanQueueOperationalParties => _outbox is not null && _allowlist?.Allows(
         "CreateOperationalParty", "CREATE", "OperationalParty") == true;
 

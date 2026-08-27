@@ -91,6 +91,8 @@ public sealed class Stage5DesktopOfflineContractTests
 
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", program, StringComparison.Ordinal);
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerCertificateCustomValidationCallback", onlineAuth, StringComparison.Ordinal);
+        Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", onlineAuth, StringComparison.Ordinal);
         Assert.Contains("args.Length != 2", program, StringComparison.Ordinal);
         Assert.Contains("Path.IsPathFullyQualified(args[1])", program, StringComparison.Ordinal);
         Assert.Contains("FileMode.CreateNew", program, StringComparison.Ordinal);

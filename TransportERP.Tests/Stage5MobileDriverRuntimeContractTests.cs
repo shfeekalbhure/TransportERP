@@ -180,7 +180,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("supervisor.SynchronizeNowAsync", composition, StringComparison.Ordinal);
         Assert.Contains("terminal?.ServerAccepted == true", selfTest, StringComparison.Ordinal);
         Assert.Contains("http_batch_server_acceptance_persisted", selfTest, StringComparison.Ordinal);
-        Assert.Contains("SafeTerminalFailureCode(terminal)", selfTest, StringComparison.Ordinal);
+        Assert.Contains("terminal, requestedCycle, activated.Runtime.LastSyncSupervisorFailure", selfTest,
+            StringComparison.Ordinal);
+        Assert.Contains("public OfflineSyncSupervisorFailure? LastSyncSupervisorFailure", composition,
+            StringComparison.Ordinal);
         Assert.Contains("local_succeeded_survived_restart", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
 
@@ -190,6 +193,9 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("adb_bounded() { timeout 30s adb", workflow, StringComparison.Ordinal);
         Assert.Contains("app_pid()", workflow, StringComparison.Ordinal);
         Assert.Contains("| tr -d '\\r' || true", workflow, StringComparison.Ordinal);
+        Assert.Contains("cmd package resolve-activity --brief", workflow, StringComparison.Ordinal);
+        Assert.Contains("grep -Fx 'Status: ok'", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("adb_bounded shell monkey", workflow, StringComparison.Ordinal);
         Assert.Contains("timeout-minutes: 12", workflow, StringComparison.Ordinal);
         Assert.Contains("adb_bounded shell am force-stop", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);

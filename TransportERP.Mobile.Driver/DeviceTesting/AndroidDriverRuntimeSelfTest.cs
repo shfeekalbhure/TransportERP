@@ -72,7 +72,7 @@ internal static class AndroidDriverRuntimeSelfTest
             // Request one bounded cycle from the already-active production supervisor. This API
             // never calls the transport directly: it serializes the request behind any in-flight
             // automatic cycle and therefore preserves the supervisor's single lease ownership.
-            await activated.Runtime.SynchronizeAsync(1, cancellationToken);
+            var requestedCycle = await activated.Runtime.SynchronizeAsync(1, cancellationToken);
             var terminal = await WaitForOperationAsync(
                 activated.Runtime, queued.Operation.LocalOperationId, cancellationToken);
             var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)
@@ -102,7 +102,8 @@ internal static class AndroidDriverRuntimeSelfTest
             };
             if (checks.Values.Any(value => !value))
                 return DriverDeviceTestResult.FromChecks(
-                    "e2e-submit", checks, SafeTerminalFailureCode(terminal));
+                    "e2e-submit", checks, SafeTerminalFailureCode(
+                        terminal, requestedCycle, activated.Runtime.LastSyncSupervisorFailure));
 
             var state = new DriverDeviceE2eState(
                 SchemaVersion,
@@ -231,19 +232,31 @@ internal static class AndroidDriverRuntimeSelfTest
         return await runtime.GetOperationStatusAsync(localOperationId, cancellationToken);
     }
 
-    private static string SafeTerminalFailureCode(DriverOfflineOperationStatusView? terminal)
+    private static string SafeTerminalFailureCode(
+        DriverOfflineOperationStatusView? terminal,
+        OfflineSyncTransportRunResult requestedCycle,
+        OfflineSyncSupervisorFailure? supervisorFailure)
     {
-        if (terminal is null) return "E2E_OPERATION_TIMEOUT";
-        if (terminal.ResultCode is { Length: > 0 } resultCode &&
-            resultCode.All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_'))
-            return resultCode;
-        return terminal.Status switch
+        var status = terminal?.Status switch
         {
-            OfflineOperationStatus.Failed => "E2E_OPERATION_FAILED",
-            OfflineOperationStatus.Rejected => "E2E_OPERATION_REJECTED",
-            OfflineOperationStatus.Conflict => "E2E_OPERATION_CONFLICT",
-            _ => "E2E_OPERATION_NON_TERMINAL"
+            OfflineOperationStatus.Queued => "QUEUED",
+            OfflineOperationStatus.Sending => "SENDING",
+            OfflineOperationStatus.Succeeded => "SUCCEEDED",
+            OfflineOperationStatus.Failed => "FAILED",
+            OfflineOperationStatus.Conflict => "CONFLICT",
+            OfflineOperationStatus.Rejected => "REJECTED",
+            OfflineOperationStatus.Resolved => "RESOLVED",
+            _ => "TIMEOUT"
         };
+        var detail = terminal?.ResultCode;
+        if (string.IsNullOrEmpty(detail)) detail = supervisorFailure?.Code;
+        if (string.IsNullOrEmpty(detail) || detail.Length > 40 ||
+            detail.Any(character => character is not (>= 'A' and <= 'Z' or >= '0' and <= '9' or '_')))
+            detail = "NONE";
+        var code = $"E2E_{status}_{detail}_CL{requestedCycle.Claimed}_AP{requestedCycle.AcceptedPending}" +
+            $"_SU{requestedCycle.Succeeded}_CO{requestedCycle.Conflicted}" +
+            $"_RE{requestedCycle.Rejected}_RT{requestedCycle.RetryScheduled}";
+        return code.Length <= 96 ? code : "E2E_OPERATION_DIAGNOSTIC_OVERFLOW";
     }
 
     private static async Task WriteE2eStateAtomicallyAsync(

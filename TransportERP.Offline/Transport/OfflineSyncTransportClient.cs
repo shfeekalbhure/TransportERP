@@ -198,6 +198,14 @@ public sealed class OfflineSyncTransportClient
             requestError = "DEVICE_PROOF_KEY_INVALID";
             requestErrorRetryable = false;
         }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A platform key/HTTP adapter may throw a provider-specific exception after the
+            // durable claim. Never strand that row in SENDING until its lease expires, and never
+            // copy the exception message or type into the encrypted status surface.
+            requestError = "INTERNAL_ERROR";
+            requestErrorRetryable = true;
+        }
 
         if (response is null)
         {

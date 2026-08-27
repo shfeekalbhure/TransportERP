@@ -14,6 +14,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
     private readonly Process _process;
     private readonly Task _stdoutDrain;
     private readonly Task _stderrDrain;
+    private readonly CancellationTokenSource _drainCancellation;
     private readonly X509Certificate2 _certificate;
     private readonly string _temporaryRoot;
 
@@ -21,12 +22,14 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         Process process,
         Task stdoutDrain,
         Task stderrDrain,
+        CancellationTokenSource drainCancellation,
         X509Certificate2 certificate,
         string temporaryRoot)
     {
         _process = process;
         _stdoutDrain = stdoutDrain;
         _stderrDrain = stderrDrain;
+        _drainCancellation = drainCancellation;
         _certificate = certificate;
         _temporaryRoot = temporaryRoot;
     }
@@ -59,46 +62,36 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             Path.GetTempPath(), "transporterp-desktop-kestrel", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporaryRoot);
         var pfxPath = Path.Combine(temporaryRoot, "kestrel.pfx");
+        var publicCertificatePath = Path.Combine(temporaryRoot, "kestrel.cer");
         var pfxPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         Checkpoint("HOST_CERTIFICATE_CREATE_STARTED");
         var certificate = CreateServerCertificate(origin.Host);
         Checkpoint("HOST_CERTIFICATE_CREATED");
-        await File.WriteAllBytesAsync(
-            pfxPath, certificate.Export(X509ContentType.Pfx, pfxPassword), cancellationToken);
-        Checkpoint("HOST_CERTIFICATE_WRITTEN");
-        Checkpoint("HOST_CERTIFICATE_TRUST_STARTED");
-        Checkpoint("HOST_ROOT_STORE_CREATE_STARTED");
-        var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
-        Checkpoint("HOST_ROOT_STORE_CREATED");
         try
         {
-            Checkpoint("HOST_ROOT_STORE_OPEN_STARTED");
-            root.Open(OpenFlags.ReadWrite);
-            Checkpoint("HOST_ROOT_STORE_OPENED");
-            Checkpoint("HOST_PUBLIC_CERTIFICATE_EXPORT_STARTED");
-            var publicCertificateBytes = certificate.Export(X509ContentType.Cert);
-            Checkpoint("HOST_PUBLIC_CERTIFICATE_EXPORTED");
-            Checkpoint("HOST_PUBLIC_CERTIFICATE_CREATE_STARTED");
-            var publicCertificate = new X509Certificate2(publicCertificateBytes);
-            Checkpoint("HOST_PUBLIC_CERTIFICATE_CREATED");
-            try
-            {
-                Checkpoint("HOST_ROOT_STORE_ADD_STARTED");
-                root.Add(publicCertificate);
-                Checkpoint("HOST_ROOT_STORE_ADD_RETURNED");
-            }
+            await File.WriteAllBytesAsync(
+                pfxPath, certificate.Export(X509ContentType.Pfx, pfxPassword), cancellationToken);
+            await File.WriteAllBytesAsync(
+                publicCertificatePath, certificate.Export(X509ContentType.Cert), cancellationToken);
+            Checkpoint("HOST_CERTIFICATE_WRITTEN");
+            Checkpoint("HOST_CERTIFICATE_TRUST_STARTED");
+            Checkpoint("HOST_CERTIFICATE_IMPORT_STARTED");
+            await RunCertificateStoreCommandAsync(
+                ["-user", "-f", "-addstore", "Root", publicCertificatePath],
+                cancellationToken);
+            Checkpoint("HOST_CERTIFICATE_IMPORT_RETURNED");
+            VerifyTrustedCertificate(certificate);
+            Checkpoint("HOST_CERTIFICATE_IMPORT_VERIFIED");
+        }
+        catch
+        {
+            try { await RemoveTrustedCertificateAsync(certificate); }
             finally
             {
-                Checkpoint("HOST_PUBLIC_CERTIFICATE_DISPOSE_STARTED");
-                publicCertificate.Dispose();
-                Checkpoint("HOST_PUBLIC_CERTIFICATE_DISPOSED");
+                certificate.Dispose();
+                DeleteTemporaryRoot(temporaryRoot);
             }
-        }
-        finally
-        {
-            Checkpoint("HOST_ROOT_STORE_DISPOSE_STARTED");
-            root.Dispose();
-            Checkpoint("HOST_ROOT_STORE_DISPOSED");
+            throw;
         }
         Checkpoint("HOST_CERTIFICATE_TRUSTED");
 
@@ -134,18 +127,22 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         }
         catch
         {
-            RemoveTrustedCertificate(certificate.Thumbprint);
-            certificate.Dispose();
-            DeleteTemporaryRoot(temporaryRoot);
+            try { await RemoveTrustedCertificateAsync(certificate); }
+            finally
+            {
+                certificate.Dispose();
+                DeleteTemporaryRoot(temporaryRoot);
+            }
             throw;
         }
         // Drain both streams continuously. The test never forwards process logs because they are
         // not needed as acceptance evidence and may contain environment-specific paths.
-        var stdoutDrain = DrainAsync(process.StandardOutput, cancellationToken);
-        var stderrDrain = DrainAsync(process.StandardError, cancellationToken);
+        var drainCancellation = new CancellationTokenSource();
+        var stdoutDrain = DrainAsync(process.StandardOutput, drainCancellation.Token);
+        var stderrDrain = DrainAsync(process.StandardError, drainCancellation.Token);
         Checkpoint("HOST_DRAINS_STARTED");
         var host = new DesktopReleaseKestrelApiHost(
-            process, stdoutDrain, stderrDrain, certificate, temporaryRoot);
+            process, stdoutDrain, stderrDrain, drainCancellation, certificate, temporaryRoot);
         try
         {
             Checkpoint("HOST_WAIT_READY");
@@ -228,26 +225,45 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        string? cleanupFailureCode = null;
         Checkpoint("HOST_DISPOSE_STARTED");
         if (!_process.HasExited)
         {
             Checkpoint("HOST_KILL_STARTED");
-            _process.Kill(entireProcessTree: true);
-            Checkpoint("HOST_KILL_RETURNED");
-            await _process.WaitForExitAsync();
-            Checkpoint("HOST_PROCESS_EXITED_AFTER_KILL");
+            if (await TerminateProcessBoundedAsync(_process))
+            {
+                Checkpoint("HOST_KILL_RETURNED");
+                Checkpoint("HOST_PROCESS_EXITED_AFTER_KILL");
+            }
+            else
+            {
+                cleanupFailureCode = "DESKTOP_E2E_API_TERMINATION_FAILED";
+            }
         }
         Checkpoint("HOST_DRAIN_WAIT_STARTED");
-        try { await Task.WhenAll(_stdoutDrain, _stderrDrain); }
-        catch (OperationCanceledException) { Checkpoint("HOST_DRAINS_CANCELLED"); }
-        Checkpoint("HOST_DRAIN_WAIT_COMPLETED");
+        if (await CompleteDrainsBoundedAsync(
+                _stdoutDrain, _stderrDrain, _drainCancellation))
+            Checkpoint("HOST_DRAIN_WAIT_COMPLETED");
+        else
+        {
+            Checkpoint("HOST_DRAINS_CANCELLED");
+            cleanupFailureCode ??= "DESKTOP_E2E_API_DRAIN_FAILED";
+        }
+        _drainCancellation.Dispose();
         _process.Dispose();
         Checkpoint("HOST_PROCESS_DISPOSED");
         Checkpoint("HOST_CERTIFICATE_REMOVE_STARTED");
         try
         {
-            RemoveTrustedCertificate(_certificate.Thumbprint);
-            Checkpoint("HOST_CERTIFICATE_REMOVED");
+            try
+            {
+                await RemoveTrustedCertificateAsync(_certificate);
+                Checkpoint("HOST_CERTIFICATE_REMOVED");
+            }
+            catch
+            {
+                cleanupFailureCode ??= "DESKTOP_E2E_CERTIFICATE_REMOVAL_FAILED";
+            }
         }
         finally
         {
@@ -256,6 +272,8 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             Checkpoint("HOST_TEMP_ROOT_DELETE_RETURNED");
         }
         Checkpoint("HOST_DISPOSE_COMPLETED");
+        if (cleanupFailureCode is not null)
+            throw new InvalidOperationException(cleanupFailureCode);
     }
 
     private static void Checkpoint(string name)
@@ -282,13 +300,153 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
     }
 
 
-    private static void RemoveTrustedCertificate(string thumbprint)
+    private static async Task RunCertificateStoreCommandAsync(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var certutilPath = Path.Combine(windowsDirectory, "System32", "certutil.exe");
+        if (!Path.IsPathFullyQualified(certutilPath) || !File.Exists(certutilPath))
+            throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_STORE_TOOL_UNAVAILABLE");
+
+        var start = new ProcessStartInfo
+        {
+            FileName = certutilPath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+
+        using var process = Process.Start(start)
+            ?? throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_STORE_TOOL_START_FAILED");
+        process.StandardInput.Close();
+        using var drainCancellation = new CancellationTokenSource();
+        var stdoutDrain = DrainAsync(process.StandardOutput, drainCancellation.Token);
+        var stderrDrain = DrainAsync(process.StandardError, drainCancellation.Token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        var callerCancelled = false;
+        string? failureCode = null;
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            callerCancelled = cancellationToken.IsCancellationRequested;
+            if (!await TerminateProcessBoundedAsync(process))
+                failureCode = "DESKTOP_E2E_CERTIFICATE_STORE_TOOL_TERMINATION_FAILED";
+            else if (!callerCancelled)
+                failureCode = "DESKTOP_E2E_CERTIFICATE_STORE_TOOL_TIMEOUT";
+        }
+        catch
+        {
+            failureCode = "DESKTOP_E2E_CERTIFICATE_STORE_TOOL_WAIT_FAILED";
+            if (!await TerminateProcessBoundedAsync(process))
+                failureCode = "DESKTOP_E2E_CERTIFICATE_STORE_TOOL_TERMINATION_FAILED";
+        }
+        if (!await CompleteDrainsBoundedAsync(
+                stdoutDrain, stderrDrain, drainCancellation))
+            failureCode ??= "DESKTOP_E2E_CERTIFICATE_STORE_TOOL_DRAIN_FAILED";
+        if (failureCode is not null)
+            throw new InvalidOperationException(failureCode);
+        if (callerCancelled)
+            cancellationToken.ThrowIfCancellationRequested();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_STORE_TOOL_FAILED");
+    }
+
+    private static async Task<bool> TerminateProcessBoundedAsync(Process process)
+    {
+        try
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException) when (process.HasExited) { }
+        catch { return false; }
+
+        using var termination = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await process.WaitForExitAsync(termination.Token);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static async Task<bool> CompleteDrainsBoundedAsync(
+        Task stdoutDrain,
+        Task stderrDrain,
+        CancellationTokenSource drainCancellation)
+    {
+        var drains = Task.WhenAll(stdoutDrain, stderrDrain);
+        try
+        {
+            await drains.WaitAsync(TimeSpan.FromSeconds(5));
+            return true;
+        }
+        catch
+        {
+            drainCancellation.Cancel();
+            try { await drains.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch { }
+            return false;
+        }
+    }
+
+    private static void VerifyTrustedCertificate(X509Certificate2 certificate)
     {
         using var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
-        root.Open(OpenFlags.ReadWrite);
-        foreach (var match in root.Certificates.Find(
-                     X509FindType.FindByThumbprint, thumbprint, validOnly: false))
-            root.Remove(match);
+        root.Open(OpenFlags.ReadOnly);
+        var matches = root.Certificates.Find(
+            X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);
+        try
+        {
+            if (matches.Count != 1 || matches[0].HasPrivateKey ||
+                !matches[0].RawData.AsSpan().SequenceEqual(certificate.RawData))
+                throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_IMPORT_VERIFICATION_FAILED");
+        }
+        finally
+        {
+            foreach (var match in matches) match.Dispose();
+        }
+    }
+
+    private static async Task RemoveTrustedCertificateAsync(X509Certificate2 certificate)
+    {
+        using (var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
+        {
+            root.Open(OpenFlags.ReadOnly);
+            var matches = root.Certificates.Find(
+                X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);
+            try
+            {
+                if (matches.Count == 0) return;
+            }
+            finally
+            {
+                foreach (var match in matches) match.Dispose();
+            }
+        }
+
+        await RunCertificateStoreCommandAsync(
+            ["-user", "-delstore", "Root", certificate.Thumbprint], CancellationToken.None);
+        using var verify = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
+        verify.Open(OpenFlags.ReadOnly);
+        var remaining = verify.Certificates.Find(
+            X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);
+        try
+        {
+            if (remaining.Count != 0)
+                throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_REMOVAL_VERIFICATION_FAILED");
+        }
+        finally
+        {
+            foreach (var match in remaining) match.Dispose();
+        }
     }
 
     private static void DeleteTemporaryRoot(string path)
