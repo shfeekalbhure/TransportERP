@@ -162,7 +162,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             await host.WaitForReadyAsync(origin, cancellationToken);
             Checkpoint("HOST_READY");
             Checkpoint("HOST_HOSTNAME_NEGATIVE_STARTED");
-            await host.VerifyHostnameMismatchRejectedAsync(origin, cancellationToken);
+            await VerifyHostnameMismatchRejectedAsync(origin, cancellationToken);
             Checkpoint("HOST_HOSTNAME_NEGATIVE_REJECTED");
             return host;
         }
