@@ -141,6 +141,8 @@ public sealed class Stage5DesktopOfflineContractTests
         var apiProgram = Read("TransportERP.Api", "Program.cs");
         var startupExceptions = Read(
             "TransportERP.Api", "Startup", "StartupOptionsValidationExceptions.cs");
+        var productionE2E = Read(
+            "TransportERP.Desktop.E2ETests", "DesktopProductionEndToEndPostgreSqlTests.cs");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
@@ -201,12 +203,22 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)",
             releaseHost, StringComparison.Ordinal);
-        Assert.Contains("StartupFailureKind.ObservedUnclassified", releaseHost,
+        Assert.Contains("return \"DESKTOP_E2E_API_STARTUP_UNCLASSIFIED\"", releaseHost,
             StringComparison.Ordinal);
-        Assert.DoesNotContain(".Message", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("line.ToString", releaseHost, StringComparison.Ordinal);
         Assert.DoesNotContain(".StackTrace", releaseHost, StringComparison.Ordinal);
         Assert.DoesNotContain("ReadToEnd", releaseHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("StringBuilder", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("new StringBuilder(\"DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY\")",
+            releaseHost, StringComparison.Ordinal);
+        Assert.Contains("Append(GovernedSyncPolicyFailures[currentIndex].Code)", releaseHost,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Append(token", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("SyncActionCatalog.Definitions", productionE2E, StringComparison.Ordinal);
+        Assert.Contains("Sync__Offline__AllowedActions__{index}", productionE2E,
+            StringComparison.Ordinal);
+        Assert.Contains("governedActions.Distinct(StringComparer.Ordinal).Count()", productionE2E,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("Console.Write", releaseHost, StringComparison.Ordinal);
         Assert.DoesNotContain("Trace.Write", releaseHost, StringComparison.Ordinal);
         Assert.DoesNotContain("Debug.Write", releaseHost, StringComparison.Ordinal);

@@ -168,6 +168,19 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
 
             var settings = ReleaseHostConfiguration(
                 connection, origin, implementationSha!, measuredBuildIdentity, seeded);
+            var governedActions = SyncActionCatalog.Definitions
+                .Select(definition => definition.ActionCodeValue)
+                .ToArray();
+            const string globalActionPrefix = "Sync__Offline__AllowedActions__";
+            Assert.Equal(governedActions.Length, settings.Keys.Count(key =>
+                key.StartsWith(globalActionPrefix, StringComparison.Ordinal)));
+            Assert.Equal(governedActions, Enumerable.Range(0, governedActions.Length)
+                .Select(index => settings[globalActionPrefix + index])
+                .ToArray());
+            Assert.Equal(governedActions.Length,
+                governedActions.Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal("CreateOperationalParty", settings[
+                $"Sync__EffectivePolicy__Devices__{seeded.RegisteredDeviceId:D}__AllowedActions__0"]);
             Checkpoint("HOST_CONFIGURATION_READY");
             await using var api = await DesktopReleaseKestrelApiHost.StartAsync(
                 origin, settings, timeout.Token);
@@ -524,7 +537,6 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             ["Sync__Offline__ActivationImplementationSha"] = implementationSha,
             ["Sync__Offline__AuthorizedBuilds__0__Platform"] = measuredBuildIdentity.Platform,
             ["Sync__Offline__AuthorizedBuilds__0__ArtifactSha256"] = measuredBuildIdentity.ArtifactSha256,
-            ["Sync__Offline__AllowedActions__0"] = "CreateOperationalParty",
             ["Sync__ServerExecution__Enabled"] = "true",
             ["Sync__Protocol__AllowedVersions__0"] = "sync-v1",
             ["Sync__Retry__ClientTransport__MaxCount"] = "5",
@@ -549,6 +561,15 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             ["Sync__Proof__ForwardedHeadersEnabled"] = "false",
             ["Sync__EffectivePolicy__SourceVersion"] = "desktop-release-e2e-v1"
         };
+        var governedActions = SyncActionCatalog.Definitions
+            .Select(definition => definition.ActionCodeValue)
+            .ToArray();
+        if (governedActions.Length == 0 ||
+            governedActions.Distinct(StringComparer.Ordinal).Count() != governedActions.Length ||
+            !governedActions.Contains("CreateOperationalParty", StringComparer.Ordinal))
+            throw new InvalidOperationException("DESKTOP_E2E_SYNC_ACTION_CATALOG_INVALID");
+        for (var index = 0; index < governedActions.Length; index++)
+            values[$"Sync__Offline__AllowedActions__{index}"] = governedActions[index];
         if (measuredBuildIdentity.SignerCertificateSha256 is { } signer)
             values["Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256"] = signer;
 
