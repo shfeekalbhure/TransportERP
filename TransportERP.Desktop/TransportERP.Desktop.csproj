@@ -18,4 +18,8 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="TransportERP.Desktop.E2ETests" />
+  </ItemGroup>
+
 </Project>
