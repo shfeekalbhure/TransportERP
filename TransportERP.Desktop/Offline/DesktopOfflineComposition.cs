@@ -282,6 +282,7 @@ public static class DesktopOfflineComposition
             return Closed(options, dependencies, "DESKTOP_SECURE_RUNTIME_UNAVAILABLE", security: true);
 
         IDeviceProofSigningKey? signingKey = null;
+        int? secureStorageCheckpoint = null;
         try
         {
             // The OS handle is opened and bound to the exact server-authorized JWK before DPAPI,
@@ -291,7 +292,13 @@ public static class DesktopOfflineComposition
                 .OpenAsync(options.DeviceSigningCertificateThumbprint, cancellationToken);
             diagnosticCheckpoint?.Invoke(33);
             VerifyProofBinding(options.ProofBinding, signingKey.PublicKey);
-            var keys = new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory);
+            var keys = diagnosticCheckpoint is null
+                ? new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory)
+                : new WindowsDpapiLocalEncryptionKeyProvider(options.ProtectedKeyDirectory, value =>
+                {
+                    secureStorageCheckpoint = value;
+                    diagnosticCheckpoint(value);
+                });
             var outbox = new OfflineOperationStore(options.OutboxDatabasePath, keys, timeProvider, options.RetryPolicy);
             var scope = new OfflineOperationScope(
                 options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
@@ -328,7 +335,8 @@ public static class DesktopOfflineComposition
         }
         catch (Exception exception)
         {
-            diagnosticCheckpoint?.Invoke(DiagnosticFailureCheckpoint(exception));
+            if (secureStorageCheckpoint is null or 349)
+                diagnosticCheckpoint?.Invoke(DiagnosticFailureCheckpoint(exception));
             signingKey?.Dispose();
             return Closed(options, dependencies, "DESKTOP_SECURE_RUNTIME_UNAVAILABLE", security: true);
         }

@@ -231,6 +231,9 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("ReadCache => \"read-cache.v1.dpapi\"", source, StringComparison.Ordinal);
         Assert.Contains("offline-sqlcipher|v1|{purpose}", source, StringComparison.Ordinal);
         Assert.Contains("LOCAL_SECURE_STORAGE_UNAVAILABLE", source, StringComparison.Ordinal);
+        Assert.Contains("DataProtectionScope.CurrentUser", source, StringComparison.Ordinal);
+        Assert.Contains("platformProbeCheckpoint: null", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", source, StringComparison.Ordinal);
         Assert.DoesNotContain("return new byte[", source, StringComparison.Ordinal);
     }
 

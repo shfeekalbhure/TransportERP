@@ -12,13 +12,22 @@ public sealed class WindowsDpapiLocalEncryptionKeyProvider : ILocalEncryptionKey
 {
     private const int KeySizeBytes = 32;
     private readonly string _keyDirectory;
+    private readonly Action<int>? _platformProbeCheckpoint;
 
     public WindowsDpapiLocalEncryptionKeyProvider(string keyDirectory)
+        : this(keyDirectory, platformProbeCheckpoint: null)
+    {
+    }
+
+    internal WindowsDpapiLocalEncryptionKeyProvider(
+        string keyDirectory,
+        Action<int>? platformProbeCheckpoint)
     {
         if (string.IsNullOrWhiteSpace(keyDirectory))
             throw new ArgumentException("A protected-key directory is required.", nameof(keyDirectory));
 
         _keyDirectory = Path.GetFullPath(keyDirectory);
+        _platformProbeCheckpoint = platformProbeCheckpoint;
     }
 
     public static WindowsDpapiLocalEncryptionKeyProvider ForCurrentUser()
@@ -42,21 +51,33 @@ public sealed class WindowsDpapiLocalEncryptionKeyProvider : ILocalEncryptionKey
         var entropy = PurposeEntropy(purpose);
         try
         {
+            _platformProbeCheckpoint?.Invoke(341);
             Directory.CreateDirectory(_keyDirectory);
             if (File.Exists(path))
-                return ValueTask.FromResult(UnprotectRequired(path, entropy));
+            {
+                _platformProbeCheckpoint?.Invoke(347);
+                var existing = UnprotectRequired(path, entropy);
+                _platformProbeCheckpoint?.Invoke(349);
+                return ValueTask.FromResult(existing);
+            }
 
+            _platformProbeCheckpoint?.Invoke(342);
             var key = RandomNumberGenerator.GetBytes(KeySizeBytes);
             byte[]? protectedKey = null;
             try
             {
+                _platformProbeCheckpoint?.Invoke(343);
                 protectedKey = ProtectedData.Protect(key, entropy, DataProtectionScope.CurrentUser);
+                _platformProbeCheckpoint?.Invoke(344);
                 PersistProtectedBlobOnce(path, protectedKey);
 
                 // A competing process may have won creation. Always return the
                 // persisted identity so both processes open the same database.
+                _platformProbeCheckpoint?.Invoke(345);
                 var persisted = UnprotectRequired(path, entropy);
+                _platformProbeCheckpoint?.Invoke(346);
                 CryptographicOperations.ZeroMemory(key);
+                _platformProbeCheckpoint?.Invoke(349);
                 return ValueTask.FromResult(persisted);
             }
             finally
