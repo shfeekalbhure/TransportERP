@@ -110,7 +110,7 @@ public partial class P1Stage5ParentLegalHoldGuard : Migration
               EXISTS (SELECT 1 FROM transport_erp.sync_operations o
                 WHERE o."Id"=OLD."SyncOperationId"
                   AND o."CompanyId"=OLD."CompanyId"
-                  AND o."BranchId"=OLD."BranchId"
+                  AND o."BranchId" IS NOT DISTINCT FROM OLD."BranchId"
                   AND NOT o."LegalHold"
                   AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
                        (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))

@@ -618,6 +618,7 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         Assert.Contains("ParentLegalHold", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("parent operation scope is immutable", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("NOT o.\"LegalHold\"", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("BranchId\" IS NOT DISTINCT FROM", conflictGuard, StringComparison.Ordinal);
         var propagationGuard = await db.Database.SqlQuery<string>($"""
             SELECT pg_get_functiondef('transport_erp.propagate_sync_operation_legal_hold()'::regprocedure) AS "Value"
             """).SingleAsync();
