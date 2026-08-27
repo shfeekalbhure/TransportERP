@@ -227,7 +227,15 @@ internal static class DesktopRuntimePlatformProbe
                 var attempt = Guid.Parse(request.Headers.GetValues("X-Correlation-Id").Single());
                 if (!request.Headers.Contains("DPoP"))
                 {
-                    var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized);
+                    var challenge = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                    {
+                        Content = new StringContent(
+                            JsonSerializer.Serialize(
+                                new SyncV1ErrorResponse("use_dpop_nonce", attempt),
+                                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                            Encoding.UTF8,
+                            "application/json")
+                    };
                     challenge.Headers.TryAddWithoutValidation(
                         "DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
                     return challenge;
