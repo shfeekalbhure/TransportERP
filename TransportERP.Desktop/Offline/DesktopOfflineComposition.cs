@@ -326,12 +326,30 @@ public static class DesktopOfflineComposition
             signingKey?.Dispose();
             throw;
         }
-        catch
+        catch (Exception exception)
         {
+            diagnosticCheckpoint?.Invoke(DiagnosticFailureCheckpoint(exception));
             signingKey?.Dispose();
             return Closed(options, dependencies, "DESKTOP_SECURE_RUNTIME_UNAVAILABLE", security: true);
         }
     }
+
+    private static int DiagnosticFailureCheckpoint(Exception exception) => exception switch
+    {
+        DeviceProofKeyStoreException => 70,
+        OfflineStoreException { Code: "LOCAL_SECURE_STORAGE_UNAVAILABLE" } => 71,
+        OfflineStoreException { Code: "LOCAL_ENCRYPTION_KEY_INVALID" } => 72,
+        OfflineStoreException { Code: "LOCAL_ENCRYPTION_UNAVAILABLE" } => 73,
+        OfflineStoreException { Code: "LOCAL_STORE_OPEN_FAILED" } => 74,
+        OfflineStoreException { Code: "LOCAL_STORE_DECRYPTION_FAILED" } => 75,
+        OfflineStoreException => 76,
+        DllNotFoundException => 77,
+        TypeInitializationException => 78,
+        BadImageFormatException => 79,
+        CryptographicException => 80,
+        InvalidOperationException => 81,
+        _ => 89
+    };
 
     private sealed class DesktopSyncConnectivity(IDesktopSyncNetworkProvider network) : IOfflineSyncConnectivity
     {
