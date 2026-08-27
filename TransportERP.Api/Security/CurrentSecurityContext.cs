@@ -85,7 +85,18 @@ public sealed class CurrentSecurityContextService(
                 select device.Id).AnyAsync(cancellationToken);
             if (!bindingActive) return null;
         }
-        else if (principal.HasClaim(x => x.Type is "registered_device_id" or "device_credential_version")) return null;
+        else
+        {
+            if (principal.HasClaim(x => x.Type is "registered_device_id" or "device_credential_version"))
+                return null;
+            // An online-only token must not survive the later registration of its textual
+            // DeviceId. Registration revokes matching sessions under the same device advisory
+            // lock; this read-side check also closes legacy or interrupted rows fail-closed.
+            if (await db.RegisteredDevices.AsNoTracking().AnyAsync(device =>
+                    device.CompanyId == companyId && device.DeviceId == session.DeviceId,
+                    cancellationToken))
+                return null;
+        }
         return new CurrentSecurityContext(userId, companyId, branchId, sessionId, session.DeviceId, true,
             session.RegisteredDeviceId, session.DeviceCredentialVersion);
     }

@@ -178,6 +178,21 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
             var preview = await db.AuthSessions.AsNoTracking().SingleOrDefaultAsync(
                 x => x.RefreshTokenHash == hash, ct);
+            var unboundSessionSuperseded = false;
+            if (preview is { RegisteredDeviceId: null })
+            {
+                // Registration uses the identical device advisory key before locking matching
+                // unbound sessions. Taking it before the refresh-family lock preserves the global
+                // Device -> AuthSession lock order and closes register/refresh races.
+                if (db.Database.IsNpgsql())
+                {
+                    var lockKey = $"device|{preview.CompanyId}|{preview.DeviceId}";
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", ct);
+                }
+                unboundSessionSuperseded = await db.RegisteredDevices.AsNoTracking().AnyAsync(device =>
+                    device.CompanyId == preview.CompanyId && device.DeviceId == preview.DeviceId, ct);
+            }
             TrustedDeviceBinding? provenBinding = null;
             if (preview?.RegisteredDeviceId.HasValue == true)
             {
@@ -224,6 +239,10 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
             if (old.RevokedAt.HasValue) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_REUSE", provenBinding, correlationId, ip, transaction, ct);
             if (old.RefreshTokenExpiresAt <= now) return await RejectTrustedRefreshAsync(old, "REFRESH_TOKEN_EXPIRED", provenBinding, correlationId, ip, transaction, ct);
             if (!string.Equals(old.DeviceId, deviceId, StringComparison.Ordinal)) return await RejectTrustedRefreshAsync(old, "DEVICE_MISMATCH", provenBinding, correlationId, ip, transaction, ct);
+            if (!old.RegisteredDeviceId.HasValue && unboundSessionSuperseded)
+                return await RejectTrustedRefreshAsync(old,
+                    "DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED", provenBinding,
+                    correlationId, ip, transaction, ct);
 
             if (old.RegisteredDeviceId.HasValue &&
                 (provenBinding is null || provenBinding.RegisteredDeviceId != old.RegisteredDeviceId ||

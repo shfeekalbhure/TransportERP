@@ -56,6 +56,11 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
                     x.DeviceModel == deviceModel && x.OsVersion == osVersion);
                 if (replay is null || candidates.Count != 1)
                     throw new RegisteredDeviceException("DEVICE_REGISTRATION_CONFLICT");
+                var revokedUnboundSessions = await RevokeUnboundSessionsForRegistrationAsync(
+                    current.CompanyId, deviceId, DateTimeOffset.UtcNow, ct);
+                await db.SaveChangesAsync(ct);
+                await AppendRegistrationSessionRevocationAuditAsync(
+                    replay, current, correlationId, revokedUnboundSessions, ct);
                 await transaction.CommitAsync(ct);
                 return ToResponse(replay);
             }
@@ -69,8 +74,15 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
                 Status = "PENDING", RegisteredByUserId = current.UserId
             }, now);
             db.RegisteredDevices.Add(device);
+            // The device advisory lock is already held. Revoke every still-unbound session for
+            // this exact company/device before publishing the registration, so an online-only
+            // session cannot be downgraded into access to the newly trusted device identity.
+            var revokedUnboundSessions = await RevokeUnboundSessionsForRegistrationAsync(
+                current.CompanyId, deviceId, now, ct);
             await db.SaveChangesAsync(ct);
             await AppendAuditAsync("RegisteredDeviceCreated", device, current, correlationId, "PENDING", ct);
+            await AppendRegistrationSessionRevocationAuditAsync(
+                device, current, correlationId, revokedUnboundSessions, ct);
             await transaction.CommitAsync(ct);
             return ToResponse(device);
         }
@@ -417,6 +429,49 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
             session.UpdatedAt = now; session.RowVersion = RandomNumberGenerator.GetBytes(16);
         }
     }
+
+    private async Task<int> RevokeUnboundSessionsForRegistrationAsync(
+        Guid companyId,
+        string deviceId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var sessions = db.Database.IsNpgsql()
+            ? await db.AuthSessions.FromSqlInterpolated($$"""
+                SELECT * FROM transport_erp.auth_sessions
+                WHERE "CompanyId"={{companyId}} AND "DeviceId"={{deviceId}}
+                  AND "RegisteredDeviceId" IS NULL AND "RevokedAt" IS NULL
+                ORDER BY "Id" FOR UPDATE
+                """).ToListAsync(ct)
+            : await db.AuthSessions.Where(session =>
+                session.CompanyId == companyId && session.DeviceId == deviceId &&
+                session.RegisteredDeviceId == null && session.RevokedAt == null)
+                .OrderBy(session => session.Id)
+                .ToListAsync(ct);
+
+        foreach (var session in sessions)
+        {
+            session.RevokedAt = now;
+            session.RevokeReason = "DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED";
+            session.UpdatedAt = now;
+            session.RowVersion = RandomNumberGenerator.GetBytes(16);
+        }
+        return sessions.Count;
+    }
+
+    private Task AppendRegistrationSessionRevocationAuditAsync(
+        RegisteredDevice device,
+        CurrentSecurityContext actor,
+        Guid correlationId,
+        int revokedCount,
+        CancellationToken ct)
+        => AppendAuditAsync(
+            "RegisteredDeviceUnboundSessionsRevoked",
+            device,
+            actor,
+            correlationId,
+            $"Count={revokedCount};Reason=DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED",
+            ct);
 
     private Task AppendSeenAuditAsync(Guid deviceId, int credentialVersion, Guid userId, Guid companyId,
         Guid? branchId, Guid correlationId, string textualDeviceId, CancellationToken ct)

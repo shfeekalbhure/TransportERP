@@ -134,6 +134,286 @@ public sealed class P1SecurityHttpPostgreSqlTests
         Assert.Null(onlineOnlyStored.DeviceCredentialVersion);
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Registering_an_unknown_device_revokes_and_defensively_denies_its_old_unbound_session()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "DEVICE-DOWNGRADE");
+        var deviceId = $"downgrade-{Guid.NewGuid():N}";
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var onlineOnly = await LoginAsync(
+            client, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+        Assert.Equal(HttpStatusCode.OK, onlineOnly.Response.StatusCode);
+        Assert.NotNull(onlineOnly.Session);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", onlineOnly.Session!.AccessToken);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+
+        var devices = new RegisteredDeviceService(db, new AuditEventService(db));
+        var actor = DeviceAdministrator(scope);
+        var credential = NewDeviceCredential();
+        var registered = await devices.RegisterAsync(actor,
+            new(deviceId, "Downgrade regression device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await devices.ApproveAsync(registered.Id, actor, Guid.NewGuid(), default);
+        await devices.AddAssignmentAsync(registered.Id,
+            new(scope.User.Id, scope.BranchId), actor, Guid.NewGuid(), default);
+
+        var revoked = await db.AuthSessions.SingleAsync(
+            session => session.Id == onlineOnly.Session.SessionId);
+        Assert.NotNull(revoked.RevokedAt);
+        Assert.Equal("DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED", revoked.RevokeReason);
+        var revocationAudit = Assert.Single(await db.AuditEvents.AsNoTracking().Where(audit =>
+            audit.Action == "RegisteredDeviceUnboundSessionsRevoked" &&
+            audit.EntityId == registered.Id).ToListAsync());
+        Assert.Equal(
+            "Count=1;Reason=DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED",
+            revocationAudit.Reason);
+        Assert.Null(revocationAudit.BeforeJson);
+        Assert.Null(revocationAudit.AfterJson);
+        Assert.DoesNotContain(onlineOnly.Session.RefreshToken,
+            System.Text.Json.JsonSerializer.Serialize(revocationAudit), StringComparison.Ordinal);
+
+        // Re-open the legacy row deliberately to prove both request-time defenses rather than
+        // relying only on the registration mutation. Neither access nor refresh may upgrade it.
+        revoked.RevokedAt = null;
+        revoked.RevokeReason = null;
+        revoked.UpdatedAt = DateTimeOffset.UtcNow;
+        revoked.RowVersion = Guid.NewGuid().ToByteArray();
+        await db.SaveChangesAsync();
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = null;
+        var refresh = await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(onlineOnly.Session.RefreshToken, deviceId));
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var terminal = await verify.AuthSessions.AsNoTracking().SingleAsync(
+            session => session.Id == onlineOnly.Session.SessionId);
+        Assert.NotNull(terminal.RevokedAt);
+        Assert.Equal("DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED", terminal.RevokeReason);
+        Assert.False(await verify.AuthSessions.AnyAsync(session =>
+            session.CompanyId == scope.CompanyId && session.DeviceId == deviceId &&
+            session.RegisteredDeviceId == null && session.RevokedAt == null));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Login_and_registration_follow_both_deterministic_device_lock_orders(bool loginFirst)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        var scope = await SeedAsync(seedDb, loginFirst ? "LOGIN-FIRST" : "REGISTER-FIRST");
+        var deviceId = $"ordered-login-register-{Guid.NewGuid():N}";
+        using var factory = CreateFactory(connection);
+        using var loginClient = factory.CreateClient();
+        await using var registrationDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var devices = new RegisteredDeviceService(registrationDb, new AuditEventService(registrationDb));
+        var credential = NewDeviceCredential();
+
+        (HttpResponseMessage Response, IdentitySessionResponse? Session) login;
+        if (loginFirst)
+        {
+            login = await LoginAsync(loginClient, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+            _ = await devices.RegisterAsync(DeviceAdministrator(scope),
+                new(deviceId, "Ordered registration device", "TEST", "1", null, null,
+                    $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        }
+        else
+        {
+            _ = await devices.RegisterAsync(DeviceAdministrator(scope),
+                new(deviceId, "Ordered registration device", "TEST", "1", null, null,
+                    $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+            login = await LoginAsync(loginClient, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+        }
+
+        Assert.Equal(loginFirst ? HttpStatusCode.OK : HttpStatusCode.Unauthorized,
+            login.Response.StatusCode);
+        if (login.Session is { } session)
+        {
+            loginClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", session.AccessToken);
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await loginClient.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+        }
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.AuthSessions.AsNoTracking().AnyAsync(session =>
+            session.CompanyId == scope.CompanyId && session.DeviceId == deviceId &&
+            session.RegisteredDeviceId == null && session.RevokedAt == null));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Refresh_and_registration_follow_both_deterministic_device_lock_orders(bool refreshFirst)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        var scope = await SeedAsync(seedDb, refreshFirst ? "REFRESH-FIRST" : "REGISTER-REFRESH-FIRST");
+        var deviceId = $"ordered-refresh-register-{Guid.NewGuid():N}";
+        using var setupFactory = CreateFactory(connection);
+        using var setupClient = setupFactory.CreateClient();
+        var original = await LoginAsync(
+            setupClient, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+        Assert.NotNull(original.Session);
+
+        using var refreshFactory = CreateFactory(connection);
+        using var refreshClient = refreshFactory.CreateClient();
+        await using var registrationDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        var devices = new RegisteredDeviceService(registrationDb, new AuditEventService(registrationDb));
+        var credential = NewDeviceCredential();
+
+        HttpResponseMessage refresh;
+        if (refreshFirst)
+        {
+            refresh = await refreshClient.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+                new RefreshIdentitySessionRequest(original.Session!.RefreshToken, deviceId));
+            _ = await devices.RegisterAsync(DeviceAdministrator(scope),
+                new(deviceId, "Ordered refresh device", "TEST", "1", null, null,
+                    $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        }
+        else
+        {
+            _ = await devices.RegisterAsync(DeviceAdministrator(scope),
+                new(deviceId, "Ordered refresh device", "TEST", "1", null, null,
+                    $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+            refresh = await refreshClient.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+                new RefreshIdentitySessionRequest(original.Session!.RefreshToken, deviceId));
+        }
+
+        Assert.Equal(refreshFirst ? HttpStatusCode.OK : HttpStatusCode.Unauthorized,
+            refresh.StatusCode);
+        if (refresh.StatusCode == HttpStatusCode.OK)
+        {
+            var rotated = await refresh.Content.ReadFromJsonAsync<IdentitySessionResponse>();
+            Assert.NotNull(rotated);
+            refreshClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", rotated!.AccessToken);
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await refreshClient.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+        }
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.AuthSessions.AsNoTracking().AnyAsync(session =>
+            session.CompanyId == scope.CompanyId && session.DeviceId == deviceId &&
+            session.RegisteredDeviceId == null && session.RevokedAt == null));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Concurrent_unknown_device_refresh_and_registration_leave_no_active_unbound_family()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var registrationDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await registrationDb.Database.MigrateAsync();
+        var scope = await SeedAsync(registrationDb, "DEVICE-DOWNGRADE-RACE");
+        var deviceId = $"downgrade-race-{Guid.NewGuid():N}";
+        using var factory = CreateFactory(connection);
+        using var loginClient = factory.CreateClient();
+        using var refreshClient = factory.CreateClient();
+        var onlineOnly = await LoginAsync(
+            loginClient, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+        Assert.NotNull(onlineOnly.Session);
+
+        var devices = new RegisteredDeviceService(
+            registrationDb, new AuditEventService(registrationDb));
+        var credential = NewDeviceCredential();
+        var registerTask = devices.RegisterAsync(DeviceAdministrator(scope),
+            new(deviceId, "Downgrade race device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        var refreshTask = refreshClient.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(onlineOnly.Session!.RefreshToken, deviceId));
+        await Task.WhenAll(registerTask, refreshTask);
+
+        Assert.Contains(refreshTask.Result.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Unauthorized });
+        if (refreshTask.Result.StatusCode == HttpStatusCode.OK)
+        {
+            var raced = await refreshTask.Result.Content.ReadFromJsonAsync<IdentitySessionResponse>();
+            Assert.NotNull(raced);
+            refreshClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", raced!.AccessToken);
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await refreshClient.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+        }
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.AuthSessions.AsNoTracking().AnyAsync(session =>
+            session.CompanyId == scope.CompanyId && session.DeviceId == deviceId &&
+            session.RegisteredDeviceId == null && session.RevokedAt == null));
+        var familyId = await verify.AuthSessions.AsNoTracking()
+            .Where(session => session.Id == onlineOnly.Session.SessionId)
+            .Select(session => session.RefreshTokenFamilyId)
+            .SingleAsync();
+        Assert.All(await verify.AuthSessions.AsNoTracking()
+            .Where(session => session.RefreshTokenFamilyId == familyId).ToListAsync(),
+            session =>
+            {
+                Assert.NotNull(session.RevokedAt);
+                Assert.Contains(session.RevokeReason,
+                    new[] { "ROTATED", "DEVICE_REGISTERED_REAUTHENTICATION_REQUIRED" });
+            });
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Concurrent_unknown_device_login_and_registration_are_linearized_by_the_device_lock()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var registrationDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await registrationDb.Database.MigrateAsync();
+        var scope = await SeedAsync(registrationDb, "DEVICE-LOGIN-REGISTER-RACE");
+        var deviceId = $"login-register-race-{Guid.NewGuid():N}";
+        using var factory = CreateFactory(connection);
+        using var loginClient = factory.CreateClient();
+        var devices = new RegisteredDeviceService(
+            registrationDb, new AuditEventService(registrationDb));
+        var credential = NewDeviceCredential();
+
+        var loginTask = LoginAsync(
+            loginClient, scope, Password, scope.CompanyId, scope.BranchId, deviceId);
+        var registerTask = devices.RegisterAsync(DeviceAdministrator(scope),
+            new(deviceId, "Login registration race device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await Task.WhenAll(loginTask, registerTask);
+
+        Assert.Contains(loginTask.Result.Response.StatusCode,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Unauthorized });
+        if (loginTask.Result.Session is not null)
+        {
+            loginClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                "Bearer", loginTask.Result.Session.AccessToken);
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await loginClient.GetAsync("/api/v1/audit/events?take=1")).StatusCode);
+        }
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.True(await verify.RegisteredDevices.AsNoTracking().AnyAsync(device =>
+            device.CompanyId == scope.CompanyId && device.DeviceId == deviceId));
+        Assert.False(await verify.AuthSessions.AsNoTracking().AnyAsync(session =>
+            session.CompanyId == scope.CompanyId && session.DeviceId == deviceId &&
+            session.RegisteredDeviceId == null && session.RevokedAt == null));
+    }
+
     [Theory]
     [InlineData("suspend")]
     [InlineData("revoke")]
@@ -193,6 +473,66 @@ public sealed class P1SecurityHttpPostgreSqlTests
         await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
         Assert.False(await verify.AuthSessions.AnyAsync(x =>
             x.RegisteredDeviceId == registered.Id && x.RevokedAt == null));
+    }
+
+    [Theory]
+    [InlineData("expires-at")]
+    [InlineData("inactive-90-days")]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Bound_access_and_refresh_are_denied_after_device_expiry_or_inactivity(string expiryMode)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, $"BOUND-EXPIRY-{expiryMode.ToUpperInvariant()}");
+        var actor = DeviceAdministrator(scope);
+        var devices = new RegisteredDeviceService(db, new AuditEventService(db));
+        var credential = NewDeviceCredential();
+        var registered = await devices.RegisterAsync(actor,
+            new($"bound-expiry-{Guid.NewGuid():N}", "Bound expiring device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await devices.ApproveAsync(registered.Id, actor, Guid.NewGuid(), default);
+        await devices.AddAssignmentAsync(registered.Id,
+            new(scope.User.Id, scope.BranchId), actor, Guid.NewGuid(), default);
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var login = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId,
+            registered.DeviceId, credential);
+        Assert.Equal(HttpStatusCode.OK, login.Response.StatusCode);
+        Assert.NotNull(login.Session);
+
+        if (expiryMode == "expires-at")
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.registered_devices
+                SET "ExpiresAt"={{DateTimeOffset.UtcNow.AddMinutes(-1)}}
+                WHERE "Id"={{registered.Id}}
+                """);
+        }
+        else
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.registered_devices
+                SET "LastSeenAt"={{DateTimeOffset.UtcNow.Subtract(RegisteredDeviceService.InactivityLimit).AddMinutes(-1)}}
+                WHERE "Id"={{registered.Id}}
+                """);
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", login.Session!.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/v1/devices/current")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = null;
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+                new RefreshIdentitySessionRequest(
+                    login.Session.RefreshToken, registered.DeviceId, credential))).StatusCode);
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.AuthSessions.AsNoTracking().AnyAsync(session =>
+            session.RegisteredDeviceId == registered.Id && session.RevokedAt == null));
     }
 
     [Fact]
