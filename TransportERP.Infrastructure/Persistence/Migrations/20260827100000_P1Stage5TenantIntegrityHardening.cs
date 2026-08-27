@@ -55,12 +55,14 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
         CREATE INDEX ix_sync_conflict_retention_cleanup
           ON transport_erp.conflict_cases ("LegalHold","RedactedAt","Status","ResolvedAt");
 
-        CREATE FUNCTION transport_erp.enforce_sync_operation_stage5_retention()
+        ALTER FUNCTION transport_erp.enforce_sync_operation_device_binding()
+          RENAME TO enforce_sync_operation_device_binding_stage4_backup;
+        CREATE FUNCTION transport_erp.enforce_sync_operation_device_binding()
         RETURNS trigger LANGUAGE plpgsql AS $body$
         DECLARE redaction_allowed boolean := false;
         BEGIN
           IF TG_OP='UPDATE' THEN
-            IF OLD."Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND
+            IF OLD."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') AND
                (OLD."Status" IS DISTINCT FROM NEW."Status" OR
                 OLD."UpdatedAt" IS DISTINCT FROM NEW."UpdatedAt") THEN
               RAISE EXCEPTION 'sync operation terminal retention timestamp is immutable';
@@ -139,9 +141,11 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
         DROP TRIGGER trg_sync_operations_device_binding ON transport_erp.sync_operations;
         CREATE TRIGGER trg_sync_operations_device_binding
           BEFORE INSERT OR UPDATE ON transport_erp.sync_operations
-          FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_operation_stage5_retention();
+          FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_operation_device_binding();
 
-        CREATE FUNCTION transport_erp.enforce_sync_conflict_stage5_redaction()
+        ALTER FUNCTION transport_erp.enforce_sync_conflict_redaction()
+          RENAME TO enforce_sync_conflict_redaction_stage4_backup;
+        CREATE FUNCTION transport_erp.enforce_sync_conflict_redaction()
         RETURNS trigger LANGUAGE plpgsql AS $body$
         DECLARE redaction_allowed boolean := false;
         BEGIN
@@ -183,7 +187,7 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
         DROP TRIGGER trg_sync_conflict_redaction ON transport_erp.conflict_cases;
         CREATE TRIGGER trg_sync_conflict_redaction
           BEFORE INSERT OR UPDATE ON transport_erp.conflict_cases
-          FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_conflict_stage5_redaction();
+          FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_conflict_redaction();
 
         DO $body$
         BEGIN
@@ -390,16 +394,20 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
             FOREIGN KEY ("ReplacedByOperationId") REFERENCES transport_erp.sync_operations ("Id") ON DELETE RESTRICT;
 
         DROP TRIGGER trg_sync_conflict_redaction ON transport_erp.conflict_cases;
+        DROP FUNCTION transport_erp.enforce_sync_conflict_redaction();
+        ALTER FUNCTION transport_erp.enforce_sync_conflict_redaction_stage4_backup()
+          RENAME TO enforce_sync_conflict_redaction;
         CREATE TRIGGER trg_sync_conflict_redaction
           BEFORE INSERT OR UPDATE ON transport_erp.conflict_cases
           FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_conflict_redaction();
-        DROP FUNCTION transport_erp.enforce_sync_conflict_stage5_redaction();
 
         DROP TRIGGER trg_sync_operations_device_binding ON transport_erp.sync_operations;
+        DROP FUNCTION transport_erp.enforce_sync_operation_device_binding();
+        ALTER FUNCTION transport_erp.enforce_sync_operation_device_binding_stage4_backup()
+          RENAME TO enforce_sync_operation_device_binding;
         CREATE TRIGGER trg_sync_operations_device_binding
           BEFORE INSERT OR UPDATE ON transport_erp.sync_operations
           FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_sync_operation_device_binding();
-        DROP FUNCTION transport_erp.enforce_sync_operation_stage5_retention();
 
         DROP INDEX transport_erp.ix_sync_conflict_retention_cleanup;
         ALTER TABLE transport_erp.conflict_cases
