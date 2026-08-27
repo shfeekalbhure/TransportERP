@@ -91,6 +91,61 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Resolution_and_parent_legal_hold_follow_operation_then_conflict_without_deadlock()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        ConflictScope holdFirst;
+        ConflictScope resolveFirst;
+        await using (var seed = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            await seed.Database.MigrateAsync();
+            holdFirst = await SeedConflictAsync(seed, "HOLD-RESOLVE");
+            resolveFirst = await SeedConflictAsync(seed, "RESOLVE-HOLD");
+        }
+
+        await using (var holdDb = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        await using (var holdTransaction = await holdDb.Database.BeginTransactionAsync())
+        {
+            await holdDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.sync_operations SET "LegalHold"=TRUE
+                WHERE "Id"={{holdFirst.OperationId}}
+                """);
+            var resolverApplication = $"conflict-resolver-wait-{Guid.NewGuid():N}";
+            await using var resolveDb = PostgreSqlTestEnvironment.CreateDbContext(
+                WithApplicationName(connection, resolverApplication));
+            var resolveTask = ResolveAsync(
+                Service(resolveDb), holdFirst, KeepRequest("hold linearized before resolution"));
+            await WaitForLockWaiterAsync(connection, resolverApplication);
+            await holdTransaction.CommitAsync();
+            var resolved = await resolveTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal("RESOLVED", resolved.ConflictStatus);
+        }
+
+        await using (var resolveDb = PostgreSqlTestEnvironment.CreateDbContext(connection))
+            _ = await ResolveAsync(
+                Service(resolveDb), resolveFirst, KeepRequest("resolution linearized before hold"));
+        await using (var holdDb = PostgreSqlTestEnvironment.CreateDbContext(connection))
+            Assert.Equal(1, await holdDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.sync_operations SET "LegalHold"=TRUE
+                WHERE "Id"={{resolveFirst.OperationId}}
+                """));
+
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        foreach (var scope in new[] { holdFirst, resolveFirst })
+        {
+            var operation = await verify.SyncOperations.AsNoTracking()
+                .SingleAsync(item => item.Id == scope.OperationId);
+            var conflict = await verify.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == scope.ConflictId);
+            Assert.True(operation.LegalHold);
+            Assert.True(conflict.ParentLegalHold);
+            Assert.Equal("RESOLVED", conflict.Status);
+            Assert.Equal("REJECTED", operation.Status);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Scope_permission_reason_decision_and_repeat_resolution_fail_closed()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -572,6 +627,34 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
     private static SyncOperationService OperationService(TransportErpDbContext db)
         => new(db, new AuditEventService(db), new SyncRetryPolicy(5,
             TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(5)));
+
+    private static string WithApplicationName(string connection, string applicationName)
+    {
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connection)
+        {
+            ApplicationName = applicationName
+        };
+        return builder.ConnectionString;
+    }
+
+    private static async Task WaitForLockWaiterAsync(string connection, string applicationName)
+    {
+        await using var observer = new Npgsql.NpgsqlConnection(connection);
+        await observer.OpenAsync();
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            await using var command = new Npgsql.NpgsqlCommand("""
+                SELECT EXISTS (
+                  SELECT 1 FROM pg_stat_activity
+                  WHERE application_name=@applicationName AND wait_event_type='Lock')
+                """, observer);
+            command.Parameters.AddWithValue("applicationName", applicationName);
+            if (await command.ExecuteScalarAsync() is true) return;
+            await Task.Delay(25);
+        }
+        throw new Xunit.Sdk.XunitException(
+            "Conflict resolution did not reach the expected operation lock barrier.");
+    }
 
     private const string Payload = "{\"FreightTotal\":100}";
     private static readonly string PayloadHash = Convert.ToHexString(

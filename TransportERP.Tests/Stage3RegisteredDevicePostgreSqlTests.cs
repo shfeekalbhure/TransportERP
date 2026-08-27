@@ -635,6 +635,19 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
             ScopeType = "COMPANY", CompanyId = company.Id, BranchId = null,
             CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
         });
+        var devicePermissionOverride = new UserPermissionOverride
+        {
+            UserId = user.Id,
+            PermissionId = Guid.Parse("d1000000-0000-4000-8000-000000000002"),
+            IsAllowed = false,
+            Reason = "migration down data-loss guard",
+            CompanyId = company.Id,
+            BranchId = null,
+            CreatedAt = now,
+            UpdatedAt = now,
+            RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        db.UserPermissionOverrides.Add(devicePermissionOverride);
         await db.SaveChangesAsync();
 
         Assert.Equal(1, await db.Database.SqlQuery<int>($"""
@@ -744,6 +757,12 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
             WHERE "RoleId"={operationalRole.Id}
               AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid
             """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.user_permission_overrides
+            WHERE "UserId"={user.Id}
+              AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid
+              AND NOT "IsAllowed" AND "Reason"='migration down data-loss guard'
+            """).SingleAsync());
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             DELETE FROM transport_erp.auth_sessions WHERE "Id"={boundSessionId};
@@ -751,6 +770,8 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
             DELETE FROM transport_erp.registered_device_assignments WHERE "Id"={assignment.Id};
             DELETE FROM transport_erp.registered_devices WHERE "Id"={registered.Id};
             DELETE FROM transport_erp.role_permissions WHERE "RoleId"={operationalRole.Id}
+              AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid;
+            DELETE FROM transport_erp.user_permission_overrides WHERE "UserId"={user.Id}
               AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid
             """);
         await migrator.MigrateAsync(Previous);

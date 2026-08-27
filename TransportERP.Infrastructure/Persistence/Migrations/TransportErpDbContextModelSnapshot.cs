@@ -634,6 +634,11 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("ParentLegalHold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTimeOffset?>("RedactedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -685,12 +690,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "BranchId", "Status", "CreatedAt");
 
-                    b.HasIndex("LegalHold", "RedactedAt", "Status", "ResolvedAt")
+                    b.HasIndex("LegalHold", "ParentLegalHold", "RedactedAt", "Status", "ResolvedAt")
                         .HasDatabaseName("ix_sync_conflict_retention_cleanup");
 
                     b.ToTable("conflict_cases", "transport_erp", t =>
                         {
-                            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND \"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND \"RetentionDaysApplied\" IS NOT NULL AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"ResolvedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
+                            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND NOT \"ParentLegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND \"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND \"RetentionDaysApplied\" IS NOT NULL AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"ResolvedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
 
                             t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
                         });

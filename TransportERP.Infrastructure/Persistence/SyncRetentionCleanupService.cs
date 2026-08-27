@@ -102,15 +102,31 @@ public sealed class SyncRetentionCleanupService(
                         continue;
                     var remaining = batchSize - redactedConflicts;
                     var affected = await db.Database.ExecuteSqlInterpolatedAsync($$"""
-                        WITH candidates AS (
-                          SELECT c."Id"
+                        WITH locked_operations AS MATERIALIZED (
+                          SELECT o."Id"
                           FROM transport_erp.conflict_cases c
                           JOIN transport_erp.sync_operations o ON o."Id"=c."SyncOperationId"
                           WHERE o."CompanyId"={{scope.CompanyId}}
                             AND o."BranchId" IS NOT DISTINCT FROM {{scope.BranchId}}
                             AND o."RegisteredDeviceId" IS NOT DISTINCT FROM {{scope.RegisteredDeviceId}}
                             AND o."DeviceId"={{scope.DeviceId}}
-                            AND NOT c."LegalHold" AND NOT o."LegalHold"
+                            AND NOT c."LegalHold" AND NOT c."ParentLegalHold" AND NOT o."LegalHold"
+                            AND c."RedactedAt" IS NULL
+                            AND c."RetentionDaysApplied" IS NULL
+                            AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
+                            AND c."ResolvedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
+                            AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+                            AND o."UpdatedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
+                          ORDER BY c."ResolvedAt",c."Id"
+                          FOR UPDATE OF o SKIP LOCKED
+                          LIMIT {{remaining}}
+                        ),
+                        candidates AS MATERIALIZED (
+                          SELECT c."Id"
+                          FROM transport_erp.conflict_cases c
+                          JOIN locked_operations selected_o ON selected_o."Id"=c."SyncOperationId"
+                          JOIN transport_erp.sync_operations o ON o."Id"=selected_o."Id"
+                          WHERE NOT c."LegalHold" AND NOT c."ParentLegalHold" AND NOT o."LegalHold"
                             AND c."RedactedAt" IS NULL
                             AND c."RetentionDaysApplied" IS NULL
                             AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
@@ -125,8 +141,10 @@ public sealed class SyncRetentionCleanupService(
                         SET "DeviceSnapshot"='{}',"ServerSnapshot"='{}',
                             "RetentionDaysApplied"={{policy.ServerPayloadDays}},
                             "RedactedAt"=clock_timestamp()
-                        FROM candidates selected
-                        WHERE c."Id"=selected."Id" AND NOT c."LegalHold" AND c."RedactedAt" IS NULL
+                        FROM candidates selected, transport_erp.sync_operations o
+                        WHERE c."Id"=selected."Id" AND o."Id"=c."SyncOperationId"
+                          AND NOT c."LegalHold" AND NOT c."ParentLegalHold"
+                          AND NOT o."LegalHold" AND c."RedactedAt" IS NULL
                         """, cancellationToken);
                     redactedConflicts += affected;
                     if (affected > 0) appliedPolicies.Add(policy);
@@ -207,7 +225,7 @@ public sealed class SyncRetentionCleanupService(
                      COALESCE(o."RegisteredDeviceId"::text,'') || '|' || o."DeviceId" AS "ScopeKey"
             FROM transport_erp.conflict_cases c
             JOIN transport_erp.sync_operations o ON o."Id"=c."SyncOperationId"
-            WHERE NOT c."LegalHold" AND NOT o."LegalHold"
+            WHERE NOT c."LegalHold" AND NOT c."ParentLegalHold" AND NOT o."LegalHold"
               AND c."RedactedAt" IS NULL AND c."RetentionDaysApplied" IS NULL
               AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
               AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')

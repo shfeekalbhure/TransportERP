@@ -410,6 +410,7 @@ public sealed class ConflictCase : P1Entity
     public string DeviceSnapshot { get; set; } = string.Empty;
     public string ServerSnapshot { get; set; } = string.Empty;
     public bool LegalHold { get; set; }
+    public bool ParentLegalHold { get; set; }
     public int? RetentionDaysApplied { get; set; }
     public DateTimeOffset? RedactedAt { get; set; }
     public string ConflictReason { get; set; } = string.Empty;

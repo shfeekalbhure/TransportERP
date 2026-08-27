@@ -104,6 +104,18 @@ public sealed class SyncConflictResolutionService(
                     cancellationToken);
             }
 
+            // Legal-hold propagation owns the parent operation before its conflict. Resolve in
+            // the same global order to prevent operation-hold versus resolution deadlocks.
+            var operations = await db.SyncOperations.FromSqlInterpolated($$"""
+                SELECT o.* FROM transport_erp.sync_operations AS o
+                JOIN transport_erp.conflict_cases AS c
+                  ON c."SyncOperationId"=o."Id" AND c."CompanyId"=o."CompanyId"
+                WHERE c."Id"={{conflictCaseId}}
+                FOR UPDATE OF o
+                """).AsTracking().ToListAsync(cancellationToken);
+            var operation = operations.SingleOrDefault()
+                ?? throw new SyncRuleException("CONFLICT_NOT_FOUND", conflictCaseId.ToString());
+
             var conflicts = await db.ConflictCases.FromSqlInterpolated($$"""
                 SELECT c.* FROM transport_erp.conflict_cases AS c
                 WHERE c."Id"={{conflictCaseId}}
@@ -111,14 +123,8 @@ public sealed class SyncConflictResolutionService(
                 """).AsTracking().ToListAsync(cancellationToken);
             var conflict = conflicts.SingleOrDefault()
                 ?? throw new SyncRuleException("CONFLICT_NOT_FOUND", conflictCaseId.ToString());
-
-            var operations = await db.SyncOperations.FromSqlInterpolated($$"""
-                SELECT o.* FROM transport_erp.sync_operations AS o
-                WHERE o."Id"={{conflict.SyncOperationId}}
-                FOR UPDATE OF o
-                """).AsTracking().ToListAsync(cancellationToken);
-            var operation = operations.SingleOrDefault()
-                ?? throw new SyncRuleException("OPERATION_NOT_FOUND", conflict.SyncOperationId.ToString());
+            if (conflict.SyncOperationId != operation.Id || conflict.CompanyId != operation.CompanyId)
+                throw new SyncRuleException("CONFLICT_SCOPE_MISMATCH", conflictCaseId.ToString());
 
             await EnsureAuthorityAsync(conflict, operation, context, cancellationToken);
             await EnsureFreshAcceptedProofAsync(acceptedProof, cancellationToken);

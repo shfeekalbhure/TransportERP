@@ -259,6 +259,11 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
                 SET "ResolvedAt"=clock_timestamp()-INTERVAL '91 days'
                 WHERE "Id"={{recentConflict.Id}}
                 """), "resolution retention timestamp is immutable");
+            await AssertDeniedAsync(() => db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.conflict_cases
+                SET "ParentLegalHold"=TRUE
+                WHERE "Id"={{recentConflict.Id}}
+                """), "parent legal hold is derived");
 
             _ = await RetentionService(db).CleanupBatchAsync();
             db.ChangeTracker.Clear();
@@ -340,6 +345,123 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Operation_legal_hold_committing_first_makes_parallel_conflict_cleanup_skip_without_deadlock()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        Guid companyId;
+        Guid operationId;
+        Guid conflictId;
+        await using (var seed = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            await seed.Database.MigrateAsync();
+            var scope = await SeedScopeAsync(seed);
+            companyId = scope.CompanyId;
+            var old = DateTimeOffset.UtcNow.AddDays(-91);
+            var operation = await AddOperationAsync(
+                seed, scope, "RESOLVED", old, old, "{\"race\":\"parent\"}");
+            var conflict = await AddConflictAsync(
+                seed, scope, operation, old, old,
+                "{\"race\":\"device\"}", "{\"race\":\"server\"}");
+            operationId = operation.Id;
+            conflictId = conflict.Id;
+        }
+
+        try
+        {
+            await using var holdDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            await using var holdTransaction = await holdDb.Database.BeginTransactionAsync();
+            await holdDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.sync_operations
+                SET "LegalHold"=TRUE
+                WHERE "Id"={{operationId}}
+                """);
+
+            await using var firstCleanupDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            await using var secondCleanupDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var cleanupResults = await Task.WhenAll(
+                    RetentionService(firstCleanupDb).CleanupBatchAsync(1),
+                    RetentionService(secondCleanupDb).CleanupBatchAsync(1))
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(0, cleanupResults.Sum(result => result.RedactedConflictCases));
+
+            await holdTransaction.CommitAsync();
+            await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var parent = await verify.SyncOperations.AsNoTracking()
+                .SingleAsync(operation => operation.Id == operationId);
+            var conflict = await verify.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == conflictId);
+            Assert.True(parent.LegalHold);
+            Assert.True(conflict.ParentLegalHold);
+            Assert.Null(parent.RedactedAt);
+            Assert.Null(conflict.RedactedAt);
+            Assert.Contains("device", conflict.DeviceSnapshot, StringComparison.Ordinal);
+            Assert.Contains("server", conflict.ServerSnapshot, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await using var cleanup = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            await DeleteScopeEvidenceAsync(cleanup, companyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Conflict_redaction_committing_first_rejects_a_late_parent_hold_without_mixed_state()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db);
+        var old = DateTimeOffset.UtcNow.AddDays(-91);
+        var operation = await AddOperationAsync(
+            db, scope, "RESOLVED", old, old, "{\"race\":\"cleanup-first-parent\"}");
+        var conflict = await AddConflictAsync(
+            db, scope, operation, old, old,
+            "{\"race\":\"cleanup-first-device\"}", "{\"race\":\"cleanup-first-server\"}");
+
+        try
+        {
+            await using var redactionTransaction = await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.conflict_cases
+                SET "DeviceSnapshot"='{}',"ServerSnapshot"='{}',
+                    "RetentionDaysApplied"=90,"RedactedAt"=clock_timestamp()
+                WHERE "Id"={{conflict.Id}}
+                """);
+            var holdApplication = $"retention-cleanup-first-hold-{Guid.NewGuid():N}";
+            await using var holdDb = PostgreSqlTestEnvironment.CreateDbContext(
+                WithApplicationName(connection, holdApplication));
+            var holdTask = holdDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                    UPDATE transport_erp.sync_operations
+                    SET "LegalHold"=TRUE
+                    WHERE "Id"={{operation.Id}}
+                    """);
+            await WaitForLockWaiterAsync(connection, holdApplication);
+            await redactionTransaction.CommitAsync();
+            var lateHold = await Assert.ThrowsAnyAsync<Exception>(() => holdTask);
+            var postgres = Assert.IsType<Npgsql.PostgresException>(lateHold.GetBaseException());
+            Assert.Equal("ck_conflict_snapshot_redaction_shape", postgres.ConstraintName);
+
+            await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var persistedOperation = await verify.SyncOperations.AsNoTracking()
+                .SingleAsync(item => item.Id == operation.Id);
+            var persistedConflict = await verify.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == conflict.Id);
+            Assert.False(persistedOperation.LegalHold);
+            Assert.Contains("cleanup-first-parent", persistedOperation.PayloadJson, StringComparison.Ordinal);
+            Assert.False(persistedConflict.ParentLegalHold);
+            Assert.NotNull(persistedConflict.RedactedAt);
+            Assert.Equal("{}", persistedConflict.DeviceSnapshot);
+            Assert.Equal("{}", persistedConflict.ServerSnapshot);
+        }
+        finally
+        {
+            await DeleteScopeEvidenceAsync(db, scope.CompanyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Migration_catalog_contains_one_way_retention_guards()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -363,6 +485,16 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
             WHERE schemaname='transport_erp'
               AND indexname IN ('ix_sync_operation_retention_cleanup','ix_sync_conflict_retention_cleanup')
             """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value"
+            FROM information_schema.columns
+            WHERE table_schema='transport_erp' AND table_name='conflict_cases'
+              AND column_name='ParentLegalHold' AND data_type='boolean' AND is_nullable='NO'
+            """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM pg_trigger
+            WHERE tgname='trg_sync_operation_propagate_legal_hold' AND NOT tgisinternal
+            """).SingleAsync());
         var operationGuard = await db.Database.SqlQuery<string>($"""
             SELECT pg_get_functiondef('transport_erp.enforce_sync_operation_device_binding()'::regprocedure) AS "Value"
             """).SingleAsync();
@@ -375,6 +507,12 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         Assert.Contains("ResolvedAt", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("RetentionDaysApplied", conflictGuard, StringComparison.Ordinal);
         Assert.Contains("LegalHold", conflictGuard, StringComparison.Ordinal);
+        Assert.Contains("ParentLegalHold", conflictGuard, StringComparison.Ordinal);
+        var propagationGuard = await db.Database.SqlQuery<string>($"""
+            SELECT pg_get_functiondef('transport_erp.propagate_sync_operation_legal_hold()'::regprocedure) AS "Value"
+            """).SingleAsync();
+        Assert.Contains("ParentLegalHold", propagationGuard, StringComparison.Ordinal);
+        Assert.Contains("FOR UPDATE", propagationGuard, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -579,6 +717,34 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
             $"DELETE FROM transport_erp.sync_proof_replays WHERE \"CompanyId\"={companyId}");
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM transport_erp.sync_proof_nonces WHERE \"CompanyId\"={companyId}");
+    }
+
+    private static string WithApplicationName(string connection, string applicationName)
+    {
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connection)
+        {
+            ApplicationName = applicationName
+        };
+        return builder.ConnectionString;
+    }
+
+    private static async Task WaitForLockWaiterAsync(string connection, string applicationName)
+    {
+        await using var observer = new Npgsql.NpgsqlConnection(connection);
+        await observer.OpenAsync();
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            await using var command = new Npgsql.NpgsqlCommand("""
+                SELECT EXISTS (
+                  SELECT 1 FROM pg_stat_activity
+                  WHERE application_name=@applicationName AND wait_event_type='Lock')
+                """, observer);
+            command.Parameters.AddWithValue("applicationName", applicationName);
+            if (await command.ExecuteScalarAsync() is true) return;
+            await Task.Delay(25);
+        }
+        throw new Xunit.Sdk.XunitException(
+            "The late parent hold did not reach the conflict-row lock barrier.");
     }
 
     private static string Hash(string payload)

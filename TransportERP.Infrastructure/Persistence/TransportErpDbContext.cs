@@ -719,7 +719,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
             t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape",
                 "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
-                "(NOT \"LegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
+                "(NOT \"LegalHold\" AND NOT \"ParentLegalHold\" AND " +
+                "\"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
                 "\"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND " +
                 "\"RetentionDaysApplied\" IS NOT NULL AND " +
                 "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
@@ -729,6 +730,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         conflict.Property(x => x.DeviceSnapshot).HasColumnType("text").IsRequired();
         conflict.Property(x => x.ServerSnapshot).HasColumnType("text").IsRequired();
         conflict.Property(x => x.LegalHold).HasDefaultValue(false);
+        conflict.Property(x => x.ParentLegalHold).HasDefaultValue(false);
         conflict.Property(x => x.ConflictReason).HasMaxLength(500).IsRequired();
         conflict.Property(x => x.Resolution).HasMaxLength(1000);
         conflict.Property(x => x.ResolvedBy).HasMaxLength(120);
@@ -737,7 +739,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         conflict.HasIndex(x => new { x.ReplacedByOperationId, x.CompanyId });
         conflict.HasIndex(x => new { x.BranchId, x.CompanyId });
         conflict.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status, x.CreatedAt });
-        conflict.HasIndex(x => new { x.LegalHold, x.RedactedAt, x.Status, x.ResolvedAt })
+        conflict.HasIndex(x => new { x.LegalHold, x.ParentLegalHold, x.RedactedAt, x.Status, x.ResolvedAt })
             .HasDatabaseName("ix_sync_conflict_retention_cleanup");
         conflict.HasOne(x => x.SyncOperation).WithOne(x => x.ConflictCase)
             .HasForeignKey<ConflictCase>(x => new { x.SyncOperationId, x.CompanyId })

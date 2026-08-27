@@ -16,6 +16,7 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
     private const string Retention = "20260826090000_P1Stage4SyncRetentionRedaction";
     private const string BeforeStage5Hardening = "20260826095000_P1SyncConflictResolvePermission";
     private const string Stage5Hardening = "20260827100000_P1Stage5TenantIntegrityHardening";
+    private const string ParentLegalHoldGuard = "20260827110000_P1Stage5ParentLegalHoldGuard";
     private const string Htu = "https://sync.example.test/api/v1/sync/operations:batch";
 
     [Fact]
@@ -228,6 +229,108 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
             await migrator.MigrateAsync(Stage5Hardening);
             Assert.Equal(4, await Stage5RetentionColumnCountAsync(db));
         });
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Parent_legal_hold_guard_up_fails_named_and_preserves_legacy_redacted_conflict()
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(Stage5Hardening);
+            var accepted = await SeedAcceptedProofAsync(db, "PARENT-HOLD-UP-BLOCK");
+            var old = Normalize(DateTimeOffset.UtcNow.AddDays(-91));
+            var operationId = await InsertStage4OperationAsync(db, accepted, "SUCCEEDED", old);
+            var conflictId = Guid.NewGuid();
+            const string emptyJson = "{}";
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO transport_erp.conflict_cases
+                  ("Id","SyncOperationId","CompanyId","BranchId","BaseVersion","DeviceSnapshot",
+                   "ServerSnapshot","ConflictReason","Resolution","ResolvedBy","ResolvedAt",
+                   "ReplacedByOperationId","Status","LegalHold","RetentionDaysApplied","RedactedAt",
+                   "CreatedAt","UpdatedAt","RowVersion")
+                VALUES ({conflictId},{operationId},{accepted.Security.CompanyId},{accepted.Security.BranchId},NULL,
+                        {"{\"legacy\":\"device\"}"},{"{\"legacy\":\"server\"}"},
+                        'LEGACY_PARENT_HOLD','KEEP_SERVER','test',{old},NULL,
+                        'RESOLVED',FALSE,NULL,NULL,
+                        {old},{old},{RandomNumberGenerator.GetBytes(16)});
+                UPDATE transport_erp.conflict_cases
+                SET "DeviceSnapshot"={emptyJson},"ServerSnapshot"={emptyJson},
+                    "RetentionDaysApplied"=90,"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
+                WHERE "Id"={conflictId};
+                UPDATE transport_erp.sync_operations SET "LegalHold"=TRUE WHERE "Id"={operationId};
+                """);
+
+            var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
+                migrator.MigrateAsync(ParentLegalHoldGuard));
+            Assert.Contains(
+                "P1_STAGE5_PARENT_LEGAL_HOLD_UP_BLOCKED_LEGACY_REDACTED_CONFLICT",
+                failure.GetBaseException().Message,
+                StringComparison.Ordinal);
+            Assert.Equal(0, await MigrationHistoryCountAsync(db, ParentLegalHoldGuard));
+            Assert.Equal(0, await db.Database.SqlQuery<int>($"""
+                SELECT count(*)::int AS "Value" FROM information_schema.columns
+                WHERE table_schema='transport_erp' AND table_name='conflict_cases'
+                  AND column_name='ParentLegalHold'
+                """).SingleAsync());
+            Assert.True(await db.Database.SqlQuery<bool>($"""
+                SELECT "LegalHold" AS "Value" FROM transport_erp.sync_operations WHERE "Id"={operationId}
+                """).SingleAsync());
+            Assert.Equal(emptyJson, await db.Database.SqlQuery<string>($"""
+                SELECT "DeviceSnapshot" AS "Value" FROM transport_erp.conflict_cases WHERE "Id"={conflictId}
+                """).SingleAsync());
+        });
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Parent_legal_hold_guard_roundtrips_fresh_up_down_up()
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(Stage5Hardening);
+            Assert.Equal(0, await ParentLegalHoldSchemaObjectCountAsync(db));
+
+            await migrator.MigrateAsync(ParentLegalHoldGuard);
+            Assert.Equal(4, await ParentLegalHoldSchemaObjectCountAsync(db));
+            Assert.Equal(1, await MigrationHistoryCountAsync(db, ParentLegalHoldGuard));
+
+            await migrator.MigrateAsync(Stage5Hardening);
+            Assert.Equal(0, await ParentLegalHoldSchemaObjectCountAsync(db));
+            Assert.Equal(0, await MigrationHistoryCountAsync(db, ParentLegalHoldGuard));
+
+            await migrator.MigrateAsync(ParentLegalHoldGuard);
+            Assert.Equal(4, await ParentLegalHoldSchemaObjectCountAsync(db));
+            Assert.Equal(1, await MigrationHistoryCountAsync(db, ParentLegalHoldGuard));
+        });
+    }
+
+    private static async Task<int> ParentLegalHoldSchemaObjectCountAsync(TransportErpDbContext db)
+    {
+        var column = await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM information_schema.columns
+            WHERE table_schema='transport_erp' AND table_name='conflict_cases'
+              AND column_name='ParentLegalHold' AND data_type='boolean' AND is_nullable='NO'
+            """).SingleAsync();
+        var trigger = await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM pg_trigger
+            WHERE tgname='trg_sync_operation_propagate_legal_hold' AND NOT tgisinternal
+            """).SingleAsync();
+        var function = await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM pg_proc p
+            JOIN pg_namespace n ON n.oid=p.pronamespace
+            WHERE n.nspname='transport_erp' AND p.proname='propagate_sync_operation_legal_hold'
+            """).SingleAsync();
+        var index = await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM pg_indexes
+            WHERE schemaname='transport_erp' AND indexname='ix_sync_conflict_retention_cleanup'
+              AND indexdef LIKE '%ParentLegalHold%'
+            """).SingleAsync();
+        return column + trigger + function + index;
     }
 
     private static async Task<int> ExecutionSchemaObjectCountAsync(TransportErpDbContext db)
