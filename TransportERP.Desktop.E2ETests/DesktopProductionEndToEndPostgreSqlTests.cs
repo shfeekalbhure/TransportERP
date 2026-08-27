@@ -306,9 +306,9 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
 
     private static TransportErpDbContext CreateDbContext(string connection)
     {
-        var options = new DbContextOptionsBuilder<TransportErpDbContext>()
-            .UseNpgsql(connection).Options;
-        return new TransportErpDbContext(options);
+        var options = new DbContextOptionsBuilder<TransportErpDbContext>();
+        options.ConfigureTransportErpPostgreSql(connection);
+        return new TransportErpDbContext(options.Options);
     }
 
     private static string RequireConnection() =>
