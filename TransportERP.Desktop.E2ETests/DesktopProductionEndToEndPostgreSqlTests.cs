@@ -13,6 +13,7 @@ using TransportERP.Desktop.Application;
 using TransportERP.Desktop.Offline;
 using TransportERP.Infrastructure.Persistence;
 using TransportERP.Offline;
+using ApiProgram = global::Program;
 
 namespace TransportERP.Desktop.E2ETests;
 
@@ -118,7 +119,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
     }
 
     private static async Task ExecuteUntilCompleteAsync(
-        WebApplicationFactory<Program> factory,
+        WebApplicationFactory<ApiProgram> factory,
         string connection,
         SeededScope seeded,
         Guid clientOperationId)
@@ -158,11 +159,11 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         throw new TimeoutException("The production Desktop outbox did not observe SUCCEEDED.");
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(
+    private static WebApplicationFactory<ApiProgram> CreateFactory(
         string connection,
         string implementationSha,
         SeededScope seeded) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        new WebApplicationFactory<ApiProgram>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:TransportErp", connection);
             builder.UseSetting("Auth:Mode", "LocalSessions");
