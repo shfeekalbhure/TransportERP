@@ -95,8 +95,8 @@ public sealed class Stage4G4ServerClosurePostgreSqlTests
         {
             var mismatch = await Assert.ThrowsAsync<SyncRuleException>(() =>
                 service.EnqueueAcceptedSyncOperationAsync(mutation.Command, mutation.Proof));
-            Assert.True(mismatch.Code == "IDEMPOTENCY_MISMATCH",
-                $"Expected IDEMPOTENCY_MISMATCH for {mutation.Field}, received {mismatch.Code}.");
+            Assert.True(mismatch.Code == "IDEMPOTENCY_CONFLICT",
+                $"Expected IDEMPOTENCY_CONFLICT for {mutation.Field}, received {mismatch.Code}.");
             Assert.Equal(operationCount,
                 await db.SyncOperations.AsNoTracking().CountAsync(x =>
                     x.CompanyId == scope.Security.CompanyId &&

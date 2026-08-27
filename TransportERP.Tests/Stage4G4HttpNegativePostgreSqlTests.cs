@@ -192,14 +192,14 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         using var mutationResponse = await SendSignedAsync(
             client, proofKey, scope.Bearer, BatchBody(scope.DeviceId, mutated));
         var mutationResult = await SingleResultAsync(mutationResponse);
-        Assert.Equal("IDEMPOTENCY_MISMATCH", mutationResult.ErrorCode);
+        Assert.Equal("IDEMPOTENCY_CONFLICT", mutationResult.ErrorCode);
         var mutationAudits = await verify.AuditEvents.AsNoTracking().Where(x =>
             x.CompanyId == scope.CompanyId &&
             x.OperationCorrelationId == companyOperation.OperationCorrelationId &&
             x.Outcome == "REJECTED").ToListAsync();
         Assert.Equal(rejectionAuditCount + 1, mutationAudits.Count);
         Assert.Contains(mutationAudits, x =>
-            (x.Reason ?? string.Empty).Contains("IDEMPOTENCY_MISMATCH", StringComparison.Ordinal));
+            (x.Reason ?? string.Empty).Contains("IDEMPOTENCY_CONFLICT", StringComparison.Ordinal));
         Assert.Equal(3, await verify.SyncOperations.CountAsync(x =>
             x.CompanyId == scope.CompanyId &&
             new[] { companyOperation.ClientOperationId, branchOperation.ClientOperationId, missingOperation.ClientOperationId }
@@ -355,6 +355,19 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.False(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
         Assert.True(root.GetProperty("keyRecoveryAllowed").GetBoolean());
         Assert.True(root.GetProperty("allowedActions").GetArrayLength() > 0);
+        Assert.Equal(25, root.GetProperty("maxBatchOperations").GetInt32());
+        Assert.Equal(2_097_152, root.GetProperty("maximumRequestBodyBytes").GetInt32());
+        Assert.Equal(16_384, root.GetProperty("maximumPayloadBytes").GetInt32());
+        Assert.Equal(2, root.GetProperty("clientTransportMaxRetryCount").GetInt32());
+        Assert.Equal(10, root.GetProperty("clientTransportBaseSeconds").GetInt32());
+        Assert.Equal(20, root.GetProperty("clientTransportMaxDelayMinutes").GetInt32());
+        Assert.Equal(12, root.GetProperty("localSuccessHours").GetInt32());
+        Assert.Equal(4, root.GetProperty("localRejectedDays").GetInt32());
+        Assert.Equal(45, root.GetProperty("serverPayloadDays").GetInt32());
+        Assert.Equal(8, root.GetProperty("cacheMaxAgeHours").GetInt32());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("activationImplementationSha").ValueKind);
+        Assert.Equal("test-policy-open-v1", root.GetProperty("policySourceVersion").GetString());
+        Assert.Equal(new string('a', 64), root.GetProperty("policySourceFingerprint").GetString());
         Assert.DoesNotContain("credentialHash", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("rawBearer", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("nonce", body, StringComparison.OrdinalIgnoreCase);
@@ -815,7 +828,7 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
                 .ToHashSet(StringComparer.Ordinal);
             return Task.FromResult(new EffectiveSyncPolicy(
                 true, actions, new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
-                100, 2_097_152, 16_384, 5, 5, 5, 5, 30, 30, 24, 7, 90, 24,
+                25, 2_097_152, 16_384, 2, 5, 10, 5, 20, 30, 12, 4, 45, 8,
                 null, "test-policy-open-v1", new string('a', 64)));
         }
     }

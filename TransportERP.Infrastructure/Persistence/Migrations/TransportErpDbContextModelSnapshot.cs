@@ -629,8 +629,16 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("LegalHold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTimeOffset?>("RedactedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RetentionDaysApplied")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("ReplacedByOperationId")
                         .HasColumnType("uuid");
@@ -668,21 +676,21 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BranchId");
+                    b.HasIndex("BranchId", "CompanyId");
 
-                    b.HasIndex("ReplacedByOperationId");
+                    b.HasIndex("ReplacedByOperationId", "CompanyId");
 
-                    b.HasIndex("SyncOperationId")
+                    b.HasIndex("SyncOperationId", "CompanyId")
                         .IsUnique();
 
                     b.HasIndex("CompanyId", "BranchId", "Status", "CreatedAt");
 
-                    b.HasIndex("RedactedAt", "Status", "ResolvedAt")
+                    b.HasIndex("LegalHold", "RedactedAt", "Status", "ResolvedAt")
                         .HasDatabaseName("ix_sync_conflict_retention_cleanup");
 
                     b.ToTable("conflict_cases", "transport_erp", t =>
                         {
-                            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape", "(\"RedactedAt\" IS NULL) OR (\"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND \"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND \"RedactedAt\" >= \"ResolvedAt\" + INTERVAL '90 days')");
+                            t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND \"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"ResolvedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
 
                             t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
                         });
@@ -2295,6 +2303,11 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("NextRetryAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("LegalHold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("OperationType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2314,6 +2327,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("RedactedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RetentionDaysApplied")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("ProofKeyVersion")
                         .HasColumnType("integer");
@@ -2369,6 +2385,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("Id", "CompanyId");
+
                     b.HasIndex("BranchId", "CompanyId");
 
                     b.HasIndex("PayloadHash");
@@ -2401,7 +2419,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RegisteredDeviceId", "CompanyId", "DeviceId");
 
-                    b.HasIndex("RedactedAt", "Status", "UpdatedAt")
+                    b.HasIndex("LegalHold", "RedactedAt", "Status", "UpdatedAt")
                         .HasDatabaseName("ix_sync_operation_retention_cleanup");
 
                     b.HasIndex("Status", "NextRetryAt", "ExecutionLeaseExpiresAt", "CreatedAt")
@@ -2411,7 +2429,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
 
-                            t.HasCheckConstraint("ck_sync_payload_redaction_shape", "(\"RedactedAt\" IS NULL) OR (\"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') AND \"RedactedAt\" >= \"UpdatedAt\" + INTERVAL '90 days')");
+                            t.HasCheckConstraint("ck_sync_payload_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
 
                             t.HasCheckConstraint("ck_sync_execution_claim_bundle", "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND \"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"ExecutionAttemptStartedAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" > \"ExecutionAttemptStartedAt\") OR (\"Status\" <> 'SENDING' AND \"ExecutionClaimToken\" IS NULL AND \"ExecutionAttemptStartedAt\" IS NULL AND \"ExecutionLeaseExpiresAt\" IS NULL)");
 
@@ -3331,7 +3349,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
                         .WithMany()
-                        .HasForeignKey("BranchId")
+                        .HasForeignKey("BranchId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
@@ -3342,12 +3361,14 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasOne("TransportERP.Infrastructure.Persistence.SyncOperation", null)
                         .WithMany()
-                        .HasForeignKey("ReplacedByOperationId")
+                        .HasForeignKey("ReplacedByOperationId", "CompanyId")
+                        .HasPrincipalKey("Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TransportERP.Infrastructure.Persistence.SyncOperation", "SyncOperation")
                         .WithOne("ConflictCase")
-                        .HasForeignKey("TransportERP.Infrastructure.Persistence.ConflictCase", "SyncOperationId")
+                        .HasForeignKey("TransportERP.Infrastructure.Persistence.ConflictCase", "SyncOperationId", "CompanyId")
+                        .HasPrincipalKey("TransportERP.Infrastructure.Persistence.SyncOperation", "Id", "CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

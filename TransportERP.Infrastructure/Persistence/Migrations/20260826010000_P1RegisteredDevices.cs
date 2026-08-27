@@ -310,6 +310,40 @@ public partial class P1RegisteredDevices : Migration
         """);
 
     protected override void Down(MigrationBuilder migrationBuilder) => migrationBuilder.Sql("""
+        LOCK TABLE transport_erp.registered_devices,
+                   transport_erp.registered_device_assignments,
+                   transport_erp.auth_sessions,
+                   transport_erp.sync_operations,
+                   transport_erp.role_permissions,
+                   transport_erp.user_permission_overrides
+          IN ACCESS EXCLUSIVE MODE;
+
+        DO $body$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM transport_erp.registered_devices)
+             OR EXISTS (SELECT 1 FROM transport_erp.registered_device_assignments)
+             OR EXISTS (SELECT 1 FROM transport_erp.auth_sessions
+                        WHERE "RegisteredDeviceId" IS NOT NULL OR "DeviceCredentialVersion" IS NOT NULL)
+             OR EXISTS (SELECT 1 FROM transport_erp.sync_operations
+                        WHERE "RegisteredDeviceId" IS NOT NULL OR "RegisteredDeviceCredentialVersion" IS NOT NULL)
+             OR EXISTS (
+                  SELECT 1 FROM transport_erp.role_permissions rp
+                  JOIN transport_erp.roles r ON r."Id"=rp."RoleId"
+                  WHERE rp."PermissionId" IN
+                    ('d1000000-0000-4000-8000-000000000001'::uuid,
+                     'd1000000-0000-4000-8000-000000000002'::uuid,
+                     'd1000000-0000-4000-8000-000000000003'::uuid)
+                    AND NOT (r."Code"='SYSTEM_ADMIN' AND r."CompanyId" IS NOT NULL
+                             AND rp."ScopeType"='COMPANY' AND rp."CompanyId"=r."CompanyId"
+                             AND rp."BranchId" IS NULL))
+             OR EXISTS (SELECT 1 FROM transport_erp.user_permission_overrides WHERE "PermissionId" IN
+                          ('d1000000-0000-4000-8000-000000000001'::uuid,
+                           'd1000000-0000-4000-8000-000000000002'::uuid,
+                           'd1000000-0000-4000-8000-000000000003'::uuid)) THEN
+            RAISE EXCEPTION 'P1_REGISTERED_DEVICES_DOWN_BLOCKED_OPERATIONAL_DATA';
+          END IF;
+        END $body$;
+
         DELETE FROM transport_erp.user_permission_overrides WHERE "PermissionId" IN
           ('d1000000-0000-4000-8000-000000000001'::uuid,'d1000000-0000-4000-8000-000000000002'::uuid,
            'd1000000-0000-4000-8000-000000000003'::uuid);

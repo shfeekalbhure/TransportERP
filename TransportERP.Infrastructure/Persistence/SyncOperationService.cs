@@ -1244,7 +1244,7 @@ public sealed class SyncOperationService
             operation.RegisteredDeviceId != acceptedProof.RegisteredDeviceId ||
             operation.RequestFingerprintVersion != "fp-v1" || operation.RequestFingerprintHash is null ||
             !CryptographicOperations.FixedTimeEquals(operation.RequestFingerprintHash, fingerprint))
-            throw new SyncRuleException("IDEMPOTENCY_MISMATCH", operation.ClientOperationId);
+            throw new SyncRuleException("IDEMPOTENCY_CONFLICT", operation.ClientOperationId);
     }
 
     private static string CanonicalTimestamp(DateTimeOffset value)

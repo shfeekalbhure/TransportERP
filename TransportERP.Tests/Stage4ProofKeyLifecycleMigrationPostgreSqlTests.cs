@@ -11,8 +11,10 @@ public sealed class Stage4ProofKeyLifecycleMigrationPostgreSqlTests
 {
     private const string Stage4Foundation = "20260826030000_P1Stage4SyncIdempotencyFoundation";
     private const string ProofKeyLifecycle = "20260826040000_P1Stage4ProofKeyLifecycle";
+    private const string BeforeStage5Hardening = "20260826095000_P1SyncConflictResolvePermission";
     private const string Thumbprint = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     private const string RotatedThumbprint = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    private const string NeverUsedThumbprint = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC";
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
@@ -358,6 +360,105 @@ public sealed class Stage4ProofKeyLifecycleMigrationPostgreSqlTests
         });
     }
 
+    [Theory]
+    [InlineData("ROTATE")]
+    [InlineData("RECOVER")]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Rotate_and_recover_reject_current_or_historical_key_material_and_allow_never_used_key(
+        string changeType)
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            await db.Database.MigrateAsync();
+            var scope = await SeedScopeAsync(db, $"REUSE-{changeType}");
+
+            var bindChallenge = NewBindChallenge(scope);
+            db.RegisteredDeviceProofKeyChallenges.Add(bindChallenge);
+            await db.SaveChangesAsync();
+            var bindChange = NewBindChange(scope, bindChallenge);
+            await using (var bind = await db.Database.BeginTransactionAsync())
+            {
+                db.RegisteredDeviceProofKeyChanges.Add(bindChange);
+                await db.SaveChangesAsync();
+                bindChallenge.ConsumedAt = DateTimeOffset.UtcNow;
+                var device = await db.RegisteredDevices.SingleAsync(x => x.Id == scope.RegisteredDeviceId);
+                device.ProofPublicJwkCanonicalJson = "{\"key\":\"one\"}";
+                device.ProofKeyThumbprint = Thumbprint;
+                device.ProofKeyVersion = 1;
+                device.ProofKeyChangedAt = DateTimeOffset.UtcNow;
+                device.ProofKeyChangedByUserId = scope.UserId;
+                await db.SaveChangesAsync();
+                await bind.CommitAsync();
+            }
+
+            var sameCurrent = NewChangeChallenge(scope, changeType, 1, Thumbprint);
+            db.RegisteredDeviceProofKeyChallenges.Add(sameCurrent);
+            await AssertDbGuardAsync(db, "proof key material reuse denied");
+
+            var valid = NewChangeChallenge(scope, changeType, 1, RotatedThumbprint);
+            db.RegisteredDeviceProofKeyChallenges.Add(valid);
+            await db.SaveChangesAsync();
+            var validChange = NewChange(scope, valid, Thumbprint, 2);
+            await using (var rotate = await db.Database.BeginTransactionAsync())
+            {
+                db.RegisteredDeviceProofKeyChanges.Add(validChange);
+                await db.SaveChangesAsync();
+                valid.ConsumedAt = DateTimeOffset.UtcNow;
+                var device = await db.RegisteredDevices.SingleAsync(x => x.Id == scope.RegisteredDeviceId);
+                device.ProofPublicJwkCanonicalJson = "{\"key\":\"two\"}";
+                device.ProofKeyThumbprint = RotatedThumbprint;
+                device.ProofKeyVersion = 2;
+                device.ProofKeyChangedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync();
+                await rotate.CommitAsync();
+            }
+
+            var historical = NewChangeChallenge(scope, changeType, 2, Thumbprint);
+            db.RegisteredDeviceProofKeyChallenges.Add(historical);
+            await AssertDbGuardAsync(db, "proof key material reuse denied");
+
+            var neverUsed = NewChangeChallenge(scope, changeType, 2, NeverUsedThumbprint);
+            db.RegisteredDeviceProofKeyChallenges.Add(neverUsed);
+            await db.SaveChangesAsync();
+            Assert.True(await db.RegisteredDeviceProofKeyChallenges.AnyAsync(x => x.Id == neverUsed.Id));
+        });
+    }
+
+    [Theory]
+    [InlineData("ROTATE")]
+    [InlineData("RECOVER")]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Stage5_change_guard_blocks_same_key_challenge_created_before_hardening(string changeType)
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(BeforeStage5Hardening);
+            var scope = await SeedScopeAsync(db, $"LEGACY-REUSE-{changeType}");
+            var device = await db.RegisteredDevices.SingleAsync(x => x.Id == scope.RegisteredDeviceId);
+            device.ProofPublicJwkCanonicalJson = "{\"key\":\"one\"}";
+            device.ProofKeyThumbprint = Thumbprint;
+            device.ProofKeyVersion = 1;
+            device.ProofKeyChangedAt = DateTimeOffset.UtcNow;
+            device.ProofKeyChangedByUserId = scope.UserId;
+            await db.SaveChangesAsync();
+
+            var legacyChallenge = NewChangeChallenge(scope, changeType, 1, Thumbprint);
+            db.RegisteredDeviceProofKeyChallenges.Add(legacyChallenge);
+            await db.SaveChangesAsync();
+
+            await db.Database.MigrateAsync();
+            db.RegisteredDeviceProofKeyChanges.Add(NewChange(scope, legacyChallenge, Thumbprint, 2));
+            await AssertDbGuardAsync(db, "proof key material reuse denied");
+            Assert.Null(await db.RegisteredDeviceProofKeyChallenges.AsNoTracking()
+                .Where(x => x.Id == legacyChallenge.Id)
+                .Select(x => x.ConsumedAt)
+                .SingleAsync());
+        });
+    }
+
     [Fact]
     [Trait("Category", "PostgreSQL")]
     public async Task Challenge_and_change_requests_are_single_use_and_expired_challenges_fail_closed()
@@ -584,6 +685,30 @@ public sealed class Stage4ProofKeyLifecycleMigrationPostgreSqlTests
         ChangeType = "BIND", ExpectedProofKeyVersion = null, PreviousProofKeyThumbprint = null,
         NewProofKeyThumbprint = challenge.NewProofKeyThumbprint, ResultProofKeyVersion = 1,
         ChangedByUserId = scope.UserId, ChangedAt = DateTimeOffset.UtcNow
+    };
+
+    private static RegisteredDeviceProofKeyChallenge NewChangeChallenge(
+        ProofScope scope, string changeType, int expectedVersion, string newThumbprint) => new()
+    {
+        Id = Guid.NewGuid(), CompanyId = scope.CompanyId, RegisteredDeviceId = scope.RegisteredDeviceId,
+        DeviceId = scope.DeviceId, ChangeRequestId = Guid.NewGuid(), ChangeType = changeType,
+        ExpectedProofKeyVersion = expectedVersion, NewProofKeyThumbprint = newThumbprint,
+        ChallengeHash = RandomNumberGenerator.GetBytes(32), IssuedAt = DateTimeOffset.UtcNow,
+        ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5), CreatedByUserId = scope.UserId
+    };
+
+    private static RegisteredDeviceProofKeyChange NewChange(
+        ProofScope scope, RegisteredDeviceProofKeyChallenge challenge,
+        string previousThumbprint, int resultVersion) => new()
+    {
+        Id = Guid.NewGuid(), CompanyId = scope.CompanyId, RegisteredDeviceId = scope.RegisteredDeviceId,
+        DeviceId = scope.DeviceId, ChangeRequestId = challenge.ChangeRequestId, ChallengeId = challenge.Id,
+        ChangeType = challenge.ChangeType, ExpectedProofKeyVersion = challenge.ExpectedProofKeyVersion,
+        PreviousProofKeyThumbprint = previousThumbprint,
+        NewProofKeyThumbprint = challenge.NewProofKeyThumbprint,
+        ResultProofKeyVersion = resultVersion, ChangedByUserId = scope.UserId,
+        Reason = challenge.ChangeType == "RECOVER" ? "verified recovery" : null,
+        ChangedAt = DateTimeOffset.UtcNow
     };
 
     private static async Task AssertDbGuardAsync(TransportErpDbContext db, string message)

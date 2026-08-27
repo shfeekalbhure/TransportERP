@@ -14,6 +14,8 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
     private const string BeforeExecution = "20260826070000_P0OperationalPartyScopeHardening";
     private const string Execution = "20260826080000_P1Stage4SyncExecutionClaimFoundation";
     private const string Retention = "20260826090000_P1Stage4SyncRetentionRedaction";
+    private const string BeforeStage5Hardening = "20260826095000_P1SyncConflictResolvePermission";
+    private const string Stage5Hardening = "20260827100000_P1Stage5TenantIntegrityHardening";
     private const string Htu = "https://sync.example.test/api/v1/sync/operations:batch";
 
     [Fact]
@@ -155,6 +157,77 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
         });
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Stage5_hardening_upgrades_preexisting_redacted_rows_with_deterministic_90_day_stamp()
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(BeforeStage5Hardening);
+            var accepted = await SeedAcceptedProofAsync(db, "STAGE5-UPGRADE");
+            var operationId = await InsertStage4OperationAsync(
+                db, accepted, "SUCCEEDED", Normalize(DateTimeOffset.UtcNow.AddDays(-91)));
+            var conflictId = Guid.NewGuid();
+            var resolvedAt = Normalize(DateTimeOffset.UtcNow.AddDays(-91));
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO transport_erp.conflict_cases
+                  ("Id","SyncOperationId","CompanyId","BranchId","BaseVersion","DeviceSnapshot",
+                   "ServerSnapshot","ConflictReason","Resolution","ResolvedBy","ResolvedAt",
+                   "ReplacedByOperationId","Status","CreatedAt","UpdatedAt","RowVersion")
+                VALUES ({conflictId},{operationId},{accepted.Security.CompanyId},{accepted.Security.BranchId},NULL,
+                        {"{\"old\":true}"},{"{\"server\":true}"},'UPGRADE_TEST','KEEP_SERVER','test',
+                        {resolvedAt},NULL,'RESOLVED',{resolvedAt},{resolvedAt},{RandomNumberGenerator.GetBytes(16)})
+                """);
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE transport_erp.sync_operations
+                SET "PayloadJson"='{}',"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
+                WHERE "Id"={operationId}
+                """);
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE transport_erp.conflict_cases
+                SET "DeviceSnapshot"='{}',"ServerSnapshot"='{}',"RedactedAt"={Normalize(DateTimeOffset.UtcNow)}
+                WHERE "Id"={conflictId}
+                """);
+
+            await migrator.MigrateAsync(Stage5Hardening);
+            Assert.Equal(90, await db.Database.SqlQuery<int>($"""
+                SELECT "RetentionDaysApplied" AS "Value"
+                FROM transport_erp.sync_operations WHERE "Id"={operationId}
+                """).SingleAsync());
+            Assert.False(await db.Database.SqlQuery<bool>($"""
+                SELECT "LegalHold" AS "Value"
+                FROM transport_erp.sync_operations WHERE "Id"={operationId}
+                """).SingleAsync());
+            Assert.Equal(90, await db.Database.SqlQuery<int>($"""
+                SELECT "RetentionDaysApplied" AS "Value"
+                FROM transport_erp.conflict_cases WHERE "Id"={conflictId}
+                """).SingleAsync());
+            Assert.Equal(4, await Stage5RetentionColumnCountAsync(db));
+            Assert.Equal(1, await MigrationHistoryCountAsync(db, Stage5Hardening));
+        });
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Stage5_hardening_roundtrips_up_down_up_when_retention_data_is_absent()
+    {
+        await WithFreshDatabaseAsync(async connection =>
+        {
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(BeforeStage5Hardening);
+            Assert.Equal(0, await Stage5RetentionColumnCountAsync(db));
+            await migrator.MigrateAsync(Stage5Hardening);
+            Assert.Equal(4, await Stage5RetentionColumnCountAsync(db));
+            await migrator.MigrateAsync(BeforeStage5Hardening);
+            Assert.Equal(0, await Stage5RetentionColumnCountAsync(db));
+            await migrator.MigrateAsync(Stage5Hardening);
+            Assert.Equal(4, await Stage5RetentionColumnCountAsync(db));
+        });
+    }
+
     private static async Task<int> ExecutionSchemaObjectCountAsync(TransportErpDbContext db)
     {
         var columns = await db.Database.SqlQuery<int>($"""
@@ -207,6 +280,15 @@ public sealed class Stage4G4MigrationClosurePostgreSqlTests
             """).SingleAsync();
         return columns + indexes + constraints + triggers;
     }
+
+    private static Task<int> Stage5RetentionColumnCountAsync(TransportErpDbContext db) =>
+        db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value"
+            FROM information_schema.columns
+            WHERE table_schema='transport_erp'
+              AND table_name IN ('sync_operations','conflict_cases')
+              AND column_name IN ('LegalHold','RetentionDaysApplied')
+            """).SingleAsync();
 
     private static Task<int> MigrationHistoryCountAsync(
         TransportErpDbContext db,

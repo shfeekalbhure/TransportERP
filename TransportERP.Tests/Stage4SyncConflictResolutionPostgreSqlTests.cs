@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
@@ -152,6 +153,95 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Conflict_relations_are_tenant_and_branch_safe_under_direct_PostgreSQL_writes()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var companyA = await SeedConflictAsync(db, "TENANT-A");
+        var companyB = await SeedConflictAsync(db, "TENANT-B");
+
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value"
+            FROM transport_erp.conflict_cases c
+            JOIN transport_erp.sync_operations o
+              ON o."Id"=c."SyncOperationId" AND o."CompanyId"=c."CompanyId"
+             AND o."BranchId" IS NOT DISTINCT FROM c."BranchId"
+            WHERE c."Id"={companyA.ConflictId}
+            """).SingleAsync());
+
+        await AssertTenantGuardAsync(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.conflict_cases
+            SET "SyncOperationId"={companyB.OperationId}
+            WHERE "Id"={companyA.ConflictId}
+            """));
+        await AssertTenantGuardAsync(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.conflict_cases
+            SET "ReplacedByOperationId"={companyB.OperationId}
+            WHERE "Id"={companyA.ConflictId}
+            """));
+
+        var otherBranch = new Branch
+        {
+            Id = Guid.NewGuid(), CompanyId = companyA.CompanyId,
+            Code = $"B-{Guid.NewGuid():N}"[..12], NameAr = "فرع آخر",
+            Timezone = "Asia/Riyadh", Status = "ACTIVE",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        db.Branches.Add(otherBranch);
+        await db.SaveChangesAsync();
+        await AssertTenantGuardAsync(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.conflict_cases
+            SET "BranchId"={otherBranch.Id}
+            WHERE "Id"={companyA.ConflictId}
+            """));
+        await AssertTenantGuardAsync(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.conflict_cases
+            SET "BranchId"=NULL
+            WHERE "Id"={companyA.ConflictId}
+            """));
+
+        var branchlessOperationId = Guid.NewGuid();
+        var historicalPayload = "{\"legacy\":true}";
+        var historicalHash = Convert.ToHexString(
+            SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(historicalPayload))).ToLowerInvariant();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            ALTER TABLE transport_erp.sync_operations DISABLE TRIGGER USER;
+            INSERT INTO transport_erp.sync_operations
+              ("Id","DeviceId","UserId","CompanyId","BranchId","OperationType","EntityType","EntityId",
+               "ClientOperationId","PayloadJson","PayloadHash","ClientOccurredAt","ServerReceivedAt","Status",
+               "RetryCount","CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({branchlessOperationId},{"historical-branchless"},{companyA.UserId},{companyA.CompanyId},NULL,
+                    'UPDATE','Historical',NULL,{$"historical-{Guid.NewGuid():N}"},{historicalPayload},
+                    {historicalHash},{DateTimeOffset.UtcNow},{DateTimeOffset.UtcNow},'QUEUED',0,
+                    {DateTimeOffset.UtcNow},{DateTimeOffset.UtcNow},{RandomNumberGenerator.GetBytes(16)});
+            ALTER TABLE transport_erp.sync_operations ENABLE TRIGGER USER
+            """);
+        const string emptyJson = "{}";
+        await AssertTenantGuardAsync(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO transport_erp.conflict_cases
+              ("Id","SyncOperationId","CompanyId","BranchId","BaseVersion","DeviceSnapshot",
+               "ServerSnapshot","ConflictReason","Resolution","ResolvedBy","ResolvedAt",
+               "ReplacedByOperationId","Status","CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({Guid.NewGuid()},{branchlessOperationId},{companyA.CompanyId},{companyA.BranchId},NULL,
+                    {emptyJson},{emptyJson},'DIRECT_SCOPE_TEST',NULL,NULL,NULL,NULL,'OPEN',
+                    {DateTimeOffset.UtcNow},{DateTimeOffset.UtcNow},{RandomNumberGenerator.GetBytes(16)})
+            """));
+
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE transport_erp.conflict_cases
+            SET "ReplacedByOperationId"={companyA.OperationId}
+            WHERE "Id"={companyA.ConflictId}
+            """);
+        Assert.Equal(companyA.OperationId, await db.ConflictCases.AsNoTracking()
+            .Where(x => x.Id == companyA.ConflictId)
+            .Select(x => x.ReplacedByOperationId)
+            .SingleAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Reapply_enqueues_replacement_first_and_atomically_supersedes_original()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -260,7 +350,8 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         replacement.UpdatedAt = cutoff;
         await db.SaveChangesAsync();
 
-        var cleanup = await new SyncRetentionCleanupService(db, new AuditEventService(db))
+        var cleanup = await new SyncRetentionCleanupService(
+                db, new AuditEventService(db), FixedRetentionPolicyProvider.Instance)
             .CleanupBatchAsync();
         Assert.True(cleanup.RedactedOperations >= 2);
         db.ChangeTracker.Clear();
@@ -691,6 +782,13 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
         return new ResolverFixture(context, proof);
     }
 
+    private static async Task AssertTenantGuardAsync(Func<Task> action)
+    {
+        var failure = await Assert.ThrowsAsync<Npgsql.PostgresException>(action);
+        Assert.Equal("P0001", failure.SqlState);
+        Assert.Contains("tenant scope mismatch", failure.MessageText, StringComparison.Ordinal);
+    }
+
     private sealed class TestPermissionResolver(bool allowOriginal) : IEffectivePermissionResolver
     {
         public Task<bool> HasPermissionAsync(Guid userId, Guid companyId, Guid? branchId, string permissionCode,
@@ -722,5 +820,19 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
     private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => value;
+    }
+
+    private sealed class FixedRetentionPolicyProvider : IEffectiveSyncRetentionPolicyProvider
+    {
+        public static FixedRetentionPolicyProvider Instance { get; } = new();
+
+        public ValueTask<EffectiveSyncRetentionPolicy?> ResolveAsync(
+            Guid companyId,
+            Guid? branchId,
+            Guid? registeredDeviceId,
+            string? deviceId,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult<EffectiveSyncRetentionPolicy?>(
+                new(90, "retention-test-policy-v1", new string('a', 64)));
     }
 }

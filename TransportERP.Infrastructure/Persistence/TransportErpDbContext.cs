@@ -580,9 +580,11 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
             t.HasCheckConstraint("ck_sync_retry_count", "\"RetryCount\" >= 0");
             t.HasCheckConstraint("ck_sync_payload_redaction_shape",
-                "(\"RedactedAt\" IS NULL) OR " +
-                "(\"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') AND " +
-                "\"RedactedAt\" >= \"UpdatedAt\" + INTERVAL '90 days')");
+                "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
+                "(NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND " +
+                "\"Status\" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND " +
+                "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
+                "\"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
             t.HasCheckConstraint("ck_sync_execution_claim_bundle",
                 "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND " +
                 "\"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND " +
@@ -606,12 +608,14 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "\"ProofKeyThumbprint\" IS NOT NULL AND length(\"ProofKeyThumbprint\") = 43 AND \"AcceptedProofReplayId\" IS NOT NULL)");
         });
         sync.HasKey(x => x.Id);
+        sync.HasAlternateKey(x => new { x.Id, x.CompanyId });
         sync.Property(x => x.DeviceId).HasMaxLength(120).IsRequired();
         sync.Property(x => x.OperationType).HasMaxLength(20).IsRequired();
         sync.Property(x => x.EntityType).HasMaxLength(120).IsRequired();
         sync.Property(x => x.ClientOperationId).HasMaxLength(120).IsRequired();
         sync.Property(x => x.PayloadJson).HasColumnType("text").IsRequired();
         sync.Property(x => x.PayloadHash).HasMaxLength(128).IsRequired();
+        sync.Property(x => x.LegalHold).HasDefaultValue(false);
         sync.Property(x => x.Status).HasMaxLength(20).IsRequired();
         sync.Property(x => x.ErrorCode).HasMaxLength(80);
         sync.Property(x => x.ActionCode).HasMaxLength(120);
@@ -637,7 +641,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             .HasDatabaseName("ux_sync_operation_execution_claim");
         sync.HasIndex(x => new { x.Status, x.NextRetryAt, x.ExecutionLeaseExpiresAt, x.CreatedAt })
             .HasDatabaseName("ix_sync_operation_execution_queue");
-        sync.HasIndex(x => new { x.RedactedAt, x.Status, x.UpdatedAt })
+        sync.HasIndex(x => new { x.LegalHold, x.RedactedAt, x.Status, x.UpdatedAt })
             .HasDatabaseName("ix_sync_operation_retention_cleanup");
         sync.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         sync.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
@@ -713,26 +717,36 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         {
             t.HasCheckConstraint("ck_conflict_case_status", "\"Status\" IN ('OPEN','RESOLVED')");
             t.HasCheckConstraint("ck_conflict_snapshot_redaction_shape",
-                "(\"RedactedAt\" IS NULL) OR (\"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
+                "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
+                "(NOT \"LegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
                 "\"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND " +
-                "\"RedactedAt\" >= \"ResolvedAt\" + INTERVAL '90 days')");
+                "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
+                "\"RedactedAt\" >= \"ResolvedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
         });
         conflict.HasKey(x => x.Id);
         conflict.Property(x => x.DeviceSnapshot).HasColumnType("text").IsRequired();
         conflict.Property(x => x.ServerSnapshot).HasColumnType("text").IsRequired();
+        conflict.Property(x => x.LegalHold).HasDefaultValue(false);
         conflict.Property(x => x.ConflictReason).HasMaxLength(500).IsRequired();
         conflict.Property(x => x.Resolution).HasMaxLength(1000);
         conflict.Property(x => x.ResolvedBy).HasMaxLength(120);
         conflict.Property(x => x.Status).HasMaxLength(20).IsRequired();
-        conflict.HasIndex(x => x.SyncOperationId).IsUnique();
+        conflict.HasIndex(x => new { x.SyncOperationId, x.CompanyId }).IsUnique();
+        conflict.HasIndex(x => new { x.ReplacedByOperationId, x.CompanyId });
+        conflict.HasIndex(x => new { x.BranchId, x.CompanyId });
         conflict.HasIndex(x => new { x.CompanyId, x.BranchId, x.Status, x.CreatedAt });
-        conflict.HasIndex(x => new { x.RedactedAt, x.Status, x.ResolvedAt })
+        conflict.HasIndex(x => new { x.LegalHold, x.RedactedAt, x.Status, x.ResolvedAt })
             .HasDatabaseName("ix_sync_conflict_retention_cleanup");
         conflict.HasOne(x => x.SyncOperation).WithOne(x => x.ConflictCase)
-            .HasForeignKey<ConflictCase>(x => x.SyncOperationId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey<ConflictCase>(x => new { x.SyncOperationId, x.CompanyId })
+            .HasPrincipalKey<SyncOperation>(x => new { x.Id, x.CompanyId })
+            .OnDelete(DeleteBehavior.Restrict);
         conflict.HasOne<SyncOperation>().WithMany()
-            .HasForeignKey(x => x.ReplacedByOperationId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(x => new { x.ReplacedByOperationId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId })
+            .OnDelete(DeleteBehavior.Restrict);
         conflict.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
-        conflict.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        conflict.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.BranchId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId }).OnDelete(DeleteBehavior.Restrict);
     }
 }

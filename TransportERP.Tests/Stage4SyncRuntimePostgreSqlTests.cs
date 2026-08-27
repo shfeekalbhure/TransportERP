@@ -64,7 +64,7 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
         };
         var mismatch = await Assert.ThrowsAsync<SyncRuleException>(() =>
             operationService.EnqueueAcceptedSyncOperationAsync(changed, secondClaim));
-        Assert.Equal("IDEMPOTENCY_MISMATCH", mismatch.Code);
+        Assert.Equal("IDEMPOTENCY_CONFLICT", mismatch.Code);
 
         var duplicateProof = await Assert.ThrowsAsync<SyncProofRuntimeException>(() =>
             proofRuntime.ClaimAsync(scope.Security, Proof(firstNonce.Value, jti, scope.Thumbprint)));

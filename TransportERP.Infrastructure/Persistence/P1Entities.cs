@@ -409,6 +409,8 @@ public sealed class ConflictCase : P1Entity
     public long? BaseVersion { get; set; }
     public string DeviceSnapshot { get; set; } = string.Empty;
     public string ServerSnapshot { get; set; } = string.Empty;
+    public bool LegalHold { get; set; }
+    public int? RetentionDaysApplied { get; set; }
     public DateTimeOffset? RedactedAt { get; set; }
     public string ConflictReason { get; set; } = string.Empty;
     public string? Resolution { get; set; }
@@ -432,6 +434,8 @@ public sealed class SyncOperation : P1Entity
     public string ClientOperationId { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
+    public bool LegalHold { get; set; }
+    public int? RetentionDaysApplied { get; set; }
     public DateTimeOffset? RedactedAt { get; set; }
     public DateTimeOffset ClientOccurredAt { get; set; }
     public DateTimeOffset? ServerReceivedAt { get; set; }

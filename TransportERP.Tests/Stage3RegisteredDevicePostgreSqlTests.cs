@@ -621,6 +621,21 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
 
         await migrator.MigrateAsync(Current);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: true);
+        var operationalRole = new Role
+        {
+            Id = Guid.NewGuid(), Code = $"OPS-{Guid.NewGuid():N}"[..18], NameAr = "دور تشغيلي",
+            IsSystem = false, CompanyId = company.Id, Status = "ACTIVE",
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        };
+        db.Roles.Add(operationalRole);
+        db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = operationalRole.Id,
+            PermissionId = Guid.Parse("d1000000-0000-4000-8000-000000000002"),
+            ScopeType = "COMPANY", CompanyId = company.Id, BranchId = null,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        });
+        await db.SaveChangesAsync();
 
         Assert.Equal(1, await db.Database.SqlQuery<int>($"""
             SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations
@@ -724,12 +739,19 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
                'd1000000-0000-4000-8000-000000000002'::uuid,
                'd1000000-0000-4000-8000-000000000003'::uuid)
             """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.role_permissions
+            WHERE "RoleId"={operationalRole.Id}
+              AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid
+            """).SingleAsync());
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             DELETE FROM transport_erp.auth_sessions WHERE "Id"={boundSessionId};
             DELETE FROM transport_erp.sync_operations WHERE "Id"={boundId};
             DELETE FROM transport_erp.registered_device_assignments WHERE "Id"={assignment.Id};
-            DELETE FROM transport_erp.registered_devices WHERE "Id"={registered.Id}
+            DELETE FROM transport_erp.registered_devices WHERE "Id"={registered.Id};
+            DELETE FROM transport_erp.role_permissions WHERE "RoleId"={operationalRole.Id}
+              AND "PermissionId"='d1000000-0000-4000-8000-000000000002'::uuid
             """);
         await migrator.MigrateAsync(Previous);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: false);
