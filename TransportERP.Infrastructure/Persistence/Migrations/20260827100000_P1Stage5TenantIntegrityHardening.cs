@@ -28,7 +28,8 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
           ADD CONSTRAINT ck_sync_payload_redaction_shape CHECK (
             ("RedactedAt" IS NULL AND "RetentionDaysApplied" IS NULL) OR
             (NOT "LegalHold" AND "PayloadJson"='{}' AND
-             "Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND
+             ("Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+              ("Status"='FAILED' AND "NextRetryAt" IS NULL)) AND
              "RetentionDaysApplied" IS NOT NULL AND
              "RetentionDaysApplied" BETWEEN 1 AND 90 AND
              "RedactedAt">="UpdatedAt"+make_interval(days => "RetentionDaysApplied"))
@@ -76,7 +77,8 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
                 OLD."RedactedAt" IS NULL AND NEW."RedactedAt" IS NOT NULL AND
                 NOT OLD."LegalHold" AND NOT NEW."LegalHold" AND
                 NEW."PayloadJson"='{}' AND OLD."Status"=NEW."Status" AND
-                OLD."Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND
+                (OLD."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                 (OLD."Status"='FAILED' AND OLD."NextRetryAt" IS NULL)) AND
                 OLD."RetentionDaysApplied" IS NULL AND NEW."RetentionDaysApplied" BETWEEN 1 AND 90 AND
                 clock_timestamp()>=OLD."UpdatedAt"+make_interval(days => NEW."RetentionDaysApplied") AND
                 NEW."RedactedAt">=OLD."UpdatedAt"+make_interval(days => NEW."RetentionDaysApplied") AND
@@ -178,7 +180,8 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
               NEW."RedactedAt"<=clock_timestamp() AND
               EXISTS (SELECT 1 FROM transport_erp.sync_operations o
                 WHERE o."Id"=OLD."SyncOperationId" AND NOT o."LegalHold"
-                  AND o."Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED')
+                  AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                       (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                   AND clock_timestamp()>=o."UpdatedAt"+make_interval(days => NEW."RetentionDaysApplied")) AND
               (to_jsonb(OLD)-ARRAY['DeviceSnapshot','ServerSnapshot','RedactedAt','RetentionDaysApplied'])=
               (to_jsonb(NEW)-ARRAY['DeviceSnapshot','ServerSnapshot','RedactedAt','RetentionDaysApplied']);

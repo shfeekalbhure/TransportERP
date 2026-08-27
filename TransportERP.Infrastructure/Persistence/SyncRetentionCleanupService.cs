@@ -66,7 +66,8 @@ public sealed class SyncRetentionCleanupService(
                             AND NOT o."LegalHold"
                             AND o."RedactedAt" IS NULL
                             AND o."RetentionDaysApplied" IS NULL
-                            AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+                            AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                                 (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                             AND o."UpdatedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
                           ORDER BY o."UpdatedAt",o."Id"
                           FOR UPDATE OF o SKIP LOCKED
@@ -115,7 +116,8 @@ public sealed class SyncRetentionCleanupService(
                             AND c."RetentionDaysApplied" IS NULL
                             AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
                             AND c."ResolvedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
-                            AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+                            AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                                 (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                             AND o."UpdatedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
                           ORDER BY c."ResolvedAt",c."Id"
                           FOR UPDATE OF o SKIP LOCKED
@@ -131,7 +133,8 @@ public sealed class SyncRetentionCleanupService(
                             AND c."RetentionDaysApplied" IS NULL
                             AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
                             AND c."ResolvedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
-                            AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+                            AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                                 (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                             AND o."UpdatedAt"<=clock_timestamp()-make_interval(days => {{policy.ServerPayloadDays}})
                           ORDER BY c."ResolvedAt",c."Id"
                           FOR UPDATE OF c SKIP LOCKED
@@ -203,7 +206,8 @@ public sealed class SyncRetentionCleanupService(
             FROM transport_erp.sync_operations o
             WHERE NOT o."LegalHold" AND o."RedactedAt" IS NULL
               AND o."RetentionDaysApplied" IS NULL
-              AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+              AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                   (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
               AND (o."CompanyId"::text || '|' || COALESCE(o."BranchId"::text,'') || '|' ||
                    COALESCE(o."RegisteredDeviceId"::text,'') || '|' || o."DeviceId") > {{cursor}}
             GROUP BY o."CompanyId",o."BranchId",o."RegisteredDeviceId",o."DeviceId"
@@ -228,7 +232,8 @@ public sealed class SyncRetentionCleanupService(
             WHERE NOT c."LegalHold" AND NOT c."ParentLegalHold" AND NOT o."LegalHold"
               AND c."RedactedAt" IS NULL AND c."RetentionDaysApplied" IS NULL
               AND c."Status"='RESOLVED' AND c."ResolvedAt" IS NOT NULL
-              AND o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED','FAILED')
+              AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                   (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
               AND (o."CompanyId"::text || '|' || COALESCE(o."BranchId"::text,'') || '|' ||
                    COALESCE(o."RegisteredDeviceId"::text,'') || '|' || o."DeviceId") > {{cursor}}
             GROUP BY o."CompanyId",o."BranchId",o."RegisteredDeviceId",o."DeviceId"

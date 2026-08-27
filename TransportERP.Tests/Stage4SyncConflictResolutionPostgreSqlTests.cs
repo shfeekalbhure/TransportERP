@@ -166,7 +166,7 @@ public sealed class Stage4SyncConflictResolutionPostgreSqlTests
 
         var scopeError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(
             Service(db), scope, KeepRequest("reason"), Context(scope) with { BranchId = Guid.NewGuid() }));
-        Assert.Equal("SCOPE_DENIED", scopeError.Code);
+        Assert.Equal("CONFLICT_NOT_FOUND", scopeError.Code);
 
         db.ChangeTracker.Clear();
         var permissionError = await Assert.ThrowsAsync<SyncRuleException>(() => ResolveAsync(

@@ -164,6 +164,41 @@ public sealed class Stage4ProofKeyLifecycleRuntimePostgreSqlTests
         Assert.NotEqual(rotate.Result.ProofKeyThumbprint, recovery.Result.ProofKeyThumbprint);
     }
 
+    [Theory]
+    [InlineData("ROTATE")]
+    [InlineData("RECOVER")]
+    [Trait("Category", "PostgreSQL")]
+    public async Task A_second_live_challenge_for_the_same_new_key_is_rejected_by_the_service(string changeType)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db);
+        var validator = new ProofKeyChangeProofValidator();
+        var service = new ProofKeyLifecycleService(db, new AuditEventService(db), validator);
+        var current = new CurrentSecurityContext(scope.UserId, scope.CompanyId, scope.BranchId,
+            scope.SessionId, scope.DeviceName, true, scope.DeviceId, 1);
+        using var currentKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var nextKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        _ = await ExecuteAsync(service, validator, scope, current, "BIND", null,
+            currentKey, null, "pending-key-test-token");
+
+        var first = await service.CreateChallengeAsync(scope.DeviceId, current,
+            new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 1, PublicJwk(nextKey)),
+            Guid.NewGuid(), default);
+        Assert.NotNull(first.Challenge);
+        var failure = await Assert.ThrowsAsync<ProofKeyLifecycleException>(() =>
+            service.CreateChallengeAsync(scope.DeviceId, current,
+                new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 1, PublicJwk(nextKey)),
+                Guid.NewGuid(), default));
+
+        Assert.Equal("PROOF_KEY_REUSE_NOT_ALLOWED", failure.Code);
+        var thumbprint = validator.ReadPublicKey(PublicJwk(nextKey)).Thumbprint;
+        Assert.Equal(1, await db.RegisteredDeviceProofKeyChallenges.AsNoTracking().CountAsync(x =>
+            x.RegisteredDeviceId == scope.DeviceId && x.NewProofKeyThumbprint == thumbprint &&
+            x.ConsumedAt == null));
+    }
+
     [Fact]
     [Trait("Category", "PostgreSQL")]
     public async Task Rotation_wins_device_lock_and_old_key_claim_leaves_no_partial_replay()

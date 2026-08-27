@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -132,6 +133,82 @@ public sealed class P1SecurityHttpPostgreSqlTests
             .SingleAsync(x => x.Id == onlineOnly.Session!.SessionId);
         Assert.Null(onlineOnlyStored.RegisteredDeviceId);
         Assert.Null(onlineOnlyStored.DeviceCredentialVersion);
+    }
+
+    [Theory]
+    [InlineData("ROTATE")]
+    [InlineData("RECOVER")]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Duplicate_live_proof_key_challenge_returns_governed_error_not_http_500(string changeType)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, $"PENDING-{changeType}");
+        var actor = DeviceAdministrator(scope);
+        var devices = new RegisteredDeviceService(db, new AuditEventService(db));
+        var credential = NewDeviceCredential();
+        var registered = await devices.RegisterAsync(actor,
+            new($"pending-key-{Guid.NewGuid():N}", "Pending key HTTP device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await devices.ApproveAsync(registered.Id, actor, Guid.NewGuid(), default);
+        await devices.AddAssignmentAsync(registered.Id,
+            new(scope.User.Id, scope.BranchId), actor, Guid.NewGuid(), default);
+
+        using var currentKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var nextKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var validator = new ProofKeyChangeProofValidator();
+        var currentJwk = PublicJwk(currentKey);
+        var currentMaterial = validator.ReadPublicKey(currentJwk);
+        var storedDevice = await db.RegisteredDevices.SingleAsync(item => item.Id == registered.Id);
+        storedDevice.ProofPublicJwkCanonicalJson = currentMaterial.CanonicalJson;
+        storedDevice.ProofKeyThumbprint = currentMaterial.Thumbprint;
+        storedDevice.ProofKeyVersion = 1;
+        storedDevice.ProofKeyChangedAt = DateTimeOffset.UtcNow;
+        storedDevice.ProofKeyChangedByUserId = scope.User.Id;
+        storedDevice.UpdatedAt = DateTimeOffset.UtcNow;
+        storedDevice.RowVersion = RandomNumberGenerator.GetBytes(16);
+        var managePermission = await db.Permissions.SingleAsync(permission =>
+            permission.Code == RegisteredDevicePermissionCodes.Manage);
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            UserId = scope.User.Id,
+            PermissionId = managePermission.Id,
+            IsAllowed = true,
+            Reason = "proof-key HTTP regression",
+            CompanyId = scope.CompanyId,
+            BranchId = managePermission.ScopeType == "BRANCH" ? scope.BranchId : null,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = RandomNumberGenerator.GetBytes(16)
+        });
+        await db.SaveChangesAsync();
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var login = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId,
+            registered.DeviceId, credential);
+        Assert.Equal(HttpStatusCode.OK, login.Response.StatusCode);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", login.Session!.AccessToken);
+        var nextJwk = PublicJwk(nextKey);
+        var first = await client.PostAsJsonAsync(
+            $"/api/v1/devices/{registered.Id:D}/proof-key-challenges",
+            new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 1, nextJwk));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var duplicate = await client.PostAsJsonAsync(
+            $"/api/v1/devices/{registered.Id:D}/proof-key-challenges",
+            new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 1, nextJwk));
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+        using var error = JsonDocument.Parse(await duplicate.Content.ReadAsStringAsync());
+        Assert.Equal("PROOF_KEY_REUSE_NOT_ALLOWED",
+            error.RootElement.GetProperty("errorCode").GetString());
+        var nextThumbprint = validator.ReadPublicKey(nextJwk).Thumbprint;
+        Assert.Equal(1, await db.RegisteredDeviceProofKeyChallenges.AsNoTracking().CountAsync(item =>
+            item.RegisteredDeviceId == registered.Id &&
+            item.NewProofKeyThumbprint == nextThumbprint && item.ConsumedAt == null));
     }
 
     [Fact]
@@ -712,6 +789,21 @@ public sealed class P1SecurityHttpPostgreSqlTests
     private static string NewDeviceCredential()
         => Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
+    private static JsonElement PublicJwk(ECDsa key)
+    {
+        var parameters = key.ExportParameters(false);
+        return JsonSerializer.SerializeToElement(new Dictionary<string, object?>
+        {
+            ["kty"] = "EC",
+            ["crv"] = "P-256",
+            ["x"] = Base64Url(parameters.Q.X!),
+            ["y"] = Base64Url(parameters.Q.Y!)
+        });
+    }
+
+    private static string Base64Url(byte[] value)
+        => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
     private static WebApplicationFactory<Program> CreateFactory(string connection)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -732,9 +824,12 @@ public sealed class P1SecurityHttpPostgreSqlTests
             MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
+        // Company.Code is capped at 18 characters. Putting the scenario suffix first used to
+        // truncate the random tail for long names, so parallel cases could insert the same code.
+        var companyCode = $"SEC-{Guid.NewGuid():N}"[..18];
         var company = new Company
         {
-            Id = Guid.NewGuid(), Code = $"SEC-{suffix}-{Guid.NewGuid():N}"[..18], LegalNameAr = "شركة أمن",
+            Id = Guid.NewGuid(), Code = companyCode, LegalNameAr = "شركة أمن",
             BaseCurrencyId = currency.Id, DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };

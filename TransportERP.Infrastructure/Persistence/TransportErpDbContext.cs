@@ -582,7 +582,8 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
             t.HasCheckConstraint("ck_sync_payload_redaction_shape",
                 "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
                 "(NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND " +
-                "\"Status\" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND " +
+                "(\"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') OR " +
+                "(\"Status\" = 'FAILED' AND \"NextRetryAt\" IS NULL)) AND " +
                 "\"RetentionDaysApplied\" IS NOT NULL AND " +
                 "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
                 "\"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");

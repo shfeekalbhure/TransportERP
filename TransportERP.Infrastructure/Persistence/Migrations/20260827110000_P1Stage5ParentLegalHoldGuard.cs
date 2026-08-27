@@ -103,7 +103,8 @@ public partial class P1Stage5ParentLegalHoldGuard : Migration
               NEW."RedactedAt"<=clock_timestamp() AND
               EXISTS (SELECT 1 FROM transport_erp.sync_operations o
                 WHERE o."Id"=OLD."SyncOperationId"
-                  AND o."Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED')
+                  AND (o."Status" IN ('SUCCEEDED','REJECTED','RESOLVED') OR
+                       (o."Status"='FAILED' AND o."NextRetryAt" IS NULL))
                   AND clock_timestamp()>=o."UpdatedAt"+make_interval(days => NEW."RetentionDaysApplied")) AND
               (to_jsonb(OLD)-ARRAY['DeviceSnapshot','ServerSnapshot','RedactedAt','RetentionDaysApplied'])=
               (to_jsonb(NEW)-ARRAY['DeviceSnapshot','ServerSnapshot','RedactedAt','RetentionDaysApplied']);

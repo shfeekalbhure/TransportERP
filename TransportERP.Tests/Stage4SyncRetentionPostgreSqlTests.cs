@@ -168,6 +168,60 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Retryable_failed_operation_and_conflict_are_not_redacted_and_remain_claimable()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db);
+        var old = DateTimeOffset.UtcNow.AddDays(-91);
+        var retryable = await AddOperationAsync(
+            db, scope, "FAILED", old.AddDays(-9), old, "{\"retryable\":\"retained\"}");
+        var conflict = await AddConflictAsync(
+            db, scope, retryable, old.AddDays(-9), old,
+            "{\"retryableDevice\":true}", "{\"retryableServer\":true}");
+        await db.Database.ExecuteSqlInterpolatedAsync($$"""
+            UPDATE transport_erp.sync_operations
+            SET "ErrorCode"='RATE_LIMITED',"RetryCount"=1,
+                "NextRetryAt"="UpdatedAt"+INTERVAL '5 seconds'
+            WHERE "Id"={{retryable.Id}}
+            """);
+
+        try
+        {
+            var cleanup = await RetentionService(db).CleanupBatchAsync();
+            db.ChangeTracker.Clear();
+            Assert.Equal(0, cleanup.RedactedOperations);
+            Assert.Equal(0, cleanup.RedactedConflictCases);
+            await AssertOperationNotRedactedAsync(db, retryable.Id, "retained");
+            var retainedConflict = await db.ConflictCases.AsNoTracking()
+                .SingleAsync(item => item.Id == conflict.Id);
+            Assert.Null(retainedConflict.RedactedAt);
+            Assert.Contains("retryableDevice", retainedConflict.DeviceSnapshot, StringComparison.Ordinal);
+
+            await RejectOtherExecutionCandidatesAsync(db, retryable.Id);
+            var service = new SyncOperationService(
+                db, new AuditEventService(db),
+                new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(80)));
+            var claim = Assert.IsType<SyncOperationExecutionClaim>(
+                await service.ClaimNextExecutionAsync(TimeSpan.FromMinutes(2), DateTimeOffset.UtcNow));
+            Assert.Equal(retryable.Id, claim.OperationId);
+            Assert.Contains("retained", claim.PayloadJson, StringComparison.Ordinal);
+            var completed = await service.CompleteExecutionSuccessAsync(
+                retryable.Id, claim.ClaimToken,
+                new SyncExecutionSuccess(Guid.NewGuid(), 1), DateTimeOffset.UtcNow);
+            Assert.Equal("SUCCEEDED", completed.Status);
+            Assert.Null(completed.NextRetryAt);
+            Assert.Null(completed.ExecutionClaimToken);
+        }
+        finally
+        {
+            await DeleteScopeEvidenceAsync(db, scope.CompanyId);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Scope_cursor_does_not_starve_eligible_rows_behind_null_policy_and_recent_pages()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -541,6 +595,20 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         Assert.Null(operation.RedactedAt);
         Assert.Contains(retainedMarker, operation.PayloadJson, StringComparison.Ordinal);
     }
+
+    private static Task<int> RejectOtherExecutionCandidatesAsync(
+        TransportErpDbContext db,
+        Guid retainedOperationId)
+        => db.Database.ExecuteSqlInterpolatedAsync($$"""
+            UPDATE transport_erp.sync_operations
+            SET "Status"='REJECTED',"ErrorCode"='TEST_RETENTION_ISOLATION',
+                "NextRetryAt"=NULL,"ExecutionClaimToken"=NULL,
+                "ExecutionAttemptStartedAt"=NULL,"ExecutionLeaseExpiresAt"=NULL,
+                "UpdatedAt"=clock_timestamp()
+            WHERE "Id"<>{{retainedOperationId}}
+              AND "ActionCode" IS NOT NULL
+              AND "Status" IN ('QUEUED','FAILED','SENDING')
+            """);
 
     private static SyncRetentionCleanupService RetentionService(
         TransportErpDbContext db,

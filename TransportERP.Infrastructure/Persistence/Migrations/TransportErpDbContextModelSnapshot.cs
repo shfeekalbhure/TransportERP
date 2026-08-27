@@ -2434,7 +2434,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_sync_operation_type", "\"OperationType\" IN ('CREATE','UPDATE','DELETE','COMMAND')");
 
-                            t.HasCheckConstraint("ck_sync_payload_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND \"Status\" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND \"RetentionDaysApplied\" IS NOT NULL AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
+                            t.HasCheckConstraint("ck_sync_payload_redaction_shape", "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR (NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND (\"Status\" IN ('SUCCEEDED','REJECTED','RESOLVED') OR (\"Status\" = 'FAILED' AND \"NextRetryAt\" IS NULL)) AND \"RetentionDaysApplied\" IS NOT NULL AND \"RetentionDaysApplied\" BETWEEN 1 AND 90 AND \"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
 
                             t.HasCheckConstraint("ck_sync_execution_claim_bundle", "(\"Status\" = 'SENDING' AND \"ExecutionClaimToken\" IS NOT NULL AND \"ExecutionClaimToken\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"ExecutionAttemptStartedAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" IS NOT NULL AND \"ExecutionLeaseExpiresAt\" > \"ExecutionAttemptStartedAt\") OR (\"Status\" <> 'SENDING' AND \"ExecutionClaimToken\" IS NULL AND \"ExecutionAttemptStartedAt\" IS NULL AND \"ExecutionLeaseExpiresAt\" IS NULL)");
 

@@ -43,7 +43,8 @@ public sealed record SyncReapplyAsNewRequest(
 public sealed record ResolveSyncConflictRequest(
     string Decision,
     string Reason,
-    SyncReapplyAsNewRequest? Reapply = null);
+    SyncReapplyAsNewRequest? Reapply = null,
+    BuildIdentityV1? BuildIdentity = null);
 
 public sealed record SyncConflictResolutionResult(
     Guid ConflictCaseId,
@@ -111,6 +112,10 @@ public sealed class SyncConflictResolutionService(
                 JOIN transport_erp.conflict_cases AS c
                   ON c."SyncOperationId"=o."Id" AND c."CompanyId"=o."CompanyId"
                 WHERE c."Id"={{conflictCaseId}}
+                  AND c."CompanyId"={{context.CompanyId}}
+                  AND c."BranchId"={{context.BranchId}}
+                  AND o."CompanyId"={{context.CompanyId}}
+                  AND o."BranchId"={{context.BranchId}}
                 FOR UPDATE OF o
                 """).AsTracking().ToListAsync(cancellationToken);
             var operation = operations.SingleOrDefault()
@@ -119,6 +124,8 @@ public sealed class SyncConflictResolutionService(
             var conflicts = await db.ConflictCases.FromSqlInterpolated($$"""
                 SELECT c.* FROM transport_erp.conflict_cases AS c
                 WHERE c."Id"={{conflictCaseId}}
+                  AND c."CompanyId"={{context.CompanyId}}
+                  AND c."BranchId"={{context.BranchId}}
                 FOR UPDATE OF c
                 """).AsTracking().ToListAsync(cancellationToken);
             var conflict = conflicts.SingleOrDefault()

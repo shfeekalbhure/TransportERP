@@ -49,7 +49,7 @@ public sealed class ProofKeyLifecycleService(
                 return response;
             }
             ValidateDeviceState(device, changeType, request.ExpectedProofKeyVersion);
-            await ValidateNewProofKeyAsync(device, changeType, publicKey.Thumbprint, ct);
+            await ValidateNewProofKeyAsync(device, changeType, publicKey.Thumbprint, null, ct);
 
             var rawChallenge = RandomNumberGenerator.GetBytes(32);
             var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
@@ -74,6 +74,12 @@ public sealed class ProofKeyLifecycleService(
                 changeType, publicKey.Thumbprint, null, ct);
             await transaction.CommitAsync(ct);
             return ToChallengeResponse(challenge, Base64Url(rawChallenge));
+        }
+        catch (DbUpdateException ex) when (IsProofKeyReuseViolation(ex))
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            throw new ProofKeyLifecycleException("PROOF_KEY_REUSE_NOT_ALLOWED");
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex, "ux_device_key_challenge_request"))
         {
@@ -133,7 +139,8 @@ public sealed class ProofKeyLifecycleService(
             }
 
             ValidateDeviceState(device, changeType, request.ExpectedProofKeyVersion);
-            await ValidateNewProofKeyAsync(device, changeType, newPublicKey.Thumbprint, ct);
+            await ValidateNewProofKeyAsync(
+                device, changeType, newPublicKey.Thumbprint, request.ChallengeId, ct);
             var challenge = await LockChallengeAsync(request.ChallengeId, device.Id, current.CompanyId, ct);
             ValidateChallenge(challenge, request, changeType, newPublicKey.Thumbprint);
 
@@ -313,6 +320,7 @@ public sealed class ProofKeyLifecycleService(
         RegisteredDevice device,
         string changeType,
         string newThumbprint,
+        Guid? permittedChallengeId,
         CancellationToken ct)
     {
         if (changeType is not ("ROTATE" or "RECOVER"))
@@ -323,9 +331,25 @@ public sealed class ProofKeyLifecycleService(
         var matchesHistory = await db.RegisteredDeviceProofKeyChanges.AsNoTracking().AnyAsync(x =>
             x.RegisteredDeviceId == device.Id &&
             (x.NewProofKeyThumbprint == newThumbprint || x.PreviousProofKeyThumbprint == newThumbprint), ct);
-        if (matchesCurrent || matchesHistory)
+        var liveChallenges = db.RegisteredDeviceProofKeyChallenges.AsNoTracking().Where(x =>
+            x.RegisteredDeviceId == device.Id && x.CompanyId == device.CompanyId &&
+            x.NewProofKeyThumbprint == newThumbprint && x.ConsumedAt == null &&
+            x.ExpiresAt > DateTimeOffset.UtcNow);
+        // ChangeAsync must be allowed to consume the exact challenge it names. Every other live
+        // challenge with the same material remains a reuse violation.
+        if (permittedChallengeId.HasValue)
+            liveChallenges = liveChallenges.Where(x => x.Id != permittedChallengeId.Value);
+        var matchesLiveChallenge = await liveChallenges.AnyAsync(ct);
+        if (matchesCurrent || matchesHistory || matchesLiveChallenge)
             throw new ProofKeyLifecycleException("PROOF_KEY_REUSE_NOT_ALLOWED");
     }
+
+    private static bool IsProofKeyReuseViolation(DbUpdateException exception) =>
+        exception.GetBaseException() is PostgresException
+        {
+            SqlState: PostgresErrorCodes.RaiseException,
+            MessageText: "proof key material reuse denied"
+        };
 
     private static void ValidateChallenge(
         RegisteredDeviceProofKeyChallenge challenge,
