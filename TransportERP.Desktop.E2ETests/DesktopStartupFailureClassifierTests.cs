@@ -3,6 +3,9 @@ namespace TransportERP.Desktop.E2ETests;
 public sealed class DesktopStartupFailureClassifierTests
 {
     [Theory]
+    [InlineData("TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException", "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION")]
+    [InlineData("TransportERP.Api.Startup.EffectivePolicyStartupOptionsValidationException", "DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION")]
+    [InlineData("TransportERP.Api.Startup.AuthStartupOptionsValidationException", "DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION")]
     [InlineData("Microsoft.Extensions.Options.OptionsValidationException", "DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION")]
     [InlineData("System.InvalidOperationException", "DESKTOP_E2E_API_STARTUP_INVALID_OPERATION")]
     [InlineData("System.TypeInitializationException", "DESKTOP_E2E_API_STARTUP_TYPE_INITIALIZATION")]
@@ -29,6 +32,7 @@ public sealed class DesktopStartupFailureClassifierTests
     [InlineData("System.InvalidOperationException: inner line")]
     [InlineData("message mentions Microsoft.Extensions.Options.OptionsValidationException: only")]
     [InlineData("Unhandled exception. System.InvalidOperationExceptionExtra: prefix spoof")]
+    [InlineData("Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationExceptionExtra: prefix spoof")]
     public void Unknown_inner_or_message_tokens_remain_unclassified(string line)
     {
         var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
@@ -45,9 +49,9 @@ public sealed class DesktopStartupFailureClassifierTests
         var classifier = new DesktopReleaseKestrelApiHost.StartupFailureClassifier();
 
         classifier.Observe(
-            $"Unhandled exception. System.InvalidOperationException: {secret}");
+            $"Unhandled exception. TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException: {secret}");
 
-        Assert.Equal("DESKTOP_E2E_API_STARTUP_INVALID_OPERATION", classifier.Code);
+        Assert.Equal("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", classifier.Code);
         Assert.DoesNotContain(secret, classifier.Code, StringComparison.Ordinal);
     }
 

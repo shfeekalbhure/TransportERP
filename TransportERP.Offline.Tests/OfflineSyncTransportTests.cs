@@ -591,11 +591,12 @@ public sealed class OfflineSyncTransportTests : IDisposable
     [Fact]
     public async Task Unexpected_platform_signing_failure_releases_the_claim_and_schedules_retry()
     {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\device-key";
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
         var store = await CreateStoreAsync(clock);
         var queued = await EnqueueRequestAsync(store, Request());
         using var key = new TestSigningKey();
-        var failingKey = new FailingSigningKey(key);
+        var failingKey = new FailingSigningKey(key, new InvalidOperationException(secret));
         var calls = 0;
         using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
         {
@@ -611,11 +612,108 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.Claimed);
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
-        Assert.Equal("INTERNAL_ERROR", persisted.ResultCode);
+        Assert.Equal("INTERNAL_ERROR_PROOF_CREATE", persisted.ResultCode);
         Assert.Equal(1, persisted.ClientTransportRetryCount);
         Assert.NotNull(persisted.NextRetryAt);
         Assert.Null(persisted.LeaseOwner);
         Assert.Null(persisted.LeaseExpiresAt);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Cryptographic_signing_failure_keeps_the_existing_nonretryable_mapping()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var failingKey = new FailingSigningKey(
+            key, new CryptographicException("synthetic cryptographic provider detail"));
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                captured.AttemptCorrelationId);
+        }));
+
+        var outcome = await Client(http, store, failingKey, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.Claimed);
+        Assert.Equal(0, outcome.RetryScheduled);
+        Assert.Equal(1, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
+        Assert.Equal("DEVICE_PROOF_KEY_INVALID", persisted.ResultCode);
+        Assert.Null(persisted.LeaseOwner);
+        Assert.Null(persisted.LeaseExpiresAt);
+    }
+
+    [Fact]
+    public async Task Governed_signing_failure_keeps_its_sync_transport_code_and_retry_decision()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var failingKey = new FailingSigningKey(
+            key, new SyncTransportException("DEVICE_KEY_REBIND_REQUIRED", retryable: false));
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                captured.AttemptCorrelationId);
+        }));
+
+        var outcome = await Client(http, store, failingKey, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, outcome.Claimed);
+        Assert.Equal(0, outcome.RetryScheduled);
+        Assert.Equal(1, outcome.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
+        Assert.Equal("DEVICE_KEY_REBIND_REQUIRED", persisted.ResultCode);
+        Assert.Null(persisted.LeaseOwner);
+        Assert.Null(persisted.LeaseExpiresAt);
+    }
+
+    [Fact]
+    public async Task Unexpected_signed_http_adapter_failure_releases_the_claim_without_leaking_details()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\signed-send";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            calls++;
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (calls == 1)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                    captured.AttemptCorrelationId);
+            throw new InvalidOperationException(secret);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(2, calls);
+        Assert.Equal(1, outcome.Claimed);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("INTERNAL_ERROR_SIGNED_SEND", persisted.ResultCode);
+        Assert.Equal(1, persisted.ClientTransportRetryCount);
+        Assert.NotNull(persisted.NextRetryAt);
+        Assert.Null(persisted.LeaseOwner);
+        Assert.Null(persisted.LeaseExpiresAt);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -1260,7 +1358,9 @@ public sealed class OfflineSyncTransportTests : IDisposable
         public void Dispose() => _key.Dispose();
     }
 
-    private sealed class FailingSigningKey(IDeviceProofSigningKey inner) : IDeviceProofSigningKey
+    private sealed class FailingSigningKey(
+        IDeviceProofSigningKey inner,
+        Exception failure) : IDeviceProofSigningKey
     {
         public ValueTask<DevicePublicP256Jwk> GetPublicJwkAsync(
             CancellationToken cancellationToken = default) =>
@@ -1269,7 +1369,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         public ValueTask<byte[]> SignEs256Async(
             ReadOnlyMemory<byte> signingInput,
             CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("simulated platform signing adapter failure");
+            throw failure;
     }
 
     private sealed class FixedBearerProvider(string bearer) : IInMemoryBearerTokenProvider

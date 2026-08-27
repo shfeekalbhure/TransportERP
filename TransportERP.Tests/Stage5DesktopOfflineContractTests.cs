@@ -138,6 +138,9 @@ public sealed class Stage5DesktopOfflineContractTests
     {
         var releaseHost = Read(
             "TransportERP.Desktop.E2ETests", "DesktopReleaseKestrelApiHost.cs");
+        var apiProgram = Read("TransportERP.Api", "Program.cs");
+        var startupExceptions = Read(
+            "TransportERP.Api", "Startup", "StartupOptionsValidationExceptions.cs");
 
         Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
         Assert.Contains("process.StandardError, startupFailureClassifier.Observe", releaseHost,
@@ -151,6 +154,26 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("StringComparison.Ordinal", releaseHost, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("throw new SyncRuntimePolicyStartupOptionsValidationException(", apiProgram,
+            StringComparison.Ordinal);
+        Assert.Contains("throw new EffectivePolicyStartupOptionsValidationException(", apiProgram,
+            StringComparison.Ordinal);
+        Assert.Contains("throw new AuthStartupOptionsValidationException(", apiProgram,
+            StringComparison.Ordinal);
+        Assert.Contains(": OptionsValidationException(\"Sync\", typeof(SyncRuntimePolicyOptions), failures)",
+            startupExceptions, StringComparison.Ordinal);
+        Assert.Contains("\"Sync:EffectivePolicy\", typeof(EffectivePolicyConfiguration), failures)",
+            startupExceptions, StringComparison.Ordinal);
+        Assert.Contains(": OptionsValidationException(\"Auth\", typeof(TransportSecurityOptions), failures)",
+            startupExceptions, StringComparison.Ordinal);
+        Assert.DoesNotContain("override string Message", startupExceptions,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,
             StringComparison.Ordinal);

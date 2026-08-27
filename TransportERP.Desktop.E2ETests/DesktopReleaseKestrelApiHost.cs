@@ -297,6 +297,12 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
         internal string Code => (StartupFailureKind)Volatile.Read(ref _kind) switch
         {
+            StartupFailureKind.SyncRuntimePolicyValidation =>
+                "DESKTOP_E2E_API_STARTUP_SYNC_RUNTIME_POLICY_VALIDATION",
+            StartupFailureKind.EffectivePolicyValidation =>
+                "DESKTOP_E2E_API_STARTUP_EFFECTIVE_POLICY_VALIDATION",
+            StartupFailureKind.AuthValidation =>
+                "DESKTOP_E2E_API_STARTUP_AUTH_VALIDATION",
             StartupFailureKind.OptionsValidation => "DESKTOP_E2E_API_STARTUP_OPTIONS_VALIDATION",
             StartupFailureKind.InvalidOperation => "DESKTOP_E2E_API_STARTUP_INVALID_OPERATION",
             StartupFailureKind.TypeInitialization => "DESKTOP_E2E_API_STARTUP_TYPE_INITIALIZATION",
@@ -324,6 +330,17 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             if (!line.StartsWith(prefix, StringComparison.Ordinal))
                 return StartupFailureKind.Unobserved;
             var exception = line.AsSpan(prefix.Length);
+            if (exception.StartsWith(
+                    "TransportERP.Api.Startup.SyncRuntimePolicyStartupOptionsValidationException:"
+                        .AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.SyncRuntimePolicyValidation;
+            if (exception.StartsWith(
+                    "TransportERP.Api.Startup.EffectivePolicyStartupOptionsValidationException:"
+                        .AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.EffectivePolicyValidation;
+            if (exception.StartsWith(
+                    "TransportERP.Api.Startup.AuthStartupOptionsValidationException:".AsSpan(),
+                    StringComparison.Ordinal)) return StartupFailureKind.AuthValidation;
             if (exception.StartsWith(
                     "Microsoft.Extensions.Options.OptionsValidationException:".AsSpan(),
                     StringComparison.Ordinal)) return StartupFailureKind.OptionsValidation;
@@ -357,6 +374,9 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         {
             Unobserved,
             ObservedUnclassified,
+            SyncRuntimePolicyValidation,
+            EffectivePolicyValidation,
+            AuthValidation,
             OptionsValidation,
             InvalidOperation,
             TypeInitialization,

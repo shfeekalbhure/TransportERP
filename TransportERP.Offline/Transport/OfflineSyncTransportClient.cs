@@ -266,35 +266,66 @@ public sealed class OfflineSyncTransportClient
         for (var signedAttempt = 0; signedAttempt < 2; signedAttempt++)
         {
             var attemptCorrelationId = Guid.NewGuid();
-            var proof = await _proofs.CreateAsync(
-                _canonicalHtu, bearer, body, nonce, attemptCorrelationId, cancellationToken);
-            using var request = CreateRequest(body, bearer, attemptCorrelationId, proof);
-            using var response = await _httpClient.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (response.IsSuccessStatusCode)
+            string proof;
+            try
             {
-                var responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                var envelope = SyncV1Json.Deserialize<SyncV1BatchResponse>(responseBytes)
-                    ?? throw new JsonException("The sync response was empty.");
-                if (!string.Equals(envelope.ProtocolVersion, ProtocolVersion, StringComparison.Ordinal) ||
-                    envelope.AttemptCorrelationId != attemptCorrelationId || envelope.Results is null)
-                    throw new JsonException("The sync response envelope did not match the request.");
-                return (envelope, null, false);
+                proof = await _proofs.CreateAsync(
+                    _canonicalHtu, bearer, body, nonce, attemptCorrelationId, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (HttpRequestException) { throw; }
+            catch (JsonException) { throw; }
+            catch (SyncTransportException) { throw; }
+            catch (CryptographicException) { throw; }
+            catch
+            {
+                return (null, "INTERNAL_ERROR_PROOF_CREATE", true);
+            }
+            using var request = CreateRequest(body, bearer, attemptCorrelationId, proof);
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (HttpRequestException) { throw; }
+            catch (JsonException) { throw; }
+            catch (SyncTransportException) { throw; }
+            catch (CryptographicException) { throw; }
+            catch
+            {
+                return (null, "INTERNAL_ERROR_SIGNED_SEND", true);
             }
 
-            var errorCode = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
-            if (signedAttempt == 0 && response.StatusCode == HttpStatusCode.Unauthorized &&
-                string.Equals(errorCode, "use_dpop_nonce", StringComparison.Ordinal) &&
-                response.Headers.TryGetValues(NonceHeader, out var refreshValues))
+            using (response)
             {
-                var refreshed = refreshValues.ToArray();
-                if (refreshed.Length == 1 && !string.IsNullOrEmpty(refreshed[0]))
+                if (response.IsSuccessStatusCode)
                 {
-                    nonce = refreshed[0];
-                    continue;
+                    var responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                    var envelope = SyncV1Json.Deserialize<SyncV1BatchResponse>(responseBytes)
+                        ?? throw new JsonException("The sync response was empty.");
+                    if (!string.Equals(envelope.ProtocolVersion, ProtocolVersion, StringComparison.Ordinal) ||
+                        envelope.AttemptCorrelationId != attemptCorrelationId || envelope.Results is null)
+                        throw new JsonException("The sync response envelope did not match the request.");
+                    return (envelope, null, false);
                 }
+
+                var errorCode = await ReadErrorCodeAsync(response, attemptCorrelationId, cancellationToken);
+                if (signedAttempt == 0 && response.StatusCode == HttpStatusCode.Unauthorized &&
+                    string.Equals(errorCode, "use_dpop_nonce", StringComparison.Ordinal) &&
+                    response.Headers.TryGetValues(NonceHeader, out var refreshValues))
+                {
+                    var refreshed = refreshValues.ToArray();
+                    if (refreshed.Length == 1 && !string.IsNullOrEmpty(refreshed[0]))
+                    {
+                        nonce = refreshed[0];
+                        continue;
+                    }
+                }
+                return (null, errorCode,
+                    IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
             }
-            return (null, errorCode, IsRetryableCode(errorCode) || IsRetryableStatus(response.StatusCode));
         }
 
         return (null, "NONCE_CHALLENGE_INVALID", false);

@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Identity;
 using TransportERP.Api.Security;
+using TransportERP.Api.Startup;
 using TransportERP.Api.Sync;
 using TransportERP.Api.Waybills;
 using TransportERP.Application.Sync;
@@ -26,7 +27,7 @@ var builder = WebApplication.CreateBuilder(hostArgs);
 var syncRuntimePolicy = SyncRuntimePolicyOptions.Load(builder.Configuration);
 var syncRuntimePolicyValidation = new SyncRuntimePolicyOptionsValidator().Validate(null, syncRuntimePolicy);
 if (syncRuntimePolicyValidation.Failed)
-    throw new OptionsValidationException("Sync", typeof(SyncRuntimePolicyOptions),
+    throw new SyncRuntimePolicyStartupOptionsValidationException(
         syncRuntimePolicyValidation.Failures);
 var syncRuntimePolicyOptions = Options.Create(syncRuntimePolicy);
 var effectivePolicyConfiguration = EffectivePolicyConfiguration.Load(builder.Configuration);
@@ -34,7 +35,7 @@ var effectivePolicyValidation = new EffectivePolicyConfigurationValidator(
         new SyncEffectivePolicyResolver(syncRuntimePolicyOptions), syncRuntimePolicyOptions)
     .Validate(effectivePolicyConfiguration);
 if (effectivePolicyValidation.Failed)
-    throw new OptionsValidationException("Sync:EffectivePolicy", typeof(EffectivePolicyConfiguration),
+    throw new EffectivePolicyStartupOptionsValidationException(
         effectivePolicyValidation.Failures);
 
 var connectionString = builder.Configuration.GetConnectionString("TransportErp")
@@ -109,7 +110,7 @@ var securityOptions = new TransportSecurityOptions
     ApplicationInstanceCount = builder.Configuration.GetValue("Auth:ApplicationInstanceCount", 1)
 };
 var validation = new TransportSecurityOptionsValidator().Validate(null, securityOptions);
-if (validation.Failed) throw new OptionsValidationException("Auth", typeof(TransportSecurityOptions), validation.Failures);
+if (validation.Failed) throw new AuthStartupOptionsValidationException(validation.Failures);
 builder.Services.AddSingleton<IOptions<TransportSecurityOptions>>(Options.Create(securityOptions));
 builder.Services.AddScoped<IEffectivePermissionResolver, EffectivePermissionResolver>();
 builder.Services.AddScoped<TenantScopeResolver>();
