@@ -262,21 +262,50 @@ def operation_ids(summaries: Iterable[str]) -> set[str]:
     return values
 
 
+def safe_sign_in_observation(driver: Driver, phase: str) -> str:
+    try:
+        if phase == "ACTION_RESULT":
+            value = driver.text("driver_action_result")
+            match = re.fullmatch(r"Result: ([A-Z0-9_]{1,64})", value)
+            return "OBSERVED_RESULT_" + match.group(1) if match is not None else "OBSERVATION_UNAVAILABLE"
+        if phase == "MODE_READY":
+            value = driver.text("driver_mode")
+            match = re.fullmatch(r"Offline runtime: (CLOSED|READY)", value)
+            return "OBSERVED_MODE_" + match.group(1) if match is not None else "OBSERVATION_UNAVAILABLE"
+    except UiE2EFailure:
+        pass
+    return "OBSERVATION_UNAVAILABLE"
+
+
 def sign_in_and_activate(driver: Driver, secret_input: dict[str, str]) -> None:
-    driver.set_text("driver_user_name", secret_input["userName"])
-    driver.set_text("driver_password", secret_input["password"], verify_plaintext=False)
-    driver.set_text("driver_company_id", secret_input["companyId"])
-    driver.set_text("driver_branch_id", secret_input["branchId"])
-    driver.set_text("driver_device_id", secret_input["deviceId"])
-    driver.set_text(
-        "driver_device_credential",
-        secret_input["deviceCredential"],
-        verify_plaintext=False,
-    )
-    driver.hide_keyboard()
-    driver.click("driver_sign_in")
-    driver.wait_text("driver_action_result", "Result: OFFLINE_ACTIVATED")
-    driver.wait_text("driver_mode", "Offline runtime: READY")
+    phase = "USER_NAME"
+    try:
+        driver.set_text("driver_user_name", secret_input["userName"])
+        phase = "PASSWORD"
+        driver.set_text("driver_password", secret_input["password"], verify_plaintext=False)
+        phase = "COMPANY_ID"
+        driver.set_text("driver_company_id", secret_input["companyId"])
+        phase = "BRANCH_ID"
+        driver.set_text("driver_branch_id", secret_input["branchId"])
+        phase = "DEVICE_ID"
+        driver.set_text("driver_device_id", secret_input["deviceId"])
+        phase = "DEVICE_CREDENTIAL"
+        driver.set_text(
+            "driver_device_credential",
+            secret_input["deviceCredential"],
+            verify_plaintext=False,
+        )
+        phase = "HIDE_KEYBOARD"
+        driver.hide_keyboard()
+        phase = "SUBMIT"
+        driver.click("driver_sign_in")
+        phase = "ACTION_RESULT"
+        driver.wait_text("driver_action_result", "Result: OFFLINE_ACTIVATED")
+        phase = "MODE_READY"
+        driver.wait_text("driver_mode", "Offline runtime: READY")
+    except UiE2EFailure as error:
+        observation = safe_sign_in_observation(driver, phase)
+        raise UiE2EFailure(f"{phase}:{observation}:{error}") from error
 
 
 def main() -> int:

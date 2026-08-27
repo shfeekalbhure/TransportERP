@@ -108,6 +108,19 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             Assert.Contains($"phase = \"{phase}\"", script, StringComparison.Ordinal);
         Assert.Contains("raise UiE2EFailure(f\"{phase}:{error}\") from error", script,
             StringComparison.Ordinal);
+        foreach (var signInPhase in new[]
+                 {
+                     "USER_NAME", "PASSWORD", "COMPANY_ID", "BRANCH_ID", "DEVICE_ID",
+                     "DEVICE_CREDENTIAL", "HIDE_KEYBOARD", "SUBMIT", "ACTION_RESULT",
+                     "MODE_READY"
+                 })
+            Assert.Contains($"phase = \"{signInPhase}\"", script, StringComparison.Ordinal);
+        Assert.Contains("re.fullmatch(r\"Result: ([A-Z0-9_]{1,64})\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("re.fullmatch(r\"Offline runtime: (CLOSED|READY)\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("OBSERVATION_UNAVAILABLE", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("{phase}:{value}", script, StringComparison.Ordinal);
         Assert.Contains("driver.run(\"shell\", \"am\", \"force-stop\"", script,
             StringComparison.Ordinal);
         Assert.Contains("driver.wait_for_operation_success(operation_id)", script,
