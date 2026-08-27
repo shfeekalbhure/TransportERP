@@ -137,6 +137,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("SubmitBusinessOperationEndToEndAsync", selfTest, StringComparison.Ordinal);
         Assert.Contains("SignInAndActivateAsync", selfTest, StringComparison.Ordinal);
         Assert.Contains("QueueOperationalPartyAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("SynchronizeAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("http_batch_accepted_pending", selfTest, StringComparison.Ordinal);
         Assert.Contains("local_succeeded_survived_restart", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
 

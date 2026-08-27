@@ -65,12 +65,15 @@ internal static class AndroidDriverRuntimeSelfTest
             var queued = await activated.Runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
                 "Android CI E2E Party", "+967700000001", "Android emulator E2E address",
                 cancellationToken);
+            var submitted = await activated.Runtime.SynchronizeAsync(
+                maximumOperations: 1, cancellationToken: cancellationToken);
             var terminal = await WaitForOperationAsync(
                 activated.Runtime, queued.Operation.LocalOperationId, cancellationToken);
             var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)
             {
                 ["authenticated_activation_ready"] = activated.Runtime.Status.Mode == DriverOfflineRuntimeMode.Ready,
                 ["keystore_bound_sync_operation_queued"] = queued.Created,
+                ["http_batch_accepted_pending"] = submitted.AcceptedPending == 1,
                 ["server_operation_succeeded"] = terminal?.Status == OfflineOperationStatus.Succeeded,
                 ["server_result_code_cleared_on_success"] = terminal?.ResultCode is null
             };
