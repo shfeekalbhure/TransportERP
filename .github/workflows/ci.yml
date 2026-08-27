@@ -776,7 +776,7 @@ jobs:
           connection='Host=127.0.0.1;Port=5432;Database=transporter_android_ci;Username=transporter_android_ci;Password=android-ci-database-password;Include Error Detail=false'
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
           admin_password=$(openssl rand -hex 24)
-          device_credential=$(openssl rand -hex 32)
+          device_credential=$(openssl rand -base64 32)
           echo "::add-mask::$admin_password"
           echo "::add-mask::$device_credential"
           export ANDROID_E2E_ADMIN_PASSWORD="$admin_password"
