@@ -89,6 +89,115 @@ public sealed class P1SecurityHttpPostgreSqlTests
     [Fact]
     [Trait("Category", "PostgreSQL")]
     [Trait("Category", "HTTP")]
+    public async Task Registered_device_login_requires_its_credential_while_unknown_device_remains_online_only()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, "DEVICE-LOGIN");
+        var actor = DeviceAdministrator(scope);
+        var devices = new RegisteredDeviceService(db, new AuditEventService(db));
+        var credential = NewDeviceCredential();
+        var registered = await devices.RegisterAsync(actor,
+            new("registered-http-device", "HTTP device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await devices.ApproveAsync(registered.Id, actor, Guid.NewGuid(), default);
+        await devices.AddAssignmentAsync(registered.Id, new(scope.User.Id, scope.BranchId),
+            actor, Guid.NewGuid(), default);
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, Password, scope.CompanyId,
+            scope.BranchId, registered.DeviceId)).Response);
+        await AssertInvalidCredentialsAsync((await LoginAsync(client, scope, Password, scope.CompanyId,
+            scope.BranchId, registered.DeviceId, NewDeviceCredential())).Response);
+        Assert.Equal(2, await db.AuditEvents.CountAsync(x => x.Action == "IdentityLogin" &&
+            x.Outcome == "FAILURE" && x.DeviceId == registered.DeviceId &&
+            x.Reason == "DEVICE_BINDING_DENIED"));
+        Assert.False(await db.AuthSessions.AnyAsync(x =>
+            x.UserId == scope.User.Id && x.DeviceId == registered.DeviceId));
+
+        var trusted = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId,
+            registered.DeviceId, credential);
+        Assert.Equal(HttpStatusCode.OK, trusted.Response.StatusCode);
+        Assert.NotNull(trusted.Session);
+        var stored = await db.AuthSessions.AsNoTracking().SingleAsync(x => x.Id == trusted.Session!.SessionId);
+        Assert.Equal(registered.Id, stored.RegisteredDeviceId);
+        Assert.Equal(registered.CredentialVersion, stored.DeviceCredentialVersion);
+
+        var onlineOnly = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId,
+            $"unknown-{Guid.NewGuid():N}");
+        Assert.Equal(HttpStatusCode.OK, onlineOnly.Response.StatusCode);
+        var onlineOnlyStored = await db.AuthSessions.AsNoTracking()
+            .SingleAsync(x => x.Id == onlineOnly.Session!.SessionId);
+        Assert.Null(onlineOnlyStored.RegisteredDeviceId);
+        Assert.Null(onlineOnlyStored.DeviceCredentialVersion);
+    }
+
+    [Theory]
+    [InlineData("suspend")]
+    [InlineData("revoke")]
+    [InlineData("rotate")]
+    [InlineData("assignment-remove")]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Bound_session_is_denied_after_device_trust_is_withdrawn(string mutation)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db, $"BOUND-{mutation.ToUpperInvariant()}");
+        var actor = DeviceAdministrator(scope);
+        var devices = new RegisteredDeviceService(db, new AuditEventService(db));
+        var credential = NewDeviceCredential();
+        var registered = await devices.RegisterAsync(actor,
+            new($"bound-{mutation}-{Guid.NewGuid():N}", "Bound device", "TEST", "1", null, null,
+                $"request-{Guid.NewGuid():N}", credential), Guid.NewGuid(), default);
+        await devices.ApproveAsync(registered.Id, actor, Guid.NewGuid(), default);
+        var assignment = await devices.AddAssignmentAsync(registered.Id,
+            new(scope.User.Id, scope.BranchId), actor, Guid.NewGuid(), default);
+
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        var login = await LoginAsync(client, scope, Password, scope.CompanyId, scope.BranchId,
+            registered.DeviceId, credential);
+        Assert.Equal(HttpStatusCode.OK, login.Response.StatusCode);
+        Assert.NotNull(login.Session);
+
+        switch (mutation)
+        {
+            case "suspend":
+                await devices.SuspendAsync(registered.Id, actor, Guid.NewGuid(), default);
+                break;
+            case "revoke":
+                await devices.RevokeAsync(registered.Id, actor, Guid.NewGuid(), default);
+                break;
+            case "rotate":
+                await devices.RotateCredentialAsync(registered.Id,
+                    new(NewDeviceCredential(), registered.CredentialVersion), actor, Guid.NewGuid(), default);
+                break;
+            case "assignment-remove":
+                await devices.RemoveAssignmentAsync(registered.Id, assignment.Id, actor, Guid.NewGuid(), default);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null);
+        }
+
+        var refresh = await client.PostAsJsonAsync("/api/v1/auth/sessions:refresh",
+            new RefreshIdentitySessionRequest(login.Session!.RefreshToken, registered.DeviceId, credential));
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", login.Session.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/v1/devices/current")).StatusCode);
+        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.False(await verify.AuthSessions.AnyAsync(x =>
+            x.RegisteredDeviceId == registered.Id && x.RevokedAt == null));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
     public async Task Oversized_credentials_and_cross_field_login_ambiguity_fail_closed_with_generic_responses()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -246,14 +355,22 @@ public sealed class P1SecurityHttpPostgreSqlTests
     }
 
     private static async Task<(HttpResponseMessage Response, IdentitySessionResponse? Session)> LoginAsync(
-        HttpClient client, SecurityScope scope, string password, Guid? companyId, Guid? branchId, string deviceId)
+        HttpClient client, SecurityScope scope, string password, Guid? companyId, Guid? branchId, string deviceId,
+        string? deviceCredential = null)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/sessions",
-            new CreateIdentitySessionRequest(scope.User.UserName, password, companyId, branchId, deviceId));
+            new CreateIdentitySessionRequest(scope.User.UserName, password, companyId, branchId, deviceId,
+                deviceCredential));
         return (response, response.IsSuccessStatusCode
             ? await response.Content.ReadFromJsonAsync<IdentitySessionResponse>()
             : null);
     }
+
+    private static CurrentSecurityContext DeviceAdministrator(SecurityScope scope) => new(
+        scope.User.Id, scope.CompanyId, scope.BranchId, Guid.NewGuid(), "device-administrator", true);
+
+    private static string NewDeviceCredential()
+        => Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     private static WebApplicationFactory<Program> CreateFactory(string connection)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

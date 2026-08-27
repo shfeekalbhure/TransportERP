@@ -236,6 +236,14 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
             new TenantScopeResolver(db, new EffectivePermissionResolver(db)), new AuditEventService(db),
             Options.Create(SecurityOptions()), devices);
 
+        var missingCredential = new CreateIdentitySessionRequest(user.UserName, "Correct-Horse-42!",
+            scope.CompanyId, scope.BranchId, "terminal-auth");
+        var missingFailure = await Assert.ThrowsAsync<IdentitySessionException>(() =>
+            identity.CreateAsync(missingCredential, Guid.NewGuid(), "127.0.0.1", default));
+        Assert.Equal("INVALID_CREDENTIALS", missingFailure.Code);
+        Assert.False(await db.AuthSessions.AnyAsync(x =>
+            x.UserId == scope.UserId && x.DeviceId == "terminal-auth"));
+
         var denied = new CreateIdentitySessionRequest(user.UserName, "Correct-Horse-42!", scope.CompanyId,
             scope.BranchId, "terminal-auth", Secret());
         var failure = await Assert.ThrowsAsync<IdentitySessionException>(() =>
@@ -676,10 +684,53 @@ public sealed class Stage3RegisteredDevicePostgreSqlTests
         var boundId = Guid.NewGuid();
         await InsertStage3SyncAsync(db, boundId, user.Id, company.Id, branch.Id, registered.DeviceId,
             registered.Id, registered.CredentialVersion, now);
+        var boundSessionId = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO transport_erp.auth_sessions
+              ("Id","UserId","CompanyId","BranchId","DeviceId","Mode","SecurityStampAtIssue",
+               "AuthVersionAtIssue","RefreshTokenHash","RefreshTokenFamilyId","ReplacedBySessionId",
+               "IssuedAt","AccessTokenExpiresAt","RefreshTokenExpiresAt","LastUsedAt","RevokedAt",
+               "RevokeReason","RegisteredDeviceId","DeviceCredentialVersion","CreatedAt","UpdatedAt","RowVersion")
+            VALUES ({boundSessionId},{user.Id},{company.Id},{branch.Id},{registered.DeviceId},'LOCAL',
+                    {user.SecurityStamp},{user.AuthVersion},{new string('f', 64)},{Guid.NewGuid()},NULL,
+                    {now},{now.AddMinutes(15)},{now.AddDays(1)},NULL,NULL,NULL,
+                    {registered.Id},{registered.CredentialVersion},{now},{now},{RandomNumberGenerator.GetBytes(16)})
+            """);
         Assert.Equal(1, await db.Database.SqlQuery<int>($"""
             SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations WHERE "Id"={boundId}
             """).SingleAsync());
 
+        var blocked = await Assert.ThrowsAnyAsync<Exception>(() => migrator.MigrateAsync(Previous));
+        Assert.Contains("P1_REGISTERED_DEVICES_DOWN_BLOCKED_OPERATIONAL_DATA", blocked.GetBaseException().Message,
+            StringComparison.Ordinal);
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.registered_devices WHERE "Id"={registered.Id}
+            """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.registered_device_assignments WHERE "Id"={assignment.Id}
+            """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.auth_sessions
+            WHERE "Id"={boundSessionId} AND "RegisteredDeviceId"={registered.Id}
+            """).SingleAsync());
+        Assert.Equal(1, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.sync_operations
+            WHERE "Id"={boundId} AND "RegisteredDeviceId"={registered.Id}
+            """).SingleAsync());
+        Assert.Equal(3, await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM transport_erp.role_permissions
+            WHERE "RoleId"={adminRole.Id} AND "PermissionId" IN
+              ('d1000000-0000-4000-8000-000000000001'::uuid,
+               'd1000000-0000-4000-8000-000000000002'::uuid,
+               'd1000000-0000-4000-8000-000000000003'::uuid)
+            """).SingleAsync());
+
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            DELETE FROM transport_erp.auth_sessions WHERE "Id"={boundSessionId};
+            DELETE FROM transport_erp.sync_operations WHERE "Id"={boundId};
+            DELETE FROM transport_erp.registered_device_assignments WHERE "Id"={assignment.Id};
+            DELETE FROM transport_erp.registered_devices WHERE "Id"={registered.Id}
+            """);
         await migrator.MigrateAsync(Previous);
         await AssertDeviceMigrationStateAsync(db, adminRole.Id, company.Id, present: false);
         await migrator.MigrateAsync(Current);

@@ -121,11 +121,15 @@ public sealed class IdentitySessionService(TransportErpDbContext db, IPasswordHa
         }
 
         TrustedDeviceBinding? deviceBinding = null;
-        if (!string.IsNullOrWhiteSpace(request.DeviceCredential))
+        var deviceDecision = registeredDevices is null
+            ? new LoginDeviceBindingDecision(
+                await db.RegisteredDevices.AsNoTracking().AnyAsync(x =>
+                    x.CompanyId == scope.Company.Id && x.DeviceId == deviceId, ct), null)
+            : await registeredDevices.ResolveLoginBindingAsync(user.Id, scope.Company.Id, scope.Branch?.Id,
+                deviceId, request.DeviceCredential, correlationId, ct);
+        if (deviceDecision.IsRegistered || !string.IsNullOrWhiteSpace(request.DeviceCredential))
         {
-            deviceBinding = registeredDevices is null ? null : await registeredDevices.ValidateBindingAsync(
-                user.Id, scope.Company.Id, scope.Branch?.Id, deviceId, request.DeviceCredential,
-                updateLastSeen: true, correlationId, ct);
+            deviceBinding = deviceDecision.Binding;
             if (deviceBinding is null)
             {
                 await AuditAsync("IdentityLogin", "FAILURE", user.Id, scope.Company.Id, scope.Branch?.Id,

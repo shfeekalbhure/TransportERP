@@ -17,6 +17,8 @@ public sealed record TrustedDeviceBinding(Guid RegisteredDeviceId, int Credentia
     internal bool LastSeenAuditPending { get; init; }
 }
 
+internal sealed record LoginDeviceBindingDecision(bool IsRegistered, TrustedDeviceBinding? Binding);
+
 public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEventService audit)
 {
     public static readonly TimeSpan InactivityLimit = TimeSpan.FromDays(90);
@@ -222,6 +224,32 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
         string deviceId, string? credential, bool updateLastSeen, Guid correlationId, CancellationToken ct)
         => ValidateBindingCoreAsync(userId, companyId, branchId, deviceId, credential, updateLastSeen,
             correlationId, ct, deferLastSeenAudit: false);
+
+    internal async Task<LoginDeviceBindingDecision> ResolveLoginBindingAsync(Guid userId, Guid companyId,
+        Guid? branchId, string deviceId, string? credential, Guid correlationId, CancellationToken ct)
+    {
+        var normalizedDevice = IdentitySessionService.NormalizeDevice(deviceId);
+        if (normalizedDevice is null) return new(false, null);
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("Login device binding requires a caller-owned transaction.");
+
+        // Registration takes the same key. This closes the absent-row race where a device could be
+        // registered between an unbound login's lookup and session creation.
+        if (db.Database.IsNpgsql())
+        {
+            var lockKey = $"device|{companyId}|{normalizedDevice}";
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", ct);
+        }
+
+        var isRegistered = await db.RegisteredDevices.AsNoTracking().AnyAsync(x =>
+            x.CompanyId == companyId && x.DeviceId == normalizedDevice, ct);
+        if (!isRegistered) return new(false, null);
+
+        var binding = await ValidateBindingCoreAsync(userId, companyId, branchId, normalizedDevice,
+            credential, updateLastSeen: true, correlationId, ct, deferLastSeenAudit: false);
+        return new(true, binding);
+    }
 
     internal Task<TrustedDeviceBinding?> ValidateBindingForRefreshAsync(Guid userId, Guid companyId, Guid? branchId,
         string deviceId, string? credential, Guid correlationId, CancellationToken ct)
