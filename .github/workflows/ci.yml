@@ -37,12 +37,14 @@ jobs:
     env:
       TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
       TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact PR head
         shell: bash
@@ -77,19 +79,47 @@ jobs:
         run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
 
       - name: Build core runtime and tests
-        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-restore
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-restore -p:TransportERPImplementationSha="$EXPECTED_SHA"
 
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
       - name: Verify EF model matches committed migrations
-        run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+        run: dotnet ef migrations has-pending-model-changes --configuration Release --no-build --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
       - name: Apply committed migrations to PostgreSQL 18
-        run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+        run: dotnet ef database update --configuration Release --no-build --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Run client producer E2E acceptance gate
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --filter "Acceptance=CLIENT-PRODUCER-E2E" --logger "trx;LogFileName=ci-client-producer-e2e.trx" -p:TransportERPImplementationSha="$EXPECTED_SHA"
+
+      - name: Verify client producer E2E was executed and not skipped
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          reports = list(Path("TransportERP.Tests/TestResults").rglob("ci-client-producer-e2e.trx"))
+          if len(reports) != 1:
+              raise SystemExit(f"Expected exactly one CLIENT-PRODUCER-E2E TRX report, found {len(reports)}.")
+          counters = ET.parse(reports[0]).getroot().find(".//{*}Counters")
+          if counters is None:
+              raise SystemExit("CLIENT-PRODUCER-E2E TRX report has no counters.")
+          total = int(counters.attrib.get("total", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          failed = int(counters.attrib.get("failed", "0"))
+          not_executed = int(counters.attrib.get("notExecuted", "0"))
+          if total < 1 or passed != total or failed != 0 or not_executed != 0:
+              raise SystemExit(
+                  "CLIENT-PRODUCER-E2E did not execute fail-closed: "
+                  f"total={total}, passed={passed}, failed={failed}, notExecuted={not_executed}."
+              )
+          print(f"CLIENT-PRODUCER-E2E executed: total={total}, passed={passed}, skipped={not_executed}")
+          PY
 
       - name: Run the complete test suite fail-closed
-        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-all-tests.trx"
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-all-tests.trx" -p:TransportERPImplementationSha="$EXPECTED_SHA"
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -127,14 +157,17 @@ jobs:
           retention-days: 30
 
   desktop-contract:
-    name: Required CI / Desktop executable + RTL runtime
+    # This display name is the exact required status context configured by the
+    # master ruleset. Changing it requires a coordinated ruleset update.
+    name: Required CI / Desktop RTL contract surface
     runs-on: windows-latest
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact PR head
         shell: pwsh
@@ -158,7 +191,55 @@ jobs:
         run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
 
       - name: Build Desktop executable
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj `
+            --configuration Release `
+            --no-restore `
+            -p:ContinuousIntegrationBuild=true `
+            -p:SourceRevisionId="$env:EXPECTED_SHA" `
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+
+      - name: Bind Desktop binary evidence to exact source SHA
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $output = 'TransportERP.Desktop/bin/Release/net10.0-windows'
+          $executable = Join-Path $output 'TransportERP.Desktop.exe'
+          $assembly = Join-Path $output 'TransportERP.Desktop.dll'
+          $applicationAssembly = Join-Path $output 'TransportERP.Application.dll'
+          if (-not (Test-Path $executable)) { throw 'Desktop WinExe artifact was not produced.' }
+          if (-not (Test-Path $assembly)) { throw 'Desktop managed assembly was not produced.' }
+          if (-not (Test-Path $applicationAssembly)) { throw 'Governed application assembly was not produced.' }
+
+          $actual = (git rev-parse HEAD).Trim()
+          if ($actual -ne $env:EXPECTED_SHA) { throw 'Desktop binary was built from a non-candidate SHA.' }
+          $productVersion = (Get-Item $assembly).VersionInfo.ProductVersion
+          if ([string]::IsNullOrWhiteSpace($productVersion) -or -not $productVersion.Contains($env:EXPECTED_SHA)) {
+            throw 'Desktop binary identity is not bound to the candidate source SHA.'
+          }
+          $governedAssembly = [System.Reflection.Assembly]::LoadFrom((Resolve-Path $applicationAssembly).Path)
+          $implementationSha = $governedAssembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute], $false) |
+            Where-Object Key -eq 'TransportERPImplementationSha' |
+            Select-Object -ExpandProperty Value -First 1
+          if ($implementationSha -ne $env:EXPECTED_SHA) {
+            throw 'Desktop governed implementation metadata is unbound or does not match the candidate source SHA.'
+          }
+
+          New-Item -ItemType Directory -Force -Path 'ci-evidence/desktop' | Out-Null
+          @(
+            'schema_version=1'
+            "source_sha=$actual"
+            "tree_sha=$((& git rev-parse 'HEAD^{tree}').Trim())"
+            "assembly_product_version=$productVersion"
+            "implementation_sha=$implementationSha"
+            "executable_sha256=$((Get-FileHash -Algorithm SHA256 $executable).Hash.ToLowerInvariant())"
+            "assembly_sha256=$((Get-FileHash -Algorithm SHA256 $assembly).Hash.ToLowerInvariant())"
+            "application_assembly_sha256=$((Get-FileHash -Algorithm SHA256 $applicationAssembly).Hash.ToLowerInvariant())"
+          ) | Set-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
       - name: Run Desktop closed-default startup smoke
         shell: pwsh
@@ -169,6 +250,133 @@ jobs:
           if (-not (Test-Path $runtimeConfig)) { throw 'Desktop runtime configuration was not produced.' }
           $process = Start-Process -FilePath $executable -ArgumentList '--startup-smoke' -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw 'Desktop startup smoke did not remain fail-closed.' }
+
+      - name: Run Desktop Windows runtime platform smoke
+        shell: pwsh
+        run: |
+          $executable = 'TransportERP.Desktop/bin/Release/net10.0-windows/TransportERP.Desktop.exe'
+          $buildIdentity = 'ci-evidence/desktop/build-identity.txt'
+          if (-not (Test-Path $executable)) { throw 'Desktop WinExe artifact was not produced.' }
+          if (-not (Test-Path $buildIdentity)) { throw 'Desktop build identity evidence was not produced.' }
+          $process = Start-Process -FilePath $executable -ArgumentList '--runtime-platform-smoke' -PassThru -Wait
+          if ($process.ExitCode -ne 0) {
+            throw 'Desktop CNG/DPAPI/SQLCipher/restart runtime platform smoke failed.'
+          }
+          'runtime_platform_smoke=PASS' | Add-Content -Encoding utf8 $buildIdentity
+
+      - name: Provision pinned PostgreSQL 18.6 for Desktop E2E
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '18.6-1'
+          $expectedArchiveSha256 = 'fbe23da234ee31547bf8a36d29dfd81e82b849df2d2b78d2eecb43d360252f8c'
+          $archive = Join-Path $env:RUNNER_TEMP "postgresql-$version-windows-x64-binaries.zip"
+          $install = Join-Path $env:RUNNER_TEMP "postgresql-$version"
+          $data = Join-Path $env:RUNNER_TEMP 'transporterp-desktop-postgresql-data'
+          $log = Join-Path $env:RUNNER_TEMP 'transporterp-desktop-postgresql.log'
+          $uri = "https://get.enterprisedb.com/postgresql/postgresql-$version-windows-x64-binaries.zip"
+
+          Invoke-WebRequest -Uri $uri -OutFile $archive
+          $archiveSha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($archiveSha256 -ne $expectedArchiveSha256) {
+            throw 'The pinned PostgreSQL 18.6 archive hash did not match.'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $install
+          $bin = Join-Path $install 'pgsql/bin'
+          $postgres = Join-Path $bin 'postgres.exe'
+          $initdb = Join-Path $bin 'initdb.exe'
+          $pgCtl = Join-Path $bin 'pg_ctl.exe'
+          $createdb = Join-Path $bin 'createdb.exe'
+          $pgIsReady = Join-Path $bin 'pg_isready.exe'
+          foreach ($required in @($postgres, $initdb, $pgCtl, $createdb, $pgIsReady)) {
+            if (-not (Test-Path $required)) { throw 'The pinned PostgreSQL archive is incomplete.' }
+          }
+          $postgresVersion = (& $postgres --version).Trim()
+          if ($postgresVersion -ne 'postgres (PostgreSQL) 18.6') {
+            throw "Expected PostgreSQL 18.6; actual version was $postgresVersion."
+          }
+
+          & $initdb -D $data -U postgres --auth-host=trust --auth-local=trust --encoding=UTF8 --no-locale
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL initdb failed.' }
+          & $pgCtl -D $data -l $log -o "-p 55432 -h 127.0.0.1" start
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL server startup failed.' }
+          & $pgIsReady -h 127.0.0.1 -p 55432 -U postgres
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL did not become ready.' }
+          & $createdb -h 127.0.0.1 -p 55432 -U postgres transporterptest
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop E2E database creation failed.' }
+
+          New-Item -ItemType Directory -Force -Path 'ci-evidence/desktop' | Out-Null
+          @(
+            "postgres_archive_sha256=$archiveSha256"
+            "postgres_version=$postgresVersion"
+          ) | Set-Content -Encoding utf8 'ci-evidence/desktop/postgresql-identity.txt'
+          "DESKTOP_E2E_POSTGRES_BIN=$bin" | Add-Content -Encoding utf8 $env:GITHUB_ENV
+          "DESKTOP_E2E_POSTGRES_DATA=$data" | Add-Content -Encoding utf8 $env:GITHUB_ENV
+          "DESKTOP_E2E_POSTGRES_LOG=$log" | Add-Content -Encoding utf8 $env:GITHUB_ENV
+          'TRANSPORTERP_TEST_CONNSTR=Host=127.0.0.1;Port=55432;Database=transporterptest;Username=postgres' |
+            Add-Content -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Restore and build Desktop E2E
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          dotnet restore TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj
+          dotnet build TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj `
+            --configuration Release `
+            --no-restore `
+            -p:ContinuousIntegrationBuild=true `
+            -p:SourceRevisionId="$env:EXPECTED_SHA" `
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+
+      - name: Run true Desktop CNG DPAPI SQLCipher HTTP PostgreSQL E2E
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          dotnet test TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj `
+            --configuration Release `
+            --no-build `
+            --filter "Acceptance=DESKTOP-E2E" `
+            --logger "trx;LogFileName=ci-desktop-e2e.trx" `
+            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
+
+          $reports = @(Get-ChildItem 'TransportERP.Desktop.E2ETests/TestResults' `
+            -Recurse -Filter 'ci-desktop-e2e.trx')
+          if ($reports.Count -ne 1) {
+            throw "Expected exactly one Desktop E2E TRX report; found $($reports.Count)."
+          }
+          [xml]$trx = Get-Content -Raw $reports[0].FullName
+          $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
+          if ($null -eq $counters) { throw 'Desktop E2E TRX has no counters.' }
+          $total = [int]$counters.total
+          $passed = [int]$counters.passed
+          $failed = [int]$counters.failed
+          $notExecuted = [int]$counters.notExecuted
+          if ($total -ne 1 -or $passed -ne 1 -or $failed -ne 0 -or $notExecuted -ne 0) {
+            throw "Desktop E2E did not execute exactly once and pass: total=$total passed=$passed failed=$failed skipped=$notExecuted."
+          }
+          'desktop_e2e=PASS' | Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
+
+      - name: Stop Desktop E2E PostgreSQL
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          if ($env:DESKTOP_E2E_POSTGRES_BIN -and $env:DESKTOP_E2E_POSTGRES_DATA) {
+            $pgCtl = Join-Path $env:DESKTOP_E2E_POSTGRES_BIN 'pg_ctl.exe'
+            if (Test-Path $pgCtl) {
+              & $pgCtl -D $env:DESKTOP_E2E_POSTGRES_DATA status *> $null
+              if ($LASTEXITCODE -eq 0) {
+                & $pgCtl -D $env:DESKTOP_E2E_POSTGRES_DATA stop --mode=fast
+                if ($LASTEXITCODE -ne 0) { throw 'Desktop E2E PostgreSQL shutdown failed.' }
+              }
+            }
+          }
+          if ($env:DESKTOP_E2E_POSTGRES_LOG -and (Test-Path $env:DESKTOP_E2E_POSTGRES_LOG)) {
+            New-Item -ItemType Directory -Force -Path 'ci-evidence/desktop' | Out-Null
+            Copy-Item $env:DESKTOP_E2E_POSTGRES_LOG 'ci-evidence/desktop/postgresql.log'
+          }
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -201,19 +409,27 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ci-desktop-evidence-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ci-evidence/desktop/exact-head-manifest.txt
+          path: |
+            ci-evidence/desktop/exact-head-manifest.txt
+            ci-evidence/desktop/build-identity.txt
+            ci-evidence/desktop/postgresql-identity.txt
+            ci-evidence/desktop/postgresql.log
+            TransportERP.Desktop.E2ETests/TestResults/**/*.trx
           if-no-files-found: warn
           retention-days: 30
 
   offline-client-core:
     name: Required CI / Encrypted offline client core
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact PR head
         shell: bash
@@ -237,10 +453,10 @@ jobs:
         run: dotnet restore TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj
 
       - name: Build encrypted offline client core
-        run: dotnet build TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-restore
+        run: dotnet build TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-restore -p:TransportERPImplementationSha="$EXPECTED_SHA"
 
       - name: Run encrypted offline client tests
-        run: dotnet test TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-offline-client-tests.trx"
+        run: dotnet test TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=ci-offline-client-tests.trx" -p:TransportERPImplementationSha="$EXPECTED_SHA"
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -285,7 +501,8 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact PR head
         shell: bash
@@ -313,10 +530,15 @@ jobs:
 
       - name: Build Mobile projects and Android Driver APK
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          dotnet build TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj --configuration Release --no-restore
-          dotnet build TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj --configuration Release --no-restore
-          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          test "$actual" = "$EXPECTED_SHA"
+          dotnet build TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
+          dotnet build TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
+          dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj --configuration Release --no-restore -f net10.0-android -p:AndroidPackageFormats=apk -p:ContinuousIntegrationBuild=true -p:SourceRevisionId="$EXPECTED_SHA" -p:TransportERPImplementationSha="$EXPECTED_SHA"
           release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*-Signed.apk' -print -quit)
           if [ -z "$release_apk" ]; then
             release_apk=$(find TransportERP.Mobile.Driver/bin/Release/net10.0-android -type f -name '*.apk' -print -quit)
@@ -333,6 +555,30 @@ jobs:
             echo 'The test-only Android activity leaked into the Release APK.'
             exit 1
           fi
+          {
+            echo 'schema_version=1'
+            echo "source_sha=$actual"
+            echo "tree_sha=$(git rev-parse 'HEAD^{tree}')"
+            echo "apk_path=$release_apk"
+            echo "apk_sha256=$(sha256sum "$release_apk" | awk '{print $1}')"
+          } > ci-evidence/mobile/build-identity.txt
+
+      - name: Verify Mobile governed implementation identity
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $applicationAssembly = 'TransportERP.Application/bin/Release/net10.0/TransportERP.Application.dll'
+          if (-not (Test-Path $applicationAssembly)) { throw 'Governed Mobile application assembly was not produced.' }
+          $governedAssembly = [System.Reflection.Assembly]::LoadFrom((Resolve-Path $applicationAssembly).Path)
+          $implementationSha = $governedAssembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute], $false) |
+            Where-Object Key -eq 'TransportERPImplementationSha' |
+            Select-Object -ExpandProperty Value -First 1
+          if ($implementationSha -ne $env:EXPECTED_SHA) {
+            throw 'Mobile governed implementation metadata is unbound or does not match the candidate source SHA.'
+          }
+          Add-Content -Encoding utf8 'ci-evidence/mobile/build-identity.txt' "implementation_sha=$implementationSha"
+          Add-Content -Encoding utf8 'ci-evidence/mobile/build-identity.txt' "application_assembly_sha256=$((Get-FileHash -Algorithm SHA256 $applicationAssembly).Hash.ToLowerInvariant())"
 
       - name: Write exact-head evidence manifest
         if: ${{ always() }}
@@ -365,6 +611,7 @@ jobs:
           name: ci-mobile-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ci-evidence/mobile/exact-head-manifest.txt
+            ci-evidence/mobile/build-identity.txt
             ci-evidence/mobile/release-manifest.xml
             TransportERP.Mobile.Driver/bin/Release/net10.0-android/**/*.apk
           if-no-files-found: warn
@@ -373,7 +620,21 @@ jobs:
   android-device-runtime:
     name: Required CI / Android native security runtime
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: transporter_android_ci
+          POSTGRES_PASSWORD: android-ci-database-password
+          POSTGRES_DB: transporter_android_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U transporter_android_ci -d transporter_android_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # Job-level env is evaluated before the runner context exists. Use an explicit ephemeral
       # path on the isolated hosted runner so workflow validation remains fail-closed.
@@ -385,7 +646,8 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact PR head
         shell: bash
@@ -405,7 +667,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libpulse0
+          sudo apt-get install --yes --no-install-recommends libpulse0 postgresql-client openssl
           dotnet workload install maui-android --skip-sign-check
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
@@ -430,9 +692,35 @@ jobs:
             --name transporterptest \
             --package 'system-images;android-35;google_apis;x86_64'
 
-      - name: Build compile-gated Android device-test APK
+      - name: Create pinned ephemeral Android E2E TLS identity
         shell: bash
         run: |
+          set -euo pipefail
+          tls_dir="$RUNNER_TEMP/android-e2e-tls"
+          mkdir -p "$tls_dir"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=10.0.2.2' \
+            -addext 'subjectAltName=IP:10.0.2.2,DNS:localhost,IP:127.0.0.1' \
+            -keyout "$tls_dir/server.key" \
+            -out "$tls_dir/server.crt" >/dev/null 2>&1
+          openssl pkcs12 -export \
+            -inkey "$tls_dir/server.key" \
+            -in "$tls_dir/server.crt" \
+            -out "$tls_dir/server.pfx" \
+            -passout pass:android-ci-tls-password
+          openssl x509 -in "$tls_dir/server.crt" -outform der \
+            | sha256sum | awk '{print $1}' > "$tls_dir/server-cert-sha256.txt"
+          test "$(wc -c < "$tls_dir/server-cert-sha256.txt")" -eq 65
+
+      - name: Build compile-gated Android device-test APK
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          test "$actual" = "$EXPECTED_SHA"
+          certificate_sha=$(cat "$RUNNER_TEMP/android-e2e-tls/server-cert-sha256.txt")
           dotnet restore TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj
           dotnet build TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj \
             --configuration Debug \
@@ -440,13 +728,229 @@ jobs:
             -f net10.0-android \
             -p:TransportERPDeviceTests=true \
             -p:AndroidPackageFormats=apk \
-            -p:EmbedAssembliesIntoApk=true
+            -p:EmbedAssembliesIntoApk=true \
+            -p:ContinuousIntegrationBuild=true \
+            -p:SourceRevisionId="$EXPECTED_SHA" \
+            -p:TransportERPImplementationSha="$EXPECTED_SHA" \
+            -p:TransportERPClientPublicOrigin=https://10.0.2.2:8443/ \
+            -p:TransportERPDeviceTestServerCertificateSha256="$certificate_sha"
           test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*-Signed.apk' -print -quit)
           if [ -z "$test_apk" ]; then
             test_apk=$(find TransportERP.Mobile.Driver/bin/Debug/net10.0-android -type f -name '*.apk' -print -quit)
           fi
           test -n "$test_apk"
           echo "$test_apk" > "$RUNNER_TEMP/android-device-test-apk.txt"
+          mkdir -p ci-evidence/android-runtime
+          {
+            echo 'schema_version=1'
+            echo "source_sha=$actual"
+            echo "tree_sha=$(git rev-parse 'HEAD^{tree}')"
+            echo "test_apk_sha256=$(sha256sum "$test_apk" | awk '{print $1}')"
+          } > ci-evidence/android-runtime/device-test-build-identity.txt
+
+      - name: Verify Android device-test governed implementation identity
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $applicationAssembly = 'TransportERP.Application/bin/Debug/net10.0/TransportERP.Application.dll'
+          if (-not (Test-Path $applicationAssembly)) { throw 'Governed Android test application assembly was not produced.' }
+          $governedAssembly = [System.Reflection.Assembly]::LoadFrom((Resolve-Path $applicationAssembly).Path)
+          $implementationSha = $governedAssembly.GetCustomAttributes([System.Reflection.AssemblyMetadataAttribute], $false) |
+            Where-Object Key -eq 'TransportERPImplementationSha' |
+            Select-Object -ExpandProperty Value -First 1
+          if ($implementationSha -ne $env:EXPECTED_SHA) {
+            throw 'Android test implementation metadata is unbound or does not match the candidate source SHA.'
+          }
+          $identity = 'ci-evidence/android-runtime/device-test-build-identity.txt'
+          Add-Content -Encoding utf8 $identity "implementation_sha=$implementationSha"
+          Add-Content -Encoding utf8 $identity "application_assembly_sha256=$((Get-FileHash -Algorithm SHA256 $applicationAssembly).Hash.ToLowerInvariant())"
+
+      - name: Bootstrap PostgreSQL and provision the Android registered device
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PGPASSWORD: android-ci-database-password
+        run: |
+          set -euo pipefail
+          connection='Host=127.0.0.1;Port=5432;Database=transporter_android_ci;Username=transporter_android_ci;Password=android-ci-database-password;Include Error Detail=false'
+          tls_dir="$RUNNER_TEMP/android-e2e-tls"
+          admin_password=$(openssl rand -hex 24)
+          device_credential=$(openssl rand -hex 32)
+          echo "::add-mask::$admin_password"
+          echo "::add-mask::$device_credential"
+          export ANDROID_E2E_ADMIN_PASSWORD="$admin_password"
+          export ANDROID_E2E_DEVICE_CREDENTIAL="$device_credential"
+          common_environment=(
+            "TRANSPORTERP_CONNECTION_STRING=$connection"
+            'Auth__Mode=LocalSessions'
+            'Auth__Issuer=transporter-android-ci'
+            'Auth__Audience=transporter-android-ci'
+            'Auth__SigningKeyId=android-ci-current'
+            'Auth__SigningKey=android-ci-signing-key-at-least-thirty-two-characters'
+            'AllowedHosts=localhost;127.0.0.1;10.0.2.2'
+            'Sync__Proof__PublicOrigin=https://10.0.2.2:8443'
+            'ASPNETCORE_ENVIRONMENT=Development'
+            'ASPNETCORE_URLS=https://0.0.0.0:8443'
+            "ASPNETCORE_Kestrel__Certificates__Default__Path=$tls_dir/server.pfx"
+            'ASPNETCORE_Kestrel__Certificates__Default__Password=android-ci-tls-password'
+          )
+
+          dotnet build TransportERP.Api/TransportERP.Api.csproj \
+            --configuration Release \
+            -p:ContinuousIntegrationBuild=true \
+            -p:SourceRevisionId="$EXPECTED_SHA" \
+            -p:TransportERPImplementationSha="$EXPECTED_SHA"
+
+          export TRANSPORTERP_BOOTSTRAP_ADMIN_PASSWORD="$admin_password"
+          env "${common_environment[@]}" \
+            'BootstrapAdmin__CurrencyCode=YER' \
+            'BootstrapAdmin__CurrencyNameAr=Android CI Currency' \
+            'BootstrapAdmin__CurrencyMinorUnit=2' \
+            'BootstrapAdmin__CompanyCode=ANDROID-CI' \
+            'BootstrapAdmin__CompanyNameAr=Android CI Company' \
+            'BootstrapAdmin__DefaultCalendarId=10000000-0000-4000-8000-000000000111' \
+            'BootstrapAdmin__BranchCode=ANDROID-MAIN' \
+            'BootstrapAdmin__BranchNameAr=Android CI Branch' \
+            'BootstrapAdmin__BranchTimezone=UTC' \
+            'BootstrapAdmin__AdminUserName=android-ci-admin' \
+            'BootstrapAdmin__AdminDisplayName=Android CI Administrator' \
+            dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll --bootstrap-admin
+          unset TRANSPORTERP_BOOTSTRAP_ADMIN_PASSWORD
+
+          nohup env "${common_environment[@]}" \
+            dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
+            > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
+          ready=false
+          for attempt in $(seq 1 90); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --cacert "$tls_dir/server.crt" \
+              https://localhost:8443/api/v1/sync/activation || true)
+            if [ "$status" = 401 ]; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+
+          company_id=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT "Id" FROM transport_erp.companies WHERE "Code" = '\''ANDROID-CI'\''')
+          branch_id=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT "Id" FROM transport_erp.branches WHERE "Code" = '\''ANDROID-MAIN'\''')
+          user_id=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT "Id" FROM transport_erp.users WHERE "NormalizedUserName" = '\''ANDROID-CI-ADMIN'\''')
+          test -n "$company_id" && test -n "$branch_id" && test -n "$user_id"
+
+          python3 - "$company_id" "$branch_id" > "$RUNNER_TEMP/android-bootstrap-login.json" <<'PY'
+          import json, os, sys
+          json.dump({
+              "userNameOrEmail": "android-ci-admin",
+              "password": os.environ["ANDROID_E2E_ADMIN_PASSWORD"],
+              "companyId": sys.argv[1],
+              "branchId": sys.argv[2],
+              "deviceId": "android-ci-provisioner",
+              "deviceCredential": None,
+          }, sys.stdout)
+          PY
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/android-bootstrap-login.json" \
+            https://localhost:8443/api/v1/auth/sessions \
+            > "$RUNNER_TEMP/android-bootstrap-session.json"
+          bearer=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["accessToken"])' \
+            "$RUNNER_TEMP/android-bootstrap-session.json")
+          test -n "$bearer"
+          echo "::add-mask::$bearer"
+          authorization_header="$RUNNER_TEMP/android-bootstrap-authorization.header"
+          printf 'Authorization: Bearer %s\n' "$bearer" > "$authorization_header"
+          chmod 600 "$authorization_header"
+
+          python3 > "$RUNNER_TEMP/android-device-registration.json" <<'PY'
+          import json, os, sys
+          json.dump({
+              "deviceId": "android-ci-device",
+              "displayName": "Android CI Emulator",
+              "platform": "Android",
+              "appVersion": "1.0-ci",
+              "deviceModel": "API 35 Emulator",
+              "osVersion": "35",
+              "registrationRequestId": "android-ci-device-registration-v1",
+              "credential": os.environ["ANDROID_E2E_DEVICE_CREDENTIAL"],
+          }, sys.stdout)
+          PY
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/android-device-registration.json" \
+            https://localhost:8443/api/v1/devices \
+            > "$RUNNER_TEMP/android-device-registration-response.json"
+          registered_device_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' \
+            "$RUNNER_TEMP/android-device-registration-response.json")
+          test -n "$registered_device_id"
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -X POST \
+            "https://localhost:8443/api/v1/devices/$registered_device_id:approve" \
+            > /dev/null
+          python3 - "$user_id" "$branch_id" > "$RUNNER_TEMP/android-device-assignment.json" <<'PY'
+          import json, sys
+          json.dump({"userId": sys.argv[1], "branchId": sys.argv[2]}, sys.stdout)
+          PY
+          curl --silent --show-error --fail-with-body \
+            --cacert "$tls_dir/server.crt" \
+            -H "@$authorization_header" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/android-device-assignment.json" \
+            "https://localhost:8443/api/v1/devices/$registered_device_id/assignments" \
+            > /dev/null
+
+          kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")"
+          wait "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" || true
+          nohup env "${common_environment[@]}" \
+            'Sync__Offline__Enabled=true' \
+            'Sync__ServerExecution__Enabled=true' \
+            'Sync__Offline__ActivationDecisionId=DEC-G5-PR69-ANDROID-E2E' \
+            "Sync__Offline__ActivationImplementationSha=$EXPECTED_SHA" \
+            'Sync__EffectivePolicy__SourceVersion=android-ci-e2e-v1' \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__CompanyId=$company_id" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__BranchId=$branch_id" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__DeviceId=android-ci-device" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__AllowedActions__0=CreateOperationalParty" \
+            dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
+            > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
+          ready=false
+          for attempt in $(seq 1 90); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --cacert "$tls_dir/server.crt" \
+              https://localhost:8443/api/v1/sync/activation || true)
+            if [ "$status" = 401 ]; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+
+          input="$RUNNER_TEMP/android-e2e-input.json"
+          python3 - "$company_id" "$branch_id" > "$input" <<'PY'
+          import json, os, sys
+          json.dump({
+              "userName": "android-ci-admin",
+              "password": os.environ["ANDROID_E2E_ADMIN_PASSWORD"],
+              "companyId": sys.argv[1],
+              "branchId": sys.argv[2],
+              "deviceId": "android-ci-device",
+              "deviceCredential": os.environ["ANDROID_E2E_DEVICE_CREDENTIAL"],
+          }, sys.stdout)
+          PY
+          chmod 600 "$input"
+          rm -f "$RUNNER_TEMP/android-bootstrap-login.json" \
+            "$RUNNER_TEMP/android-bootstrap-session.json" \
+            "$RUNNER_TEMP/android-device-registration.json" \
+            "$RUNNER_TEMP/android-device-registration-response.json" \
+            "$RUNNER_TEMP/android-device-assignment.json" \
+            "$authorization_header"
+          unset ANDROID_E2E_ADMIN_PASSWORD ANDROID_E2E_DEVICE_CREDENTIAL
 
       - name: Start API 35 emulator
         shell: bash
@@ -510,12 +1014,14 @@ jobs:
           run_phase() {
             local phase="$1"
             local temporary="$RUNNER_TEMP/android-${phase}-result.json"
+            local maximum_attempts=60
+            if [ "$phase" = e2e-submit ]; then maximum_attempts=150; fi
             adb shell run-as "$ANDROID_TEST_PACKAGE" rm -f "files/$result_name"
             adb shell am start -W \
               -n "$ANDROID_TEST_COMPONENT" \
               --es phase "$phase" >/dev/null
             complete=false
-            for attempt in $(seq 1 60); do
+            for attempt in $(seq 1 "$maximum_attempts"); do
               # Some adb versions return exit code 0 while forwarding the remote
               # `cat: ... No such file` diagnostic on stdout.  Check existence in
               # the app sandbox first, then accept only a complete JSON document.
@@ -563,14 +1069,84 @@ jobs:
           verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$verify_pid"
           run_phase loss
+          adb exec-out run-as "$ANDROID_TEST_PACKAGE" sh -c \
+            'cat > files/driver-device-e2e-input.json' \
+            < "$RUNNER_TEMP/android-e2e-input.json"
+          adb shell run-as "$ANDROID_TEST_PACKAGE" chmod 600 \
+            files/driver-device-e2e-input.json
+          rm -f "$RUNNER_TEMP/android-e2e-input.json"
+          run_phase e2e-submit
+          e2e_submit_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          test -n "$e2e_submit_pid"
+          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          e2e_stopped=false
+          for attempt in $(seq 1 30); do
+            if [ -z "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+              e2e_stopped=true
+              break
+            fi
+            sleep 1
+          done
+          test "$e2e_stopped" = true
+          run_phase e2e-verify
+          e2e_verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          test -n "$e2e_verify_pid"
           {
             echo 'process_stopped_before_restart=true'
             echo 'new_process_observed_after_restart=true'
-            echo 'offline_runtime_activated=false'
+            echo 'business_process_stopped_before_restart=true'
+            echo 'business_operation_succeeded_after_restart=true'
+            echo 'offline_runtime_active_at_cleanup=false'
+            echo 'ci_test_runtime_was_activated=true'
             echo 'raw_security_artifacts_exported=false'
           } > ci-evidence/android-runtime/restart-evidence.txt
           adb shell am force-stop "$ANDROID_TEST_PACKAGE"
           adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+
+      - name: Verify Android business result in PostgreSQL 18.6
+        shell: bash
+        env:
+          PGPASSWORD: android-ci-database-password
+        run: |
+          set -euo pipefail
+          server_version=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SHOW server_version')
+          server_version_num=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SHOW server_version_num')
+          test "$server_version_num" = '180006'
+          sync_succeeded=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'' AND "Status" = '\''SUCCEEDED'\''')
+          party_created=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.operational_parties WHERE "Name" = '\''Android CI E2E Party'\''')
+          proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.registered_devices WHERE "DeviceId" = '\''android-ci-device'\'' AND "ProofKeyVersion" = 1 AND "ProofKeyThumbprint" IS NOT NULL')
+          nonce_proof_accepted=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n."Id" = r."NonceRecordId" WHERE r."DeviceId" = '\''android-ci-device'\'' AND r."ProofKeyVersion" = 1')
+          operation_proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'' AND "ProofKeyVersion" = 1 AND "ProofKeyThumbprint" IS NOT NULL AND "AcceptedProofReplayId" IS NOT NULL')
+          test "$sync_succeeded" = 1
+          test "$party_created" = 1
+          test "$proof_bound" = 1
+          test "$nonce_proof_accepted" -ge 1
+          test "$operation_proof_bound" = 1
+          python3 - <<'PY'
+          import json
+          with open('TransportERP.Api/appsettings.json', encoding='utf-8') as stream:
+              settings = json.load(stream)
+          if settings['Sync']['Offline']['Enabled'] is not False:
+              raise SystemExit('Production Offline default changed during Android E2E.')
+          PY
+          {
+            echo 'postgresql_image=postgres:18.6-bookworm'
+            echo "postgresql_server_version=$server_version"
+            echo "postgresql_server_version_num=$server_version_num"
+            echo 'device_proof_key_bound=true'
+            echo 'nonce_signed_proof_accepted=true'
+            echo 'operation_bound_to_accepted_proof=true'
+            echo 'sync_operation_succeeded=true'
+            echo 'operational_party_created=true'
+            echo 'production_offline_default=false'
+          } > ci-evidence/android-runtime/business-postgresql-evidence.txt
 
       - name: Capture sanitized Android crash diagnostics
         if: ${{ failure() }}
@@ -585,6 +1161,11 @@ jobs:
           adb shell dumpsys activity exit-info "$ANDROID_TEST_PACKAGE" \
             > ci-evidence/android-runtime/android-process-exit-info.txt
           sed -n '1,240p' ci-evidence/android-runtime/android-process-exit-info.txt
+          if [ -f "$RUNNER_TEMP/android-e2e-api.log" ]; then
+            grep -oE '(APPLICATION_|DEVICE_|OFFLINE_|SYNC_|PROOF_|PAYLOAD_|RUNTIME_)[A-Z0-9_]+' \
+              "$RUNNER_TEMP/android-e2e-api.log" \
+              | sort -u | tail -n 300 > ci-evidence/android-runtime/api-errors-sanitized.txt || true
+          fi
 
       - name: Write Android exact-head evidence manifest
         if: ${{ always() }}
@@ -609,9 +1190,24 @@ jobs:
             echo "tree_sha=$tree"
             echo 'runner=ubuntu-24.04-x64'
             echo 'system_image=android-35-google_apis-x86_64'
-            echo 'offline_runtime_enabled=false'
+            echo 'production_offline_default=false'
+            echo 'ci_test_runtime_activated=true'
           } > ci-evidence/android-runtime/exact-head-manifest.txt
           test "$actual" = "$EXPECTED_SHA"
+
+      - name: Clear Android device-test credentials and sandbox
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/android-e2e-input.json" \
+            "$RUNNER_TEMP/android-bootstrap-login.json" \
+            "$RUNNER_TEMP/android-bootstrap-session.json" \
+            "$RUNNER_TEMP/android-device-registration.json" \
+            "$RUNNER_TEMP/android-device-registration-response.json" \
+            "$RUNNER_TEMP/android-device-assignment.json" \
+            "$RUNNER_TEMP/android-bootstrap-authorization.header"
+          adb shell am force-stop "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
+          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
 
       - name: Stop Android emulator
         if: ${{ always() }}
@@ -625,13 +1221,26 @@ jobs:
           name: ci-android-runtime-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ci-evidence/android-runtime/exact-head-manifest.txt
+            ci-evidence/android-runtime/device-test-build-identity.txt
             ci-evidence/android-runtime/emulator-version.txt
             ci-evidence/android-runtime/startup.json
             ci-evidence/android-runtime/seed.json
             ci-evidence/android-runtime/verify.json
+            ci-evidence/android-runtime/e2e-submit.json
+            ci-evidence/android-runtime/e2e-verify.json
             ci-evidence/android-runtime/loss.json
             ci-evidence/android-runtime/restart-evidence.txt
+            ci-evidence/android-runtime/business-postgresql-evidence.txt
             ci-evidence/android-runtime/android-runtime-errors.txt
             ci-evidence/android-runtime/android-process-exit-info.txt
+            ci-evidence/android-runtime/api-errors-sanitized.txt
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Stop Android E2E API
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/android-e2e-api.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" >/dev/null 2>&1 || true
+          fi
