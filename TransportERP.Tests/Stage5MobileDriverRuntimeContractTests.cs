@@ -143,7 +143,9 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("runs-on: ubuntu-24.04", workflow, StringComparison.Ordinal);
         Assert.Contains("system-images;android-35;google_apis;x86_64", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("adb shell am force-stop", workflow, StringComparison.Ordinal);
+        Assert.Contains("adb_bounded() { timeout 30s adb", workflow, StringComparison.Ordinal);
+        Assert.Contains("timeout-minutes: 12", workflow, StringComparison.Ordinal);
+        Assert.Contains("adb_bounded shell am force-stop", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase seed", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase verify", workflow, StringComparison.Ordinal);
@@ -159,7 +161,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("#if TRANSPORTERP_DEVICE_TESTS", network, StringComparison.Ordinal);
         Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", network,
             StringComparison.Ordinal);
-        Assert.Contains("adb exec-out run-as", workflow, StringComparison.Ordinal);
+        Assert.Contains("adb_bounded exec-out run-as", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--es password", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--es deviceCredential", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("GetStringExtra(\"password\")", activity, StringComparison.Ordinal);
