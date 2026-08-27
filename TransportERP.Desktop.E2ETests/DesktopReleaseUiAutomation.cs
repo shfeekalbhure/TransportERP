@@ -13,6 +13,8 @@ namespace TransportERP.Desktop.E2ETests;
 /// </summary>
 internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
 {
+    private static readonly TimeSpan NormalCloseTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan CleanupExitTimeout = TimeSpan.FromSeconds(5);
     private readonly Process _process;
     private AutomationElement? _window;
 
@@ -108,10 +110,64 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
 
     internal async Task CloseNormallyAsync(CancellationToken cancellationToken)
     {
-        if (_process.HasExited) return;
+        RequireRunningBeforeClose(_process);
+        if (cancellationToken.IsCancellationRequested)
+            throw new InvalidOperationException("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED");
         if (!_process.CloseMainWindow())
+        {
+            if (_process.HasExited)
+                throw new InvalidOperationException("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE");
             throw new InvalidOperationException("DESKTOP_E2E_NORMAL_CLOSE_UNAVAILABLE");
-        await _process.WaitForExitAsync(cancellationToken);
+        }
+        await WaitForNormalExitAsync(_process, NormalCloseTimeout, cancellationToken);
+    }
+
+    internal static void RequireRunningBeforeClose(Process process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (process.HasExited)
+            throw new InvalidOperationException("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE");
+    }
+
+    internal static async Task WaitForNormalExitAsync(
+        Process process,
+        TimeSpan closeTimeout,
+        CancellationToken parentCancellation)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (closeTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(closeTimeout));
+        if (process.HasExited)
+        {
+            EnsureNormalExit(process);
+            return;
+        }
+
+        using var phase = CancellationTokenSource.CreateLinkedTokenSource(parentCancellation);
+        phase.CancelAfter(closeTimeout);
+        try
+        {
+            await process.WaitForExitAsync(phase.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (parentCancellation.IsCancellationRequested)
+                throw new InvalidOperationException("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED");
+            process.Refresh();
+            if (process.HasExited)
+            {
+                EnsureNormalExit(process);
+                return;
+            }
+            throw new InvalidOperationException("DESKTOP_E2E_NORMAL_CLOSE_TIMEOUT");
+        }
+        EnsureNormalExit(process);
+    }
+
+    private static void EnsureNormalExit(Process process)
+    {
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException("DESKTOP_E2E_NORMAL_CLOSE_NONZERO");
     }
 
     internal string ReadStatus() => Element(DesktopAutomationIds.OfflineStatus)
@@ -226,19 +282,43 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_process.HasExited)
+        try
+        {
+            if (_process.HasExited)
+                return;
+            _process.CloseMainWindow();
+            using var normalTimeout = new CancellationTokenSource(CleanupExitTimeout);
+            try
+            {
+                await _process.WaitForExitAsync(normalTimeout.Token);
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                // Cleanup may kill a failed test process, but a kill is never acceptance evidence.
+            }
+
+            _process.Refresh();
+            if (_process.HasExited)
+                return;
+            try { _process.Kill(entireProcessTree: true); }
+            catch
+            {
+                _process.Refresh();
+                if (_process.HasExited)
+                    return;
+                throw new InvalidOperationException("DESKTOP_E2E_PROCESS_KILL_FAILED");
+            }
+            using var killTimeout = new CancellationTokenSource(CleanupExitTimeout);
+            try { await _process.WaitForExitAsync(killTimeout.Token); }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException("DESKTOP_E2E_PROCESS_KILL_TIMEOUT");
+            }
+        }
+        finally
         {
             _process.Dispose();
-            return;
         }
-        _process.CloseMainWindow();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        try { await _process.WaitForExitAsync(timeout.Token); }
-        catch (OperationCanceledException)
-        {
-            _process.Kill(entireProcessTree: true);
-            await _process.WaitForExitAsync();
-        }
-        _process.Dispose();
     }
 }

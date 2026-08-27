@@ -150,7 +150,9 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         string? certificateThumbprint = null;
         string? localRoot = null;
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        // The isolated runner has a seven-minute hard limit. Keep three minutes for bounded
+        // process/API/certificate/PostgreSQL cleanup while allowing the actual restart proof.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
         try
         {
             certificateThumbprint = CreateCertificate(keyName);

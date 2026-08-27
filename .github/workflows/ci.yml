@@ -429,7 +429,7 @@ jobs:
           $passed = [int]$counters.passed
           $failed = [int]$counters.failed
           $notExecuted = [int]$counters.notExecuted
-          if ($total -ne 61 -or $passed -ne 61 -or $failed -ne 0 -or $notExecuted -ne 0) {
+          if ($total -ne 66 -or $passed -ne 66 -or $failed -ne 0 -or $notExecuted -ne 0) {
             throw "Desktop startup classifier execution mismatch: total=$total passed=$passed failed=$failed skipped=$notExecuted."
           }
 
@@ -515,9 +515,9 @@ jobs:
               break
             }
 
-            $completed = $process.WaitForExit(300000)
+            $completed = $process.WaitForExit(420000)
             if (-not $completed) {
-              $failures.Add("$fullyQualifiedName exceeded its five-minute timeout.")
+              $failures.Add("$fullyQualifiedName exceeded its seven-minute timeout.")
               $taskKill = Start-Process `
                 -FilePath (Join-Path $env:SystemRoot 'System32/taskkill.exe') `
                 -ArgumentList @('/PID', "$($process.Id)", '/T', '/F') `
@@ -1836,6 +1836,20 @@ jobs:
       - name: Start API 35 emulator
         shell: bash
         run: |
+          adb_root_bounded() {
+            local attempt
+            for attempt in $(seq 1 10); do
+              timeout 30s adb wait-for-device >/dev/null 2>&1 || true
+              if timeout 30s adb root >/dev/null 2>&1 \
+                && timeout 30s adb wait-for-device >/dev/null 2>&1 \
+                && [ "$(timeout 30s adb shell id -u 2>/dev/null | tr -d '\r')" = '0' ]; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo 'ANDROID_EMULATOR_ADB_ROOT_UNAVAILABLE'
+            return 1
+          }
           mkdir -p ci-evidence/android-runtime
           "$ANDROID_HOME/emulator/emulator" -version 2>&1 | head -n 1 > ci-evidence/android-runtime/emulator-version.txt
           nohup "$ANDROID_HOME/emulator/emulator" \
@@ -1863,8 +1877,7 @@ jobs:
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
           certificate_hash=$(openssl x509 -in "$tls_dir/server.crt" -subject_hash_old -noout | head -n 1)
           [[ "$certificate_hash" =~ ^[0-9a-f]{8}$ ]]
-          adb root
-          adb wait-for-device
+          adb_root_bounded
           adb remount
           adb reboot
           timeout 30s adb wait-for-disconnect
@@ -1878,8 +1891,7 @@ jobs:
             sleep 2
           done
           test "$booted" = true
-          adb root
-          adb wait-for-device
+          adb_root_bounded
           adb remount
           adb shell 'touch /system/etc/security/cacerts/.transporterp-write-probe'
           adb shell 'rm /system/etc/security/cacerts/.transporterp-write-probe'

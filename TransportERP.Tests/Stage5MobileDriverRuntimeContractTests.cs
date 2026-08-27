@@ -192,6 +192,14 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("runs-on: ubuntu-24.04", workflow, StringComparison.Ordinal);
         Assert.Contains("system-images;android-35;google_apis;x86_64", workflow,
             StringComparison.Ordinal);
+        Assert.Contains("adb_root_bounded()", workflow, StringComparison.Ordinal);
+        Assert.Contains("for attempt in $(seq 1 10)", workflow, StringComparison.Ordinal);
+        Assert.Contains("timeout 30s adb root >/dev/null 2>&1", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("timeout 30s adb shell id -u", workflow, StringComparison.Ordinal);
+        Assert.Contains("ANDROID_EMULATOR_ADB_ROOT_UNAVAILABLE", workflow,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("          adb root\n", workflow, StringComparison.Ordinal);
         Assert.Contains("adb_bounded() { timeout 30s adb", workflow, StringComparison.Ordinal);
         Assert.Contains("app_pid()", workflow, StringComparison.Ordinal);
         Assert.Contains("| tr -d '\\r' || true", workflow, StringComparison.Ordinal);

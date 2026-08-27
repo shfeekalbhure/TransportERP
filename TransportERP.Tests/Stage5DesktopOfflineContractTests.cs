@@ -143,6 +143,8 @@ public sealed class Stage5DesktopOfflineContractTests
             "TransportERP.Api", "Startup", "StartupOptionsValidationExceptions.cs");
         var productionE2E = Read(
             "TransportERP.Desktop.E2ETests", "DesktopProductionEndToEndPostgreSqlTests.cs");
+        var uiAutomation = Read(
+            "TransportERP.Desktop.E2ETests", "DesktopReleaseUiAutomation.cs");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
@@ -190,7 +192,7 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("FullyQualifiedName~DesktopStartupFailureClassifierTests", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("$total -ne 61", workflow, StringComparison.Ordinal);
+        Assert.Contains("$total -ne 66", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("override string Message", startupExceptions,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,
@@ -214,6 +216,21 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("Append(GovernedSyncPolicyFailures[currentIndex].Code)", releaseHost,
             StringComparison.Ordinal);
         Assert.DoesNotContain("Append(token", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromMinutes(4)", productionE2E, StringComparison.Ordinal);
+        Assert.Contains("WaitForExit(420000)", workflow, StringComparison.Ordinal);
+        Assert.Contains("exceeded its seven-minute timeout", workflow, StringComparison.Ordinal);
+        Assert.Contains("WaitForNormalExitAsync(_process, NormalCloseTimeout, cancellationToken)",
+            uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("CancellationTokenSource.CreateLinkedTokenSource(parentCancellation)",
+            uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_NORMAL_CLOSE_TIMEOUT", uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_PROCESS_KILL_TIMEOUT", uiAutomation, StringComparison.Ordinal);
+        Assert.DoesNotContain("await _process.WaitForExitAsync();", uiAutomation,
+            StringComparison.Ordinal);
         Assert.Contains("SyncActionCatalog.Definitions", productionE2E, StringComparison.Ordinal);
         Assert.Contains("Sync__Offline__AllowedActions__{index}", productionE2E,
             StringComparison.Ordinal);

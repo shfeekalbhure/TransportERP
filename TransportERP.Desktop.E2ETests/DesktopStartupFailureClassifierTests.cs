@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace TransportERP.Desktop.E2ETests;
 
 public sealed class DesktopStartupFailureClassifierTests
@@ -300,5 +302,119 @@ public sealed class DesktopStartupFailureClassifierTests
             "Unhandled exception. System.FormatException: top-level");
 
         Assert.Equal("DESKTOP_E2E_API_STARTUP_FORMAT", classifier.Code);
+    }
+
+    [Fact]
+    public async Task Bounded_normal_exit_accepts_only_exit_code_zero()
+    {
+        using var process = StartCommand("exit 0");
+
+        await DesktopReleaseUiAutomation.WaitForNormalExitAsync(
+            process, TimeSpan.FromSeconds(5), CancellationToken.None);
+
+        Assert.True(process.HasExited);
+        Assert.Equal(0, process.ExitCode);
+    }
+
+    [Fact]
+    public async Task Bounded_normal_exit_rejects_a_nonzero_exit()
+    {
+        using var process = StartCommand("exit 7");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            DesktopReleaseUiAutomation.WaitForNormalExitAsync(
+                process, TimeSpan.FromSeconds(5), CancellationToken.None));
+
+        Assert.Equal("DESKTOP_E2E_NORMAL_CLOSE_NONZERO", failure.Message);
+    }
+
+    [Fact]
+    public async Task Bounded_normal_exit_reports_its_phase_timeout()
+    {
+        using var process = StartLongRunningProcess();
+        try
+        {
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                DesktopReleaseUiAutomation.WaitForNormalExitAsync(
+                    process, TimeSpan.FromMilliseconds(100), CancellationToken.None));
+
+            Assert.Equal("DESKTOP_E2E_NORMAL_CLOSE_TIMEOUT", failure.Message);
+        }
+        finally
+        {
+            await KillAsync(process);
+        }
+    }
+
+    [Fact]
+    public async Task Parent_cancellation_precedes_the_normal_close_timeout()
+    {
+        using var process = StartLongRunningProcess();
+        using var parent = new CancellationTokenSource();
+        parent.Cancel();
+        try
+        {
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                DesktopReleaseUiAutomation.WaitForNormalExitAsync(
+                    process, TimeSpan.FromSeconds(5), parent.Token));
+
+            Assert.Equal("DESKTOP_E2E_PARENT_BUDGET_EXHAUSTED", failure.Message);
+        }
+        finally
+        {
+            await KillAsync(process);
+        }
+    }
+
+    [Fact]
+    public async Task Process_exit_before_a_close_request_is_not_acceptance()
+    {
+        using var process = StartCommand("exit 0");
+        await process.WaitForExitAsync();
+
+        var failure = Assert.Throws<InvalidOperationException>(() =>
+            DesktopReleaseUiAutomation.RequireRunningBeforeClose(process));
+
+        Assert.Equal("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE", failure.Message);
+    }
+
+    private static Process StartCommand(string command)
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        start.ArgumentList.Add("/d");
+        start.ArgumentList.Add("/c");
+        start.ArgumentList.Add(command);
+        return Process.Start(start)
+            ?? throw new InvalidOperationException("DESKTOP_E2E_TEST_PROCESS_START_FAILED");
+    }
+
+    private static Process StartLongRunningProcess()
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = Path.Combine(Environment.SystemDirectory, "PING.EXE"),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        start.ArgumentList.Add("-n");
+        start.ArgumentList.Add("30");
+        start.ArgumentList.Add("127.0.0.1");
+        return Process.Start(start)
+            ?? throw new InvalidOperationException("DESKTOP_E2E_TEST_PROCESS_START_FAILED");
+    }
+
+    private static async Task KillAsync(Process process)
+    {
+        if (process.HasExited) return;
+        process.Kill(entireProcessTree: true);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await process.WaitForExitAsync(timeout.Token);
     }
 }
