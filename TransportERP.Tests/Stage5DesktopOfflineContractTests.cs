@@ -282,6 +282,14 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("const string statusPrefix = \"عمليات المزامنة (\"", uiAutomation,
             StringComparison.Ordinal);
         Assert.Contains("AutomationElement.HelpTextProperty", uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("TreeScope.Descendants, operationsWindowCondition", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("AutomationElement.ProcessIdProperty, _process.Id", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("AutomationElement.AutomationIdProperty, SyncOperationsAutomationIds.Form",
+            uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("AutomationElement.ControlTypeProperty, ControlType.Window", uiAutomation,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("CancelAfter(OperationsWindowDiagnosticDelay)", uiAutomation,
             StringComparison.Ordinal);
         Assert.Contains("await Task.Delay(100, cancellationToken)", uiAutomation,

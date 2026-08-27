@@ -252,6 +252,11 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
     {
         var processCondition = new PropertyCondition(
             AutomationElement.ProcessIdProperty, _process.Id);
+        var operationsWindowCondition = new AndCondition(
+            processCondition,
+            new PropertyCondition(
+                AutomationElement.AutomationIdProperty, SyncOperationsAutomationIds.Form),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window));
         var diagnosticAt = DateTimeOffset.UtcNow + OperationsWindowDiagnosticDelay;
         var diagnosticEmitted = false;
         var consecutiveUnexpectedWindowSamples = 0;
@@ -274,6 +279,15 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
             if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE",
                     StringComparison.Ordinal))
                 throw new InvalidOperationException("DESKTOP_E2E_OPERATIONS_WINDOW_NOT_VISIBLE");
+
+            // WinForms exposes an owned modeless Form below its owner in some UIA providers,
+            // rather than as a direct child of the desktop root. Keep both process and exact
+            // AutomationId in the query; a title, class name or arbitrary descendant is never
+            // accepted as the governed operations surface.
+            var operationsWindow = AutomationElement.RootElement.FindFirst(
+                TreeScope.Descendants, operationsWindowCondition);
+            if (operationsWindow is not null)
+                return operationsWindow;
 
             var windows = AutomationElement.RootElement.FindAll(TreeScope.Children, processCondition);
             var unexpectedWindowObserved = false;
