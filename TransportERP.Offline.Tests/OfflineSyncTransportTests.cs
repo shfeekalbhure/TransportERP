@@ -663,6 +663,30 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Caller_cancellation_precedes_an_unexpected_nonce_send_failure()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-cancel";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var cancellation = new CancellationTokenSource();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            cancellation.Cancel();
+            throw new InvalidOperationException(secret);
+        }));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            Client(http, store, key, clock, "token").ProcessNextBatchAsync(
+                cancellationToken: cancellation.Token));
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Null(persisted!.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Unexpected_nonce_error_body_failure_is_retryable_and_exposes_only_a_fixed_boundary_code()
     {
         const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-read";
@@ -709,6 +733,35 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.Equal(1, outcome.RetryScheduled);
         Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
         Assert.Equal("CLIENT_NONCE_RESPONSE_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_precedes_a_nonce_response_disposal_failure()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\nonce-dispose-cancel";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        using var cancellation = new CancellationTokenSource();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new ThrowingDisposeContent(
+                    new InvalidOperationException(secret), cancellation.Cancel)
+            };
+            response.Headers.TryAddWithoutValidation("DPoP-Nonce", Base64Url(RandomNumberGenerator.GetBytes(32)));
+            return Task.FromResult(response);
+        }));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            Client(http, store, key, clock, "token").ProcessNextBatchAsync(
+                cancellationToken: cancellation.Token));
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Null(persisted!.ResultCode);
         Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
     }
 
@@ -1678,7 +1731,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }
     }
 
-    private sealed class ThrowingDisposeContent(Exception failure) : HttpContent
+    private sealed class ThrowingDisposeContent(Exception failure, Action? beforeThrow = null) : HttpContent
     {
         protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
             Task.CompletedTask;
@@ -1692,7 +1745,11 @@ public sealed class OfflineSyncTransportTests : IDisposable
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            if (disposing) throw failure;
+            if (disposing)
+            {
+                beforeThrow?.Invoke();
+                throw failure;
+            }
         }
     }
 

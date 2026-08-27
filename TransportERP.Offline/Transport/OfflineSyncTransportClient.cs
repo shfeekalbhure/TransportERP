@@ -277,6 +277,10 @@ public sealed class OfflineSyncTransportClient
         {
             request = CreateRequest(body, bearer, attemptCorrelationId, proof: null);
         }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
         catch (Exception)
         {
             return (null, "CLIENT_NONCE_REQUEST_FAILURE", true);
@@ -292,6 +296,10 @@ public sealed class OfflineSyncTransportClient
             }
             catch (OperationCanceledException) { throw; }
             catch (HttpRequestException) { throw; }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
             catch (Exception)
             {
                 return (null, "CLIENT_NONCE_SEND_FAILURE", true);
@@ -317,6 +325,10 @@ public sealed class OfflineSyncTransportClient
             }
             catch (OperationCanceledException) { throw; }
             catch (HttpRequestException) { throw; }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
             catch (Exception)
             {
                 return (null, "CLIENT_NONCE_RESPONSE_FAILURE", true);
