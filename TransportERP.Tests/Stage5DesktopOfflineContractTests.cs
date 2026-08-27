@@ -23,6 +23,8 @@ public sealed class Stage5DesktopOfflineContractTests
         var sessions = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+        var releaseHost = Read(
+            "TransportERP.Desktop.E2ETests", "DesktopReleaseKestrelApiHost.cs");
         var operations = Read("TransportERP.Desktop", "Offline", "SyncOperationsForm.cs");
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
@@ -93,6 +95,31 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerCertificateCustomValidationCallback", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("[\"-addstore\", \"Root\", publicCertificatePath]", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("[\"-delstore\", \"Root\", certificate.Thumbprint]", releaseHost,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("[\"-user\",", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("StoreLocation.LocalMachine", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("StoreLocation.CurrentUser", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("VerifyCertificateAbsent(certificate)", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("if (trustMutationMayHaveOccurred)", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("[\"-f\",", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("matches.Count != 1 || matches[0].HasPrivateKey", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("Environment.GetEnvironmentVariable(\"RUNNER_ENVIRONMENT\"), \"github-hosted\"",
+            releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("WindowsBuiltInRole.Administrator", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false)", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("TargetHost = \"localhost\"", releaseHost, StringComparison.Ordinal);
+        Assert.Contains("timeout.CancelAfter(TimeSpan.FromSeconds(5))", releaseHost,
+            StringComparison.Ordinal);
+        Assert.Contains("catch (AuthenticationException)", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("RemoteCertificateValidationCallback", releaseHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", releaseHost,
+            StringComparison.Ordinal);
         Assert.Contains("args.Length != 2", program, StringComparison.Ordinal);
         Assert.Contains("Path.IsPathFullyQualified(args[1])", program, StringComparison.Ordinal);
         Assert.Contains("FileMode.CreateNew", program, StringComparison.Ordinal);

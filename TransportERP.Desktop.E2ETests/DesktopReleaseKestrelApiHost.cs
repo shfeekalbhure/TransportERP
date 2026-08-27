@@ -2,8 +2,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Principal;
 using System.Text;
 
 namespace TransportERP.Desktop.E2ETests;
@@ -43,6 +47,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         if (!OperatingSystem.IsWindows() || origin.Scheme != Uri.UriSchemeHttps ||
             origin.AbsolutePath != "/" || origin.IsDefaultPort)
             throw new InvalidOperationException("DESKTOP_E2E_EMBEDDED_ORIGIN_MUST_BE_EXACT_HTTPS_LOOPBACK");
+        EnsureEphemeralHostedMachineTrustAuthority();
         Checkpoint("HOST_LOOPBACK_CHECK_STARTED");
         if (!await ResolvesOnlyToLoopbackAsync(origin))
             throw new InvalidOperationException("DESKTOP_E2E_EMBEDDED_ORIGIN_MUST_BE_EXACT_HTTPS_LOOPBACK");
@@ -66,6 +71,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         var pfxPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         Checkpoint("HOST_CERTIFICATE_CREATE_STARTED");
         var certificate = CreateServerCertificate(origin.Host);
+        var trustMutationMayHaveOccurred = false;
         Checkpoint("HOST_CERTIFICATE_CREATED");
         try
         {
@@ -75,9 +81,12 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
                 publicCertificatePath, certificate.Export(X509ContentType.Cert), cancellationToken);
             Checkpoint("HOST_CERTIFICATE_WRITTEN");
             Checkpoint("HOST_CERTIFICATE_TRUST_STARTED");
+            VerifyCertificateAbsent(certificate);
+            Checkpoint("HOST_CERTIFICATE_ABSENCE_VERIFIED");
             Checkpoint("HOST_CERTIFICATE_IMPORT_STARTED");
+            trustMutationMayHaveOccurred = true;
             await RunCertificateStoreCommandAsync(
-                ["-user", "-f", "-addstore", "Root", publicCertificatePath],
+                ["-addstore", "Root", publicCertificatePath],
                 cancellationToken);
             Checkpoint("HOST_CERTIFICATE_IMPORT_RETURNED");
             VerifyTrustedCertificate(certificate);
@@ -85,7 +94,11 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         }
         catch
         {
-            try { await RemoveTrustedCertificateAsync(certificate); }
+            try
+            {
+                if (trustMutationMayHaveOccurred)
+                    await RemoveTrustedCertificateAsync(certificate);
+            }
             finally
             {
                 certificate.Dispose();
@@ -148,6 +161,9 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             Checkpoint("HOST_WAIT_READY");
             await host.WaitForReadyAsync(origin, cancellationToken);
             Checkpoint("HOST_READY");
+            Checkpoint("HOST_HOSTNAME_NEGATIVE_STARTED");
+            await host.VerifyHostnameMismatchRejectedAsync(origin, cancellationToken);
+            Checkpoint("HOST_HOSTNAME_NEGATIVE_REJECTED");
             return host;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -185,6 +201,44 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             await Task.Delay(100, cancellationToken);
         }
         throw new InvalidOperationException($"DESKTOP_E2E_API_EXITED_{_process.ExitCode}");
+    }
+
+    private static async Task VerifyHostnameMismatchRejectedAsync(
+        Uri origin,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(origin.Host, "127.0.0.1", StringComparison.Ordinal))
+            throw new InvalidOperationException("DESKTOP_E2E_TLS_HOSTNAME_NEGATIVE_UNAVAILABLE");
+
+        using var tcp = new TcpClient();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        await tcp.ConnectAsync(origin.Host, origin.Port, timeout.Token);
+        await using var tls = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false);
+        try
+        {
+            await tls.AuthenticateAsClientAsync(
+                new SslClientAuthenticationOptions { TargetHost = "localhost" },
+                timeout.Token);
+        }
+        catch (AuthenticationException)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("DESKTOP_E2E_TLS_HOSTNAME_VALIDATION_BYPASSED");
+    }
+
+    private static void EnsureEphemeralHostedMachineTrustAuthority()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        if (!string.Equals(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true",
+                StringComparison.Ordinal) ||
+            !string.Equals(Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT"), "github-hosted",
+                StringComparison.Ordinal) ||
+            !principal.IsInRole(WindowsBuiltInRole.Administrator))
+            throw new InvalidOperationException("DESKTOP_E2E_MACHINE_TRUST_AUTHORITY_DENIED");
     }
 
     private static async Task<bool> ResolvesOnlyToLoopbackAsync(Uri origin)
@@ -399,7 +453,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
     private static void VerifyTrustedCertificate(X509Certificate2 certificate)
     {
-        using var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
+        using var root = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
         root.Open(OpenFlags.ReadOnly);
         var matches = root.Certificates.Find(
             X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);
@@ -415,9 +469,26 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         }
     }
 
+    private static void VerifyCertificateAbsent(X509Certificate2 certificate)
+    {
+        using var root = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
+        root.Open(OpenFlags.ReadOnly);
+        var matches = root.Certificates.Find(
+            X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);
+        try
+        {
+            if (matches.Count != 0)
+                throw new InvalidOperationException("DESKTOP_E2E_CERTIFICATE_ALREADY_PRESENT");
+        }
+        finally
+        {
+            foreach (var match in matches) match.Dispose();
+        }
+    }
+
     private static async Task RemoveTrustedCertificateAsync(X509Certificate2 certificate)
     {
-        using (var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
+        using (var root = new X509Store(StoreName.Root, StoreLocation.LocalMachine))
         {
             root.Open(OpenFlags.ReadOnly);
             var matches = root.Certificates.Find(
@@ -425,6 +496,10 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             try
             {
                 if (matches.Count == 0) return;
+                if (matches.Count != 1 || matches[0].HasPrivateKey ||
+                    !matches[0].RawData.AsSpan().SequenceEqual(certificate.RawData))
+                    throw new InvalidOperationException(
+                        "DESKTOP_E2E_CERTIFICATE_REMOVAL_TARGET_INVALID");
             }
             finally
             {
@@ -433,8 +508,8 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         }
 
         await RunCertificateStoreCommandAsync(
-            ["-user", "-delstore", "Root", certificate.Thumbprint], CancellationToken.None);
-        using var verify = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
+            ["-delstore", "Root", certificate.Thumbprint], CancellationToken.None);
+        using var verify = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
         verify.Open(OpenFlags.ReadOnly);
         var remaining = verify.Certificates.Find(
             X509FindType.FindByThumbprint, certificate.Thumbprint, validOnly: false);

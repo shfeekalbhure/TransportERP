@@ -193,7 +193,12 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("adb_bounded() { timeout 30s adb", workflow, StringComparison.Ordinal);
         Assert.Contains("app_pid()", workflow, StringComparison.Ordinal);
         Assert.Contains("| tr -d '\\r' || true", workflow, StringComparison.Ordinal);
-        Assert.Contains("cmd package resolve-activity --brief", workflow, StringComparison.Ordinal);
+        Assert.Contains("cmd package resolve-activity --components", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("cmd package resolve-activity --brief", workflow, StringComparison.Ordinal);
+        Assert.Contains("Android launcher resolution returned an unexpected line count.", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("Android launcher resolution returned an invalid component.", workflow,
+            StringComparison.Ordinal);
         Assert.Contains("grep -Fx 'Status: ok'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("adb_bounded shell monkey", workflow, StringComparison.Ordinal);
         Assert.Contains("timeout-minutes: 12", workflow, StringComparison.Ordinal);

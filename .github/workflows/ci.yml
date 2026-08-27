@@ -546,6 +546,7 @@ jobs:
             'HOST_CERTIFICATE_CREATED'
             'HOST_CERTIFICATE_WRITTEN'
             'HOST_CERTIFICATE_TRUST_STARTED'
+            'HOST_CERTIFICATE_ABSENCE_VERIFIED'
             'HOST_CERTIFICATE_IMPORT_STARTED'
             'HOST_CERTIFICATE_IMPORT_RETURNED'
             'HOST_CERTIFICATE_IMPORT_VERIFIED'
@@ -556,6 +557,8 @@ jobs:
             'HOST_WAIT_READY'
             'HOST_ACTIVATION_REACHABLE'
             'HOST_READY'
+            'HOST_HOSTNAME_NEGATIVE_STARTED'
+            'HOST_HOSTNAME_NEGATIVE_REJECTED'
             'HOST_START_CANCELLED'
             'HOST_START_FAILED'
             'HOST_DISPOSE_STARTED'
@@ -1938,16 +1941,25 @@ jobs:
 
           adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
           mapfile -t launcher_candidates < <(
-            adb_bounded shell cmd package resolve-activity --brief \
+            adb_bounded shell cmd package resolve-activity --components \
               -a android.intent.action.MAIN \
               -c android.intent.category.LAUNCHER \
               "$ANDROID_TEST_PACKAGE" | tr -d '\r'
           )
-          test "${#launcher_candidates[@]}" -eq 1
+          if [ "${#launcher_candidates[@]}" -ne 1 ]; then
+            echo 'Android launcher resolution returned an unexpected line count.'
+            exit 1
+          fi
           launcher_component="${launcher_candidates[0]}"
-          [[ "$launcher_component" =~ ^com\.transporterp\.mobile\.driver/[A-Za-z0-9._$]+$ ]]
+          if [[ ! "$launcher_component" =~ ^com\.transporterp\.mobile\.driver/[A-Za-z0-9._$]+$ ]]; then
+            echo 'Android launcher resolution returned an invalid component.'
+            exit 1
+          fi
           launch_result=$(adb_bounded shell am start -W -n "$launcher_component" | tr -d '\r')
-          grep -Fx 'Status: ok' <<< "$launch_result" >/dev/null
+          if ! grep -Fx 'Status: ok' <<< "$launch_result" >/dev/null; then
+            echo 'Android launcher did not report an exact successful OS status.'
+            exit 1
+          fi
           observed_pid=''
           stable_pid=false
           for attempt in $(seq 1 30); do
@@ -1959,7 +1971,10 @@ jobs:
             observed_pid="$current_pid"
             sleep 1
           done
-          test "$stable_pid" = true
+          if [ "$stable_pid" != true ]; then
+            echo 'Android launcher process did not reach a stable numeric PID.'
+            exit 1
+          fi
           echo 'android_closed_startup_launcher_verified=true'
 
           run_phase startup
