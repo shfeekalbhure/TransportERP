@@ -16,7 +16,9 @@ public sealed record OfflineSyncTransportOptions(
     string WorkerId,
     TimeSpan? LeaseDuration = null,
     int MaximumBatchOperations = 100,
-    TimeSpan? AcceptedPollInterval = null)
+    TimeSpan? AcceptedPollInterval = null,
+    int MaximumRequestBodyBytes = 2_097_152,
+    int MaximumPayloadBytes = 16_384)
 {
     public TimeSpan EffectiveLeaseDuration => LeaseDuration ?? TimeSpan.FromMinutes(2);
     public TimeSpan EffectiveAcceptedPollInterval => AcceptedPollInterval ?? TimeSpan.FromSeconds(5);
@@ -40,8 +42,6 @@ public sealed class OfflineSyncTransportClient
     private const string ProtocolVersion = "sync-v1";
     private const string CorrelationHeader = "X-Correlation-Id";
     private const string NonceHeader = "DPoP-Nonce";
-    private const int MaximumPayloadBytes = 16_384;
-    private const int MaximumRequestBodyBytes = 2_097_152;
     private readonly HttpClient _httpClient;
     private readonly OfflineOperationStore _store;
     private readonly IInMemoryBearerTokenProvider _bearerTokens;
@@ -76,7 +76,10 @@ public sealed class OfflineSyncTransportClient
             options.EffectiveLeaseDuration <= TimeSpan.Zero ||
             options.EffectiveAcceptedPollInterval <= TimeSpan.Zero ||
             options.EffectiveAcceptedPollInterval > TimeSpan.FromHours(1) ||
-            options.MaximumBatchOperations is < 1 or > 100)
+            options.MaximumBatchOperations is < 1 or > 100 ||
+            options.MaximumRequestBodyBytes is < 1 or > 2_097_152 ||
+            options.MaximumPayloadBytes is < 1 or > 16_384 ||
+            options.MaximumPayloadBytes > options.MaximumRequestBodyBytes)
             throw new ArgumentException("The sync transport options are invalid.", nameof(options));
     }
 
@@ -115,7 +118,7 @@ public sealed class OfflineSyncTransportClient
                 operation.CompanyId != _options.CompanyId || operation.BranchId != _options.BranchId ||
                 operation.UserId != _options.UserId;
             var payloadInvalid = operation.PayloadJson is null ||
-                Encoding.UTF8.GetByteCount(operation.PayloadJson) > MaximumPayloadBytes;
+                Encoding.UTF8.GetByteCount(operation.PayloadJson) > _options.MaximumPayloadBytes;
             if (scopeInvalid || payloadInvalid)
             {
                 await _store.MarkRejectedAsync(
@@ -133,7 +136,7 @@ public sealed class OfflineSyncTransportClient
             return new(claimed.Count, 0, 0, rejectedBeforeSend, 0);
 
         var body = CreateBody(eligible);
-        if (body.Length > MaximumRequestBodyBytes)
+        if (body.Length > _options.MaximumRequestBodyBytes)
         {
             var oversized = await CompleteRequestFailureAsync(
                 eligible, "REQUEST_BODY_TOO_LARGE", retryable: false, cancellationToken);

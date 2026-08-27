@@ -11,4 +11,8 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

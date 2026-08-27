@@ -19,6 +19,35 @@ public sealed class OfflineSyncTransportTests : IDisposable
     private readonly byte[] _cacheKey = RandomNumberGenerator.GetBytes(32);
 
     [Fact]
+    public async Task Effective_payload_ceiling_rejects_locally_before_any_HTTP_call()
+    {
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            calls++;
+            throw new InvalidOperationException("The narrowed client policy must reject before transport.");
+        }));
+        var options = new OfflineSyncTransportOptions(
+            Endpoint, "desktop-device-1", RegisteredDeviceId, CompanyId, BranchId, UserId, "policy-worker",
+            MaximumRequestBodyBytes: 1024,
+            MaximumPayloadBytes: 8);
+        var client = new OfflineSyncTransportClient(
+            http, store, new FixedBearerProvider("token"), key, options, clock);
+
+        var result = await client.ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(0, calls);
+        Assert.Equal(1, result.Rejected);
+        Assert.Equal(OfflineOperationStatus.Rejected, persisted!.Status);
+        Assert.Equal("PAYLOAD_TOO_LARGE", persisted.ResultCode);
+    }
+
+    [Fact]
     public async Task Nonce_challenge_is_followed_by_a_fresh_cryptographically_valid_proof_over_exact_body()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));

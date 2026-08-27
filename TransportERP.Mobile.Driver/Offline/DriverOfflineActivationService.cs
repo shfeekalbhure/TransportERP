@@ -1,4 +1,6 @@
 using Microsoft.Maui.Storage;
+using TransportERP.Application.Sync;
+using TransportERP.Offline;
 using TransportERP.Offline.Transport;
 
 namespace TransportERP.Mobile.Driver.Offline;
@@ -25,6 +27,7 @@ public sealed class DriverOfflineActivationRequest
         Uri batchEndpoint,
         IReadOnlyCollection<DriverOfflineActionGrant> grantedActions,
         DriverOfflineOperationPermissions operationPermissions,
+        SyncClientEffectivePolicy effectivePolicy,
         bool offlineRuntimeAuthorized = false)
     {
         CompanyId = companyId;
@@ -37,6 +40,7 @@ public sealed class DriverOfflineActivationRequest
         BatchEndpoint = batchEndpoint;
         GrantedActions = grantedActions;
         OperationPermissions = operationPermissions;
+        EffectivePolicy = effectivePolicy;
         OfflineRuntimeAuthorized = offlineRuntimeAuthorized;
     }
 
@@ -50,6 +54,7 @@ public sealed class DriverOfflineActivationRequest
     public Uri BatchEndpoint { get; }
     public IReadOnlyCollection<DriverOfflineActionGrant> GrantedActions { get; }
     public DriverOfflineOperationPermissions OperationPermissions { get; }
+    public SyncClientEffectivePolicy EffectivePolicy { get; }
     public bool OfflineRuntimeAuthorized { get; }
 }
 
@@ -184,7 +189,10 @@ public sealed class DriverOfflineActivationService(
                     request.CompanyId,
                     request.BranchId,
                     request.UserId,
-                    $"driver-android-{Guid.NewGuid():N}");
+                    $"driver-android-{Guid.NewGuid():N}",
+                    MaximumBatchOperations: request.EffectivePolicy.MaxBatchOperations,
+                    MaximumRequestBodyBytes: request.EffectivePolicy.MaximumRequestBodyBytes,
+                    MaximumPayloadBytes: request.EffectivePolicy.MaximumPayloadBytes);
                 var options = new DriverOfflineCompositionOptions(
                     request.CompanyId,
                     request.BranchId,
@@ -193,6 +201,11 @@ public sealed class DriverOfflineActivationService(
                     Path.Combine(scopeDirectory, "outbox.db"),
                     Path.Combine(scopeDirectory, "read-cache.db"),
                     transport,
+                    request.EffectivePolicy,
+                    new OfflineRetryPolicy(
+                        request.EffectivePolicy.ClientTransportMaxRetryCount,
+                        request.EffectivePolicy.ClientRetryBaseDelay,
+                        request.EffectivePolicy.ClientRetryMaxDelay),
                     OfflineRuntimeAuthorized: true);
                 var dependencies = new DriverOfflineDependencies(
                     encryptionKeys,
@@ -289,7 +302,8 @@ public sealed class DriverOfflineActivationService(
             request.SessionBearer.Any(character => character > 0x7f || char.IsWhiteSpace(character)) ||
             !request.BatchEndpoint.IsAbsoluteUri || request.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
             request.GrantedActions is null || request.GrantedActions.Count == 0 ||
-            request.OperationPermissions is null)
+            request.OperationPermissions is null || request.EffectivePolicy is null ||
+            !request.EffectivePolicy.IsValid)
         {
             throw new ArgumentException("A complete HTTPS scope, session and grant set is required.", nameof(request));
         }

@@ -39,6 +39,14 @@ public sealed class MainPage : ContentPage
     };
     private readonly Button _signIn = new() { Text = "Sign in and activate authorized Offline scope" };
     private readonly Button _signOut = new() { Text = "Sign out", IsEnabled = false };
+    private readonly Entry _partyName = new() { Placeholder = "Operational party name" };
+    private readonly Entry _partyMobile = new() { Placeholder = "Operational party mobile", Keyboard = Keyboard.Telephone };
+    private readonly Entry _partyAddress = new() { Placeholder = "Operational party address" };
+    private readonly Button _queueParty = new()
+    {
+        Text = "Queue encrypted operational party",
+        IsEnabled = false
+    };
     private DriverOfflineOperationStatusView? _selected;
     private bool _subscribed;
     private bool _busy;
@@ -86,6 +94,7 @@ public sealed class MainPage : ContentPage
         refresh.Clicked += async (_, _) => await RefreshAsync();
         _signIn.Clicked += async (_, _) => await SignInAndActivateAsync();
         _signOut.Clicked += async (_, _) => await SignOutAsync();
+        _queueParty.Clicked += async (_, _) => await QueueOperationalPartyAsync();
         _retry.Clicked += async (_, _) => await RetrySelectedAsync();
         _keepServer.Clicked += async (_, _) =>
             await ResolveSelectedAsync(OfflineConflictDecision.KeepServer);
@@ -115,6 +124,11 @@ public sealed class MainPage : ContentPage
                 _deviceId,
                 _deviceCredential,
                 new HorizontalStackLayout { Spacing = 8, Children = { _signIn, _signOut } },
+                new Label { Text = "Offline business action — CreateOperationalParty" },
+                _partyName,
+                _partyMobile,
+                _partyAddress,
+                _queueParty,
                 refresh
             }
         };
@@ -233,6 +247,7 @@ public sealed class MainPage : ContentPage
         _actionResult.Text = "Sign in and explicitly activate an authorized scope to use synchronization.";
         _signIn.IsEnabled = true;
         _signOut.IsEnabled = false;
+        _queueParty.IsEnabled = false;
         _operations.Clear();
         _selected = null;
         _conflictReview.Text = "Conflict review: NOT_SELECTED";
@@ -268,6 +283,40 @@ public sealed class MainPage : ContentPage
         catch (Exception exception)
         {
             _actionResult.Text = $"Result: {SafeCode(exception)}";
+        }
+    }
+
+    private async Task QueueOperationalPartyAsync()
+    {
+        var active = _activation.Active;
+        if (active is null)
+        {
+            RenderClosed();
+            return;
+        }
+
+        _queueParty.IsEnabled = false;
+        try
+        {
+            var result = await active.Runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
+                _partyName.Text ?? string.Empty,
+                _partyMobile.Text ?? string.Empty,
+                _partyAddress.Text ?? string.Empty);
+            _partyName.Text = string.Empty;
+            _partyMobile.Text = string.Empty;
+            _partyAddress.Text = string.Empty;
+            _actionResult.Text = result.Created ? "Result: BUSINESS_OPERATION_QUEUED" : "Result: BUSINESS_OPERATION_EXISTS";
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            _actionResult.Text = $"Result: {SafeCode(exception)}";
+        }
+        finally
+        {
+            if (_activation.Active is { Runtime: { Status.Mode: DriverOfflineRuntimeMode.Ready,
+                    CanQueueOperationalParties: true } })
+                _queueParty.IsEnabled = true;
         }
     }
 
@@ -388,6 +437,7 @@ public sealed class MainPage : ContentPage
     private void UpdateActionAvailability(DriverOfflineRuntime runtime)
     {
         var ready = runtime.Status.Mode == DriverOfflineRuntimeMode.Ready;
+        _queueParty.IsEnabled = ready && runtime.CanQueueOperationalParties;
         var conflictSelected = _selected is
             { Status: OfflineOperationStatus.Conflict, ConflictDecisionReady: true, ConflictBaseVersion: > 0 };
         _retry.IsEnabled = ready && runtime.OperationPermissions.CanRetryFailedOperations &&
@@ -407,6 +457,7 @@ public sealed class MainPage : ContentPage
         _resolutionConfirmed.IsChecked = false;
         _keepServer.IsEnabled = false;
         _reapply.IsEnabled = false;
+        _queueParty.IsEnabled = false;
     }
 
     private static string SafeCode(Exception exception) => exception switch

@@ -307,6 +307,44 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Driver_consumes_effective_policy_build_identity_and_queues_a_typed_business_action()
+    {
+        var page = Read("TransportERP.Mobile.Driver", "MainPage.cs");
+        var authenticated = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverAuthenticatedActivationCoordinator.cs");
+        var activation = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineActivationService.cs");
+        var composition = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineComposition.cs");
+        var producer = Read("TransportERP.Mobile.Driver", "Offline",
+            "DriverOfflineBusinessProducer.cs");
+        var sharedProducer = Read("TransportERP.Offline", "OperationalPartyOfflineProducer.cs");
+
+        Assert.Contains("EffectivePolicy(decision)", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.MaxBatchOperations", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.ClientTransportMaxRetryCount", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.LocalSuccessHours", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.CacheMaxAgeHours", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.MaximumRequestBodyBytes", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.MaximumPayloadBytes", authenticated, StringComparison.Ordinal);
+        Assert.Contains("decision.ActivationImplementationSha", authenticated, StringComparison.Ordinal);
+        Assert.Contains("request.EffectivePolicy.MaxBatchOperations", activation, StringComparison.Ordinal);
+        Assert.Contains("request.EffectivePolicy.ClientTransportMaxRetryCount", activation,
+            StringComparison.Ordinal);
+        Assert.Contains("options.EffectivePolicy.IsValid", composition, StringComparison.Ordinal);
+        Assert.Contains("options.EffectivePolicy.LocalSuccessRetention", composition, StringComparison.Ordinal);
+        Assert.Contains("READ_CACHE_POLICY_DENIED", composition, StringComparison.Ordinal);
+
+        Assert.Contains("QueueOperationalPartyAsync", producer, StringComparison.Ordinal);
+        Assert.Contains("new OperationalPartyOfflineProducer", producer, StringComparison.Ordinal);
+        Assert.Contains("new OperationalPartyCreateRequest", sharedProducer, StringComparison.Ordinal);
+        Assert.Contains("identity.ClientOperationId", sharedProducer, StringComparison.Ordinal);
+        Assert.Contains("runtime.QueueAsync", producer, StringComparison.Ordinal);
+        Assert.Contains("Queue encrypted operational party", page, StringComparison.Ordinal);
+        Assert.Contains("CreateBusinessProducer().QueueOperationalPartyAsync", page, StringComparison.Ordinal);
+    }
+
     private static string Read(params string[] path) =>
         File.ReadAllText(Path.Combine([RepositoryRoot(), .. path]));
 

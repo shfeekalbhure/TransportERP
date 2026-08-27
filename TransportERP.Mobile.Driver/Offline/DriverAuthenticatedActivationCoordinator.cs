@@ -82,6 +82,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                 var decision = await GetActivationDecisionAsync(
                     session.AccessToken, cancellationToken);
                 ValidateDecision(request, session, decision);
+                var effectivePolicy = EffectivePolicy(decision);
 
                 var localKeyAvailable = await signingKey.IsNativeSigningKeyAvailableAsync(cancellationToken);
                 DevicePublicP256Jwk? localPublicKey = localKeyAvailable
@@ -106,6 +107,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                     decision = await GetActivationDecisionAsync(
                         session.AccessToken, cancellationToken);
                     ValidateDecision(request, session, decision);
+                    effectivePolicy = EffectivePolicy(decision);
                 }
 
                 featureGate.Authorize(decision, session.AccessTokenExpiresAt);
@@ -125,6 +127,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                         new DriverOfflineOperationPermissions(
                             decision.CanRetryFailedOperations,
                             decision.CanResolveConflicts),
+                        effectivePolicy,
                         offlineRuntimeAuthorized: true),
                     cancellationToken);
                 ArmExpiry(session.AccessTokenExpiresAt);
@@ -346,6 +349,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             !HasOnlySupportedUniqueActions(decision.AllowedActions) ||
             string.IsNullOrWhiteSpace(decision.PolicySourceVersion) ||
             !IsSha256Hex(decision.PolicySourceFingerprint) ||
+            !EffectivePolicy(decision).IsValid ||
             decision.BatchEndpoint is null || !decision.BatchEndpoint.IsAbsoluteUri ||
             decision.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
             !SameOrigin(SyncClientDeploymentAuthority.Origin, decision.BatchEndpoint) ||
@@ -364,6 +368,21 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                      new DevicePublicP256Jwk(publicJwk.X, publicJwk.Y)))))
             throw new DriverOfflineUnavailableException("OFFLINE_ACTIVATION_DECISION_INVALID");
     }
+
+    private static SyncClientEffectivePolicy EffectivePolicy(DriverServerActivationDecision decision) => new(
+        decision.MaxBatchOperations,
+        decision.ClientTransportMaxRetryCount,
+        decision.ClientTransportBaseSeconds,
+        decision.ClientTransportMaxDelayMinutes,
+        decision.LocalSuccessHours,
+        decision.LocalRejectedDays,
+        decision.ServerPayloadDays,
+        decision.CacheMaxAgeHours,
+        decision.MaximumRequestBodyBytes,
+        decision.MaximumPayloadBytes,
+        decision.PolicySourceVersion ?? string.Empty,
+        decision.PolicySourceFingerprint ?? string.Empty,
+        decision.ActivationImplementationSha ?? string.Empty);
 
     private async Task DeactivateCoreAsync(CancellationToken cancellationToken)
     {
@@ -607,4 +626,15 @@ public sealed record DriverServerActivationDecision(
     bool KeyRecoveryAllowed,
     string? PolicySourceVersion,
     string? PolicySourceFingerprint,
+    int MaxBatchOperations,
+    int ClientTransportMaxRetryCount,
+    int ClientTransportBaseSeconds,
+    int ClientTransportMaxDelayMinutes,
+    int LocalSuccessHours,
+    int LocalRejectedDays,
+    int ServerPayloadDays,
+    int CacheMaxAgeHours,
+    int MaximumRequestBodyBytes,
+    int MaximumPayloadBytes,
+    string? ActivationImplementationSha,
     string? ClosedReason);

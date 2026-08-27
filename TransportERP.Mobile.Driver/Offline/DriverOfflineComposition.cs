@@ -1,4 +1,5 @@
 using TransportERP.Mobile.Internal;
+using TransportERP.Application.Sync;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
 
@@ -102,6 +103,7 @@ public sealed record DriverOfflineCompositionOptions(
     string OutboxDatabasePath,
     string ReadCacheDatabasePath,
     OfflineSyncTransportOptions TransportOptions,
+    SyncClientEffectivePolicy EffectivePolicy,
     OfflineRetryPolicy? RetryPolicy = null,
     bool OfflineRuntimeAuthorized = false);
 
@@ -188,6 +190,7 @@ public sealed class DriverOfflineRuntime
     private readonly Guid _branchId;
     private readonly Guid _userId;
     private readonly Guid _registeredDeviceId;
+    private readonly SyncClientEffectivePolicy _effectivePolicy;
     private readonly OfflineOperationScope _scope;
     private readonly IDriverOfflineActionAllowlist? _allowlist;
     private readonly IDriverSyncNetworkProvider _network;
@@ -207,6 +210,7 @@ public sealed class DriverOfflineRuntime
         _branchId = options.BranchId;
         _userId = options.UserId;
         _registeredDeviceId = options.RegisteredDeviceId;
+        _effectivePolicy = options.EffectivePolicy;
         _scope = new OfflineOperationScope(
             options.CompanyId, options.BranchId, options.UserId, options.RegisteredDeviceId);
         _allowlist = dependencies.ActionAllowlist;
@@ -226,7 +230,12 @@ public sealed class DriverOfflineRuntime
             : null;
         _supervisor = result is { Outbox: not null, Transport: not null }
             ? new OfflineSyncSupervisor(
-                result.Outbox, result.Transport, new DriverSyncConnectivity(dependencies.Network))
+                result.Outbox, result.Transport, new DriverSyncConnectivity(dependencies.Network),
+                new OfflineSyncSupervisorOptions(
+                    options.EffectivePolicy.MaxBatchOperations,
+                    RetentionPolicy: new OfflineRetentionPolicy(
+                        options.EffectivePolicy.LocalSuccessRetention,
+                        options.EffectivePolicy.LocalRejectedRetention)))
             : null;
         Status = new(
             Map(result.Mode),
@@ -238,6 +247,17 @@ public sealed class DriverOfflineRuntime
 
     public DriverOfflineRuntimeStatus Status { get; }
     public DriverOfflineOperationPermissions OperationPermissions { get; }
+    public SyncClientEffectivePolicy EffectivePolicy => _effectivePolicy;
+    public bool CanQueueOperationalParties => _outbox is not null && _allowlist?.Allows(
+        "CreateOperationalParty", "CREATE", "OperationalParty") == true;
+
+    public DriverOfflineBusinessProducer CreateBusinessProducer()
+    {
+        if (_outbox is null) throw Unavailable();
+        if (!CanQueueOperationalParties)
+            throw new DriverOfflineUnavailableException("OFFLINE_ACTION_NOT_AUTHORIZED");
+        return new DriverOfflineBusinessProducer(this, _scope);
+    }
 
     [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
     public Task<OfflineEnqueueResult> QueueAsync(
@@ -289,8 +309,13 @@ public sealed class DriverOfflineRuntime
         string cacheKey,
         string payloadJson,
         TimeSpan lifetime,
-        CancellationToken cancellationToken = default) =>
-        (_readCache ?? throw Unavailable()).PutAsync(cacheKind, cacheKey, payloadJson, lifetime, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (lifetime <= TimeSpan.Zero || lifetime > _effectivePolicy.CacheMaxAge)
+            throw new DriverOfflineUnavailableException("READ_CACHE_POLICY_DENIED");
+        return (_readCache ?? throw Unavailable()).PutAsync(
+            cacheKind, cacheKey, payloadJson, lifetime, cancellationToken);
+    }
 
     public Task<string?> GetReadCacheAsync(
         string cacheKind,
@@ -339,7 +364,11 @@ public sealed class DriverOfflineRuntime
     }
 
     public Task<int> RedactExpiredPayloadsAsync(CancellationToken cancellationToken = default) =>
-        (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(cancellationToken: cancellationToken);
+        (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(
+            new OfflineRetentionPolicy(
+                _effectivePolicy.LocalSuccessRetention,
+                _effectivePolicy.LocalRejectedRetention),
+            cancellationToken);
 
     private bool MatchesScope(OfflineOperationEnqueueTemplate request) =>
         request.CompanyId == _companyId && request.BranchId == _branchId &&
@@ -416,7 +445,15 @@ public static class DriverOfflineComposition
             options.TransportOptions.RegisteredDeviceId != options.RegisteredDeviceId ||
             options.TransportOptions.CompanyId != options.CompanyId ||
             options.TransportOptions.BranchId != options.BranchId ||
-            options.TransportOptions.UserId != options.UserId)
+            options.TransportOptions.UserId != options.UserId ||
+            options.EffectivePolicy is null || !options.EffectivePolicy.IsValid ||
+            options.TransportOptions.MaximumBatchOperations != options.EffectivePolicy.MaxBatchOperations ||
+            options.TransportOptions.MaximumRequestBodyBytes != options.EffectivePolicy.MaximumRequestBodyBytes ||
+            options.TransportOptions.MaximumPayloadBytes != options.EffectivePolicy.MaximumPayloadBytes ||
+            options.RetryPolicy is null ||
+            options.RetryPolicy.MaxRetryCount != options.EffectivePolicy.ClientTransportMaxRetryCount ||
+            options.RetryPolicy.EffectiveBaseDelay != options.EffectivePolicy.ClientRetryBaseDelay ||
+            options.RetryPolicy.EffectiveMaxDelay != options.EffectivePolicy.ClientRetryMaxDelay)
         {
             throw new ArgumentException("The configured mobile scope and transport device must be identical.", nameof(options));
         }

@@ -3,6 +3,18 @@ namespace TransportERP.Tests;
 public sealed class Stage5DesktopOfflineContractTests
 {
     [Fact]
+    public void Client_build_identity_requires_two_exact_equal_lowercase_commit_shas()
+    {
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        Assert.True(TransportERP.Application.Sync.SyncClientDeploymentAuthority.FixedShaEquals(sha, sha));
+        Assert.False(TransportERP.Application.Sync.SyncClientDeploymentAuthority.FixedShaEquals(
+            sha, "1123456789abcdef0123456789abcdef01234567"));
+        Assert.False(TransportERP.Application.Sync.SyncClientDeploymentAuthority.FixedShaEquals(
+            sha.ToUpperInvariant(), sha));
+        Assert.False(TransportERP.Application.Sync.SyncClientDeploymentAuthority.FixedShaEquals("UNBOUND", sha));
+    }
+
+    [Fact]
     public void Desktop_is_an_executable_with_closed_default_startup_and_encrypted_offline_core()
     {
         var project = Read("TransportERP.Desktop", "TransportERP.Desktop.csproj");
@@ -144,6 +156,66 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.DoesNotContain("DeviceCredential =", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
         Assert.DoesNotContain("args[", onlineAuth, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Desktop_consumes_exact_effective_policy_build_identity_and_has_a_real_business_producer()
+    {
+        var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
+        var composition = Read("TransportERP.Desktop", "Offline", "DesktopOfflineComposition.cs");
+        var producer = Read("TransportERP.Desktop", "Offline", "DesktopOfflineBusinessProducer.cs");
+        var sharedProducer = Read("TransportERP.Offline", "OperationalPartyOfflineProducer.cs");
+        var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+        var program = Read("TransportERP.Desktop", "Program.cs");
+        var platformProbe = Read("TransportERP.Desktop", "Offline", "DesktopRuntimePlatformProbe.cs");
+        var authority = Read("TransportERP.Application", "Sync", "SyncClientDeploymentAuthority.cs");
+        var policy = Read("TransportERP.Application", "Sync", "SyncClientEffectivePolicy.cs");
+        var project = Read("TransportERP.Application", "TransportERP.Application.csproj");
+
+        Assert.Contains("TryEffectivePolicy(activation", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.MaxBatchOperations", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.ClientTransportMaxRetryCount", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.LocalSuccessHours", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.CacheMaxAgeHours", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.MaximumRequestBodyBytes", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.MaximumPayloadBytes", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("activation.ActivationImplementationSha", onlineAuth, StringComparison.Ordinal);
+        Assert.Contains("options.EffectivePolicy.IsValid", composition, StringComparison.Ordinal);
+        Assert.Contains("options.EffectivePolicy.MaxBatchOperations", composition, StringComparison.Ordinal);
+        Assert.Contains("options.EffectivePolicy.LocalSuccessRetention", composition, StringComparison.Ordinal);
+        Assert.Contains("READ_CACHE_POLICY_DENIED", composition, StringComparison.Ordinal);
+
+        Assert.Contains("TransportERPImplementationSha", project, StringComparison.Ordinal);
+        Assert.Contains("IsAuthorizedImplementation", authority, StringComparison.Ordinal);
+        Assert.Contains("CryptographicOperations.FixedTimeEquals", authority, StringComparison.Ordinal);
+        Assert.Contains("SyncClientDeploymentAuthority.IsAuthorizedImplementation", policy, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.GetEnvironmentVariable", authority, StringComparison.Ordinal);
+
+        Assert.Contains("QueueOperationalPartyAsync", producer, StringComparison.Ordinal);
+        Assert.Contains("new OperationalPartyOfflineProducer", producer, StringComparison.Ordinal);
+        Assert.Contains("new OperationalPartyCreateRequest", sharedProducer, StringComparison.Ordinal);
+        Assert.Contains("identity.ClientOperationId", sharedProducer, StringComparison.Ordinal);
+        Assert.Contains("runtime.QueueAsync", producer, StringComparison.Ordinal);
+        Assert.Contains("QueueOperationalPartyAsync", shell, StringComparison.Ordinal);
+        Assert.Contains("CreateBusinessProducer", shell, StringComparison.Ordinal);
+        Assert.Contains("_runtimeAuthorized = false", shell, StringComparison.Ordinal);
+        Assert.Contains("_runtime = null", shell, StringComparison.Ordinal);
+        Assert.Contains("_businessProducer = null", shell, StringComparison.Ordinal);
+        Assert.Contains("_runtimeAuthorized && _businessProducer is not null", shell,
+            StringComparison.Ordinal);
+        Assert.True(
+            shell.IndexOf("_runtimeAuthorized = false", shell.IndexOf("ReportSupervisorStopped", StringComparison.Ordinal),
+                StringComparison.Ordinal) <
+            shell.IndexOf("_queueParty.Enabled = false", shell.IndexOf("ReportSupervisorStopped", StringComparison.Ordinal),
+                StringComparison.Ordinal));
+        Assert.Contains("--runtime-platform-smoke", program, StringComparison.Ordinal);
+        Assert.Contains("CngExportPolicies.None", platformProbe, StringComparison.Ordinal);
+        Assert.Contains("WindowsDpapiLocalEncryptionKeyProvider", composition, StringComparison.Ordinal);
+        Assert.Contains("QueueOperationalPartyAsync", platformProbe, StringComparison.Ordinal);
+        Assert.Contains("SynchronizeAsync", platformProbe, StringComparison.Ordinal);
+        Assert.Contains("GetOperationAsync", platformProbe, StringComparison.Ordinal);
+        Assert.Contains("Status: OfflineOperationStatus.Succeeded", platformProbe, StringComparison.Ordinal);
+        Assert.Contains("in-process protocol peer", platformProbe, StringComparison.Ordinal);
     }
 
     [Fact]

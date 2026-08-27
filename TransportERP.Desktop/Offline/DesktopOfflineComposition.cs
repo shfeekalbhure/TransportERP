@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using TransportERP.Application.Sync;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
 
@@ -25,6 +26,7 @@ public sealed record DesktopOfflineCompositionOptions(
     string DeviceSigningCertificateThumbprint,
     DesktopDeviceProofBinding ProofBinding,
     OfflineSyncTransportOptions TransportOptions,
+    SyncClientEffectivePolicy EffectivePolicy,
     OfflineRetryPolicy? RetryPolicy = null,
     bool OfflineRuntimeAuthorized = false);
 
@@ -91,6 +93,18 @@ public sealed class DesktopOfflineRuntime : IDisposable
     }
 
     public DesktopOfflineRuntimeStatus Status { get; }
+    public SyncClientEffectivePolicy EffectivePolicy => _options.EffectivePolicy;
+    public bool CanQueueOperationalParties => _outbox is not null &&
+        _dependencies.WritePolicy.Allows("CreateOperationalParty", "CREATE", "OperationalParty");
+
+    public DesktopOfflineBusinessProducer CreateBusinessProducer()
+    {
+        if (_outbox is null) throw Unavailable();
+        if (!CanQueueOperationalParties)
+            throw new OfflineStoreException(
+                "OFFLINE_ACTION_NOT_AUTHORIZED", "The action is not authorized for offline execution.");
+        return new DesktopOfflineBusinessProducer(this, Scope(_options));
+    }
 
     [Obsolete("Use the identity-aware template overload so the business payload is bound to ClientOperationId atomically.")]
     public Task<OfflineEnqueueResult> QueueAsync(
@@ -131,12 +145,22 @@ public sealed class DesktopOfflineRuntime : IDisposable
     }
 
     public Task PutReadCacheAsync(string kind, string key, string payloadJson, TimeSpan lifetime,
-        CancellationToken cancellationToken = default) =>
-        (_readCache ?? throw Unavailable()).PutAsync(kind, key, payloadJson, lifetime, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (lifetime <= TimeSpan.Zero || lifetime > _options.EffectivePolicy.CacheMaxAge)
+            throw new OfflineStoreException(
+                "READ_CACHE_POLICY_DENIED", "The requested cache lifetime exceeds the effective server policy.");
+        return (_readCache ?? throw Unavailable()).PutAsync(kind, key, payloadJson, lifetime, cancellationToken);
+    }
 
     public Task<string?> GetReadCacheAsync(string kind, string key,
         CancellationToken cancellationToken = default) =>
         (_readCache ?? throw Unavailable()).GetAsync(kind, key, cancellationToken);
+
+    public Task<OfflineOperation?> GetOperationAsync(
+        Guid localOperationId,
+        CancellationToken cancellationToken = default) =>
+        (_outbox ?? throw Unavailable()).GetAsync(localOperationId, Scope(_options), cancellationToken);
 
     public SyncOperationsForm CreateOperationsForm()
     {
@@ -152,7 +176,11 @@ public sealed class DesktopOfflineRuntime : IDisposable
     }
 
     public Task<int> RedactExpiredPayloadsAsync(CancellationToken cancellationToken = default) =>
-        (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(cancellationToken: cancellationToken);
+        (_outbox ?? throw Unavailable()).RedactExpiredPayloadsAsync(
+            new OfflineRetentionPolicy(
+                _options.EffectivePolicy.LocalSuccessRetention,
+                _options.EffectivePolicy.LocalRejectedRetention),
+            cancellationToken);
 
     public void Dispose() => _signingKey?.Dispose();
 
@@ -254,7 +282,12 @@ public static class DesktopOfflineComposition
                 dependencies.Network.SyncHttpClient, outbox, dependencies.VolatileSession,
                 signingKey, options.TransportOptions, timeProvider);
             var supervisor = new OfflineSyncSupervisor(
-                outbox, transport, new DesktopSyncConnectivity(dependencies.Network));
+                outbox, transport, new DesktopSyncConnectivity(dependencies.Network),
+                new OfflineSyncSupervisorOptions(
+                    options.EffectivePolicy.MaxBatchOperations,
+                    RetentionPolicy: new OfflineRetentionPolicy(
+                        options.EffectivePolicy.LocalSuccessRetention,
+                        options.EffectivePolicy.LocalRejectedRetention)));
             return new DesktopOfflineRuntime(options, dependencies,
                 new(DesktopOfflineRuntimeMode.Ready, "READY", true, true, true),
                 outbox, readCache, transport, conflicts, supervisor, signingKey);
@@ -302,6 +335,14 @@ public static class DesktopOfflineComposition
             options.TransportOptions.BranchId != options.BranchId ||
             options.TransportOptions.UserId != options.UserId ||
             options.TransportOptions.RegisteredDeviceId != options.RegisteredDeviceId ||
+            options.EffectivePolicy is null || !options.EffectivePolicy.IsValid ||
+            options.TransportOptions.MaximumBatchOperations != options.EffectivePolicy.MaxBatchOperations ||
+            options.TransportOptions.MaximumRequestBodyBytes != options.EffectivePolicy.MaximumRequestBodyBytes ||
+            options.TransportOptions.MaximumPayloadBytes != options.EffectivePolicy.MaximumPayloadBytes ||
+            options.RetryPolicy is null ||
+            options.RetryPolicy.MaxRetryCount != options.EffectivePolicy.ClientTransportMaxRetryCount ||
+            options.RetryPolicy.EffectiveBaseDelay != options.EffectivePolicy.ClientRetryBaseDelay ||
+            options.RetryPolicy.EffectiveMaxDelay != options.EffectivePolicy.ClientRetryMaxDelay ||
             options.ProofBinding is null || options.ProofBinding.Version < 1 ||
             string.IsNullOrEmpty(options.ProofBinding.JwkThumbprint) ||
             options.ProofBinding.JwkThumbprint.Length != 43 ||

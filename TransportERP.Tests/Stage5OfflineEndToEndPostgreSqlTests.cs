@@ -12,8 +12,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
-using TransportERP.Contracts.Geo;
-using TransportERP.Contracts.Waybills;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
@@ -39,7 +38,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
     [Trait("Category", "PostgreSQL")]
     [Trait("Category", "HTTP")]
     [Trait("Category", "OfflineE2E")]
-    public async Task Encrypted_outbox_reopens_then_nonce_batch_worker_and_status_replay_reach_succeeded()
+    [Trait("Acceptance", "CLIENT-PRODUCER-E2E")]
+    public async Task Production_party_producer_encrypted_outbox_restart_nonce_batch_worker_and_PostgreSql_succeed()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
         await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
@@ -154,9 +154,13 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 x.CompanyId == scope.CompanyId &&
                 x.RegisteredDeviceId == scope.RegisteredDeviceId &&
                 x.ClientOperationId == enqueued.Operation.ClientOperationId).ToListAsync());
+            var businessKey = SyncBusinessIdempotencyKey.Create(
+                scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId,
+                enqueued.Operation.ClientOperationId);
+            Assert.NotEqual(enqueued.Operation.ClientOperationId, businessKey);
             Assert.Single(await verify.Set<OperationalPartyEntity>().AsNoTracking().Where(x =>
                 x.CompanyId == scope.CompanyId &&
-                x.ClientOperationId == enqueued.Operation.ClientOperationId).ToListAsync());
+                x.ClientOperationId == businessKey).ToListAsync());
             await AssertEvidenceAsync(connection, scope, enqueued.Operation);
         }
         finally
@@ -205,17 +209,12 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         DateTimeOffset occurredAt,
         string suffix)
     {
-        var template = new OfflineOperationEnqueueTemplate(
-            Guid.NewGuid(), scope.CompanyId, scope.BranchId, scope.UserId, scope.RegisteredDeviceId,
-            "CreateOperationalParty", "CREATE", "OperationalParty", null, null, occurredAt);
-        return store.EnqueueAsync(template, identity => JsonSerializer.Serialize(
-            new OperationalPartyCreateRequest(
-                $"Offline E2E {suffix}",
-                "700000000",
-                null,
-                null,
-                new GeoAddressSnapshot(null, null, null, null, "Encrypted offline E2E"),
-                identity.ClientOperationId)));
+        var producer = new OperationalPartyOfflineProducer(
+            (template, payloadFactory, cancellationToken) => store.EnqueueAsync(
+                template with { ClientOccurredAt = occurredAt }, payloadFactory, cancellationToken),
+            LocalScope(scope));
+        return producer.QueueAsync(
+            $"Offline E2E {suffix}", "700000000", "Encrypted offline E2E");
     }
 
     private static async Task<bool> ExecuteOneServerOperationAsync(WebApplicationFactory<Program> factory)
@@ -240,8 +239,11 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
         Assert.True(string.Equals(status, operation.Status, StringComparison.Ordinal),
             $"Expected server status {status}; actual={operation.Status}; error={operation.ErrorCode ?? "<none>"}.");
         Assert.Equal(local.OperationCorrelationId, operation.OperationCorrelationId);
+        var businessKey = SyncBusinessIdempotencyKey.Create(
+            scope.CompanyId, scope.BranchId, scope.RegisteredDeviceId, local.ClientOperationId);
+        Assert.NotEqual(local.ClientOperationId, businessKey);
         Assert.Equal(partyCount, await db.Set<OperationalPartyEntity>().AsNoTracking().CountAsync(x =>
-            x.CompanyId == scope.CompanyId && x.ClientOperationId == local.ClientOperationId));
+            x.CompanyId == scope.CompanyId && x.ClientOperationId == businessKey));
     }
 
     private static async Task AssertEvidenceAsync(string connection, E2eScope scope, OfflineOperation local)

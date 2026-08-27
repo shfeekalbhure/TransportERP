@@ -106,7 +106,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
             {
                 var authorization = await GetSyncActivationAsync(origin, bearer, cancellationToken);
                 if (!TryValidateActivation(origin, session, authorization, out var batchEndpoint,
-                        out var allowedActions, out var proofBinding))
+                        out var allowedActions, out var proofBinding, out var effectivePolicy))
                     return await RejectProvisionalSessionAsync(
                         origin, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
 
@@ -118,7 +118,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 var network = new AuthenticatedDesktopSyncNetworkProvider(_syncHttpClient);
                 var options = CreateCompositionOptions(
                     session, authorization, batchEndpoint!, request.DeviceSigningCertificateThumbprint,
-                    proofBinding!);
+                    proofBinding!, effectivePolicy!);
                 var dependencies = new DesktopOfflineDependencies(
                     bearer,
                     network,
@@ -306,11 +306,13 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         DesktopSyncActivationResponse? activation,
         out Uri? batchEndpoint,
         out IReadOnlySet<(string Action, string Operation, string Entity)>? allowedActions,
-        out DesktopDeviceProofBinding? proofBinding)
+        out DesktopDeviceProofBinding? proofBinding,
+        out SyncClientEffectivePolicy? effectivePolicy)
     {
         batchEndpoint = null;
         allowedActions = null;
         proofBinding = null;
+        effectivePolicy = null;
         if (activation is null || !activation.Enabled ||
             activation.ClosedReason is not null ||
             activation.CompanyId != session.CompanyId || activation.BranchId != session.BranchId ||
@@ -322,6 +324,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
             activation.ProofPublicJwk is null ||
             string.IsNullOrWhiteSpace(activation.PolicySourceVersion) ||
             !IsLowerHex64(activation.PolicySourceFingerprint) ||
+            !TryEffectivePolicy(activation, out effectivePolicy) ||
             !TryHttpsBatchEndpoint(origin, activation.BatchEndpoint, out batchEndpoint))
             return false;
 
@@ -366,7 +369,8 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         DesktopSyncActivationResponse activation,
         Uri batchEndpoint,
         string certificateThumbprint,
-        DesktopDeviceProofBinding proofBinding)
+        DesktopDeviceProofBinding proofBinding,
+        SyncClientEffectivePolicy effectivePolicy)
     {
         var root = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -390,8 +394,39 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 session.CompanyId,
                 session.BranchId.Value,
                 session.UserId,
-                $"desktop-{Guid.NewGuid():N}"),
+                $"desktop-{Guid.NewGuid():N}",
+                MaximumBatchOperations: effectivePolicy.MaxBatchOperations,
+                MaximumRequestBodyBytes: effectivePolicy.MaximumRequestBodyBytes,
+                MaximumPayloadBytes: effectivePolicy.MaximumPayloadBytes),
+            effectivePolicy,
+            new OfflineRetryPolicy(
+                effectivePolicy.ClientTransportMaxRetryCount,
+                effectivePolicy.ClientRetryBaseDelay,
+                effectivePolicy.ClientRetryMaxDelay),
             OfflineRuntimeAuthorized: true);
+    }
+
+    private static bool TryEffectivePolicy(
+        DesktopSyncActivationResponse activation,
+        out SyncClientEffectivePolicy? policy)
+    {
+        policy = new SyncClientEffectivePolicy(
+            activation.MaxBatchOperations,
+            activation.ClientTransportMaxRetryCount,
+            activation.ClientTransportBaseSeconds,
+            activation.ClientTransportMaxDelayMinutes,
+            activation.LocalSuccessHours,
+            activation.LocalRejectedDays,
+            activation.ServerPayloadDays,
+            activation.CacheMaxAgeHours,
+            activation.MaximumRequestBodyBytes,
+            activation.MaximumPayloadBytes,
+            activation.PolicySourceVersion ?? string.Empty,
+            activation.PolicySourceFingerprint ?? string.Empty,
+            activation.ActivationImplementationSha ?? string.Empty);
+        if (policy.IsValid) return true;
+        policy = null;
+        return false;
     }
 
     private static bool TryHttpsBatchEndpoint(Uri origin, string value, out Uri? endpoint)
@@ -529,4 +564,15 @@ internal sealed record DesktopSyncActivationResponse(
     bool KeyRecoveryAllowed,
     string? PolicySourceVersion,
     string? PolicySourceFingerprint,
+    int MaxBatchOperations,
+    int ClientTransportMaxRetryCount,
+    int ClientTransportBaseSeconds,
+    int ClientTransportMaxDelayMinutes,
+    int LocalSuccessHours,
+    int LocalRejectedDays,
+    int ServerPayloadDays,
+    int CacheMaxAgeHours,
+    int MaximumRequestBodyBytes,
+    int MaximumPayloadBytes,
+    string? ActivationImplementationSha,
     string? ClosedReason);
