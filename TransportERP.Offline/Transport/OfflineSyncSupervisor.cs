@@ -82,6 +82,9 @@ public sealed class OfflineSyncSupervisor
     private readonly OfflineSyncSupervisorOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _wake = new(0, 1);
+    private readonly object _lifecycleLock = new();
+    private RequestedSyncCycle? _pendingRequestedCycle;
+    private SupervisorLifecycle _lifecycle;
     private OfflineSyncSupervisorFailure? _lastObservedFailure;
 
     /// <summary>
@@ -112,6 +115,60 @@ public sealed class OfflineSyncSupervisor
         catch (SemaphoreFullException) { }
     }
 
+    /// <summary>
+    /// Requests one bounded drain cycle from the active supervisor. The caller never invokes the
+    /// transport directly, so a UI/manual refresh cannot race the production supervisor for a
+    /// durable lease. If a normal cycle is already in flight, this request runs immediately after
+    /// it and observes the resulting queue state deterministically.
+    /// </summary>
+    public async Task<OfflineSyncTransportRunResult> SynchronizeNowAsync(
+        int? maximumOperations = null,
+        CancellationToken cancellationToken = default)
+    {
+        var limit = maximumOperations ?? _options.MaximumBatchOperations;
+        if (limit is < 1 or > 100 || limit > _options.MaximumBatchOperations)
+            throw new ArgumentOutOfRangeException(nameof(maximumOperations));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequestedSyncCycle request;
+        lock (_lifecycleLock)
+        {
+            if (_lifecycle != SupervisorLifecycle.Running)
+                throw SupervisorUnavailable(_lifecycle);
+
+            if (_pendingRequestedCycle is { } pending)
+            {
+                if (pending.MaximumOperations != limit)
+                    throw new OfflineStoreException(
+                        "LOCAL_SYNC_REQUEST_PENDING",
+                        "A bounded manual sync cycle is already pending.");
+                request = pending;
+            }
+            else
+            {
+                request = new RequestedSyncCycle(limit);
+                _pendingRequestedCycle = request;
+            }
+            request.WaiterCount++;
+        }
+        NotifyWorkAvailable();
+        try
+        {
+            return await request.Completion.Task.WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            lock (_lifecycleLock)
+            {
+                request.WaiterCount--;
+                if (request.WaiterCount == 0 && !request.Claimed &&
+                    ReferenceEquals(_pendingRequestedCycle, request))
+                {
+                    _pendingRequestedCycle = null;
+                }
+            }
+        }
+    }
+
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         var path = Path.GetFullPath(_store.DatabasePath);
@@ -121,8 +178,18 @@ public sealed class OfflineSyncSupervisor
                 "LOCAL_SYNC_SUPERVISOR_ALREADY_RUNNING",
                 "Only one local sync supervisor may drain an encrypted outbox.");
 
+        CancellationTokenRegistration stoppingRegistration = default;
         try
         {
+            lock (_lifecycleLock)
+            {
+                if (_lifecycle != SupervisorLifecycle.Created)
+                    throw SupervisorUnavailable(_lifecycle);
+                _lifecycle = SupervisorLifecycle.Running;
+            }
+            stoppingRegistration = cancellationToken.UnsafeRegister(
+                static state => ((OfflineSyncSupervisor)state!).BeginStopping(), this);
+
             var nextRetentionSweepAt = _timeProvider.GetUtcNow();
             var consecutiveFailureCount = 0;
             while (true)
@@ -140,6 +207,23 @@ public sealed class OfflineSyncSupervisor
                     if (!await _connectivity.IsOnlineAsync(cancellationToken))
                     {
                         await WaitForConnectivityOrRetentionAsync(nextRetentionSweepAt, cancellationToken);
+                        consecutiveFailureCount = 0;
+                        continue;
+                    }
+
+                    if (TryClaimRequestedCycle(out var requestedCycle))
+                    {
+                        try
+                        {
+                            var result = await _transport.ProcessNextBatchAsync(
+                                requestedCycle.MaximumOperations, cancellationToken);
+                            requestedCycle.Completion.TrySetResult(result);
+                        }
+                        catch (Exception exception)
+                        {
+                            requestedCycle.Completion.TrySetException(exception);
+                            throw;
+                        }
                         consecutiveFailureCount = 0;
                         continue;
                     }
@@ -178,9 +262,51 @@ public sealed class OfflineSyncSupervisor
         }
         finally
         {
+            BeginStopping();
+            stoppingRegistration.Dispose();
+            lock (_lifecycleLock) _lifecycle = SupervisorLifecycle.Stopped;
             gate.Release();
         }
     }
+
+    private bool TryClaimRequestedCycle(out RequestedSyncCycle requestedCycle)
+    {
+        lock (_lifecycleLock)
+        {
+            if (_pendingRequestedCycle is null)
+            {
+                requestedCycle = null!;
+                return false;
+            }
+
+            requestedCycle = _pendingRequestedCycle;
+            _pendingRequestedCycle = null;
+            requestedCycle.Claimed = true;
+            return true;
+        }
+    }
+
+    private void BeginStopping()
+    {
+        RequestedSyncCycle? abandoned = null;
+        lock (_lifecycleLock)
+        {
+            if (_lifecycle is SupervisorLifecycle.Stopping or SupervisorLifecycle.Stopped) return;
+            _lifecycle = SupervisorLifecycle.Stopping;
+            abandoned = _pendingRequestedCycle;
+            _pendingRequestedCycle = null;
+        }
+        abandoned?.Completion.TrySetException(SupervisorUnavailable(SupervisorLifecycle.Stopping));
+    }
+
+    private static OfflineStoreException SupervisorUnavailable(SupervisorLifecycle lifecycle) =>
+        lifecycle is SupervisorLifecycle.Stopping or SupervisorLifecycle.Stopped
+            ? new OfflineStoreException(
+                "LOCAL_SYNC_SUPERVISOR_STOPPING",
+                "The local sync supervisor is stopping and cannot accept work.")
+            : new OfflineStoreException(
+                "LOCAL_SYNC_SUPERVISOR_NOT_RUNNING",
+                "The local sync supervisor has not started.");
 
     private async Task WaitForConnectivityOrRetentionAsync(
         DateTimeOffset nextRetentionSweepAt,
@@ -208,4 +334,21 @@ public sealed class OfflineSyncSupervisor
     }
 
     private static TimeSpan Min(TimeSpan left, TimeSpan right) => left <= right ? left : right;
+
+    private sealed class RequestedSyncCycle(int maximumOperations)
+    {
+        internal int MaximumOperations { get; } = maximumOperations;
+        internal int WaiterCount { get; set; }
+        internal bool Claimed { get; set; }
+        internal TaskCompletionSource<OfflineSyncTransportRunResult> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private enum SupervisorLifecycle
+    {
+        Created,
+        Running,
+        Stopping,
+        Stopped
+    }
 }

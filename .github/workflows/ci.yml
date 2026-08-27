@@ -921,6 +921,15 @@ jobs:
             "Sync__EffectivePolicy__Devices__${registered_device_id}__BranchId=$branch_id" \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__DeviceId=android-ci-device" \
             "Sync__EffectivePolicy__Devices__${registered_device_id}__AllowedActions__0=CreateOperationalParty" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__MaxBatchOperations=1" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__MaximumRequestBodyBytes=4096" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__MaximumPayloadBytes=1024" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__ClientTransportMaxRetryCount=2" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__ClientTransportBaseSeconds=9" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__LocalSuccessHours=12" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__LocalRejectedDays=3" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__ServerPayloadDays=30" \
+            "Sync__EffectivePolicy__Devices__${registered_device_id}__CacheMaxAgeHours=1" \
             dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
             > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
@@ -1114,6 +1123,39 @@ jobs:
           adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
 
+      - name: Capture sanitized Android PostgreSQL diagnostics
+        if: ${{ always() }}
+        shell: bash
+        env:
+          PGPASSWORD: android-ci-database-password
+        run: |
+          mkdir -p ci-evidence/android-runtime
+          diagnostic=ci-evidence/android-runtime/business-postgresql-diagnostics.txt
+          if ! psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc 'SELECT 1' >/dev/null 2>&1; then
+            echo 'postgresql_diagnostics=unavailable' > "$diagnostic"
+            exit 0
+          fi
+          schema_ready=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            "SELECT CASE WHEN to_regclass('transport_erp.sync_operations') IS NULL THEN 0 ELSE 1 END")
+          if [ "$schema_ready" != 1 ]; then
+            echo 'postgresql_diagnostics=schema_unavailable' > "$diagnostic"
+            exit 0
+          fi
+          {
+            echo 'schema_version=1'
+            echo 'scope=device:android-ci-device;action:CreateOperationalParty'
+            psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "WITH buckets(status) AS (VALUES ('QUEUED'),('SENDING'),('FAILED'),('REJECTED'),('SUCCEEDED')), scoped AS (SELECT o.\"Status\" FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\"='android-ci-device')) SELECT 'status_bucket=' || b.status || ';count=' || count(s.\"Status\") FROM buckets b LEFT JOIN scoped s ON s.\"Status\"=b.status GROUP BY b.status ORDER BY b.status"
+            psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT 'status_bucket=ABSENT;count=' || CASE WHEN EXISTS (SELECT 1 FROM transport_erp.sync_operations o WHERE o.\"ActionCode\"='CreateOperationalParty' AND o.\"RegisteredDeviceId\" IN (SELECT d.\"Id\" FROM transport_erp.registered_devices d WHERE d.\"DeviceId\"='android-ci-device')) THEN 0 ELSE 1 END"
+            psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT 'nonce_count=' || count(*) FROM transport_erp.sync_proof_nonces WHERE \"DeviceId\" = 'android-ci-device'"
+            psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT 'replay_count=' || count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n.\"Id\" = r.\"NonceRecordId\" WHERE r.\"DeviceId\" = 'android-ci-device'"
+            psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+              "SELECT 'audit_action=' || \"Action\" || ';count=' || count(*) FROM transport_erp.audit_events WHERE \"OperationCorrelationId\" IN (SELECT \"OperationCorrelationId\" FROM transport_erp.sync_operations WHERE \"ActionCode\" = 'CreateOperationalParty' AND \"RegisteredDeviceId\" IN (SELECT \"Id\" FROM transport_erp.registered_devices WHERE \"DeviceId\" = 'android-ci-device')) GROUP BY \"Action\" ORDER BY \"Action\""
+          } > "$diagnostic"
+
       - name: Verify Android business result in PostgreSQL 18.6
         shell: bash
         env:
@@ -1135,11 +1177,20 @@ jobs:
             'SELECT count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n."Id" = r."NonceRecordId" WHERE r."DeviceId" = '\''android-ci-device'\'' AND r."ProofKeyVersion" = 1')
           operation_proof_bound=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
             'SELECT count(*) FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'' AND "ProofKeyVersion" = 1 AND "ProofKeyThumbprint" IS NOT NULL AND "AcceptedProofReplayId" IS NOT NULL')
+          queued_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncOperationQueued'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
+          dispatch_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncBusinessDispatchAttempt'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
+          succeeded_audit=$(psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+            'SELECT count(*) FROM transport_erp.audit_events WHERE "Action" = '\''SyncOperationExecutionSucceeded'\'' AND "OperationCorrelationId" IN (SELECT "OperationCorrelationId" FROM transport_erp.sync_operations WHERE "ActionCode" = '\''CreateOperationalParty'\'')')
           test "$sync_succeeded" = 1
           test "$party_created" = 1
           test "$proof_bound" = 1
           test "$nonce_proof_accepted" -ge 1
           test "$operation_proof_bound" = 1
+          test "$queued_audit" = 1
+          test "$dispatch_audit" = 1
+          test "$succeeded_audit" = 1
           python3 - <<'PY'
           import json
           with open('TransportERP.Api/appsettings.json', encoding='utf-8') as stream:
@@ -1154,6 +1205,9 @@ jobs:
             echo 'device_proof_key_bound=true'
             echo 'nonce_signed_proof_accepted=true'
             echo 'operation_bound_to_accepted_proof=true'
+            echo 'sync_queued_audit_persisted=true'
+            echo 'sync_dispatch_audit_persisted=true'
+            echo 'sync_succeeded_audit_persisted=true'
             echo 'sync_operation_succeeded=true'
             echo 'operational_party_created=true'
             echo 'production_offline_default=false'
@@ -1248,6 +1302,7 @@ jobs:
             ci-evidence/android-runtime/e2e-verify.json
             ci-evidence/android-runtime/loss.json
             ci-evidence/android-runtime/restart-evidence.txt
+            ci-evidence/android-runtime/business-postgresql-diagnostics.txt
             ci-evidence/android-runtime/business-postgresql-evidence.txt
             ci-evidence/android-runtime/android-runtime-errors.txt
             ci-evidence/android-runtime/android-process-exit-info.txt

@@ -112,6 +112,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             "DriverDeviceTestActivity.cs");
         var selfTest = Read("TransportERP.Mobile.Driver", "DeviceTesting",
             "AndroidDriverRuntimeSelfTest.cs");
+        var composition = Read("TransportERP.Mobile.Driver", "Offline", "DriverOfflineComposition.cs");
         var signer = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
             "AndroidKeystoreDeviceSigningKey.cs");
         var network = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
@@ -137,8 +138,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("SubmitBusinessOperationEndToEndAsync", selfTest, StringComparison.Ordinal);
         Assert.Contains("SignInAndActivateAsync", selfTest, StringComparison.Ordinal);
         Assert.Contains("QueueOperationalPartyAsync", selfTest, StringComparison.Ordinal);
-        Assert.Contains("SynchronizeAsync", selfTest, StringComparison.Ordinal);
-        Assert.Contains("http_batch_accepted_pending", selfTest, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProcessNextBatchAsync", selfTest, StringComparison.Ordinal);
+        Assert.Contains("supervisor.SynchronizeNowAsync", composition, StringComparison.Ordinal);
+        Assert.Contains("terminal?.ServerAccepted == true", selfTest, StringComparison.Ordinal);
+        Assert.Contains("http_batch_server_acceptance_persisted", selfTest, StringComparison.Ordinal);
         Assert.Contains("local_succeeded_survived_restart", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
 

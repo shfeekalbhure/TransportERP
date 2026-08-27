@@ -28,6 +28,7 @@ public sealed record DriverOfflineOperationStatusView(
     int RetryCount,
     DateTimeOffset? NextRetryAt,
     string? ResultCode,
+    bool ServerAccepted,
     DateTimeOffset UpdatedAt,
     long? ConflictBaseVersion,
     string? ConflictReason,
@@ -53,6 +54,7 @@ public sealed record DriverOfflineOperationStatusView(
         operation.ClientTransportRetryCount,
         operation.NextRetryAt,
         SanitizeResultCode(operation.ResultCode),
+        operation.ServerOperationId is { } serverOperationId && serverOperationId != Guid.Empty,
         operation.UpdatedAt,
         operation.ConflictReview?.BaseVersion,
         SanitizeConflictReason(operation.ConflictReview?.ConflictReason),
@@ -196,7 +198,6 @@ public sealed class DriverOfflineRuntime
     private readonly IDriverSyncNetworkProvider _network;
     private readonly OfflineReadCacheStore? _readCache;
     private readonly OfflineOperationStore? _outbox;
-    private readonly OfflineSyncTransportClient? _transport;
     private readonly OfflineSyncConflictClient? _conflicts;
     private readonly OfflineSyncSupervisor? _supervisor;
 
@@ -217,7 +218,6 @@ public sealed class DriverOfflineRuntime
         _network = dependencies.Network;
         _readCache = result.ReadCache;
         _outbox = result.Outbox;
-        _transport = result.Transport;
         OperationPermissions = dependencies.OperationPermissions;
         _conflicts = result is { Outbox: not null, Transport: not null }
             ? new OfflineSyncConflictClient(
@@ -295,13 +295,13 @@ public sealed class DriverOfflineRuntime
         int? maximumOperations = null,
         CancellationToken cancellationToken = default)
     {
-        var transport = _transport ?? throw Unavailable();
+        var supervisor = _supervisor ?? throw Unavailable();
         if (!await _network.IsNetworkAvailableAsync(cancellationToken))
         {
             throw new DriverOfflineUnavailableException("NETWORK_UNAVAILABLE");
         }
 
-        return await transport.ProcessNextBatchAsync(maximumOperations, cancellationToken);
+        return await supervisor.SynchronizeNowAsync(maximumOperations, cancellationToken);
     }
 
     public Task PutReadCacheAsync(

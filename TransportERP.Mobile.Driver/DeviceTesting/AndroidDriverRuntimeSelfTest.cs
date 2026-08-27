@@ -62,20 +62,42 @@ internal static class AndroidDriverRuntimeSelfTest
         {
             var activated = await coordinator.SignInAndActivateAsync(
                 configuration.ToSignInRequest(), cancellationToken);
+            var batchPolicyEnforced = await IsBatchPolicyEnforcedAsync(
+                activated.Runtime, cancellationToken);
+            var cachePolicyEnforced = await IsCachePolicyEnforcedAsync(
+                activated.Runtime, cancellationToken);
             var queued = await activated.Runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
                 "Android CI E2E Party", "+967700000001", "Android emulator E2E address",
                 cancellationToken);
-            var submitted = await activated.Runtime.SynchronizeAsync(
-                maximumOperations: 1, cancellationToken: cancellationToken);
+            // Activation owns the one production drain supervisor. Starting a second manual
+            // transport pass here races the supervisor for the same durable lease and makes the
+            // caller's zero-claim result nondeterministic even though the supervisor is working.
+            // Observe the supervisor-owned acceptance and terminal transition instead.
             var terminal = await WaitForOperationAsync(
                 activated.Runtime, queued.Operation.LocalOperationId, cancellationToken);
             var checks = new SortedDictionary<string, bool>(StringComparer.Ordinal)
             {
                 ["authenticated_activation_ready"] = activated.Runtime.Status.Mode == DriverOfflineRuntimeMode.Ready,
+                ["device_effective_policy_projected"] = activated.Runtime.EffectivePolicy is
+                {
+                    MaxBatchOperations: 1,
+                    ClientTransportMaxRetryCount: 2,
+                    ClientTransportBaseSeconds: 9,
+                    LocalSuccessHours: 12,
+                    LocalRejectedDays: 3,
+                    ServerPayloadDays: 30,
+                    CacheMaxAgeHours: 1,
+                    MaximumRequestBodyBytes: 4096,
+                    MaximumPayloadBytes: 1024,
+                    SourceVersion: "android-ci-e2e-v1"
+                } && activated.Runtime.EffectivePolicy.SourceFingerprint.Length == 64,
+                ["device_batch_policy_enforced"] = batchPolicyEnforced,
+                ["device_cache_policy_enforced"] = cachePolicyEnforced,
                 ["keystore_bound_sync_operation_queued"] = queued.Created,
-                ["http_batch_accepted_pending"] = submitted.AcceptedPending == 1,
+                ["http_batch_server_acceptance_persisted"] = terminal?.ServerAccepted == true,
                 ["server_operation_succeeded"] = terminal?.Status == OfflineOperationStatus.Succeeded,
-                ["server_result_code_cleared_on_success"] = terminal?.ResultCode is null
+                ["server_result_code_cleared_on_success"] = terminal is
+                    { Status: OfflineOperationStatus.Succeeded, ResultCode: null }
             };
             if (checks.Values.Any(value => !value))
                 return DriverDeviceTestResult.FromChecks("e2e-submit", checks);
@@ -106,6 +128,39 @@ internal static class AndroidDriverRuntimeSelfTest
         }
     }
 
+    private static async Task<bool> IsBatchPolicyEnforcedAsync(
+        DriverOfflineRuntime runtime,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await runtime.SynchronizeAsync(2, cancellationToken);
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return true;
+        }
+    }
+
+    private static async Task<bool> IsCachePolicyEnforcedAsync(
+        DriverOfflineRuntime runtime,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await runtime.PutReadCacheAsync(
+                "policy", "too-long", "{}",
+                TimeSpan.FromHours(1).Add(TimeSpan.FromSeconds(1)), cancellationToken);
+            return false;
+        }
+        catch (DriverOfflineUnavailableException exception)
+            when (exception.Code == "READ_CACHE_POLICY_DENIED")
+        {
+            return true;
+        }
+    }
+
     private static async Task<DriverDeviceTestResult> VerifyBusinessOperationAfterRestartAsync(
         string e2eStatePath,
         DriverDeviceE2eConfiguration configuration,
@@ -132,7 +187,8 @@ internal static class AndroidDriverRuntimeSelfTest
                 ["process_restart_reauthenticated"] = activated.Runtime.Status.Mode == DriverOfflineRuntimeMode.Ready,
                 ["encrypted_outbox_reopened"] = persisted is not null,
                 ["local_succeeded_survived_restart"] = persisted?.Status == OfflineOperationStatus.Succeeded,
-                ["success_result_remains_terminal_after_restart"] = persisted?.ResultCode is null
+                ["success_result_remains_terminal_after_restart"] = persisted is
+                    { Status: OfflineOperationStatus.Succeeded, ResultCode: null }
             };
             var result = DriverDeviceTestResult.FromChecks("e2e-verify", checks);
             if (result.Passed) File.Delete(e2eStatePath);

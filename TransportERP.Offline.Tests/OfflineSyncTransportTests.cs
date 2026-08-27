@@ -314,6 +314,124 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Manual_sync_request_joins_the_single_supervisor_owner_without_duplicate_send_or_stale_lease()
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var signedCalls = 0;
+        var signedEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSigned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (captured.Proof is null)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)), captured.AttemptCorrelationId);
+            Interlocked.Increment(ref signedCalls);
+            signedEntered.TrySetResult();
+            await releaseSigned.Task.WaitAsync(cancellationToken);
+            return Success(captured, "SUCCEEDED", resultEntityId: Guid.NewGuid(), resultVersion: 1);
+        }));
+        var transport = Client(http, store, key, TimeProvider.System, "single-owner-worker");
+        var supervisor = new OfflineSyncSupervisor(
+            store,
+            transport,
+            new AlwaysOnlineSyncConnectivity(),
+            new OfflineSyncSupervisorOptions(
+                MaximumBatchOperations: 1,
+                IdleWakeInterval: TimeSpan.FromMilliseconds(20)));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+        await signedEntered.Task.WaitAsync(stop.Token);
+
+        var manual = supervisor.SynchronizeNowAsync(1, stop.Token);
+        Assert.False(manual.IsCompleted);
+        releaseSigned.TrySetResult();
+        var manualResult = await manual;
+
+        await WaitUntilAsync(async () =>
+            (await store.GetAsync(queued.Operation.LocalOperationId, Scope()))?.Status ==
+                OfflineOperationStatus.Succeeded,
+            stop.Token);
+        var terminal = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+        Assert.Equal(1, signedCalls);
+        Assert.Equal(0, manualResult.Claimed);
+        Assert.Equal(OfflineOperationStatus.Succeeded, terminal!.Status);
+        Assert.Null(terminal.LeaseOwner);
+        Assert.Null(terminal.LeaseExpiresAt);
+
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+    }
+
+    [Fact]
+    public async Task Manual_sync_fails_fast_before_start_and_after_shutdown()
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        using var key = new TestSigningKey();
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+            throw new InvalidOperationException("An empty lifecycle test must not call HTTP.")));
+        var supervisor = new OfflineSyncSupervisor(
+            store,
+            Client(http, store, key, TimeProvider.System, "token"),
+            new ManualConnectivity(initiallyOnline: false));
+
+        var beforeStart = await Assert.ThrowsAsync<OfflineStoreException>(() => supervisor.SynchronizeNowAsync());
+        Assert.Equal("LOCAL_SYNC_SUPERVISOR_NOT_RUNNING", beforeStart.Code);
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+        await Task.Delay(20, stop.Token);
+        var pending = supervisor.SynchronizeNowAsync();
+        stop.Cancel();
+
+        var whileStopping = await Assert.ThrowsAsync<OfflineStoreException>(() => pending);
+        Assert.Equal("LOCAL_SYNC_SUPERVISOR_STOPPING", whileStopping.Code);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        var afterStop = await Assert.ThrowsAsync<OfflineStoreException>(() => supervisor.SynchronizeNowAsync());
+        Assert.Equal("LOCAL_SYNC_SUPERVISOR_STOPPING", afterStop.Code);
+    }
+
+    [Fact]
+    public async Task Canceled_coalesced_manual_waiters_leave_no_pending_cycle_or_transport_work()
+    {
+        var store = await CreateStoreAsync(TimeProvider.System);
+        using var key = new TestSigningKey();
+        var httpCalls = 0;
+        using var http = new HttpClient(new DelegateHandler((_, _) =>
+        {
+            Interlocked.Increment(ref httpCalls);
+            throw new InvalidOperationException("An empty canceled request must not call HTTP.");
+        }));
+        var connectivity = new ManualConnectivity(initiallyOnline: false);
+        var supervisor = new OfflineSyncSupervisor(
+            store,
+            Client(http, store, key, TimeProvider.System, "token"),
+            connectivity,
+            new OfflineSyncSupervisorOptions(IdleWakeInterval: TimeSpan.FromMilliseconds(20)));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = supervisor.RunAsync(stop.Token);
+        await Task.Delay(20, stop.Token);
+
+        var canceledWaiters = Enumerable.Range(0, 50).Select(async _ =>
+        {
+            using var cancel = new CancellationTokenSource();
+            var request = supervisor.SynchronizeNowAsync(cancellationToken: cancel.Token);
+            cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+        });
+        await Task.WhenAll(canceledWaiters);
+
+        connectivity.SetOnline();
+        var fresh = await supervisor.SynchronizeNowAsync(cancellationToken: stop.Token);
+        Assert.Equal(0, fresh.Claimed);
+        Assert.Equal(0, httpCalls);
+
+        stop.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+    }
+
+    [Fact]
     public async Task Supervisor_runs_local_retention_even_without_transport_work()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero));
