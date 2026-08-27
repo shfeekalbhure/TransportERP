@@ -28,6 +28,7 @@ public sealed class DriverOfflineActivationRequest
         IReadOnlyCollection<DriverOfflineActionGrant> grantedActions,
         DriverOfflineOperationPermissions operationPermissions,
         SyncClientEffectivePolicy effectivePolicy,
+        BuildIdentityV1 buildIdentity,
         bool offlineRuntimeAuthorized = false)
     {
         CompanyId = companyId;
@@ -41,6 +42,7 @@ public sealed class DriverOfflineActivationRequest
         GrantedActions = grantedActions;
         OperationPermissions = operationPermissions;
         EffectivePolicy = effectivePolicy;
+        BuildIdentity = buildIdentity;
         OfflineRuntimeAuthorized = offlineRuntimeAuthorized;
     }
 
@@ -55,6 +57,7 @@ public sealed class DriverOfflineActivationRequest
     public IReadOnlyCollection<DriverOfflineActionGrant> GrantedActions { get; }
     public DriverOfflineOperationPermissions OperationPermissions { get; }
     public SyncClientEffectivePolicy EffectivePolicy { get; }
+    public BuildIdentityV1 BuildIdentity { get; }
     public bool OfflineRuntimeAuthorized { get; }
 }
 
@@ -192,7 +195,8 @@ public sealed class DriverOfflineActivationService(
                     $"driver-android-{Guid.NewGuid():N}",
                     MaximumBatchOperations: request.EffectivePolicy.MaxBatchOperations,
                     MaximumRequestBodyBytes: request.EffectivePolicy.MaximumRequestBodyBytes,
-                    MaximumPayloadBytes: request.EffectivePolicy.MaximumPayloadBytes);
+                    MaximumPayloadBytes: request.EffectivePolicy.MaximumPayloadBytes,
+                    BuildIdentity: request.BuildIdentity);
                 var options = new DriverOfflineCompositionOptions(
                     request.CompanyId,
                     request.BranchId,
@@ -303,7 +307,7 @@ public sealed class DriverOfflineActivationService(
             !request.BatchEndpoint.IsAbsoluteUri || request.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
             request.GrantedActions is null || request.GrantedActions.Count == 0 ||
             request.OperationPermissions is null || request.EffectivePolicy is null ||
-            !request.EffectivePolicy.IsValid)
+            !request.EffectivePolicy.IsValid || request.BuildIdentity is not { IsValid: true })
         {
             throw new ArgumentException("A complete HTTPS scope, session and grant set is required.", nameof(request));
         }

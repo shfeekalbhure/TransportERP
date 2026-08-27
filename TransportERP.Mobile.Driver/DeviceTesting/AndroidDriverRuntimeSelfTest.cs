@@ -83,6 +83,7 @@ internal static class AndroidDriverRuntimeSelfTest
                     MaxBatchOperations: 1,
                     ClientTransportMaxRetryCount: 2,
                     ClientTransportBaseSeconds: 9,
+                    ClientTransportMaxDelayMinutes: 30,
                     LocalSuccessHours: 12,
                     LocalRejectedDays: 3,
                     ServerPayloadDays: 30,
@@ -96,11 +97,12 @@ internal static class AndroidDriverRuntimeSelfTest
                 ["keystore_bound_sync_operation_queued"] = queued.Created,
                 ["http_batch_server_acceptance_persisted"] = terminal?.ServerAccepted == true,
                 ["server_operation_succeeded"] = terminal?.Status == OfflineOperationStatus.Succeeded,
-                ["server_result_code_cleared_on_success"] = terminal is
-                    { Status: OfflineOperationStatus.Succeeded, ResultCode: null }
+                ["server_success_result_code_persisted"] = terminal is
+                    { Status: OfflineOperationStatus.Succeeded, ResultCode: "SUCCEEDED" }
             };
             if (checks.Values.Any(value => !value))
-                return DriverDeviceTestResult.FromChecks("e2e-submit", checks);
+                return DriverDeviceTestResult.FromChecks(
+                    "e2e-submit", checks, SafeTerminalFailureCode(terminal));
 
             var state = new DriverDeviceE2eState(
                 SchemaVersion,
@@ -188,7 +190,7 @@ internal static class AndroidDriverRuntimeSelfTest
                 ["encrypted_outbox_reopened"] = persisted is not null,
                 ["local_succeeded_survived_restart"] = persisted?.Status == OfflineOperationStatus.Succeeded,
                 ["success_result_remains_terminal_after_restart"] = persisted is
-                    { Status: OfflineOperationStatus.Succeeded, ResultCode: null }
+                    { Status: OfflineOperationStatus.Succeeded, ResultCode: "SUCCEEDED" }
             };
             var result = DriverDeviceTestResult.FromChecks("e2e-verify", checks);
             if (result.Passed) File.Delete(e2eStatePath);
@@ -227,6 +229,21 @@ internal static class AndroidDriverRuntimeSelfTest
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
         return await runtime.GetOperationStatusAsync(localOperationId, cancellationToken);
+    }
+
+    private static string SafeTerminalFailureCode(DriverOfflineOperationStatusView? terminal)
+    {
+        if (terminal is null) return "E2E_OPERATION_TIMEOUT";
+        if (terminal.ResultCode is { Length: > 0 } resultCode &&
+            resultCode.All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_'))
+            return resultCode;
+        return terminal.Status switch
+        {
+            OfflineOperationStatus.Failed => "E2E_OPERATION_FAILED",
+            OfflineOperationStatus.Rejected => "E2E_OPERATION_REJECTED",
+            OfflineOperationStatus.Conflict => "E2E_OPERATION_CONFLICT",
+            _ => "E2E_OPERATION_NON_TERMINAL"
+        };
     }
 
     private static async Task WriteE2eStateAtomicallyAsync(
@@ -957,10 +974,15 @@ internal sealed record DriverDeviceTestResult(
 {
     internal static DriverDeviceTestResult FromChecks(
         string phase,
-        IReadOnlyDictionary<string, bool> checks)
+        IReadOnlyDictionary<string, bool> checks,
+        string failureCode = "CHECK_FAILED")
     {
         var passed = checks.Count > 0 && checks.Values.All(value => value);
-        return new(1, phase, passed, passed ? "PASS" : "CHECK_FAILED", checks);
+        var safeFailureCode = failureCode is { Length: > 0 and <= 96 } &&
+            failureCode.All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_')
+            ? failureCode
+            : "CHECK_FAILED";
+        return new(1, phase, passed, passed ? "PASS" : safeFailureCode, checks);
     }
 
     internal static DriverDeviceTestResult Failure(string phase, string code) =>

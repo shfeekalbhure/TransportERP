@@ -11,40 +11,109 @@ public sealed class MainPage : ContentPage
     private readonly DriverOfflineActivationService _activation;
     private readonly DriverAuthenticatedActivationCoordinator _authenticatedActivation;
     private readonly ObservableCollection<DriverOfflineOperationStatusView> _operations = [];
-    private readonly Label _mode = new();
-    private readonly Label _reason = new();
-    private readonly Label _evidence = new();
-    private readonly Label _conflictReview = new() { Text = "Conflict review: NOT_SELECTED" };
-    private readonly Label _actionResult = new();
+    private readonly Label _mode = new() { AutomationId = "driver_mode" };
+    private readonly Label _reason = new() { AutomationId = "driver_reason" };
+    private readonly Label _evidence = new() { AutomationId = "driver_evidence" };
+    private readonly Label _conflictReview = new()
+    {
+        AutomationId = "driver_conflict_review",
+        Text = "Conflict review: NOT_SELECTED"
+    };
+    private readonly Label _actionResult = new() { AutomationId = "driver_action_result" };
     private readonly CollectionView _operationList;
-    private readonly Button _retry = new() { Text = "Manual retry", IsEnabled = false };
-    private readonly Button _keepServer = new() { Text = "KEEP_SERVER", IsEnabled = false };
-    private readonly Button _reapply = new() { Text = "REAPPLY", IsEnabled = false };
+    private readonly Button _retry = new()
+    {
+        AutomationId = "driver_retry",
+        Text = "Manual retry",
+        IsEnabled = false
+    };
+    private readonly Button _keepServer = new()
+    {
+        AutomationId = "driver_keep_server",
+        Text = "KEEP_SERVER",
+        IsEnabled = false
+    };
+    private readonly Button _reapply = new()
+    {
+        AutomationId = "driver_reapply",
+        Text = "REAPPLY",
+        IsEnabled = false
+    };
     private readonly Entry _resolutionReason = new()
     {
         Placeholder = "Resolution reason (required)",
+        AutomationId = "driver_resolution_reason",
         MaxLength = 500,
         IsEnabled = false
     };
-    private readonly CheckBox _resolutionConfirmed = new() { IsEnabled = false };
-    private readonly Entry _userName = new() { Placeholder = "User name or email" };
-    private readonly Entry _password = new() { Placeholder = "Password", IsPassword = true };
-    private readonly Entry _companyId = new() { Placeholder = "Company UUID (required)" };
-    private readonly Entry _branchId = new() { Placeholder = "Branch UUID (required)" };
-    private readonly Entry _deviceId = new() { Placeholder = "Registered DeviceId" };
+    private readonly CheckBox _resolutionConfirmed = new()
+    {
+        AutomationId = "driver_resolution_confirmed",
+        IsEnabled = false
+    };
+    private readonly Entry _userName = new()
+    {
+        AutomationId = "driver_user_name",
+        Placeholder = "User name or email"
+    };
+    private readonly Entry _password = new()
+    {
+        AutomationId = "driver_password",
+        Placeholder = "Password",
+        IsPassword = true
+    };
+    private readonly Entry _companyId = new()
+    {
+        AutomationId = "driver_company_id",
+        Placeholder = "Company UUID (required)"
+    };
+    private readonly Entry _branchId = new()
+    {
+        AutomationId = "driver_branch_id",
+        Placeholder = "Branch UUID (required)"
+    };
+    private readonly Entry _deviceId = new()
+    {
+        AutomationId = "driver_device_id",
+        Placeholder = "Registered DeviceId"
+    };
     private readonly Entry _deviceCredential = new()
     {
         Placeholder = "Device credential (local session)",
+        AutomationId = "driver_device_credential",
         IsPassword = true
     };
-    private readonly Button _signIn = new() { Text = "Sign in and activate authorized Offline scope" };
-    private readonly Button _signOut = new() { Text = "Sign out", IsEnabled = false };
-    private readonly Entry _partyName = new() { Placeholder = "Operational party name" };
-    private readonly Entry _partyMobile = new() { Placeholder = "Operational party mobile", Keyboard = Keyboard.Telephone };
-    private readonly Entry _partyAddress = new() { Placeholder = "Operational party address" };
+    private readonly Button _signIn = new()
+    {
+        AutomationId = "driver_sign_in",
+        Text = "Sign in and activate authorized Offline scope"
+    };
+    private readonly Button _signOut = new()
+    {
+        AutomationId = "driver_sign_out",
+        Text = "Sign out",
+        IsEnabled = false
+    };
+    private readonly Entry _partyName = new()
+    {
+        AutomationId = "driver_party_name",
+        Placeholder = "Operational party name"
+    };
+    private readonly Entry _partyMobile = new()
+    {
+        AutomationId = "driver_party_mobile",
+        Placeholder = "Operational party mobile",
+        Keyboard = Keyboard.Telephone
+    };
+    private readonly Entry _partyAddress = new()
+    {
+        AutomationId = "driver_party_address",
+        Placeholder = "Operational party address"
+    };
     private readonly Button _queueParty = new()
     {
         Text = "Queue encrypted operational party",
+        AutomationId = "driver_queue_party",
         IsEnabled = false
     };
     private DriverOfflineOperationStatusView? _selected;
@@ -69,13 +138,20 @@ public sealed class MainPage : ContentPage
 
         _operationList = new CollectionView
         {
+            AutomationId = "driver_operation_list",
             ItemsSource = _operations,
             SelectionMode = SelectionMode.Single,
-            EmptyView = new Label { Text = "No local synchronization operation metadata." },
+            HeightRequest = 280,
+            EmptyView = new Label
+            {
+                AutomationId = "driver_operation_empty",
+                Text = "No local synchronization operation metadata."
+            },
             ItemTemplate = new DataTemplate(() =>
             {
                 var summary = new Label
                 {
+                    AutomationId = "driver_operation_summary",
                     Margin = new Thickness(0, 6),
                     LineBreakMode = LineBreakMode.WordWrap,
                     TextColor = Color.FromArgb("#263238")
@@ -90,7 +166,11 @@ public sealed class MainPage : ContentPage
             if (_activation.Active is { } active) UpdateActionAvailability(active.Runtime);
         };
 
-        var refresh = new Button { Text = "Refresh operation status" };
+        var refresh = new Button
+        {
+            AutomationId = "driver_refresh",
+            Text = "Refresh operation status"
+        };
         refresh.Clicked += async (_, _) => await RefreshAsync();
         _signIn.Clicked += async (_, _) => await SignInAndActivateAsync();
         _signOut.Clicked += async (_, _) => await SignOutAsync();
@@ -156,22 +236,22 @@ public sealed class MainPage : ContentPage
                 }
             }
         };
-        var content = new Grid
+        var content = new VerticalStackLayout
         {
             Padding = new Thickness(24),
-            RowDefinitions =
+            Spacing = 12,
+            Children =
             {
-                new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Star),
-                new RowDefinition(GridLength.Auto)
+                header,
+                _operationList,
+                actions
             }
         };
-        Grid.SetRow(_operationList, 1);
-        Grid.SetRow(actions, 2);
-        content.Children.Add(header);
-        content.Children.Add(_operationList);
-        content.Children.Add(actions);
-        Content = content;
+        Content = new ScrollView
+        {
+            AutomationId = "driver_main_scroll",
+            Content = content
+        };
 
         RenderClosed();
         Loaded += OnLoaded;

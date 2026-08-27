@@ -24,7 +24,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             activation, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/sessions", authenticated, StringComparison.Ordinal);
         Assert.Contains("/api/v1/sync/activation", authenticated, StringComparison.Ordinal);
-        Assert.Contains("ValidateDecision(request, session, decision)", authenticated, StringComparison.Ordinal);
+        Assert.Contains("ValidateDecision(request, session, decision, measuredBuildIdentity)", authenticated,
+            StringComparison.Ordinal);
         Assert.Contains("session.CompanyId != request.CompanyId", authenticated, StringComparison.Ordinal);
         Assert.Contains("session.BranchId != request.BranchId", authenticated, StringComparison.Ordinal);
         Assert.Contains("request.CompanyId is null", authenticated, StringComparison.Ordinal);
@@ -66,6 +67,43 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("volatileSession.Clear()", activation, StringComparison.Ordinal);
         Assert.Contains("public sealed class DriverOfflineActivationRequest", activation, StringComparison.Ordinal);
         Assert.DoesNotContain("record DriverOfflineActivationRequest", activation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Android_release_UI_E2E_uses_the_ordinary_non_debuggable_launcher_and_only_stable_automation_ids()
+    {
+        var page = Read("TransportERP.Mobile.Driver", "MainPage.cs");
+        var script = Read("eng", "ci", "android_release_ui_e2e.py");
+
+        Assert.Contains("Content = new ScrollView", page, StringComparison.Ordinal);
+        Assert.Contains("AutomationId = \"driver_main_scroll\"", page, StringComparison.Ordinal);
+        foreach (var automationId in new[]
+                 {
+                     "driver_mode", "driver_reason", "driver_user_name", "driver_password",
+                     "driver_company_id", "driver_branch_id", "driver_device_id",
+                     "driver_device_credential", "driver_sign_in", "driver_sign_out",
+                     "driver_party_name", "driver_party_mobile", "driver_party_address",
+                     "driver_queue_party", "driver_operation_list", "driver_operation_summary"
+                 })
+            Assert.Contains($"\"{automationId}\"", page, StringComparison.Ordinal);
+
+        Assert.Contains("android.intent.category.LAUNCHER", script, StringComparison.Ordinal);
+        Assert.Contains("INSTALLED_PACKAGE_IS_DEBUGGABLE", script, StringComparison.Ordinal);
+        Assert.Contains("uiautomator", script, StringComparison.Ordinal);
+        Assert.Contains("ordinary-launcher", script, StringComparison.Ordinal);
+        Assert.Contains("businessOperationSucceeded", script, StringComparison.Ordinal);
+        Assert.Contains("persistedAfterReleaseRestart", script, StringComparison.Ordinal);
+        Assert.Contains("driver.run(\"shell\", \"am\", \"force-stop\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("driver.wait_for_operation_success(operation_id)", script,
+            StringComparison.Ordinal);
+        Assert.Contains("signedOutClosed", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("DriverDeviceTestActivity", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("http://", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("run-as", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,6 +180,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("supervisor.SynchronizeNowAsync", composition, StringComparison.Ordinal);
         Assert.Contains("terminal?.ServerAccepted == true", selfTest, StringComparison.Ordinal);
         Assert.Contains("http_batch_server_acceptance_persisted", selfTest, StringComparison.Ordinal);
+        Assert.Contains("SafeTerminalFailureCode(terminal)", selfTest, StringComparison.Ordinal);
         Assert.Contains("local_succeeded_survived_restart", selfTest, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionBearer", selfTest, StringComparison.Ordinal);
 
@@ -334,6 +373,9 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("SanitizeResultCode(operation.ResultCode)", composition,
             StringComparison.Ordinal);
+        Assert.Contains("\"invalid_dpop_proof\" => \"INVALID_DPOP_PROOF\"", composition,
+            StringComparison.Ordinal);
+        Assert.Contains("_ => \"INVALID_RESULT_CODE\"", composition, StringComparison.Ordinal);
         Assert.Contains("operation.ConflictReview?.BaseVersion", composition, StringComparison.Ordinal);
         Assert.Contains("BuildRedactedLocalSnapshot(operation.ConflictReview)", composition,
             StringComparison.Ordinal);

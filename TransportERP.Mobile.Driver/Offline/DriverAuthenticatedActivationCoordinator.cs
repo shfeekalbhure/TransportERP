@@ -79,9 +79,10 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                 session.SessionId, session.AccessToken, session.AccessTokenExpiresAt);
             try
             {
+                var measuredBuildIdentity = await AndroidBuildIdentityProbe.MeasureAsync(cancellationToken);
                 var decision = await GetActivationDecisionAsync(
-                    session.AccessToken, cancellationToken);
-                ValidateDecision(request, session, decision);
+                    session.AccessToken, measuredBuildIdentity, cancellationToken);
+                ValidateDecision(request, session, decision, measuredBuildIdentity);
                 var effectivePolicy = EffectivePolicy(decision);
 
                 var localKeyAvailable = await signingKey.IsNativeSigningKeyAvailableAsync(cancellationToken);
@@ -105,8 +106,8 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                         throw new DriverOfflineUnavailableException(
                             "DEVICE_KEY_RECOVERY_REAUTHENTICATION_REQUIRED");
                     decision = await GetActivationDecisionAsync(
-                        session.AccessToken, cancellationToken);
-                    ValidateDecision(request, session, decision);
+                        session.AccessToken, measuredBuildIdentity, cancellationToken);
+                    ValidateDecision(request, session, decision, measuredBuildIdentity);
                     effectivePolicy = EffectivePolicy(decision);
                 }
 
@@ -128,6 +129,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                             decision.CanRetryFailedOperations,
                             decision.CanResolveConflicts),
                         effectivePolicy,
+                        measuredBuildIdentity,
                         offlineRuntimeAuthorized: true),
                     cancellationToken);
                 ArmExpiry(session.AccessTokenExpiresAt);
@@ -190,10 +192,12 @@ public sealed class DriverAuthenticatedActivationCoordinator(
 
     private async Task<DriverServerActivationDecision> GetActivationDecisionAsync(
         string bearer,
+        BuildIdentityV1 measuredBuildIdentity,
         CancellationToken cancellationToken)
     {
         using var message = AuthorizedRequest(
             HttpMethod.Get, Endpoint("/api/v1/sync/activation"), bearer);
+        AddBuildIdentityHeaders(message, measuredBuildIdentity);
         using var response = await network.SyncHttpClient.SendAsync(
             message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.StatusCode != HttpStatusCode.OK)
@@ -340,7 +344,8 @@ public sealed class DriverAuthenticatedActivationCoordinator(
     private static void ValidateDecision(
         DriverInteractiveSignInRequest request,
         DriverSessionResponse session,
-        DriverServerActivationDecision decision)
+        DriverServerActivationDecision decision,
+        BuildIdentityV1 measuredBuildIdentity)
     {
         if (!decision.Enabled || decision.CompanyId != session.CompanyId ||
             decision.BranchId != session.BranchId || decision.UserId != session.UserId ||
@@ -349,6 +354,8 @@ public sealed class DriverAuthenticatedActivationCoordinator(
             !HasOnlySupportedUniqueActions(decision.AllowedActions) ||
             string.IsNullOrWhiteSpace(decision.PolicySourceVersion) ||
             !IsSha256Hex(decision.PolicySourceFingerprint) ||
+            decision.AuthorizedBuildIdentity is not { IsValid: true } authorizedBuild ||
+            !authorizedBuild.FixedTimeEquals(measuredBuildIdentity) ||
             !EffectivePolicy(decision).IsValid ||
             decision.BatchEndpoint is null || !decision.BatchEndpoint.IsAbsoluteUri ||
             decision.BatchEndpoint.Scheme != Uri.UriSchemeHttps ||
@@ -367,6 +374,16 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                  !FixedEquals(decision.ProofKeyThumbprint!, Thumbprint(
                      new DevicePublicP256Jwk(publicJwk.X, publicJwk.Y)))))
             throw new DriverOfflineUnavailableException("OFFLINE_ACTIVATION_DECISION_INVALID");
+    }
+
+    private static void AddBuildIdentityHeaders(HttpRequestMessage request, BuildIdentityV1 identity)
+    {
+        if (!identity.IsValid)
+            throw new DriverOfflineUnavailableException("BUILD_IDENTITY_UNAVAILABLE");
+        request.Headers.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, identity.Platform);
+        request.Headers.TryAddWithoutValidation(BuildIdentityV1.ArtifactSha256Header, identity.ArtifactSha256);
+        if (identity.SignerCertificateSha256 is { } signer)
+            request.Headers.TryAddWithoutValidation(BuildIdentityV1.SignerCertificateSha256Header, signer);
     }
 
     private static SyncClientEffectivePolicy EffectivePolicy(DriverServerActivationDecision decision) => new(
@@ -637,4 +654,5 @@ public sealed record DriverServerActivationDecision(
     int MaximumRequestBodyBytes,
     int MaximumPayloadBytes,
     string? ActivationImplementationSha,
+    BuildIdentityV1? AuthorizedBuildIdentity,
     string? ClosedReason);

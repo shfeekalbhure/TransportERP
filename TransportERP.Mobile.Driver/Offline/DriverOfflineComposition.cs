@@ -73,6 +73,8 @@ public sealed record DriverOfflineOperationStatusView(
     private static string? SanitizeResultCode(string? code) => code switch
     {
         null => null,
+        "invalid_dpop_proof" => "INVALID_DPOP_PROOF",
+        "use_dpop_nonce" => "USE_DPOP_NONCE",
         { Length: > 0 and <= 64 } when code.All(character =>
             character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_') => code,
         _ => "INVALID_RESULT_CODE"
