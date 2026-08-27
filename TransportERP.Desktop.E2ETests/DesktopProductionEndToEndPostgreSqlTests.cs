@@ -61,7 +61,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                 seeded.DeviceId, credential, certificateThumbprint);
 
             Guid localOperationId;
-            Guid clientOperationId;
+            string clientOperationId;
             Guid correlationId;
             using (var authenticator = new DesktopOnlineSessionAuthenticator(factory.Server.CreateHandler))
             {
@@ -122,7 +122,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         WebApplicationFactory<ApiProgram> factory,
         string connection,
         SeededScope seeded,
-        Guid clientOperationId)
+        string clientOperationId)
     {
         for (var attempt = 0; attempt < 20; attempt++)
         {
@@ -274,7 +274,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
     private static async Task AssertPostgreSqlEvidenceAsync(
         string connection,
         SeededScope seeded,
-        Guid clientOperationId,
+        string clientOperationId,
         Guid correlationId)
     {
         await using var db = CreateDbContext(connection);
