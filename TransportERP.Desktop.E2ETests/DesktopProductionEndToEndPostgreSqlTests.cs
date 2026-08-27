@@ -168,6 +168,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
 
             var settings = ReleaseHostConfiguration(
                 connection, origin, implementationSha!, measuredBuildIdentity, seeded);
+            Checkpoint("HOST_CONFIGURATION_READY");
             await using var api = await DesktopReleaseKestrelApiHost.StartAsync(
                 origin, settings, timeout.Token);
             Checkpoint("API_READY");

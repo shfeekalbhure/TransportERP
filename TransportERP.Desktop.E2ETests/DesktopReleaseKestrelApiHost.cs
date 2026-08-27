@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace TransportERP.Desktop.E2ETests;
 
@@ -35,9 +36,15 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         IReadOnlyDictionary<string, string> configuration,
         CancellationToken cancellationToken)
     {
+        Checkpoint("HOST_START");
         if (!OperatingSystem.IsWindows() || origin.Scheme != Uri.UriSchemeHttps ||
-            origin.AbsolutePath != "/" || origin.IsDefaultPort || !await ResolvesOnlyToLoopbackAsync(origin))
+            origin.AbsolutePath != "/" || origin.IsDefaultPort)
             throw new InvalidOperationException("DESKTOP_E2E_EMBEDDED_ORIGIN_MUST_BE_EXACT_HTTPS_LOOPBACK");
+        Checkpoint("HOST_LOOPBACK_CHECK_STARTED");
+        if (!await ResolvesOnlyToLoopbackAsync(origin))
+            throw new InvalidOperationException("DESKTOP_E2E_EMBEDDED_ORIGIN_MUST_BE_EXACT_HTTPS_LOOPBACK");
+        Checkpoint("HOST_LOOPBACK_CHECK_COMPLETED");
+        Checkpoint("HOST_ORIGIN_VALIDATED");
 
         var apiAssembly = Path.Combine(AppContext.BaseDirectory, "TransportERP.Api.dll");
         var runtimeConfig = Path.Combine(AppContext.BaseDirectory,
@@ -46,15 +53,20 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             "TransportERP.Desktop.E2ETests.deps.json");
         if (!File.Exists(apiAssembly) || !File.Exists(runtimeConfig) || !File.Exists(dependencyManifest))
             throw new InvalidOperationException("DESKTOP_E2E_API_ENTRY_POINT_UNAVAILABLE");
+        Checkpoint("HOST_ENTRYPOINT_VALIDATED");
 
         var temporaryRoot = Path.Combine(
             Path.GetTempPath(), "transporterp-desktop-kestrel", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporaryRoot);
         var pfxPath = Path.Combine(temporaryRoot, "kestrel.pfx");
         var pfxPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        Checkpoint("HOST_CERTIFICATE_CREATE_STARTED");
         var certificate = CreateServerCertificate(origin.Host);
+        Checkpoint("HOST_CERTIFICATE_CREATED");
         await File.WriteAllBytesAsync(
             pfxPath, certificate.Export(X509ContentType.Pfx, pfxPassword), cancellationToken);
+        Checkpoint("HOST_CERTIFICATE_WRITTEN");
+        Checkpoint("HOST_CERTIFICATE_TRUST_STARTED");
         using (var root = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
         {
             root.Open(OpenFlags.ReadWrite);
@@ -62,6 +74,7 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
                 certificate.Export(X509ContentType.Cert));
             root.Add(publicCertificate);
         }
+        Checkpoint("HOST_CERTIFICATE_TRUSTED");
 
         var start = new ProcessStartInfo
         {
@@ -88,8 +101,10 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         Process process;
         try
         {
+            Checkpoint("HOST_PROCESS_START_STARTED");
             process = Process.Start(start)
                 ?? throw new InvalidOperationException("DESKTOP_E2E_API_START_FAILED");
+            Checkpoint("HOST_PROCESS_STARTED");
         }
         catch
         {
@@ -102,15 +117,25 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
         // not needed as acceptance evidence and may contain environment-specific paths.
         var stdoutDrain = DrainAsync(process.StandardOutput, cancellationToken);
         var stderrDrain = DrainAsync(process.StandardError, cancellationToken);
+        Checkpoint("HOST_DRAINS_STARTED");
         var host = new DesktopReleaseKestrelApiHost(
             process, stdoutDrain, stderrDrain, certificate, temporaryRoot);
         try
         {
+            Checkpoint("HOST_WAIT_READY");
             await host.WaitForReadyAsync(origin, cancellationToken);
+            Checkpoint("HOST_READY");
             return host;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Checkpoint("HOST_START_CANCELLED");
+            await host.DisposeAsync();
+            throw;
         }
         catch
         {
+            Checkpoint("HOST_START_FAILED");
             await host.DisposeAsync();
             throw;
         }
@@ -126,7 +151,11 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/sync/activation");
                 using var response = await client.SendAsync(request, cancellationToken);
-                if (response.StatusCode == HttpStatusCode.Unauthorized) return;
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    Checkpoint("HOST_ACTIVATION_REACHABLE");
+                    return;
+                }
             }
             catch (HttpRequestException) { }
             catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
@@ -173,19 +202,56 @@ internal sealed class DesktopReleaseKestrelApiHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Checkpoint("HOST_DISPOSE_STARTED");
         if (!_process.HasExited)
         {
+            Checkpoint("HOST_KILL_STARTED");
             _process.Kill(entireProcessTree: true);
+            Checkpoint("HOST_KILL_RETURNED");
             await _process.WaitForExitAsync();
+            Checkpoint("HOST_PROCESS_EXITED_AFTER_KILL");
         }
+        Checkpoint("HOST_DRAIN_WAIT_STARTED");
         try { await Task.WhenAll(_stdoutDrain, _stderrDrain); }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) { Checkpoint("HOST_DRAINS_CANCELLED"); }
+        Checkpoint("HOST_DRAIN_WAIT_COMPLETED");
         _process.Dispose();
-        try { RemoveTrustedCertificate(_certificate.Thumbprint); }
+        Checkpoint("HOST_PROCESS_DISPOSED");
+        Checkpoint("HOST_CERTIFICATE_REMOVE_STARTED");
+        try
+        {
+            RemoveTrustedCertificate(_certificate.Thumbprint);
+            Checkpoint("HOST_CERTIFICATE_REMOVED");
+        }
         finally
         {
             _certificate.Dispose();
             DeleteTemporaryRoot(_temporaryRoot);
+            Checkpoint("HOST_TEMP_ROOT_DELETE_RETURNED");
+        }
+        Checkpoint("HOST_DISPOSE_COMPLETED");
+    }
+
+    private static void Checkpoint(string name)
+    {
+        var checkpointFile = Environment.GetEnvironmentVariable(
+            "TRANSPORTERP_DESKTOP_E2E_CHECKPOINT_FILE");
+        if (string.IsNullOrWhiteSpace(checkpointFile) ||
+            !Path.IsPathFullyQualified(checkpointFile))
+            return;
+        try
+        {
+            using var stream = new FileStream(
+                checkpointFile, FileMode.Append, FileAccess.Write, FileShare.Read,
+                bufferSize: 4096, options: FileOptions.WriteThrough);
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
+            writer.WriteLine(name);
+            writer.Flush();
+            stream.Flush(flushToDisk: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Checkpoints must never prevent release-host cleanup.
         }
     }
 

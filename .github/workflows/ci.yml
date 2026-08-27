@@ -523,6 +523,7 @@ jobs:
             'MIGRATIONS_APPLIED'
             'SCOPE_SEEDED'
             'LOCAL_ROOT_RESET'
+            'HOST_CONFIGURATION_READY'
             'API_READY'
             'DESKTOP_LAUNCHED'
             'SIGNED_IN'
@@ -536,6 +537,36 @@ jobs:
             'ENCRYPTED_OUTBOX_VERIFIED'
             'DATABASE_EVIDENCE_VERIFIED'
             'CLEANUP_COMPLETED'
+            'HOST_START'
+            'HOST_LOOPBACK_CHECK_STARTED'
+            'HOST_LOOPBACK_CHECK_COMPLETED'
+            'HOST_ORIGIN_VALIDATED'
+            'HOST_ENTRYPOINT_VALIDATED'
+            'HOST_CERTIFICATE_CREATE_STARTED'
+            'HOST_CERTIFICATE_CREATED'
+            'HOST_CERTIFICATE_WRITTEN'
+            'HOST_CERTIFICATE_TRUST_STARTED'
+            'HOST_CERTIFICATE_TRUSTED'
+            'HOST_PROCESS_START_STARTED'
+            'HOST_PROCESS_STARTED'
+            'HOST_DRAINS_STARTED'
+            'HOST_WAIT_READY'
+            'HOST_ACTIVATION_REACHABLE'
+            'HOST_READY'
+            'HOST_START_CANCELLED'
+            'HOST_START_FAILED'
+            'HOST_DISPOSE_STARTED'
+            'HOST_KILL_STARTED'
+            'HOST_KILL_RETURNED'
+            'HOST_PROCESS_EXITED_AFTER_KILL'
+            'HOST_DRAIN_WAIT_STARTED'
+            'HOST_DRAINS_CANCELLED'
+            'HOST_DRAIN_WAIT_COMPLETED'
+            'HOST_PROCESS_DISPOSED'
+            'HOST_CERTIFICATE_REMOVE_STARTED'
+            'HOST_CERTIFICATE_REMOVED'
+            'HOST_TEMP_ROOT_DELETE_RETURNED'
+            'HOST_DISPOSE_COMPLETED'
           )
           if (-not (Test-Path $checkpointFile -PathType Leaf)) {
             $failures.Add('The Desktop release E2E produced no checkpoint evidence.')
@@ -1664,6 +1695,9 @@ jobs:
             ci-evidence/android-runtime/release-build-identity.txt)
           [[ "$release_artifact_sha" =~ ^[0-9a-f]{64}$ ]]
           [[ "$release_signer_sha" =~ ^[0-9a-f]{64}$ ]]
+          (umask 077; printf '%s' "$release_signer_sha" \
+            > "$RUNNER_TEMP/android-release-signer-sha256.txt")
+          test "$(stat -c '%a' "$RUNNER_TEMP/android-release-signer-sha256.txt")" = '600'
 
           kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")"
           wait "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" || true
@@ -1746,7 +1780,6 @@ jobs:
             echo "ANDROID_E2E_BRANCH_ID=$branch_id"
             echo "ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID=$release_registered_device_id"
             echo "ANDROID_E2E_RELEASE_ARTIFACT_SHA=$release_artifact_sha"
-            echo "ANDROID_E2E_RELEASE_SIGNER_SHA=$release_signer_sha"
           } >> "$GITHUB_ENV"
           rm -f "$RUNNER_TEMP/android-bootstrap-login.json" \
             "$RUNNER_TEMP/android-bootstrap-session.json" \
@@ -1792,9 +1825,27 @@ jobs:
           adb root
           adb wait-for-device
           adb remount
+          adb reboot
+          timeout 30s adb wait-for-disconnect
+          adb wait-for-device
+          booted=false
+          for attempt in $(seq 1 150); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; then
+              booted=true
+              break
+            fi
+            sleep 2
+          done
+          test "$booted" = true
+          adb root
+          adb wait-for-device
+          adb remount
+          adb shell 'touch /system/etc/security/cacerts/.transporterp-write-probe'
+          adb shell 'rm /system/etc/security/cacerts/.transporterp-write-probe'
           adb push "$tls_dir/server.crt" "/system/etc/security/cacerts/${certificate_hash}.0"
           adb shell chmod 644 "/system/etc/security/cacerts/${certificate_hash}.0"
           adb reboot
+          timeout 30s adb wait-for-disconnect
           adb wait-for-device
           booted=false
           for attempt in $(seq 1 150); do
@@ -1954,6 +2005,8 @@ jobs:
           connection='Host=127.0.0.1;Port=5432;Database=transporter_android_ci;Username=transporter_android_ci;Password=android-ci-database-password;Include Error Detail=false'
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
           api_content_root="$PWD/TransportERP.Api/bin/Release/net10.0"
+          release_signer_sha=$(cat "$RUNNER_TEMP/android-release-signer-sha256.txt")
+          [[ "$release_signer_sha" =~ ^[0-9a-f]{64}$ ]]
           kill "$(cat "$RUNNER_TEMP/android-e2e-api.pid")"
           wait "$(cat "$RUNNER_TEMP/android-e2e-api.pid")" || true
           nohup env \
@@ -1976,7 +2029,7 @@ jobs:
             "Sync__Offline__ActivationImplementationSha=$EXPECTED_SHA" \
             'Sync__Offline__AuthorizedBuilds__0__Platform=android' \
             "Sync__Offline__AuthorizedBuilds__0__ArtifactSha256=$ANDROID_E2E_RELEASE_ARTIFACT_SHA" \
-            "Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256=$ANDROID_E2E_RELEASE_SIGNER_SHA" \
+            "Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256=$release_signer_sha" \
             'Sync__EffectivePolicy__SourceVersion=android-release-ci-e2e-v1' \
             "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__CompanyId=$ANDROID_E2E_COMPANY_ID" \
             "Sync__EffectivePolicy__Devices__${ANDROID_E2E_RELEASE_REGISTERED_DEVICE_ID}__BranchId=$ANDROID_E2E_BRANCH_ID" \
@@ -1994,6 +2047,8 @@ jobs:
             dotnet TransportERP.Api/bin/Release/net10.0/TransportERP.Api.dll \
             > "$RUNNER_TEMP/android-e2e-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/android-e2e-api.pid"
+          rm -f "$RUNNER_TEMP/android-release-signer-sha256.txt"
+          unset release_signer_sha
           ready=false
           for attempt in $(seq 1 90); do
             status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
@@ -2270,7 +2325,8 @@ jobs:
             "$RUNNER_TEMP/android-release-device-registration.json" \
             "$RUNNER_TEMP/android-release-device-registration-response.json" \
             "$RUNNER_TEMP/android-device-assignment.json" \
-            "$RUNNER_TEMP/android-bootstrap-authorization.header"
+            "$RUNNER_TEMP/android-bootstrap-authorization.header" \
+            "$RUNNER_TEMP/android-release-signer-sha256.txt"
           adb shell am force-stop "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
           adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
 
