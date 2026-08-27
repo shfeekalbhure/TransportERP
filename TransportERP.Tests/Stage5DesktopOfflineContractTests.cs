@@ -275,6 +275,12 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE", shell, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_OPERATIONS_WINDOW_SHOWN", shell, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_OPERATIONS_SHOW_RETURNED", shell, StringComparison.Ordinal);
+        Assert.Contains("SetOperationsDiagnosticState", shell, StringComparison.Ordinal);
+        Assert.Contains("IsSafeCode(state)", shell, StringComparison.Ordinal);
+        Assert.Contains("_offlineStatus.Text = $\"عمليات المزامنة ({safeState})\"", shell,
+            StringComparison.Ordinal);
+        Assert.Contains("const string statusPrefix = \"عمليات المزامنة (\"", uiAutomation,
+            StringComparison.Ordinal);
         Assert.Contains("AutomationElement.HelpTextProperty", uiAutomation, StringComparison.Ordinal);
         Assert.DoesNotContain("CancelAfter(OperationsWindowDiagnosticDelay)", uiAutomation,
             StringComparison.Ordinal);

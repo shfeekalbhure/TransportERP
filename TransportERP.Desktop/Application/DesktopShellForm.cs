@@ -177,15 +177,15 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
 
     private void ShowOperations()
     {
-        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_INVOKED";
+        SetOperationsDiagnosticState("DESKTOP_OPERATIONS_INVOKED");
         var runtime = _runtime;
         if (runtime is null)
         {
-            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_RUNTIME_MISSING";
+            SetOperationsDiagnosticState("DESKTOP_OPERATIONS_RUNTIME_MISSING");
             return;
         }
 
-        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATE_STARTED";
+        SetOperationsDiagnosticState("DESKTOP_OPERATIONS_CREATE_STARTED");
         SyncOperationsForm operations;
         try
         {
@@ -193,30 +193,37 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         }
         catch
         {
-            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATE_FAILED";
+            SetOperationsDiagnosticState("DESKTOP_OPERATIONS_CREATE_FAILED");
             return;
         }
 
-        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATED";
+        SetOperationsDiagnosticState("DESKTOP_OPERATIONS_CREATED");
         operations.Shown += (_, _) =>
-            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_WINDOW_SHOWN";
-        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_STARTED";
+            SetOperationsDiagnosticState("DESKTOP_OPERATIONS_WINDOW_SHOWN");
+        SetOperationsDiagnosticState("DESKTOP_OPERATIONS_SHOW_STARTED");
         try
         {
             operations.Show(this);
             if (!operations.IsHandleCreated || !operations.Visible)
             {
                 DisposeOperationsForm(operations);
-                _operations.AccessibleDescription = "DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE";
+                SetOperationsDiagnosticState("DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE");
                 return;
             }
-            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_RETURNED";
+            SetOperationsDiagnosticState("DESKTOP_OPERATIONS_SHOW_RETURNED");
         }
         catch
         {
             DisposeOperationsForm(operations);
-            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_FAILED";
+            SetOperationsDiagnosticState("DESKTOP_OPERATIONS_SHOW_FAILED");
         }
+    }
+
+    private void SetOperationsDiagnosticState(string state)
+    {
+        var safeState = IsSafeCode(state) ? state : "DESKTOP_OPERATIONS_DIAGNOSTIC_INVALID";
+        _operations.AccessibleDescription = safeState;
+        _offlineStatus.Text = $"عمليات المزامنة ({safeState})";
     }
 
     private static void DisposeOperationsForm(SyncOperationsForm operations)

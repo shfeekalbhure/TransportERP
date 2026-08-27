@@ -306,9 +306,18 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
 
     private string ReadOperationsDiagnosticState()
     {
-        var value = Element(DesktopAutomationIds.Operations).GetCurrentPropertyValue(
+        const string statusPrefix = "عمليات المزامنة (";
+        var status = ReadStatus();
+        if (status.StartsWith(statusPrefix, StringComparison.Ordinal) &&
+            status.EndsWith(')'))
+            return status[statusPrefix.Length..^1];
+
+        var helpText = Element(DesktopAutomationIds.Operations).GetCurrentPropertyValue(
             AutomationElement.HelpTextProperty, ignoreDefaultValue: true);
-        return value as string ?? "";
+        return helpText is string value && value.StartsWith("DESKTOP_OPERATIONS_",
+                   StringComparison.Ordinal)
+            ? value
+            : "";
     }
 
     internal static string ClassifyOperationsWindowTimeout(string diagnosticState) =>
