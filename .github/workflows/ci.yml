@@ -986,12 +986,14 @@ jobs:
           adb shell getprop ro.build.version.sdk | tr -d '\r' | grep -Fx '35'
 
       - name: Run closed startup and native security restart proof
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
           result_name='driver-device-test-result.json'
           apk=$(cat "$RUNNER_TEMP/android-device-test-apk.txt")
-          adb install -r "$apk"
+          adb_bounded() { timeout 30s adb "$@"; }
+          adb_bounded install -r "$apk"
 
           validate_result() {
             local phase="$1"
@@ -1020,8 +1022,8 @@ jobs:
             local maximum_attempts=60
             if [ "$phase" = e2e-submit ]; then maximum_attempts=150; fi
             echo "android_phase_start=$phase"
-            adb shell run-as "$ANDROID_TEST_PACKAGE" rm -f "files/$result_name"
-            timeout 30s adb shell am start -W \
+            adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" rm -f "files/$result_name"
+            adb_bounded shell am start -W \
               -n "$ANDROID_TEST_COMPONENT" \
               --es phase "$phase" >/dev/null
             complete=false
@@ -1029,8 +1031,8 @@ jobs:
               # Some adb versions return exit code 0 while forwarding the remote
               # `cat: ... No such file` diagnostic on stdout.  Check existence in
               # the app sandbox first, then accept only a complete JSON document.
-              if adb shell run-as "$ANDROID_TEST_PACKAGE" test -s "files/$result_name" >/dev/null 2>&1; then
-                adb exec-out run-as "$ANDROID_TEST_PACKAGE" cat "files/$result_name" > "$temporary"
+              if adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" test -s "files/$result_name" >/dev/null 2>&1; then
+                adb_bounded exec-out run-as "$ANDROID_TEST_PACKAGE" cat "files/$result_name" > "$temporary"
                 if python3 -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$temporary"; then
                   complete=true
                   break
@@ -1044,25 +1046,25 @@ jobs:
             echo "android_phase_complete=$phase"
           }
 
-          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
-          timeout 30s adb shell monkey \
+          adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+          adb_bounded shell monkey \
             -p "$ANDROID_TEST_PACKAGE" \
             -c android.intent.category.LAUNCHER \
             1 >/dev/null
           for attempt in $(seq 1 30); do
-            test -n "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" && break
+            test -n "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" && break
             sleep 1
           done
-          test -n "$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')"
+          test -n "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')"
 
           run_phase startup
           run_phase seed
-          seed_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          seed_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$seed_pid"
-          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           stopped=false
           for attempt in $(seq 1 30); do
-            if [ -z "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+            if [ -z "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
               stopped=true
               break
             fi
@@ -1071,22 +1073,22 @@ jobs:
           test "$stopped" = true
 
           run_phase verify
-          verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          verify_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$verify_pid"
           run_phase loss
-          adb exec-out run-as "$ANDROID_TEST_PACKAGE" sh -c \
+          adb_bounded exec-out run-as "$ANDROID_TEST_PACKAGE" sh -c \
             'cat > files/driver-device-e2e-input.json' \
             < "$RUNNER_TEMP/android-e2e-input.json"
-          adb shell run-as "$ANDROID_TEST_PACKAGE" chmod 600 \
+          adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" chmod 600 \
             files/driver-device-e2e-input.json
           rm -f "$RUNNER_TEMP/android-e2e-input.json"
           run_phase e2e-submit
-          e2e_submit_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          e2e_submit_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$e2e_submit_pid"
-          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           e2e_stopped=false
           for attempt in $(seq 1 30); do
-            if [ -z "$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+            if [ -z "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
               e2e_stopped=true
               break
             fi
@@ -1094,7 +1096,7 @@ jobs:
           done
           test "$e2e_stopped" = true
           run_phase e2e-verify
-          e2e_verify_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          e2e_verify_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
           test -n "$e2e_verify_pid"
           {
             echo 'process_stopped_before_restart=true'
@@ -1105,8 +1107,8 @@ jobs:
             echo 'ci_test_runtime_was_activated=true'
             echo 'raw_security_artifacts_exported=false'
           } > ci-evidence/android-runtime/restart-evidence.txt
-          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
-          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+          adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
+          adb_bounded shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
 
       - name: Verify Android business result in PostgreSQL 18.6
         shell: bash
