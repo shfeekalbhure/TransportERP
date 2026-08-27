@@ -445,6 +445,11 @@ jobs:
             throw 'The isolated Desktop E2E results directory already exists.'
           }
           New-Item -ItemType Directory -Force -Path $resultsRoot | Out-Null
+          $checkpointFile = Join-Path $env:RUNNER_TEMP 'desktop-release-e2e-checkpoints.txt'
+          if (Test-Path $checkpointFile) {
+            throw 'The Desktop E2E checkpoint file already exists.'
+          }
+          $env:TRANSPORTERP_DESKTOP_E2E_CHECKPOINT_FILE = $checkpointFile
 
           $failures = [System.Collections.Generic.List[string]]::new()
           for ($index = 0; $index -lt $testMethods.Count; $index++) {
@@ -508,6 +513,47 @@ jobs:
             if ($process.ExitCode -ne 0) {
               $failures.Add("$fullyQualifiedName exited with code $($process.ExitCode).")
               break
+            }
+          }
+
+          $allowedCheckpoints = @(
+            'START'
+            'CERTIFICATE_CREATED'
+            'PROOF_READ'
+            'MIGRATIONS_APPLIED'
+            'SCOPE_SEEDED'
+            'LOCAL_ROOT_RESET'
+            'API_READY'
+            'DESKTOP_LAUNCHED'
+            'SIGNED_IN'
+            'OPERATION_QUEUED'
+            'SERVER_OPERATION_SUCCEEDED'
+            'DESKTOP_CLOSED'
+            'DESKTOP_RESTARTED'
+            'RESTART_SIGNED_IN'
+            'PERSISTED_OPERATION_VERIFIED'
+            'RESTART_CLOSED'
+            'ENCRYPTED_OUTBOX_VERIFIED'
+            'DATABASE_EVIDENCE_VERIFIED'
+            'CLEANUP_COMPLETED'
+          )
+          if (-not (Test-Path $checkpointFile -PathType Leaf)) {
+            $failures.Add('The Desktop release E2E produced no checkpoint evidence.')
+          }
+          else {
+            $checkpoints = @(Get-Content $checkpointFile)
+            if ($checkpoints.Count -eq 0) {
+              $failures.Add('The Desktop release E2E checkpoint evidence is empty.')
+            }
+            foreach ($checkpoint in $checkpoints) {
+              if ($checkpoint -notin $allowedCheckpoints) {
+                $failures.Add('The Desktop release E2E emitted a non-allowlisted checkpoint.')
+                continue
+              }
+              Write-Host "Desktop release E2E checkpoint=$checkpoint"
+            }
+            if ($failures -notcontains 'The Desktop release E2E emitted a non-allowlisted checkpoint.') {
+              Copy-Item $checkpointFile 'ci-evidence/desktop/desktop-release-e2e-checkpoints.txt'
             }
           }
 
@@ -728,6 +774,7 @@ jobs:
             ci-evidence/desktop/provenance-verification.json
             ci-evidence/desktop/postgresql-identity.txt
             ci-evidence/desktop/postgresql.log
+            ci-evidence/desktop/desktop-release-e2e-checkpoints.txt
             TransportERP.Desktop.E2ETests/TestResults/**/*.trx
           if-no-files-found: warn
           retention-days: 30
@@ -925,68 +972,50 @@ jobs:
           if ! signer_sha256=$(python3 - "$signer_stdout" "$signer_stderr" <<'PY'
           import pathlib, re, sys
 
-          prefix = re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:")
-          field = re.compile(
-              r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
-              r"([0-9A-Fa-f]{64})[ \t]*$")
+          prefixes = (
+              re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:"),
+              re.compile(
+                  r"^V[1-9][0-9]*(?:\.[0-9]+)? Signer:[ \t]*"
+                  r"certificate SHA-256 digest:"),
+          )
+          fields = (
+              re.compile(
+                  r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
+                  r"([0-9A-Fa-f]{64})[ \t]*$"),
+              re.compile(
+                  r"^V[1-9][0-9]*(?:\.[0-9]+)? Signer:[ \t]*"
+                  r"certificate SHA-256 digest:[ \t]*"
+                  r"([0-9A-Fa-f]{64})[ \t]*$"),
+          )
           matches = []
-          reports = []
           for name in sys.argv[1:]:
               path = pathlib.Path(name)
               raw = path.read_bytes()
               lines = raw.decode("utf-8", errors="strict").splitlines()
-              reports.append((path, raw, lines))
               for line_number, line in enumerate(lines, 1):
-                  if not prefix.match(line):
+                  match = next(
+                      (candidate for field in fields
+                       if (candidate := field.fullmatch(line)) is not None),
+                      None)
+                  if match is not None:
+                      matches.append(match.group(1).lower())
                       continue
-                  match = field.fullmatch(line)
-                  if match is None:
+                  if any(prefix.match(line) for prefix in prefixes):
                       raise SystemExit(
                           f"Recognized signer SHA-256 field is malformed in "
                           f"{path.name}:{line_number}.")
-                  matches.append(match.group(1).lower())
-          if len(matches) != 1:
-              for path, raw, lines in reports:
-                  print(
-                      f"{path.name}: bytes={len(raw)} lines={len(lines)}",
-                      file=sys.stderr)
-                  for line_number, line in enumerate(lines[:50], 1):
-                      label, separator, value = line.partition(":")
-                      if not separator:
-                          print(
-                              f"{path.name}:{line_number}: no-colon "
-                              f"length={len(line)}",
-                              file=sys.stderr)
-                          continue
-                      normalized_label = " ".join(label.strip().split())
-                      if re.fullmatch(
-                              r"Signer #[1-9][0-9]* certificate SHA-256 digest",
-                              normalized_label):
-                          label_category = "NUMBERED_SIGNER_CERT_SHA256"
-                      elif re.fullmatch(
-                              r"V[1-9][0-9]*(?:\.[0-9]+)? Signer",
-                              normalized_label):
-                          label_category = "VERSIONED_SIGNER"
-                      else:
-                          label_category = "UNRECOGNIZED"
-                      normalized_value = value.strip()
-                      if normalized_value.startswith(
-                              "certificate SHA-256 digest:"):
-                          value_category = "CERT_SHA256_FIELD"
-                      elif normalized_value.startswith("certificate DN:"):
-                          value_category = "CERT_DN_FIELD"
-                      else:
-                          value_category = "UNRECOGNIZED"
-                      print(
-                          f"{path.name}:{line_number}: has_colon=true "
-                          f"label_length={len(label)} value_length={len(normalized_value)} "
-                          f"label_category={label_category} "
-                          f"value_category={value_category}",
-                          file=sys.stderr)
+                  if "certificate sha-256 digest:" in line.casefold():
+                      raise SystemExit(
+                          f"Unrecognized signer SHA-256 field in "
+                          f"{path.name}:{line_number}.")
+          unique_matches = set(matches)
+          if not matches or len(unique_matches) != 1:
               raise SystemExit(
-                  "Expected exactly one signer SHA-256 field across apksigner "
-                  f"stdout/stderr; found {len(matches)}.")
-          print(matches[0], end="")
+                  "Expected at least one recognized signer SHA-256 field and "
+                  "exactly one distinct signer identity across apksigner "
+                  f"stdout/stderr; found {len(matches)} fields and "
+                  f"{len(unique_matches)} distinct identities.")
+          print(next(iter(unique_matches)), end="")
           PY
           ); then
             echo 'Android Release APK signer digest extraction failed closed.'
@@ -1344,68 +1373,50 @@ jobs:
           if ! signer_sha256=$(python3 - "$signer_stdout" "$signer_stderr" <<'PY'
           import pathlib, re, sys
 
-          prefix = re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:")
-          field = re.compile(
-              r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
-              r"([0-9A-Fa-f]{64})[ \t]*$")
+          prefixes = (
+              re.compile(r"^Signer #[1-9][0-9]* certificate SHA-256 digest:"),
+              re.compile(
+                  r"^V[1-9][0-9]*(?:\.[0-9]+)? Signer:[ \t]*"
+                  r"certificate SHA-256 digest:"),
+          )
+          fields = (
+              re.compile(
+                  r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
+                  r"([0-9A-Fa-f]{64})[ \t]*$"),
+              re.compile(
+                  r"^V[1-9][0-9]*(?:\.[0-9]+)? Signer:[ \t]*"
+                  r"certificate SHA-256 digest:[ \t]*"
+                  r"([0-9A-Fa-f]{64})[ \t]*$"),
+          )
           matches = []
-          reports = []
           for name in sys.argv[1:]:
               path = pathlib.Path(name)
               raw = path.read_bytes()
               lines = raw.decode("utf-8", errors="strict").splitlines()
-              reports.append((path, raw, lines))
               for line_number, line in enumerate(lines, 1):
-                  if not prefix.match(line):
+                  match = next(
+                      (candidate for field in fields
+                       if (candidate := field.fullmatch(line)) is not None),
+                      None)
+                  if match is not None:
+                      matches.append(match.group(1).lower())
                       continue
-                  match = field.fullmatch(line)
-                  if match is None:
+                  if any(prefix.match(line) for prefix in prefixes):
                       raise SystemExit(
                           f"Recognized signer SHA-256 field is malformed in "
                           f"{path.name}:{line_number}.")
-                  matches.append(match.group(1).lower())
-          if len(matches) != 1:
-              for path, raw, lines in reports:
-                  print(
-                      f"{path.name}: bytes={len(raw)} lines={len(lines)}",
-                      file=sys.stderr)
-                  for line_number, line in enumerate(lines[:50], 1):
-                      label, separator, value = line.partition(":")
-                      if not separator:
-                          print(
-                              f"{path.name}:{line_number}: no-colon "
-                              f"length={len(line)}",
-                              file=sys.stderr)
-                          continue
-                      normalized_label = " ".join(label.strip().split())
-                      if re.fullmatch(
-                              r"Signer #[1-9][0-9]* certificate SHA-256 digest",
-                              normalized_label):
-                          label_category = "NUMBERED_SIGNER_CERT_SHA256"
-                      elif re.fullmatch(
-                              r"V[1-9][0-9]*(?:\.[0-9]+)? Signer",
-                              normalized_label):
-                          label_category = "VERSIONED_SIGNER"
-                      else:
-                          label_category = "UNRECOGNIZED"
-                      normalized_value = value.strip()
-                      if normalized_value.startswith(
-                              "certificate SHA-256 digest:"):
-                          value_category = "CERT_SHA256_FIELD"
-                      elif normalized_value.startswith("certificate DN:"):
-                          value_category = "CERT_DN_FIELD"
-                      else:
-                          value_category = "UNRECOGNIZED"
-                      print(
-                          f"{path.name}:{line_number}: has_colon=true "
-                          f"label_length={len(label)} value_length={len(normalized_value)} "
-                          f"label_category={label_category} "
-                          f"value_category={value_category}",
-                          file=sys.stderr)
+                  if "certificate sha-256 digest:" in line.casefold():
+                      raise SystemExit(
+                          f"Unrecognized signer SHA-256 field in "
+                          f"{path.name}:{line_number}.")
+          unique_matches = set(matches)
+          if not matches or len(unique_matches) != 1:
               raise SystemExit(
-                  "Expected exactly one signer SHA-256 field across apksigner "
-                  f"stdout/stderr; found {len(matches)}.")
-          print(matches[0], end="")
+                  "Expected at least one recognized signer SHA-256 field and "
+                  "exactly one distinct signer identity across apksigner "
+                  f"stdout/stderr; found {len(matches)} fields and "
+                  f"{len(unique_matches)} distinct identities.")
+          print(next(iter(unique_matches)), end="")
           PY
           ); then
             echo 'Android device-test APK signer digest extraction failed closed.'

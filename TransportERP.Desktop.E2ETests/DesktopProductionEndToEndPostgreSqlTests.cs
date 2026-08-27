@@ -114,6 +114,28 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
     [Trait("Category", "HTTP")]
     public async Task Same_release_WinExe_UI_Kestrel_SQLCipher_worker_and_PostgreSql_succeed()
     {
+        static void Checkpoint(string name)
+        {
+            var checkpointFile = Environment.GetEnvironmentVariable(
+                "TRANSPORTERP_DESKTOP_E2E_CHECKPOINT_FILE");
+            if (string.IsNullOrWhiteSpace(checkpointFile))
+            {
+                Console.WriteLine($"DESKTOP_RELEASE_E2E_CHECKPOINT={name}");
+                return;
+            }
+            if (!Path.IsPathFullyQualified(checkpointFile))
+                throw new InvalidOperationException("DESKTOP_E2E_CHECKPOINT_FILE_INVALID");
+            using var stream = new FileStream(
+                checkpointFile, FileMode.Append, FileAccess.Write, FileShare.Read,
+                bufferSize: 4096, options: FileOptions.WriteThrough);
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
+            writer.WriteLine(name);
+            writer.Flush();
+            stream.Flush(flushToDisk: true);
+            Console.WriteLine($"DESKTOP_RELEASE_E2E_CHECKPOINT={name}");
+        }
+
+        Checkpoint("START");
         Assert.True(OperatingSystem.IsWindows(), "DESKTOP-E2E must execute on Windows; SKIPPED is not PASS.");
         var implementationSha = SyncClientDeploymentAuthority.ImplementationSha;
         Assert.Matches("^[0-9a-f]{40}$", implementationSha ?? string.Empty);
@@ -132,20 +154,27 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         try
         {
             certificateThumbprint = CreateCertificate(keyName);
+            Checkpoint("CERTIFICATE_CREATED");
             var proof = await ReadProofAsync(certificateThumbprint);
+            Checkpoint("PROOF_READ");
             await using (var migrationDb = CreateDbContext(connection))
                 await migrationDb.Database.MigrateAsync(timeout.Token);
+            Checkpoint("MIGRATIONS_APPLIED");
             var seeded = await SeedAsync(connection, credential, proof);
+            Checkpoint("SCOPE_SEEDED");
             localRoot = LocalRoot(seeded);
             DeleteDirectory(localRoot);
+            Checkpoint("LOCAL_ROOT_RESET");
 
             var settings = ReleaseHostConfiguration(
                 connection, origin, implementationSha!, measuredBuildIdentity, seeded);
             await using var api = await DesktopReleaseKestrelApiHost.StartAsync(
                 origin, settings, timeout.Token);
+            Checkpoint("API_READY");
             await using (var desktop = await DesktopReleaseUiAutomation.LaunchAsync(
                              executable, timeout.Token))
             {
+                Checkpoint("DESKTOP_LAUNCHED");
                 Assert.True(string.Equals(
                     Path.GetFullPath(executable), Path.GetFullPath(desktop.ExecutablePath),
                     StringComparison.OrdinalIgnoreCase));
@@ -153,17 +182,22 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                 await desktop.SignInAsync(
                     seeded.UserName, Password, seeded.CompanyId, seeded.BranchId,
                     seeded.DeviceId, credential, certificateThumbprint, timeout.Token);
+                Checkpoint("SIGNED_IN");
                 await desktop.QueueOperationalPartyAsync(
                     "Desktop Release UI E2E", "700000001", "UI Automation Kestrel PostgreSQL",
                     timeout.Token);
+                Checkpoint("OPERATION_QUEUED");
                 Assert.True(desktop.ReadStatus().StartsWith(
                     "تمت إضافة العملية المشفرة", StringComparison.Ordinal));
                 await WaitForReleaseOperationAsync(connection, seeded, timeout.Token);
+                Checkpoint("SERVER_OPERATION_SUCCEEDED");
                 await desktop.CloseNormallyAsync(timeout.Token);
+                Checkpoint("DESKTOP_CLOSED");
             }
             await using (var restartedDesktop = await DesktopReleaseUiAutomation.LaunchAsync(
                              executable, timeout.Token))
             {
+                Checkpoint("DESKTOP_RESTARTED");
                 Assert.True(string.Equals(
                     Path.GetFullPath(executable), Path.GetFullPath(restartedDesktop.ExecutablePath),
                     StringComparison.OrdinalIgnoreCase));
@@ -171,8 +205,11 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                 await restartedDesktop.SignInAsync(
                     seeded.UserName, Password, seeded.CompanyId, seeded.BranchId,
                     seeded.DeviceId, credential, certificateThumbprint, timeout.Token);
+                Checkpoint("RESTART_SIGNED_IN");
                 await restartedDesktop.WaitForPersistedSucceededOperationAsync(timeout.Token);
+                Checkpoint("PERSISTED_OPERATION_VERIFIED");
                 await restartedDesktop.CloseNormallyAsync(timeout.Token);
+                Checkpoint("RESTART_CLOSED");
             }
 
             var encryptedOutbox = Path.Combine(localRoot, "write-outbox.db");
@@ -180,6 +217,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             var rawDatabase = await File.ReadAllBytesAsync(encryptedOutbox, timeout.Token);
             Assert.Equal(-1, rawDatabase.AsSpan().IndexOf(
                 Encoding.UTF8.GetBytes("Desktop Release UI E2E")));
+            Checkpoint("ENCRYPTED_OUTBOX_VERIFIED");
 
             await using var verify = CreateDbContext(connection);
             var operation = await verify.SyncOperations.AsNoTracking().SingleAsync(x =>
@@ -201,12 +239,14 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                 .Select(x => x.Action).ToListAsync(timeout.Token);
             Assert.Contains("SyncOperationQueued", audits);
             Assert.Contains("SyncOperationExecutionSucceeded", audits);
+            Checkpoint("DATABASE_EVIDENCE_VERIFIED");
         }
         finally
         {
             if (certificateThumbprint is not null) RemoveCertificate(certificateThumbprint);
             DeleteCngKey(keyName);
             if (localRoot is not null) DeleteDirectory(localRoot);
+            Checkpoint("CLEANUP_COMPLETED");
         }
     }
 
