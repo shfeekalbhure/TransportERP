@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
@@ -31,6 +32,8 @@ namespace TransportERP.Tests;
 [Collection("PostgreSql")]
 public sealed class Stage4G4HttpNegativePostgreSqlTests
 {
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('e', 64));
     private const string Issuer = "TransportERP.Stage4.G4.HttpNegative";
     private const string Audience = "TransportERP.Stage4.G4.HttpNegative.Api";
     private const string SigningKey = "transport-erp-stage4-g4-http-negative-signing-key-minimum-32";
@@ -482,6 +485,10 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.Equal(45, root.GetProperty("serverPayloadDays").GetInt32());
         Assert.Equal(8, root.GetProperty("cacheMaxAgeHours").GetInt32());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("activationImplementationSha").ValueKind);
+        Assert.Equal(TestBuildIdentity.Platform,
+            root.GetProperty("authorizedBuildIdentity").GetProperty("platform").GetString());
+        Assert.Equal(TestBuildIdentity.ArtifactSha256,
+            root.GetProperty("authorizedBuildIdentity").GetProperty("artifactSha256").GetString());
         Assert.Equal("test-policy-open-v1", root.GetProperty("policySourceVersion").GetString());
         Assert.Equal(new string('a', 64), root.GetProperty("policySourceFingerprint").GetString());
         Assert.DoesNotContain("credentialHash", body, StringComparison.OrdinalIgnoreCase);
@@ -520,6 +527,99 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         Assert.True(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
         Assert.False(root.GetProperty("keyRecoveryAllowed").GetBoolean());
         Assert.Equal("PROOF_KEY_BINDING_REQUIRED", root.GetProperty("closedReason").GetString());
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("wrong-platform")]
+    [InlineData("wrong-digest")]
+    [InlineData("unexpected-signer")]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Activation_rejects_missing_or_mismatched_measured_build_identity(string mismatch)
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var scope = await SeedAsync(seedDb, proofKey, "BUILD-IDENTITY-" + mismatch);
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = PublicOrigin });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
+        if (mismatch != "missing")
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                BuildIdentityV1.PlatformHeader,
+                mismatch == "wrong-platform" ? BuildIdentityV1.AndroidPlatform : TestBuildIdentity.Platform);
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                BuildIdentityV1.ArtifactSha256Header,
+                mismatch == "wrong-digest" ? new string('f', 64) : TestBuildIdentity.ArtifactSha256);
+            if (mismatch == "unexpected-signer")
+                client.DefaultRequestHeaders.TryAddWithoutValidation(
+                    BuildIdentityV1.SignerCertificateSha256Header, new string('1', 64));
+        }
+
+        using var response = await client.GetAsync("/api/v1/sync/activation");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("BUILD_IDENTITY_MISMATCH",
+            document.RootElement.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Activation_selects_the_exact_Android_identity_from_the_multi_platform_allowlist()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var scope = await SeedAsync(seedDb, proofKey, "ANDROID-BUILD-IDENTITY");
+        var android = new BuildIdentityV1(
+            BuildIdentityV1.AndroidPlatform, new string('2', 64), new string('3', 64));
+        using var factory = CreateFactory(connection, [TestBuildIdentity, android]);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = PublicOrigin });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, android.Platform);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.SignerCertificateSha256Header, android.SignerCertificateSha256);
+
+        using var response = await client.GetAsync("/api/v1/sync/activation");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var accepted = document.RootElement.GetProperty("authorizedBuildIdentity");
+        Assert.Equal(android.Platform, accepted.GetProperty("platform").GetString());
+        Assert.Equal(android.ArtifactSha256, accepted.GetProperty("artifactSha256").GetString());
+        Assert.Equal(android.SignerCertificateSha256,
+            accepted.GetProperty("signerCertificateSha256").GetString());
+
+        using var wrongSigner = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = PublicOrigin });
+        wrongSigner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
+        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, android.Platform);
+        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
+        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.SignerCertificateSha256Header, new string('4', 64));
+        using var denied = await wrongSigner.GetAsync("/api/v1/sync/activation");
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        using var missingSigner = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = PublicOrigin });
+        missingSigner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
+        missingSigner.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.PlatformHeader, android.Platform);
+        missingSigner.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
+        using var missingSignerResponse = await missingSigner.GetAsync("/api/v1/sync/activation");
+        Assert.Equal(HttpStatusCode.Forbidden, missingSignerResponse.StatusCode);
     }
 
     [Fact]
@@ -574,6 +674,10 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = PublicOrigin });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.PlatformHeader, TestBuildIdentity.Platform);
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            BuildIdentityV1.ArtifactSha256Header, TestBuildIdentity.ArtifactSha256);
         return client;
     }
 
@@ -588,7 +692,9 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
             null, "device-narrow-body-v1", new string('b', 64));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string connection)
+    private static WebApplicationFactory<Program> CreateFactory(
+        string connection,
+        IReadOnlyList<BuildIdentityV1>? authorizedBuilds = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:TransportErp", connection);
@@ -604,6 +710,11 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
             {
                 services.RemoveAll<ISyncRuntimeGate>();
                 services.AddScoped<ISyncRuntimeGate, IsolatedOpenSyncRuntimeGate>();
+                services.RemoveAll<IOptions<SyncRuntimePolicyOptions>>();
+                services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(new SyncRuntimePolicyOptions
+                {
+                    OfflineAuthorizedBuilds = (authorizedBuilds ?? new[] { TestBuildIdentity }).ToArray()
+                }));
                 services.RemoveAll<IEffectiveSyncPolicyProvider>();
                 services.AddScoped<IEffectiveSyncPolicyProvider, IsolatedOpenEffectivePolicyProvider>();
                 services.RemoveAll<ISyncRetryPolicyResolver>();
@@ -677,6 +788,7 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
         {
             deviceId,
             protocolVersion = "sync-v1",
+            buildIdentity = TestBuildIdentity,
             operations = operations.Select(x => new
             {
                 actionCode = x.ActionCode,

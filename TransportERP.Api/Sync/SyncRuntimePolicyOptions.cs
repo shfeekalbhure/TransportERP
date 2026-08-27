@@ -8,6 +8,7 @@ public sealed class SyncRuntimePolicyOptions
     public bool? OfflineEnabled { get; init; }
     public string? OfflineActivationDecisionId { get; init; }
     public string? OfflineActivationImplementationSha { get; init; }
+    public BuildIdentityV1[] OfflineAuthorizedBuilds { get; init; } = [];
     public bool? ServerExecutionEnabled { get; init; }
     public string[] AllowedActions { get; init; } = [];
     public string[] AllowedProtocolVersions { get; init; } = [];
@@ -31,6 +32,8 @@ public sealed class SyncRuntimePolicyOptions
         OfflineEnabled = configuration.GetValue<bool?>("Sync:Offline:Enabled"),
         OfflineActivationDecisionId = configuration["Sync:Offline:ActivationDecisionId"],
         OfflineActivationImplementationSha = configuration["Sync:Offline:ActivationImplementationSha"],
+        OfflineAuthorizedBuilds = configuration.GetSection("Sync:Offline:AuthorizedBuilds")
+            .Get<BuildIdentityV1[]>() ?? [],
         ServerExecutionEnabled = configuration.GetValue<bool?>("Sync:ServerExecution:Enabled"),
         AllowedActions = configuration.GetSection("Sync:Offline:AllowedActions").Get<string[]>() ?? [],
         AllowedProtocolVersions = configuration.GetSection("Sync:Protocol:AllowedVersions").Get<string[]>() ?? [],
@@ -100,9 +103,11 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
     {
         var decisionId = options.OfflineActivationDecisionId;
         var implementationSha = options.OfflineActivationImplementationSha;
+        var authorizedBuilds = options.OfflineAuthorizedBuilds ?? [];
         if (options.OfflineEnabled is not true)
         {
-            if (!string.IsNullOrWhiteSpace(decisionId) || !string.IsNullOrWhiteSpace(implementationSha))
+            if (!string.IsNullOrWhiteSpace(decisionId) || !string.IsNullOrWhiteSpace(implementationSha) ||
+                authorizedBuilds.Length != 0)
                 errors.Add("Offline activation evidence must be absent while Sync:Offline:Enabled is false.");
             return;
         }
@@ -113,6 +118,11 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
             errors.Add("Sync:Offline:ActivationDecisionId must be an explicit safe G5 decision identifier.");
         if (!IsExactCommitSha(implementationSha))
             errors.Add("Sync:Offline:ActivationImplementationSha must bind G5 activation to an exact 40-character commit SHA.");
+        if (authorizedBuilds.Length == 0 ||
+            authorizedBuilds.Any(identity => identity is not { IsValid: true }) ||
+            authorizedBuilds.Select(identity => identity.Platform)
+                .Distinct(StringComparer.Ordinal).Count() != authorizedBuilds.Length)
+            errors.Add("Sync:Offline:AuthorizedBuilds must contain one valid exact identity per approved platform.");
     }
 
     private static bool IsSafeDecisionId(string? value) =>

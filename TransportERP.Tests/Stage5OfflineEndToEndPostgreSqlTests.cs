@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
@@ -33,6 +34,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
     private const string SigningKey = "transport-erp-stage5-e2e-signing-key-32-characters-minimum";
     private static readonly Uri PublicOrigin = new("https://sync.example.test");
     private static readonly Uri BatchEndpoint = new(PublicOrigin, "/api/v1/sync/operations:batch");
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('b', 64));
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
@@ -203,7 +206,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
                 scope.UserId,
                 workerId,
                 LeaseDuration: TimeSpan.FromSeconds(30),
-                AcceptedPollInterval: TimeSpan.FromMilliseconds(100)),
+                AcceptedPollInterval: TimeSpan.FromMilliseconds(100),
+                BuildIdentity: TestBuildIdentity),
             time);
 
     private static Task<OfflineEnqueueResult> EnqueuePartyAsync(
@@ -319,6 +323,11 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             {
                 services.RemoveAll<ISyncRuntimeGate>();
                 services.AddScoped<ISyncRuntimeGate, IsolatedOpenSyncRuntimeGate>();
+                services.RemoveAll<IOptions<SyncRuntimePolicyOptions>>();
+                services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(new SyncRuntimePolicyOptions
+                {
+                    OfflineAuthorizedBuilds = [TestBuildIdentity]
+                }));
                 services.RemoveAll<ISyncRetryPolicyResolver>();
                 services.AddSingleton<ISyncRetryPolicyResolver>(new FixedSyncRetryPolicyResolver(
                     new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(30))));

@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using TransportERP.Api.Sync;
 using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
@@ -13,6 +14,8 @@ namespace TransportERP.Tests;
 public sealed class Stage4SyncRuntimePostgreSqlTests
 {
     private const string Htu = "https://sync.example.test/api/v1/sync/operations:batch";
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('d', 64));
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
@@ -656,7 +659,8 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
             "CreateJournalEntry", "CREATE", "JournalEntry", null,
             "denied-unavailable-" + Guid.NewGuid().ToString("N"), payload, Hash(payload),
             DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'"), Guid.NewGuid());
-        var request = new SyncBatchRequest(scope.Security.DeviceId, "sync-v1", [item, unavailable]);
+        var request = new SyncBatchRequest(
+            scope.Security.DeviceId, "sync-v1", [item, unavailable], TestBuildIdentity);
         var body = JsonSerializer.SerializeToUtf8Bytes(request, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var http = new DefaultHttpContext();
         http.Request.Body = new MemoryStream(body);
@@ -683,6 +687,10 @@ public sealed class Stage4SyncRuntimePostgreSqlTests
             http, new AcceptedRequestAuthenticator(accepted), CreateOperationService(db),
             new DenyPermissionResolver(),
             new SyncBatchRejectionAuditSink(new AuditEventService(db)),
+            Options.Create(new SyncRuntimePolicyOptions
+            {
+                OfflineAuthorizedBuilds = [TestBuildIdentity]
+            }),
             CancellationToken.None);
 
         var response = Assert.IsType<SyncBatchResponse>(

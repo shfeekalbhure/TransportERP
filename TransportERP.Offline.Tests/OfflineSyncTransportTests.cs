@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using TransportERP.Application.Sync;
 using TransportERP.Offline.Transport;
 
 namespace TransportERP.Offline.Tests;
@@ -14,6 +15,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
     private static readonly Guid BranchId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid UserId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid RegisteredDeviceId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('a', 64));
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "transporterp-transport-tests", Guid.NewGuid().ToString("N"));
     private readonly byte[] _outboxKey = RandomNumberGenerator.GetBytes(32);
     private readonly byte[] _cacheKey = RandomNumberGenerator.GetBytes(32);
@@ -34,7 +37,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
         var options = new OfflineSyncTransportOptions(
             Endpoint, "desktop-device-1", RegisteredDeviceId, CompanyId, BranchId, UserId, "policy-worker",
             MaximumRequestBodyBytes: 1024,
-            MaximumPayloadBytes: 8);
+            MaximumPayloadBytes: 8,
+            BuildIdentity: TestBuildIdentity);
         var client = new OfflineSyncTransportClient(
             http, store, new FixedBearerProvider("token"), key, options, clock);
 
@@ -86,6 +90,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.NotNull(signed.Proof);
         Assert.NotEqual(challengeCorrelation, signed.AttemptCorrelationId);
         AssertExactJsonOnlyWireContract(signed.Body);
+        Assert.Equal(TestBuildIdentity, ReadBatch(signed.Body).BuildIdentity);
         VerifyProof(signed.Proof!, signed.Body, bearer, nonce, signed.AttemptCorrelationId, key);
         var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
         Assert.Equal(OfflineOperationStatus.Succeeded, persisted!.Status);
@@ -259,7 +264,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
         }));
         var transport = new OfflineSyncTransportClient(http, reopened, new FixedBearerProvider("token"), key,
             new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
-                CompanyId, BranchId, UserId, "supervised-worker", AcceptedPollInterval: TimeSpan.FromMilliseconds(20)));
+                CompanyId, BranchId, UserId, "supervised-worker",
+                AcceptedPollInterval: TimeSpan.FromMilliseconds(20), BuildIdentity: TestBuildIdentity));
         var connectivity = new ManualConnectivity(initiallyOnline: false);
         var supervisor = new OfflineSyncSupervisor(reopened, transport, connectivity,
             new OfflineSyncSupervisorOptions(10, TimeSpan.FromMilliseconds(20)));
@@ -490,7 +496,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
                 "resilient-worker",
                 // The lease is certainly expired before the supervisor's delayed recovery.
                 // A fresh attempt must recover the same durable operation exactly once.
-                LeaseDuration: TimeSpan.FromTicks(1)),
+                LeaseDuration: TimeSpan.FromTicks(1),
+                BuildIdentity: TestBuildIdentity),
             TimeProvider.System);
         var supervisor = new OfflineSyncSupervisor(
             store,
@@ -549,7 +556,8 @@ public sealed class OfflineSyncTransportTests : IDisposable
                 BranchId,
                 UserId,
                 "short-lease-worker",
-                LeaseDuration: TimeSpan.FromSeconds(1)),
+                LeaseDuration: TimeSpan.FromSeconds(1),
+                BuildIdentity: TestBuildIdentity),
             clock);
 
         var result = await transport.ProcessNextBatchAsync();
@@ -900,13 +908,15 @@ public sealed class OfflineSyncTransportTests : IDisposable
             if (call == 2) throw new TaskCanceledException("server committed but response was lost");
             var resolution = JsonSerializer.Deserialize<SyncV1ConflictResolutionRequest>(captured.Body,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            Assert.Equal(TestBuildIdentity, resolution.BuildIdentity);
             return Json(HttpStatusCode.OK, new SyncV1ConflictResolutionResponse(
                 conflictCaseId, StableServerOperationId(queued.Operation.ClientOperationId),
                 resolution.Decision, "RESOLVED", "RESOLVED",
                 null, Guid.NewGuid(), clock.GetUtcNow(), captured.AttemptCorrelationId));
         }));
         var options = new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
-            queued.Operation.CompanyId, queued.Operation.BranchId, queued.Operation.UserId, "test-worker");
+            queued.Operation.CompanyId, queued.Operation.BranchId, queued.Operation.UserId, "test-worker",
+            BuildIdentity: TestBuildIdentity);
         var client = new OfflineSyncConflictClient(http, store, new FixedBearerProvider("token"), key, options, clock);
 
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
@@ -950,7 +960,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
             throw new InvalidOperationException("An invalid reason must fail before HTTP.")));
         var client = new OfflineSyncConflictClient(http, store, new FixedBearerProvider("token"), key,
             new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
-                CompanyId, BranchId, UserId, "test-worker"));
+                CompanyId, BranchId, UserId, "test-worker", BuildIdentity: TestBuildIdentity));
 
         var error = await Assert.ThrowsAsync<OfflineStoreException>(() => client.ResolveAsync(
             queued.Operation.LocalOperationId, OfflineConflictDecision.KeepServer, reason));
@@ -982,7 +992,7 @@ public sealed class OfflineSyncTransportTests : IDisposable
         TimeProvider clock,
         string bearer) => new(http, store, new FixedBearerProvider(bearer), key,
         new OfflineSyncTransportOptions(Endpoint, "desktop-device-1", RegisteredDeviceId,
-            CompanyId, BranchId, UserId, "test-worker"), clock);
+            CompanyId, BranchId, UserId, "test-worker", BuildIdentity: TestBuildIdentity), clock);
 
     private static OfflineOperationEnqueueRequest Request(Guid? localIntentId = null) => new(
         localIntentId ?? Guid.NewGuid(),
@@ -1155,8 +1165,11 @@ public sealed class OfflineSyncTransportTests : IDisposable
     private static void AssertExactJsonOnlyWireContract(byte[] body)
     {
         using var document = JsonDocument.Parse(body);
-        Assert.Equal(new[] { "deviceId", "protocolVersion", "operations" },
+        Assert.Equal(new[] { "deviceId", "protocolVersion", "operations", "buildIdentity" },
             document.RootElement.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(new[] { "platform", "artifactSha256", "signerCertificateSha256" },
+            document.RootElement.GetProperty("buildIdentity").EnumerateObject()
+                .Select(property => property.Name).ToArray());
         var operation = document.RootElement.GetProperty("operations")[0];
         Assert.Equal(new[]
         {

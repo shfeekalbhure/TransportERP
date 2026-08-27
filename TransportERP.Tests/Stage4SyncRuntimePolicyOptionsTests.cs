@@ -65,6 +65,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         missingRuntime["Sync:Offline:Enabled"] = "true";
         missingRuntime["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
         missingRuntime["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(missingRuntime);
 
         var malformedSha = new Dictionary<string, string?>(missingRuntime)
         {
@@ -86,6 +87,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         values["Sync:ServerExecution:Enabled"] = "true";
         values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
         values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
 
         var options = SyncRuntimePolicyOptions.Load(Configuration(values));
         var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
@@ -95,12 +97,117 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         Assert.Equal("DEC-G5-PR69-20260827-01", options.OfflineActivationDecisionId);
     }
 
+    [Theory]
+    [InlineData("Sync:Offline:AuthorizedBuilds:0:Platform", null)]
+    [InlineData("Sync:Offline:AuthorizedBuilds:0:Platform", "desktop")]
+    [InlineData("Sync:Offline:AuthorizedBuilds:0:ArtifactSha256", null)]
+    [InlineData("Sync:Offline:AuthorizedBuilds:0:ArtifactSha256", "ABCDEF")]
+    [InlineData("Sync:Offline:AuthorizedBuilds:0:SignerCertificateSha256", "ABCDEF")]
+    public void Offline_activation_rejects_missing_or_noncanonical_measured_build_identity(
+        string key,
+        string? value)
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-BUILD-IDENTITY";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
+        if (value is null) values.Remove(key);
+        else values[key] = value;
+
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(values)));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("AuthorizedBuild", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Same_cosmetic_implementation_sha_cannot_authorize_a_different_artifact_digest()
+    {
+        const string authorizedImplementationSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string differentBinaryImplementationSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var authorized = new BuildIdentityV1(
+            BuildIdentityV1.DesktopWindowsPlatform, new string('b', 64));
+        var differentBinary = new BuildIdentityV1(
+            BuildIdentityV1.DesktopWindowsPlatform, new string('c', 64));
+        Assert.Equal(authorizedImplementationSha, differentBinaryImplementationSha);
+        Assert.True(authorized.IsValid);
+        Assert.True(differentBinary.IsValid);
+        Assert.False(authorized.FixedTimeEquals(differentBinary));
+    }
+
+    [Fact]
+    public void Offline_activation_authority_accepts_one_exact_identity_for_each_client_platform()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-MULTI-PLATFORM";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
+        values["Sync:Offline:AuthorizedBuilds:1:Platform"] = BuildIdentityV1.AndroidPlatform;
+        values["Sync:Offline:AuthorizedBuilds:1:ArtifactSha256"] = new string('c', 64);
+        values["Sync:Offline:AuthorizedBuilds:1:SignerCertificateSha256"] = new string('d', 64);
+
+        var options = SyncRuntimePolicyOptions.Load(Configuration(values));
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, options.OfflineAuthorizedBuilds.Length);
+        Assert.Contains(options.OfflineAuthorizedBuilds,
+            identity => identity.Platform == BuildIdentityV1.DesktopWindowsPlatform);
+        Assert.Contains(options.OfflineAuthorizedBuilds,
+            identity => identity.Platform == BuildIdentityV1.AndroidPlatform &&
+                        identity.SignerCertificateSha256 == new string('d', 64));
+    }
+
+    [Fact]
+    public void Offline_activation_authority_rejects_android_identity_without_signer()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-ANDROID-NO-SIGNER";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
+        values["Sync:Offline:AuthorizedBuilds:1:Platform"] = BuildIdentityV1.AndroidPlatform;
+        values["Sync:Offline:AuthorizedBuilds:1:ArtifactSha256"] = new string('c', 64);
+
+        var options = SyncRuntimePolicyOptions.Load(Configuration(values));
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("AuthorizedBuilds", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Offline_activation_authority_rejects_duplicate_platform_entries()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-DUPLICATE-PLATFORM";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
+        values["Sync:Offline:AuthorizedBuilds:1:Platform"] = BuildIdentityV1.DesktopWindowsPlatform;
+        values["Sync:Offline:AuthorizedBuilds:1:ArtifactSha256"] = new string('c', 64);
+
+        var result = new SyncRuntimePolicyOptionsValidator().Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(values)));
+
+        Assert.True(result.Failed);
+    }
+
     [Fact]
     public void Closed_default_rejects_stale_activation_evidence()
     {
         var values = RequiredSettings();
         values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-20260827-01";
         values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
 
         var result = new SyncRuntimePolicyOptionsValidator().Validate(null,
             SyncRuntimePolicyOptions.Load(Configuration(values)));
@@ -300,6 +407,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         OfflineEnabled = source.OfflineEnabled,
         OfflineActivationDecisionId = source.OfflineActivationDecisionId,
         OfflineActivationImplementationSha = source.OfflineActivationImplementationSha,
+        OfflineAuthorizedBuilds = source.OfflineAuthorizedBuilds,
         ServerExecutionEnabled = source.ServerExecutionEnabled,
         AllowedActions = actions,
         AllowedProtocolVersions = source.AllowedProtocolVersions,
@@ -345,5 +453,11 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         foreach (var action in SyncActionCatalog.Definitions)
             values[$"Sync:Offline:AllowedActions:{index++}"] = action.ActionCodeValue;
         return values;
+    }
+
+    private static void AddAuthorizedBuild(IDictionary<string, string?> values)
+    {
+        values["Sync:Offline:AuthorizedBuilds:0:Platform"] = BuildIdentityV1.DesktopWindowsPlatform;
+        values["Sync:Offline:AuthorizedBuilds:0:ArtifactSha256"] = new string('b', 64);
     }
 }

@@ -1,12 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TransportERP.Application.Sync;
 
 namespace TransportERP.Offline.Transport;
 
 public sealed record SyncV1BatchRequest(
     string DeviceId,
     string ProtocolVersion,
-    IReadOnlyList<SyncV1OperationRequest> Operations);
+    IReadOnlyList<SyncV1OperationRequest> Operations,
+    BuildIdentityV1 BuildIdentity);
 
 public sealed record SyncV1OperationRequest(
     string ActionCode,
@@ -79,7 +81,8 @@ public sealed record SyncV1ConflictReapplyRequest(
 public sealed record SyncV1ConflictResolutionRequest(
     string Decision,
     string Reason,
-    SyncV1ConflictReapplyRequest? Reapply = null);
+    SyncV1ConflictReapplyRequest? Reapply,
+    BuildIdentityV1 BuildIdentity);
 
 public sealed record SyncV1ConflictResolutionResponse(
     Guid ConflictCaseId,

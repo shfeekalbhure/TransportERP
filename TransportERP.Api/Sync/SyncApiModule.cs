@@ -187,6 +187,11 @@ public static class SyncApiModule
         if (!deployment.IsValid || deployment.CanonicalHtu is null)
             return Results.Json(new { ErrorCode = "SYNC_DEPLOYMENT_INVALID", CorrelationId = correlationId },
                 statusCode: StatusCodes.Status503ServiceUnavailable);
+        var measuredBuild = SyncBuildIdentityAuthority.ReadMeasured(http.Request);
+        var authorizedBuild = SyncBuildIdentityAuthority.Authorized(measuredBuild, runtimePolicy);
+        if (authorizedBuild is not { IsValid: true })
+            return Results.Json(new { ErrorCode = "BUILD_IDENTITY_MISMATCH", CorrelationId = correlationId },
+                statusCode: StatusCodes.Status403Forbidden);
 
         var now = DateTimeOffset.UtcNow;
         var device = await (from candidate in db.RegisteredDevices.AsNoTracking()
@@ -253,6 +258,7 @@ public static class SyncApiModule
             policy.ServerPayloadDays,
             policy.CacheMaxAgeHours,
             runtimePolicy.Value.OfflineActivationImplementationSha,
+            authorizedBuild,
             policy.SourceVersion,
             policy.SourceFingerprint,
             closedReason));
@@ -264,6 +270,7 @@ public static class SyncApiModule
         SyncOperationService sync,
         IEffectivePermissionResolver permissions,
         ISyncBatchRejectionAuditSink rejectionAudit,
+        IOptions<SyncRuntimePolicyOptions> runtimePolicy,
         CancellationToken cancellationToken)
     {
         var authentication = await authenticator.AuthenticateAsync(
@@ -296,6 +303,14 @@ public static class SyncApiModule
             return Results.BadRequest(new { ErrorCode = envelopeError, CorrelationId = attemptCorrelationId });
 
         var validRequest = request!;
+        if (!SyncBuildIdentityAuthority.MatchesAuthorized(validRequest.BuildIdentity, runtimePolicy))
+        {
+            await rejectionAudit.WriteAsync(
+                acceptedProof, null, "BUILD_IDENTITY_MISMATCH", cancellationToken);
+            return Results.Json(
+                new { ErrorCode = "BUILD_IDENTITY_MISMATCH", CorrelationId = attemptCorrelationId },
+                statusCode: StatusCodes.Status403Forbidden);
+        }
         var operations = validRequest.Operations!;
         var results = new List<SyncBatchOperationResult>(operations.Count);
         foreach (var item in operations)
@@ -469,6 +484,7 @@ public sealed record SyncActivationResponse(
     int ServerPayloadDays,
     int CacheMaxAgeHours,
     string? ActivationImplementationSha,
+    BuildIdentityV1 AuthorizedBuildIdentity,
     string? PolicySourceVersion,
     string? PolicySourceFingerprint,
     string? ClosedReason);
@@ -514,7 +530,8 @@ public static class SyncBatchJsonContract
 public sealed record SyncBatchRequest(
     string DeviceId,
     string ProtocolVersion,
-    IReadOnlyList<SyncBatchOperationRequest?> Operations);
+    IReadOnlyList<SyncBatchOperationRequest?> Operations,
+    BuildIdentityV1? BuildIdentity = null);
 
 public sealed record SyncBatchOperationRequest(
     string ActionCode,

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using TransportERP.Application.Sync;
 
 namespace TransportERP.Offline.Transport;
 
@@ -18,7 +19,8 @@ public sealed record OfflineSyncTransportOptions(
     int MaximumBatchOperations = 100,
     TimeSpan? AcceptedPollInterval = null,
     int MaximumRequestBodyBytes = 2_097_152,
-    int MaximumPayloadBytes = 16_384)
+    int MaximumPayloadBytes = 16_384,
+    BuildIdentityV1? BuildIdentity = null)
 {
     public TimeSpan EffectiveLeaseDuration => LeaseDuration ?? TimeSpan.FromMinutes(2);
     public TimeSpan EffectiveAcceptedPollInterval => AcceptedPollInterval ?? TimeSpan.FromSeconds(5);
@@ -79,7 +81,8 @@ public sealed class OfflineSyncTransportClient
             options.MaximumBatchOperations is < 1 or > 100 ||
             options.MaximumRequestBodyBytes is < 1 or > 2_097_152 ||
             options.MaximumPayloadBytes is < 1 or > 16_384 ||
-            options.MaximumPayloadBytes > options.MaximumRequestBodyBytes)
+            options.MaximumPayloadBytes > options.MaximumRequestBodyBytes ||
+            options.BuildIdentity is not { IsValid: true })
             throw new ArgumentException("The sync transport options are invalid.", nameof(options));
     }
 
@@ -220,7 +223,8 @@ public sealed class OfflineSyncTransportClient
             FormatClientTime(operation.ClientOccurredAt),
             operation.OperationCorrelationId,
             operation.BaseVersion)).ToArray();
-        return SyncV1Json.Serialize(new SyncV1BatchRequest(_options.DeviceId, ProtocolVersion, requests));
+        return SyncV1Json.Serialize(new SyncV1BatchRequest(
+            _options.DeviceId, ProtocolVersion, requests, _options.BuildIdentity!));
     }
 
     private async Task<(string? Nonce, string? ErrorCode, bool Retryable)> AcquireNonceAsync(

@@ -11,6 +11,9 @@ namespace TransportERP.Tests;
 
 public sealed class Stage4EffectiveSyncPolicyRuntimeTests
 {
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('c', 64));
+
     [Fact]
     public async Task Missing_device_policy_in_immutable_source_fails_closed()
     {
@@ -362,10 +365,54 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
         Assert.Equal("SCOPE_DENIED", Assert.Single(deniedResponse.Results).ErrorCode);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Batch_rejects_missing_or_different_build_identity_before_enqueue(bool missing)
+    {
+        var scope = Scope();
+        var policy = OpenPolicy(
+            allowedActions: new HashSet<string>(["CreateWaybillDraft"], StringComparer.Ordinal),
+            maxBatch: 1,
+            maximumPayloadBytes: 16_384);
+        var request = Request(scope.DeviceId, [Operation("CreateWaybillDraft")]) with
+        {
+            BuildIdentity = missing
+                ? null
+                : new BuildIdentityV1(BuildIdentityV1.DesktopWindowsPlatform, new string('f', 64))
+        };
+
+        var result = await HandleAsync(scope, policy, request);
+
+        Assert.Equal("BUILD_IDENTITY_MISMATCH", await ErrorCodeAsync(result));
+        Assert.Equal(StatusCodes.Status403Forbidden,
+            Assert.IsAssignableFrom<IStatusCodeHttpResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task Batch_accepts_an_exact_Android_identity_from_the_multi_platform_authority()
+    {
+        var scope = Scope();
+        var policy = OpenPolicy(
+            allowedActions: new HashSet<string>(["CreateWaybillDraft"], StringComparer.Ordinal),
+            maxBatch: 1,
+            maximumPayloadBytes: 16_384);
+        var android = new BuildIdentityV1(
+            BuildIdentityV1.AndroidPlatform, new string('8', 64), new string('9', 64));
+        var request = Request(scope.DeviceId, [Operation("CreateWaybillDraft")]) with
+            { BuildIdentity = android };
+
+        var result = await HandleAsync(scope, policy, request,
+            RuntimePolicy(TestBuildIdentity, android));
+
+        Assert.IsType<SyncBatchResponse>(Assert.IsAssignableFrom<IValueHttpResult>(result).Value);
+    }
+
     private static async Task<IResult> HandleAsync(
         TestScope scope,
         EffectiveSyncPolicy policy,
-        SyncBatchRequest request)
+        SyncBatchRequest request,
+        IOptions<SyncRuntimePolicyOptions>? runtimePolicy = null)
     {
         var body = JsonSerializer.SerializeToUtf8Bytes(request, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var accepted = new AcceptedSyncHttpRequest(
@@ -380,7 +427,7 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
             policy);
         return await SyncApiModule.HandleBatchAsync(
             new DefaultHttpContext(), new AcceptedAuthenticator(accepted), null!, null!,
-            NoOpRejectionAuditSink.Instance, default);
+            NoOpRejectionAuditSink.Instance, runtimePolicy ?? RuntimePolicy(TestBuildIdentity), default);
     }
 
     private static Task<string?> ErrorCodeAsync(IResult result)
@@ -392,7 +439,13 @@ public sealed class Stage4EffectiveSyncPolicyRuntimeTests
     }
 
     private static SyncBatchRequest Request(string deviceId, IReadOnlyList<SyncBatchOperationRequest?> operations)
-        => new(deviceId, "sync-v1", operations);
+        => new(deviceId, "sync-v1", operations, TestBuildIdentity);
+
+    private static IOptions<SyncRuntimePolicyOptions> RuntimePolicy(params BuildIdentityV1[] identities) =>
+        Options.Create(new SyncRuntimePolicyOptions
+    {
+        OfflineAuthorizedBuilds = identities
+    });
 
     private static SyncBatchOperationRequest Operation(string action, string payload = "{}")
     {

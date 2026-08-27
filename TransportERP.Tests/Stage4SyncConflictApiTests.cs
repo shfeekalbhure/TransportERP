@@ -12,12 +12,15 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TransportERP.Api.Security;
 using TransportERP.Api.Sync;
+using TransportERP.Application.Sync;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
 
 public sealed class Stage4SyncConflictApiTests
 {
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('6', 64));
     [Fact]
     public async Task Separate_conflict_endpoint_requires_resolve_permission_and_forwards_exact_registered_device_scope()
     {
@@ -26,7 +29,8 @@ public sealed class Stage4SyncConflictApiTests
         using var client = app.GetTestClient();
         var conflictId = Guid.NewGuid();
         var request = new ResolveSyncConflictRequest(
-            SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reviewed conflict");
+            SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reviewed conflict",
+            BuildIdentity: TestBuildIdentity);
 
         var forbidden = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{conflictId}:resolve", request);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -53,7 +57,8 @@ public sealed class Stage4SyncConflictApiTests
         client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
 
         var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
-            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason"));
+            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason",
+                BuildIdentity: TestBuildIdentity));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
@@ -73,7 +78,8 @@ public sealed class Stage4SyncConflictApiTests
             new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.ReapplyAsNew, "reason",
                 new SyncReapplyAsNewRequest("new-operation", Guid.NewGuid(), "UpdateWaybillDraft", "UPDATE",
                     "Waybill", Guid.NewGuid(), 2, DateTimeOffset.UtcNow, "{}",
-                    Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("{}"u8)).ToLowerInvariant())));
+                    Convert.ToHexString(System.Security.Cryptography.SHA256.HashData("{}"u8)).ToLowerInvariant()),
+                TestBuildIdentity));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(capture.Proof);
@@ -92,7 +98,8 @@ public sealed class Stage4SyncConflictApiTests
         client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
 
         var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
-            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason"));
+            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason",
+                BuildIdentity: TestBuildIdentity));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
@@ -113,7 +120,8 @@ public sealed class Stage4SyncConflictApiTests
         client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
 
         var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
-            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason"));
+            new ResolveSyncConflictRequest(SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reason",
+                BuildIdentity: TestBuildIdentity));
 
         Assert.Equal(expectedStatus, response.StatusCode);
         Assert.Equal(0, capture.CallCount);
@@ -139,10 +147,54 @@ public sealed class Stage4SyncConflictApiTests
         Assert.Equal(0, capture.CallCount);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Conflict_resolution_rejects_missing_or_different_build_identity_before_mutation(bool missing)
+    {
+        var capture = new CapturingConflictService();
+        await using var app = await StartAppAsync(capture, registered: true);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
+        var identity = missing
+            ? null
+            : new BuildIdentityV1(BuildIdentityV1.DesktopWindowsPlatform, new string('7', 64));
+
+        var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
+            new ResolveSyncConflictRequest(
+                SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reviewed", BuildIdentity: identity));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("BUILD_IDENTITY_MISMATCH", body!.ErrorCode);
+        Assert.Equal(0, capture.CallCount);
+    }
+
+    [Fact]
+    public async Task Conflict_resolution_accepts_an_exact_Android_identity_from_the_multi_platform_authority()
+    {
+        var android = new BuildIdentityV1(
+            BuildIdentityV1.AndroidPlatform, new string('8', 64), new string('9', 64));
+        var capture = new CapturingConflictService();
+        await using var app = await StartAppAsync(
+            capture, registered: true, authorizedBuilds: [TestBuildIdentity, android]);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Permission", SyncConflictPermissionCodes.Resolve);
+
+        var response = await client.PostAsJsonAsync($"/api/v1/sync/conflicts/{Guid.NewGuid()}:resolve",
+            new ResolveSyncConflictRequest(
+                SyncConflictResolutionDecisions.KeepServerAndRejectLocal, "reviewed",
+                BuildIdentity: android));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, capture.CallCount);
+    }
+
     private static async Task<WebApplication> StartAppAsync(
         CapturingConflictService service,
         bool registered,
-        string? authenticationError = null)
+        string? authenticationError = null,
+        IReadOnlyList<BuildIdentityV1>? authorizedBuilds = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -154,6 +206,10 @@ public sealed class Stage4SyncConflictApiTests
         builder.Services.AddSingleton<ISyncPopHttpRequestAuthenticator>(
             new FakeAuthenticator(registered, service, authenticationError));
         builder.Services.AddSingleton<ISyncConflictResolutionService>(service);
+        builder.Services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(new SyncRuntimePolicyOptions
+        {
+            OfflineAuthorizedBuilds = (authorizedBuilds ?? new[] { TestBuildIdentity }).ToArray()
+        }));
 
         var app = builder.Build();
         app.UseAuthentication();

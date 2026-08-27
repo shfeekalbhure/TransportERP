@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using TransportERP.Api.Security;
 using TransportERP.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ public static class SyncConflictApiModule
             HttpContext http,
             ISyncPopHttpRequestAuthenticator authenticator,
             ISyncConflictResolutionService service,
+            IOptions<SyncRuntimePolicyOptions> runtimePolicy,
             CancellationToken cancellationToken) =>
         {
             var canonicalPath = $"/api/v1/sync/conflicts/{conflictCaseId:D}:resolve";
@@ -36,6 +38,9 @@ public static class SyncConflictApiModule
             }
             if (request is null)
                 return Error(StatusCodes.Status400BadRequest, "REQUEST_SCHEMA_INVALID",
+                    accepted.AttemptCorrelationId);
+            if (!SyncBuildIdentityAuthority.MatchesAuthorized(request.BuildIdentity, runtimePolicy))
+                return Error(StatusCodes.Status403Forbidden, "BUILD_IDENTITY_MISMATCH",
                     accepted.AttemptCorrelationId);
 
             try

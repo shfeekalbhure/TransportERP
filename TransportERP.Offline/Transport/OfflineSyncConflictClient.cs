@@ -122,7 +122,8 @@ public sealed class OfflineSyncConflictClient
         return SyncV1Json.Serialize(new SyncV1ConflictResolutionRequest(
             decision == OfflineConflictDecision.KeepServer ? KeepServerDecision : ReapplyDecision,
             reason,
-            reapply));
+            reapply,
+            _options.BuildIdentity!));
     }
 
     private async Task<string> AcquireNonceAsync(Uri endpoint, byte[] body, string bearer,
