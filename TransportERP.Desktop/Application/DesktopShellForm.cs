@@ -28,6 +28,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
 
     internal DesktopShellForm()
     {
+        Name = DesktopAutomationIds.Shell;
         Text = "TransportERP";
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
@@ -36,20 +37,22 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
 
         _offlineStatus = new Label
         {
+            Name = DesktopAutomationIds.OfflineStatus,
             AutoSize = true,
             Text = "العمل دون اتصال مغلق — يلزم تسجيل الدخول والتفويض",
             Dock = DockStyle.Top,
             Padding = new Padding(16)
         };
-        _userName = Input();
-        _password = Input(password: true);
-        _companyId = Input();
-        _branchId = Input();
-        _deviceId = Input();
-        _deviceCredential = Input(password: true);
-        _certificateThumbprint = Input();
+        _userName = Input(DesktopAutomationIds.UserName);
+        _password = Input(DesktopAutomationIds.Password, password: true);
+        _companyId = Input(DesktopAutomationIds.CompanyId);
+        _branchId = Input(DesktopAutomationIds.BranchId);
+        _deviceId = Input(DesktopAutomationIds.DeviceId);
+        _deviceCredential = Input(DesktopAutomationIds.DeviceCredential, password: true);
+        _certificateThumbprint = Input(DesktopAutomationIds.CertificateThumbprint);
         _signIn = new Button
         {
+            Name = DesktopAutomationIds.SignIn,
             Text = "تسجيل الدخول والتحقق من العمل دون اتصال",
             AutoSize = true,
             Margin = new Padding(8)
@@ -57,6 +60,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _signIn.Click += (_, _) => RequestSignIn();
         _logout = new Button
         {
+            Name = DesktopAutomationIds.Logout,
             Text = "تسجيل الخروج",
             Enabled = false,
             AutoSize = true,
@@ -65,17 +69,19 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _logout.Click += (_, _) => LogoutRequested?.Invoke(this, EventArgs.Empty);
         _operations = new Button
         {
+            Name = DesktopAutomationIds.Operations,
             Text = "عمليات المزامنة",
             Enabled = false,
             AutoSize = true,
             Margin = new Padding(16)
         };
         _operations.Click += (_, _) => ShowOperations();
-        _partyName = Input();
-        _partyMobile = Input();
-        _partyAddress = Input();
+        _partyName = Input(DesktopAutomationIds.PartyName);
+        _partyMobile = Input(DesktopAutomationIds.PartyMobile);
+        _partyAddress = Input(DesktopAutomationIds.PartyAddress);
         _queueParty = new Button
         {
+            Name = DesktopAutomationIds.QueueParty,
             Text = "حفظ طرف تشغيلي في قائمة المزامنة المشفرة",
             Enabled = false,
             AutoSize = true,
@@ -255,8 +261,9 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _deviceCredential.Clear();
     }
 
-    private static TextBox Input(string? value = null, bool password = false) => new()
+    private static TextBox Input(string automationId, string? value = null, bool password = false) => new()
     {
+        Name = automationId,
         Width = 520,
         Text = value ?? string.Empty,
         UseSystemPasswordChar = password
@@ -275,4 +282,24 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         panel.Controls.Add(input);
         return panel;
     }
+}
+
+internal static class DesktopAutomationIds
+{
+    internal const string Shell = "TransportERP.Desktop.Shell";
+    internal const string OfflineStatus = "TransportERP.Desktop.OfflineStatus";
+    internal const string UserName = "TransportERP.Desktop.UserName";
+    internal const string Password = "TransportERP.Desktop.Password";
+    internal const string CompanyId = "TransportERP.Desktop.CompanyId";
+    internal const string BranchId = "TransportERP.Desktop.BranchId";
+    internal const string DeviceId = "TransportERP.Desktop.DeviceId";
+    internal const string DeviceCredential = "TransportERP.Desktop.DeviceCredential";
+    internal const string CertificateThumbprint = "TransportERP.Desktop.CertificateThumbprint";
+    internal const string SignIn = "TransportERP.Desktop.SignIn";
+    internal const string Logout = "TransportERP.Desktop.Logout";
+    internal const string Operations = "TransportERP.Desktop.Operations";
+    internal const string PartyName = "TransportERP.Desktop.PartyName";
+    internal const string PartyMobile = "TransportERP.Desktop.PartyMobile";
+    internal const string PartyAddress = "TransportERP.Desktop.PartyAddress";
+    internal const string QueueParty = "TransportERP.Desktop.QueueParty";
 }

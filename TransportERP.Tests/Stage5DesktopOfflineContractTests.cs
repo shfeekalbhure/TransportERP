@@ -23,6 +23,7 @@ public sealed class Stage5DesktopOfflineContractTests
         var sessions = Read("TransportERP.Desktop", "Application", "DesktopAuthenticatedSessionBridge.cs");
         var onlineAuth = Read("TransportERP.Desktop", "Application", "DesktopOnlineAuthentication.cs");
         var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
+        var operations = Read("TransportERP.Desktop", "Offline", "SyncOperationsForm.cs");
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
         Assert.Contains("TransportERP.Offline\\TransportERP.Offline.csproj", project, StringComparison.Ordinal);
@@ -41,6 +42,11 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("RunSyncSupervisorAsync", context, StringComparison.Ordinal);
         Assert.Contains("Enabled = false", shell, StringComparison.Ordinal);
         Assert.Contains("AttachAuthenticatedRuntime", shell, StringComparison.Ordinal);
+        Assert.Contains("DesktopAutomationIds.OfflineStatus", shell, StringComparison.Ordinal);
+        Assert.Contains("DesktopAutomationIds.SignIn", shell, StringComparison.Ordinal);
+        Assert.Contains("DesktopAutomationIds.QueueParty", shell, StringComparison.Ordinal);
+        Assert.Contains("SyncOperationsAutomationIds.Summary", operations, StringComparison.Ordinal);
+        Assert.Contains("آخر حالة: {rows[0].StatusText}", operations, StringComparison.Ordinal);
         Assert.Contains("The bridge begins closed", sessions, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/sessions", onlineAuth, StringComparison.Ordinal);
         Assert.Contains("/api/v1/sync/activation", onlineAuth, StringComparison.Ordinal);
@@ -85,7 +91,11 @@ public sealed class Stage5DesktopOfflineContractTests
 
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", program, StringComparison.Ordinal);
         Assert.DoesNotContain("Environment.GetEnvironmentVariable", onlineAuth, StringComparison.Ordinal);
-        Assert.DoesNotContain("args[", program, StringComparison.Ordinal);
+        Assert.Contains("args.Length != 2", program, StringComparison.Ordinal);
+        Assert.Contains("Path.IsPathFullyQualified(args[1])", program, StringComparison.Ordinal);
+        Assert.Contains("FileMode.CreateNew", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Password", program, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Credential", program, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("BearerToken", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("DeviceCredential", bridge, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProofJson", bridge, StringComparison.OrdinalIgnoreCase);
@@ -209,6 +219,11 @@ public sealed class Stage5DesktopOfflineContractTests
             shell.IndexOf("_queueParty.Enabled = false", shell.IndexOf("ReportSupervisorStopped", StringComparison.Ordinal),
                 StringComparison.Ordinal));
         Assert.Contains("--runtime-platform-smoke", program, StringComparison.Ordinal);
+        Assert.Contains("--print-build-identity", program, StringComparison.Ordinal);
+        Assert.Contains("DesktopBuildIdentityProbe.Measure()", program, StringComparison.Ordinal);
+        Assert.Contains("BUILD_IDENTITY_OUTPUT_INVALID", program, StringComparison.Ordinal);
+        Assert.Contains("FileMode.CreateNew", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Console.Out", program, StringComparison.Ordinal);
         Assert.Contains("CngExportPolicies.None", platformProbe, StringComparison.Ordinal);
         Assert.Contains("WindowsDpapiLocalEncryptionKeyProvider", composition, StringComparison.Ordinal);
         Assert.Contains("QueueOperationalPartyAsync", platformProbe, StringComparison.Ordinal);

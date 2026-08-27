@@ -9,8 +9,13 @@ namespace TransportERP.Desktop.Offline;
 public sealed class SyncOperationsForm : Form
 {
     private readonly SyncOperationsController _controller;
-    private readonly DataGridView _operations = new();
-    private readonly Button _refresh = new() { Text = "تحديث", AutoSize = true };
+    private readonly DataGridView _operations = new() { Name = SyncOperationsAutomationIds.Grid };
+    private readonly Button _refresh = new()
+    {
+        Name = SyncOperationsAutomationIds.Refresh,
+        Text = "تحديث",
+        AutoSize = true
+    };
     private readonly Button _retry = new() { Text = "إعادة المحاولة", AutoSize = true };
     private readonly Button _keepServer = new() { Text = "الاحتفاظ بنسخة الخادم", AutoSize = true };
     private readonly Button _reapply = new() { Text = "إعادة التطبيق", AutoSize = true };
@@ -23,13 +28,18 @@ public sealed class SyncOperationsForm : Form
     private readonly Label _decision = new() { AutoSize = true };
     private readonly Label _resolver = new() { AutoSize = true };
     private readonly Label _conflictResult = new() { AutoSize = true };
-    private readonly Label _message = new() { AutoSize = true };
+    private readonly Label _message = new()
+    {
+        Name = SyncOperationsAutomationIds.Summary,
+        AutoSize = true
+    };
     private readonly CancellationTokenSource _lifetime = new();
     private bool _busy;
 
     public SyncOperationsForm(SyncOperationsController controller)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        Name = SyncOperationsAutomationIds.Form;
         Text = "عمليات المزامنة";
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
@@ -95,8 +105,11 @@ public sealed class SyncOperationsForm : Form
 
         await RunBusyAsync(async () =>
         {
-            _operations.DataSource = (await _controller.RefreshAsync(_lifetime.Token)).ToList();
-            _message.Text = _operations.Rows.Count == 0 ? "لا توجد عمليات مزامنة محلية." : $"عدد العمليات: {_operations.Rows.Count}";
+            var rows = (await _controller.RefreshAsync(_lifetime.Token)).ToList();
+            _operations.DataSource = rows;
+            _message.Text = rows.Count == 0
+                ? "لا توجد عمليات مزامنة محلية."
+                : $"عدد العمليات: {rows.Count}؛ آخر حالة: {rows[0].StatusText}؛ النتيجة: {rows[0].Result}";
         });
     }
 
@@ -233,4 +246,12 @@ public sealed class SyncOperationsForm : Form
         HeaderText = title,
         ReadOnly = true
     };
+}
+
+internal static class SyncOperationsAutomationIds
+{
+    internal const string Form = "TransportERP.Desktop.SyncOperations";
+    internal const string Grid = "TransportERP.Desktop.SyncOperations.Grid";
+    internal const string Refresh = "TransportERP.Desktop.SyncOperations.Refresh";
+    internal const string Summary = "TransportERP.Desktop.SyncOperations.Summary";
 }

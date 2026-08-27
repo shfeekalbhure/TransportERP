@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using TransportERP.Application.Sync;
+using TransportERP.Desktop.Application;
 using TransportERP.Offline;
 using TransportERP.Offline.Transport;
 
@@ -114,7 +115,8 @@ internal static class DesktopRuntimePlatformProbe
                 scope.CompanyId, scope.BranchId, scope.UserId, "desktop-probe-worker",
                 MaximumBatchOperations: policy.MaxBatchOperations,
                 MaximumRequestBodyBytes: policy.MaximumRequestBodyBytes,
-                MaximumPayloadBytes: policy.MaximumPayloadBytes),
+                MaximumPayloadBytes: policy.MaximumPayloadBytes,
+                BuildIdentity: DesktopBuildIdentityProbe.Measure()),
             policy,
             new OfflineRetryPolicy(
                 policy.ClientTransportMaxRetryCount,

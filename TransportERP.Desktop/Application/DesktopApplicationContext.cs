@@ -147,6 +147,7 @@ internal sealed class DesktopApplicationContext : System.Windows.Forms.Applicati
         activation.SessionId != Guid.Empty &&
         activation.SessionExpiresAt > DateTimeOffset.UtcNow &&
         activation.OfflineRuntimeAuthorized &&
+        activation.MeasuredBuildIdentity is { IsValid: true } &&
         activation.AuthenticatedScope.IsComplete &&
         activation.AuthorizedOfflineScope.IsComplete &&
         activation.AuthenticatedScope == activation.AuthorizedOfflineScope &&

@@ -26,6 +26,8 @@ internal sealed record DesktopAuthenticatedOfflineActivation(
     DesktopAuthenticatedSessionScope AuthorizedOfflineScope,
     bool OfflineRuntimeAuthorized,
     SyncClientEffectivePolicy EffectivePolicy,
+    BuildIdentityV1 MeasuredBuildIdentity,
+    IReadOnlySet<(string Action, string Operation, string Entity)> AllowedActions,
     Func<CancellationToken, Task<DesktopOfflineRuntime>> CreateRuntimeAsync);
 
 internal interface IDesktopAuthenticatedSessionSource : IDisposable

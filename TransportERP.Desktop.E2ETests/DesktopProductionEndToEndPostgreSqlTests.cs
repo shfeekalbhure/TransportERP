@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -21,8 +22,9 @@ namespace TransportERP.Desktop.E2ETests;
 /// <summary>
 /// Windows acceptance evidence for the complete Desktop production path. The test uses the real
 /// HTTPS sign-in and activation endpoints, CNG certificate store, CurrentUser DPAPI, SQLCipher
-/// outbox, DPoP transport, sync worker and PostgreSQL. Production configuration remains closed;
-/// only this isolated TestServer receives the explicit test activation decision.
+/// outbox, DPoP transport, sync worker and PostgreSQL. The release-process case starts the normal
+/// API entry point on Kestrel; the narrower policy case retains TestServer for deterministic
+/// policy-boundary assertions. Production configuration remains closed in both cases.
 /// </summary>
 public sealed class DesktopProductionEndToEndPostgreSqlTests
 {
@@ -33,6 +35,182 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
 
     [Fact]
     [Trait("Acceptance", "DESKTOP-E2E")]
+    public void Measured_deployment_tree_changes_when_any_binary_changes()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "transporterp-build-identity", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "TransportERP.Desktop.exe"), [1, 2, 3]);
+            File.WriteAllBytes(Path.Combine(root, "TransportERP.Application.dll"), [4, 5, 6]);
+            var original = DesktopBuildIdentityProbe.Measure(root);
+            File.WriteAllBytes(Path.Combine(root, "TransportERP.Application.dll"), [4, 5, 7]);
+            var substituted = DesktopBuildIdentityProbe.Measure(root);
+
+            Assert.True(original.IsValid);
+            Assert.True(substituted.IsValid);
+            Assert.False(original.FixedTimeEquals(substituted));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    [Trait("Acceptance", "DESKTOP-E2E")]
+    public async Task WinExe_writes_its_measured_build_identity_to_an_explicit_new_file()
+    {
+        Assert.True(OperatingSystem.IsWindows(), "DESKTOP-E2E must execute on Windows; SKIPPED is not PASS.");
+        var executable = Path.Combine(ReleaseDeploymentDirectory(), "TransportERP.Desktop.exe");
+        Assert.True(File.Exists(executable), $"Desktop release executable is missing: {executable}");
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "transporterp-desktop-identity", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outputDirectory);
+        var output = Path.Combine(outputDirectory, "build-identity.json");
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                ArgumentList = { "--print-build-identity", output }
+            });
+            Assert.NotNull(process);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await process!.WaitForExitAsync(timeout.Token);
+            Assert.Equal(0, process.ExitCode);
+            Assert.True(File.Exists(output));
+            var actual = JsonSerializer.Deserialize<BuildIdentityV1>(
+                await File.ReadAllTextAsync(output, timeout.Token),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var expected = DesktopBuildIdentityProbe.Measure(Path.GetDirectoryName(executable));
+            Assert.NotNull(actual);
+            Assert.True(actual!.FixedTimeEquals(expected));
+        }
+        finally
+        {
+            Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    [Trait("Acceptance", "DESKTOP-E2E")]
+    public async Task Release_WinExe_starts_closed_and_is_driven_through_stable_UI_Automation_ids()
+    {
+        Assert.True(OperatingSystem.IsWindows(), "DESKTOP-E2E must execute on Windows; SKIPPED is not PASS.");
+        var executable = Path.Combine(ReleaseDeploymentDirectory(), "TransportERP.Desktop.exe");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var desktop = await DesktopReleaseUiAutomation.LaunchAsync(executable, timeout.Token);
+        Assert.True(string.Equals(
+            Path.GetFullPath(executable), Path.GetFullPath(desktop.ExecutablePath),
+            StringComparison.OrdinalIgnoreCase));
+        desktop.AssertClosedDefault();
+    }
+
+    [Fact]
+    [Trait("Acceptance", "DESKTOP-E2E")]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
+    public async Task Same_release_WinExe_UI_Kestrel_SQLCipher_worker_and_PostgreSql_succeed()
+    {
+        Assert.True(OperatingSystem.IsWindows(), "DESKTOP-E2E must execute on Windows; SKIPPED is not PASS.");
+        var implementationSha = SyncClientDeploymentAuthority.ImplementationSha;
+        Assert.Matches("^[0-9a-f]{40}$", implementationSha ?? string.Empty);
+        var origin = SyncClientDeploymentAuthority.Origin;
+        var executable = Path.Combine(ReleaseDeploymentDirectory(), "TransportERP.Desktop.exe");
+        Assert.True(File.Exists(executable));
+        var measuredBuildIdentity = DesktopBuildIdentityProbe.Measure(Path.GetDirectoryName(executable));
+        Assert.True(measuredBuildIdentity.IsValid);
+        var connection = RequireConnection();
+        var credential = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var keyName = "TransportERP.Desktop.Release.E2E." + Guid.NewGuid().ToString("N");
+        string? certificateThumbprint = null;
+        string? localRoot = null;
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        try
+        {
+            certificateThumbprint = CreateCertificate(keyName);
+            var proof = await ReadProofAsync(certificateThumbprint);
+            await using (var migrationDb = CreateDbContext(connection))
+                await migrationDb.Database.MigrateAsync(timeout.Token);
+            var seeded = await SeedAsync(connection, credential, proof);
+            localRoot = LocalRoot(seeded);
+            DeleteDirectory(localRoot);
+
+            var settings = ReleaseHostConfiguration(
+                connection, origin, implementationSha!, measuredBuildIdentity, seeded);
+            await using var api = await DesktopReleaseKestrelApiHost.StartAsync(
+                origin, settings, timeout.Token);
+            await using (var desktop = await DesktopReleaseUiAutomation.LaunchAsync(
+                             executable, timeout.Token))
+            {
+                Assert.True(string.Equals(
+                    Path.GetFullPath(executable), Path.GetFullPath(desktop.ExecutablePath),
+                    StringComparison.OrdinalIgnoreCase));
+                desktop.AssertClosedDefault();
+                await desktop.SignInAsync(
+                    seeded.UserName, Password, seeded.CompanyId, seeded.BranchId,
+                    seeded.DeviceId, credential, certificateThumbprint, timeout.Token);
+                await desktop.QueueOperationalPartyAsync(
+                    "Desktop Release UI E2E", "700000001", "UI Automation Kestrel PostgreSQL",
+                    timeout.Token);
+                Assert.True(desktop.ReadStatus().StartsWith(
+                    "تمت إضافة العملية المشفرة", StringComparison.Ordinal));
+                await WaitForReleaseOperationAsync(connection, seeded, timeout.Token);
+                await desktop.CloseNormallyAsync(timeout.Token);
+            }
+            await using (var restartedDesktop = await DesktopReleaseUiAutomation.LaunchAsync(
+                             executable, timeout.Token))
+            {
+                Assert.True(string.Equals(
+                    Path.GetFullPath(executable), Path.GetFullPath(restartedDesktop.ExecutablePath),
+                    StringComparison.OrdinalIgnoreCase));
+                restartedDesktop.AssertClosedDefault();
+                await restartedDesktop.SignInAsync(
+                    seeded.UserName, Password, seeded.CompanyId, seeded.BranchId,
+                    seeded.DeviceId, credential, certificateThumbprint, timeout.Token);
+                await restartedDesktop.WaitForPersistedSucceededOperationAsync(timeout.Token);
+                await restartedDesktop.CloseNormallyAsync(timeout.Token);
+            }
+
+            var encryptedOutbox = Path.Combine(localRoot, "write-outbox.db");
+            Assert.True(File.Exists(encryptedOutbox));
+            var rawDatabase = await File.ReadAllBytesAsync(encryptedOutbox, timeout.Token);
+            Assert.Equal(-1, rawDatabase.AsSpan().IndexOf(
+                Encoding.UTF8.GetBytes("Desktop Release UI E2E")));
+
+            await using var verify = CreateDbContext(connection);
+            var operation = await verify.SyncOperations.AsNoTracking().SingleAsync(x =>
+                x.CompanyId == seeded.CompanyId &&
+                x.RegisteredDeviceId == seeded.RegisteredDeviceId,
+                timeout.Token);
+            Assert.Equal("SUCCEEDED", operation.Status);
+            Assert.NotNull(operation.OperationCorrelationId);
+            Assert.NotEqual(Guid.Empty, operation.OperationCorrelationId!.Value);
+            var businessKey = SyncBusinessIdempotencyKey.Create(
+                seeded.CompanyId, seeded.BranchId, seeded.RegisteredDeviceId,
+                operation.ClientOperationId);
+            Assert.Single(await verify.Set<OperationalPartyEntity>().AsNoTracking().Where(x =>
+                x.CompanyId == seeded.CompanyId && x.ClientOperationId == businessKey)
+                .ToListAsync(timeout.Token));
+            var audits = await verify.AuditEvents.AsNoTracking().Where(x =>
+                    x.CompanyId == seeded.CompanyId &&
+                    x.OperationCorrelationId == operation.OperationCorrelationId)
+                .Select(x => x.Action).ToListAsync(timeout.Token);
+            Assert.Contains("SyncOperationQueued", audits);
+            Assert.Contains("SyncOperationExecutionSucceeded", audits);
+        }
+        finally
+        {
+            if (certificateThumbprint is not null) RemoveCertificate(certificateThumbprint);
+            DeleteCngKey(keyName);
+            if (localRoot is not null) DeleteDirectory(localRoot);
+        }
+    }
+
+    [Fact]
+    [Trait("Acceptance", "DESKTOP-E2E")]
     [Trait("Category", "PostgreSQL")]
     [Trait("Category", "HTTP")]
     public async Task Authenticated_producer_CNG_DPAPI_SQLCipher_HTTP_worker_PostgreSql_and_restart_succeed()
@@ -40,6 +218,8 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         Assert.True(OperatingSystem.IsWindows(), "DESKTOP-E2E must execute on Windows; SKIPPED is not PASS.");
         var implementationSha = SyncClientDeploymentAuthority.ImplementationSha;
         Assert.Matches("^[0-9a-f]{40}$", implementationSha ?? string.Empty);
+        var measuredBuildIdentity = DesktopBuildIdentityProbe.Measure();
+        Assert.True(measuredBuildIdentity.IsValid);
         var connection = RequireConnection();
         var credential = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var keyName = "TransportERP.Desktop.E2E." + Guid.NewGuid().ToString("N");
@@ -56,7 +236,8 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             localRoot = LocalRoot(seeded);
             DeleteDirectory(localRoot);
 
-            using var factory = CreateFactory(connection, implementationSha!, seeded);
+            using var factory = CreateFactory(
+                connection, implementationSha!, measuredBuildIdentity, seeded);
             var request = new DesktopOnlineSignInRequest(
                 seeded.UserName, Password, seeded.CompanyId, seeded.BranchId,
                 seeded.DeviceId, credential, certificateThumbprint);
@@ -72,6 +253,11 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                     $"Desktop online authentication failed closed with {authentication.Code}.");
                 Assert.NotNull(authentication.Activation);
                 effectivePolicy = authentication.Activation!.EffectivePolicy;
+                Assert.True(authentication.Activation.MeasuredBuildIdentity.FixedTimeEquals(measuredBuildIdentity));
+                var allowedAction = Assert.Single(authentication.Activation.AllowedActions);
+                Assert.Equal("CreateOperationalParty", allowedAction.Action);
+                Assert.Equal("CREATE", allowedAction.Operation);
+                Assert.Equal("OperationalParty", allowedAction.Entity);
                 using var runtime = await authentication.Activation!.CreateRuntimeAsync(CancellationToken.None);
                 Assert.Equal(DesktopOfflineRuntimeMode.Ready, runtime.Status.Mode);
                 Assert.True(runtime.CanQueueOperationalParties);
@@ -208,6 +394,7 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
     private static WebApplicationFactory<ApiProgram> CreateFactory(
         string connection,
         string implementationSha,
+        BuildIdentityV1 measuredBuildIdentity,
         SeededScope seeded) =>
         new WebApplicationFactory<ApiProgram>().WithWebHostBuilder(builder =>
         {
@@ -223,6 +410,10 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             builder.UseSetting("Sync:Offline:Enabled", "true");
             builder.UseSetting("Sync:Offline:ActivationDecisionId", "DEC-G5-DESKTOP-E2E");
             builder.UseSetting("Sync:Offline:ActivationImplementationSha", implementationSha);
+            builder.UseSetting("Sync:Offline:AuthorizedBuilds:0:Platform", measuredBuildIdentity.Platform);
+            builder.UseSetting("Sync:Offline:AuthorizedBuilds:0:ArtifactSha256", measuredBuildIdentity.ArtifactSha256);
+            if (measuredBuildIdentity.SignerCertificateSha256 is { } signer)
+                builder.UseSetting("Sync:Offline:AuthorizedBuilds:0:SignerCertificateSha256", signer);
             builder.UseSetting("Sync:ServerExecution:Enabled", "true");
             builder.UseSetting("Sync:EffectivePolicy:SourceVersion", "desktop-e2e-v1");
             var companyPolicy = $"Sync:EffectivePolicy:Companies:{seeded.CompanyId:D}";
@@ -260,6 +451,107 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             builder.UseSetting($"{devicePolicy}:ServerPayloadDays", "30");
             builder.UseSetting($"{devicePolicy}:CacheMaxAgeHours", "1");
         });
+
+    private static IReadOnlyDictionary<string, string> ReleaseHostConfiguration(
+        string connection,
+        Uri origin,
+        string implementationSha,
+        BuildIdentityV1 measuredBuildIdentity,
+        SeededScope seeded)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ConnectionStrings__TransportErp"] = connection,
+            ["AllowedHosts"] = origin.IdnHost,
+            ["Auth__Mode"] = "LocalSessions",
+            ["Auth__Issuer"] = Issuer,
+            ["Auth__Audience"] = Audience,
+            ["Auth__SigningKey"] = SigningKey,
+            ["Auth__SigningKeyId"] = "desktop-release-e2e-current",
+            ["Auth__AccessTokenMinutes"] = "15",
+            ["Auth__RefreshTokenDays"] = "30",
+            ["Auth__MaxFailures"] = "5",
+            ["Auth__LockoutMinutes"] = "15",
+            ["Auth__LoginRateLimitPermitCount"] = "10",
+            ["Auth__RefreshRateLimitPermitCount"] = "20",
+            ["Auth__RateLimitWindowSeconds"] = "60",
+            ["Auth__RateLimiterMode"] = "SingleNode",
+            ["Auth__ApplicationInstanceCount"] = "1",
+            ["Sync__Offline__Enabled"] = "true",
+            ["Sync__Offline__ActivationDecisionId"] = "DEC-G5-DESKTOP-RELEASE-E2E",
+            ["Sync__Offline__ActivationImplementationSha"] = implementationSha,
+            ["Sync__Offline__AuthorizedBuilds__0__Platform"] = measuredBuildIdentity.Platform,
+            ["Sync__Offline__AuthorizedBuilds__0__ArtifactSha256"] = measuredBuildIdentity.ArtifactSha256,
+            ["Sync__Offline__AllowedActions__0"] = "CreateOperationalParty",
+            ["Sync__ServerExecution__Enabled"] = "true",
+            ["Sync__Protocol__AllowedVersions__0"] = "sync-v1",
+            ["Sync__Retry__ClientTransport__MaxCount"] = "5",
+            ["Sync__Retry__ClientTransport__BaseSeconds"] = "5",
+            ["Sync__Retry__ClientTransport__MaxDelayMinutes"] = "30",
+            ["Sync__Retry__ServerExecution__MaxCount"] = "5",
+            ["Sync__Retry__ServerExecution__BaseSeconds"] = "5",
+            ["Sync__Retry__ServerExecution__MaxDelayMinutes"] = "30",
+            ["Sync__Batch__MaxOperations"] = "100",
+            ["Sync__Conflict__AutoMerge"] = "false",
+            ["Sync__Retention__LocalSuccessHours"] = "24",
+            ["Sync__Retention__LocalRejectedDays"] = "7",
+            ["Sync__Retention__ServerPayloadDays"] = "90",
+            ["Sync__Cache__MaxAgeHours"] = "24",
+            ["Sync__Proof__PublicOrigin"] = origin.ToString(),
+            ["Sync__Proof__MaximumPastSeconds"] = "120",
+            ["Sync__Proof__MaximumFutureSeconds"] = "30",
+            ["Sync__Proof__NonceLifetimeSeconds"] = "300",
+            ["Sync__Proof__ReplayRetentionSeconds"] = "600",
+            ["Sync__Proof__MaximumRequestBodyBytes"] = "2097152",
+            ["Sync__Proof__MaximumPayloadBytes"] = "16384",
+            ["Sync__Proof__ForwardedHeadersEnabled"] = "false",
+            ["Sync__EffectivePolicy__SourceVersion"] = "desktop-release-e2e-v1"
+        };
+        if (measuredBuildIdentity.SignerCertificateSha256 is { } signer)
+            values["Sync__Offline__AuthorizedBuilds__0__SignerCertificateSha256"] = signer;
+
+        var device = $"Sync__EffectivePolicy__Devices__{seeded.RegisteredDeviceId:D}__";
+        values[device + "CompanyId"] = seeded.CompanyId.ToString("D");
+        values[device + "BranchId"] = seeded.BranchId.ToString("D");
+        values[device + "DeviceId"] = seeded.DeviceId;
+        values[device + "AllowedActions__0"] = "CreateOperationalParty";
+        return values;
+    }
+
+    private static async Task WaitForReleaseOperationAsync(
+        string connection,
+        SeededScope seeded,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await using var db = CreateDbContext(connection);
+            var statuses = await db.SyncOperations.AsNoTracking().Where(x =>
+                    x.CompanyId == seeded.CompanyId &&
+                    x.RegisteredDeviceId == seeded.RegisteredDeviceId)
+                .Select(x => x.Status).ToListAsync(cancellationToken);
+            if (statuses.Count == 1 && statuses[0] == "SUCCEEDED") return;
+            Assert.DoesNotContain("FAILED", statuses);
+            Assert.DoesNotContain("REJECTED", statuses);
+            await Task.Delay(200, cancellationToken);
+        }
+    }
+
+    private static string ReleaseDeploymentDirectory()
+    {
+        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (directory is not null)
+        {
+            var project = Path.Combine(directory.FullName,
+                "TransportERP.Desktop", "TransportERP.Desktop.csproj");
+            if (File.Exists(project))
+                return Path.Combine(directory.FullName,
+                    "TransportERP.Desktop", "bin", "Release", "net10.0-windows");
+            directory = directory.Parent;
+        }
+        throw new InvalidOperationException("DESKTOP_E2E_REPOSITORY_ROOT_UNAVAILABLE");
+    }
 
     private static async Task<SeededScope> SeedAsync(
         string connection,

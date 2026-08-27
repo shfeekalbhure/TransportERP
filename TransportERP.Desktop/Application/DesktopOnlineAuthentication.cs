@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -91,6 +92,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
 
         try
         {
+            var measuredBuildIdentity = DesktopBuildIdentityProbe.Measure();
             var session = await CreateSessionAsync(origin, request, cancellationToken);
             if (session is null)
                 return DesktopOnlineAuthenticationResult.Denied("AUTHENTICATED_SCOPE_INVALID");
@@ -104,9 +106,12 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
             var bearer = new VolatileBearerTokenProvider(session.AccessToken);
             try
             {
-                var authorization = await GetSyncActivationAsync(origin, bearer, cancellationToken);
+                var authorization = await GetSyncActivationAsync(
+                    origin, bearer, measuredBuildIdentity, cancellationToken);
                 if (!TryValidateActivation(origin, session, authorization, out var batchEndpoint,
-                        out var allowedActions, out var proofBinding, out var effectivePolicy))
+                        out var allowedActions, out var proofBinding, out var effectivePolicy) ||
+                    authorization!.AuthorizedBuildIdentity is not { IsValid: true } authorizedBuild ||
+                    !authorizedBuild.FixedTimeEquals(measuredBuildIdentity))
                     return await RejectProvisionalSessionAsync(
                         origin, session, "OFFLINE_AUTHORIZATION_DENIED", cancellationToken, bearer);
 
@@ -118,7 +123,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 var network = new AuthenticatedDesktopSyncNetworkProvider(_syncHttpClient);
                 var options = CreateCompositionOptions(
                     session, authorization, batchEndpoint!, request.DeviceSigningCertificateThumbprint,
-                    proofBinding!, effectivePolicy!);
+                    proofBinding!, effectivePolicy!, measuredBuildIdentity);
                 var dependencies = new DesktopOfflineDependencies(
                     bearer,
                     network,
@@ -133,6 +138,8 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                     scope,
                     OfflineRuntimeAuthorized: true,
                     EffectivePolicy: effectivePolicy!,
+                    MeasuredBuildIdentity: measuredBuildIdentity,
+                    AllowedActions: allowedActions!.ToFrozenSet(),
                     CreateRuntimeAsync: cancellation => DesktopOfflineComposition.CreateAsync(
                         options, dependencies, cancellationToken: cancellation));
 
@@ -287,6 +294,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
     private async Task<DesktopSyncActivationResponse?> GetSyncActivationAsync(
         Uri origin,
         VolatileBearerTokenProvider bearer,
+        BuildIdentityV1 measuredBuildIdentity,
         CancellationToken cancellationToken)
     {
         using var message = new HttpRequestMessage(
@@ -294,6 +302,7 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         message.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer", await bearer.GetBearerTokenAsync(cancellationToken));
         message.Headers.TryAddWithoutValidation("X-Correlation-Id", Guid.NewGuid().ToString("D"));
+        AddBuildIdentityHeaders(message, measuredBuildIdentity);
         using var response = await AuthenticationHttpClient.SendAsync(
             message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.StatusCode != HttpStatusCode.OK)
@@ -371,7 +380,8 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
         Uri batchEndpoint,
         string certificateThumbprint,
         DesktopDeviceProofBinding proofBinding,
-        SyncClientEffectivePolicy effectivePolicy)
+        SyncClientEffectivePolicy effectivePolicy,
+        BuildIdentityV1 measuredBuildIdentity)
     {
         var root = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -398,13 +408,23 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                 $"desktop-{Guid.NewGuid():N}",
                 MaximumBatchOperations: effectivePolicy.MaxBatchOperations,
                 MaximumRequestBodyBytes: effectivePolicy.MaximumRequestBodyBytes,
-                MaximumPayloadBytes: effectivePolicy.MaximumPayloadBytes),
+                MaximumPayloadBytes: effectivePolicy.MaximumPayloadBytes,
+                BuildIdentity: measuredBuildIdentity),
             effectivePolicy,
             new OfflineRetryPolicy(
                 effectivePolicy.ClientTransportMaxRetryCount,
                 effectivePolicy.ClientRetryBaseDelay,
                 effectivePolicy.ClientRetryMaxDelay),
             OfflineRuntimeAuthorized: true);
+    }
+
+    private static void AddBuildIdentityHeaders(HttpRequestMessage request, BuildIdentityV1 identity)
+    {
+        if (!identity.IsValid) throw new InvalidOperationException("BUILD_IDENTITY_UNAVAILABLE");
+        request.Headers.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, identity.Platform);
+        request.Headers.TryAddWithoutValidation(BuildIdentityV1.ArtifactSha256Header, identity.ArtifactSha256);
+        if (identity.SignerCertificateSha256 is { } signer)
+            request.Headers.TryAddWithoutValidation(BuildIdentityV1.SignerCertificateSha256Header, signer);
     }
 
     private static bool TryEffectivePolicy(
@@ -576,4 +596,5 @@ internal sealed record DesktopSyncActivationResponse(
     int MaximumRequestBodyBytes,
     int MaximumPayloadBytes,
     string? ActivationImplementationSha,
+    BuildIdentityV1? AuthorizedBuildIdentity,
     string? ClosedReason);
