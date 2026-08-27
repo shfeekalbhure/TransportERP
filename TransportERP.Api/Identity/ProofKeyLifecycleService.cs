@@ -49,6 +49,7 @@ public sealed class ProofKeyLifecycleService(
                 return response;
             }
             ValidateDeviceState(device, changeType, request.ExpectedProofKeyVersion);
+            await ValidateNewProofKeyAsync(device, changeType, publicKey.Thumbprint, ct);
 
             var rawChallenge = RandomNumberGenerator.GetBytes(32);
             var now = NormalizeTimestamp(DateTimeOffset.UtcNow);
@@ -132,6 +133,7 @@ public sealed class ProofKeyLifecycleService(
             }
 
             ValidateDeviceState(device, changeType, request.ExpectedProofKeyVersion);
+            await ValidateNewProofKeyAsync(device, changeType, newPublicKey.Thumbprint, ct);
             var challenge = await LockChallengeAsync(request.ChallengeId, device.Id, current.CompanyId, ct);
             ValidateChallenge(challenge, request, changeType, newPublicKey.Thumbprint);
 
@@ -305,6 +307,24 @@ public sealed class ProofKeyLifecycleService(
         };
         if (!valid) throw new ProofKeyLifecycleException(
             device.Status == "REVOKED" ? "DEVICE_REVOKED" : "DEVICE_PROOF_KEY_STATE_INVALID");
+    }
+
+    private async Task ValidateNewProofKeyAsync(
+        RegisteredDevice device,
+        string changeType,
+        string newThumbprint,
+        CancellationToken ct)
+    {
+        if (changeType is not ("ROTATE" or "RECOVER"))
+            return;
+
+        var matchesCurrent = device.ProofKeyThumbprint is not null &&
+                             FixedEquals(device.ProofKeyThumbprint, newThumbprint);
+        var matchesHistory = await db.RegisteredDeviceProofKeyChanges.AsNoTracking().AnyAsync(x =>
+            x.RegisteredDeviceId == device.Id &&
+            (x.NewProofKeyThumbprint == newThumbprint || x.PreviousProofKeyThumbprint == newThumbprint), ct);
+        if (matchesCurrent || matchesHistory)
+            throw new ProofKeyLifecycleException("PROOF_KEY_REUSE_NOT_ALLOWED");
     }
 
     private static void ValidateChallenge(

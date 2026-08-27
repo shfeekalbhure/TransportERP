@@ -104,6 +104,68 @@ public sealed class Stage4ProofKeyLifecycleRuntimePostgreSqlTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Rotate_and_recover_reject_current_and_previous_keys_while_new_keys_are_allowed()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedAsync(db);
+        var validator = new ProofKeyChangeProofValidator();
+        var service = new ProofKeyLifecycleService(db, new AuditEventService(db), validator);
+        var current = new CurrentSecurityContext(scope.UserId, scope.CompanyId, scope.BranchId,
+            scope.SessionId, scope.DeviceName, true, scope.DeviceId, 1);
+        const string token = "same-key-test-token";
+        using var currentKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var nextKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var recoveryKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        _ = await ExecuteAsync(service, validator, scope, current, "BIND", null,
+            currentKey, null, token);
+        var challengeCount = await db.RegisteredDeviceProofKeyChallenges.CountAsync(x =>
+            x.RegisteredDeviceId == scope.DeviceId);
+
+        foreach (var changeType in new[] { "ROTATE", "RECOVER" })
+        {
+            var failure = await Assert.ThrowsAsync<ProofKeyLifecycleException>(() =>
+                service.CreateChallengeAsync(scope.DeviceId, current,
+                    new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 1, PublicJwk(currentKey)),
+                    Guid.NewGuid(), default));
+
+            Assert.Equal("PROOF_KEY_REUSE_NOT_ALLOWED", failure.Code);
+        }
+
+        Assert.Equal(challengeCount, await db.RegisteredDeviceProofKeyChallenges.CountAsync(x =>
+            x.RegisteredDeviceId == scope.DeviceId));
+        Assert.Equal(1, await db.RegisteredDevices.Where(x => x.Id == scope.DeviceId)
+            .Select(x => x.ProofKeyVersion).SingleAsync());
+
+        var rotate = await ExecuteAsync(service, validator, scope, current, "ROTATE", 1,
+            nextKey, currentKey, token);
+        Assert.Equal(2, rotate.Result.ProofKeyVersion);
+        Assert.NotEqual(validator.ReadPublicKey(PublicJwk(currentKey)).Thumbprint,
+            rotate.Result.ProofKeyThumbprint);
+
+        challengeCount = await db.RegisteredDeviceProofKeyChallenges.CountAsync(x =>
+            x.RegisteredDeviceId == scope.DeviceId);
+        foreach (var changeType in new[] { "ROTATE", "RECOVER" })
+        {
+            var failure = await Assert.ThrowsAsync<ProofKeyLifecycleException>(() =>
+                service.CreateChallengeAsync(scope.DeviceId, current,
+                    new CreateProofKeyChallengeRequest(Guid.NewGuid(), changeType, 2, PublicJwk(currentKey)),
+                    Guid.NewGuid(), default));
+
+            Assert.Equal("PROOF_KEY_REUSE_NOT_ALLOWED", failure.Code);
+        }
+        Assert.Equal(challengeCount, await db.RegisteredDeviceProofKeyChallenges.CountAsync(x =>
+            x.RegisteredDeviceId == scope.DeviceId));
+
+        var recovery = await ExecuteAsync(service, validator, scope, current, "RECOVER", 2,
+            recoveryKey, null, token, "verified recovery to a never-used key");
+        Assert.Equal(3, recovery.Result.ProofKeyVersion);
+        Assert.NotEqual(rotate.Result.ProofKeyThumbprint, recovery.Result.ProofKeyThumbprint);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Rotation_wins_device_lock_and_old_key_claim_leaves_no_partial_replay()
     {
         await AssertRotationClaimLinearizationAsync(rotationFirst: true);
