@@ -233,6 +233,8 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("LOCAL_SECURE_STORAGE_UNAVAILABLE", source, StringComparison.Ordinal);
         Assert.Contains("DataProtectionScope.CurrentUser", source, StringComparison.Ordinal);
         Assert.Contains("platformProbeCheckpoint: null", source, StringComparison.Ordinal);
+        Assert.Contains("stream.Flush(flushToDisk: true);\n            }\n            File.Move", source,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("exception.Message", source, StringComparison.Ordinal);
         Assert.DoesNotContain("return new byte[", source, StringComparison.Ordinal);
     }

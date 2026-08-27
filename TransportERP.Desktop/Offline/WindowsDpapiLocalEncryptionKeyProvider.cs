@@ -109,15 +109,19 @@ public sealed class WindowsDpapiLocalEncryptionKeyProvider : ILocalEncryptionKey
         var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            using var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 4096,
-                FileOptions.WriteThrough);
-            stream.Write(protectedKey);
-            stream.Flush(flushToDisk: true);
+            // Windows cannot atomically move a FileShare.None handle while it is still open.
+            // Flush and close the temporary blob before publishing it at the stable path.
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 4096,
+                       FileOptions.WriteThrough))
+            {
+                stream.Write(protectedKey);
+                stream.Flush(flushToDisk: true);
+            }
             File.Move(temporaryPath, path, overwrite: false);
         }
         catch (IOException) when (File.Exists(path))
