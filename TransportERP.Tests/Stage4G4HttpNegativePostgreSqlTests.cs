@@ -1,1227 +1,1 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using TransportERP.Api.Security;
-using TransportERP.Api.Sync;
-using TransportERP.Application.Sync;
-using TransportERP.Contracts.Attachments;
-using TransportERP.Contracts.Geo;
-using TransportERP.Contracts.Waybills;
-using TransportERP.Infrastructure.Persistence;
-
-namespace TransportERP.Tests;
-
-/// <summary>
-/// Exact HTTP/PostgreSQL negative evidence for the remaining G4 sync-v1 acceptance cases.
-/// The production Offline and server worker switches remain closed; this isolated TestServer
-/// opens only the request gate and drives the real processor deterministically.
-/// </summary>
-[Collection("PostgreSql")]
-public sealed class Stage4G4HttpNegativePostgreSqlTests
-{
-    private static readonly BuildIdentityV1 TestBuildIdentity = new(
-        BuildIdentityV1.DesktopWindowsPlatform, new string('e', 64));
-    private const string Issuer = "TransportERP.Stage4.G4.HttpNegative";
-    private const string Audience = "TransportERP.Stage4.G4.HttpNegative.Api";
-    private const string SigningKey = "transport-erp-stage4-g4-http-negative-signing-key-minimum-32";
-    private static readonly Uri PublicOrigin = new("https://sync.example.test");
-    private const string BatchPath = "/api/v1/sync/operations:batch";
-    private const string BatchHtu = "https://sync.example.test/api/v1/sync/operations:batch";
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    public async Task Business_idempotency_is_device_scoped_through_HTTP_PostgreSql_and_the_real_domain_adapter()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var firstKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var secondKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var firstScope = await SeedAsync(seedDb, firstKey, "DEVICE-IDEMPOTENCY");
-        var secondScope = await SeedSecondDeviceAsync(seedDb, firstScope, secondKey);
-        using var factory = CreateFactory(connection);
-        using var firstClient = CreateClient(factory, firstScope.Bearer);
-        using var secondClient = CreateClient(factory, secondScope.Bearer);
-
-        var clientOperationId = $"shared-device-key-{Guid.NewGuid():N}";
-        var firstOperation = Operation(
-            "CreateOperationalParty", "CREATE", "OperationalParty", null,
-            clientOperationId, Guid.NewGuid(),
-            PartyPayload(clientOperationId, "DEVICE-A"), null, null);
-        var secondOperation = Operation(
-            "CreateOperationalParty", "CREATE", "OperationalParty", null,
-            clientOperationId, Guid.NewGuid(),
-            PartyPayload(clientOperationId, "DEVICE-B"), null, null);
-
-        Guid firstServerOperationId;
-        Guid secondServerOperationId;
-        using (var firstResponse = await SendSignedAsync(
-                   firstClient, firstKey, firstScope.Bearer,
-                   BatchBody(firstScope.DeviceId, firstOperation)))
-        using (var secondResponse = await SendSignedAsync(
-                   secondClient, secondKey, secondScope.Bearer,
-                   BatchBody(secondScope.DeviceId, secondOperation)))
-        {
-            var firstResult = await SingleResultAsync(firstResponse);
-            var secondResult = await SingleResultAsync(secondResponse);
-            Assert.Equal("QUEUED", firstResult.Status);
-            Assert.Equal("QUEUED", secondResult.Status);
-            firstServerOperationId = Assert.IsType<Guid>(firstResult.ServerOperationId);
-            secondServerOperationId = Assert.IsType<Guid>(secondResult.ServerOperationId);
-            Assert.NotEqual(firstServerOperationId, secondServerOperationId);
-        }
-
-        await ExecuteUntilTerminalAsync(factory, connection,
-            [clientOperationId, clientOperationId]);
-
-        await using (var verify = PostgreSqlTestEnvironment.CreateDbContext(connection))
-        {
-            var operations = await verify.SyncOperations.AsNoTracking().Where(operation =>
-                operation.CompanyId == firstScope.CompanyId &&
-                operation.ClientOperationId == clientOperationId).ToListAsync();
-            Assert.Equal(2, operations.Count);
-            Assert.Contains(operations, operation =>
-                operation.RegisteredDeviceId == firstScope.RegisteredDeviceId &&
-                operation.Id == firstServerOperationId && operation.Status == "SUCCEEDED");
-            Assert.Contains(operations, operation =>
-                operation.RegisteredDeviceId == secondScope.RegisteredDeviceId &&
-                operation.Id == secondServerOperationId && operation.Status == "SUCCEEDED");
-
-            var expectedBusinessKeys = new[]
-            {
-                SyncBusinessIdempotencyKey.Create(
-                    firstScope.CompanyId, firstScope.BranchId,
-                    firstScope.RegisteredDeviceId, clientOperationId),
-                SyncBusinessIdempotencyKey.Create(
-                    secondScope.CompanyId, secondScope.BranchId,
-                    secondScope.RegisteredDeviceId, clientOperationId)
-            };
-            var parties = await verify.Set<OperationalPartyEntity>().AsNoTracking().Where(party =>
-                party.CompanyId == firstScope.CompanyId &&
-                expectedBusinessKeys.Contains(party.ClientOperationId)).ToListAsync();
-            Assert.Equal(2, parties.Count);
-            Assert.Equal(2, parties.Select(party => party.Id).Distinct().Count());
-        }
-
-        using (var replayResponse = await SendSignedAsync(
-                   firstClient, firstKey, firstScope.Bearer,
-                   BatchBody(firstScope.DeviceId, firstOperation)))
-        {
-            var replay = await SingleResultAsync(replayResponse);
-            Assert.Equal("SUCCEEDED", replay.Status);
-            Assert.Equal(firstServerOperationId, replay.ServerOperationId);
-        }
-
-        var mutatedPayload = PartyPayload(clientOperationId, "DEVICE-A-MUTATED");
-        var mutated = firstOperation with
-        {
-            PayloadJson = mutatedPayload,
-            PayloadHash = Sha256(mutatedPayload)
-        };
-        using (var mutationResponse = await SendSignedAsync(
-                   firstClient, firstKey, firstScope.Bearer,
-                   BatchBody(firstScope.DeviceId, mutated)))
-        {
-            var mutation = await SingleResultAsync(mutationResponse);
-            Assert.Equal("REJECTED", mutation.Status);
-            Assert.Equal("IDEMPOTENCY_CONFLICT", mutation.ErrorCode);
-            Assert.Null(mutation.ServerOperationId);
-        }
-
-        await using var terminalVerify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        Assert.Equal(2, await terminalVerify.SyncOperations.CountAsync(operation =>
-            operation.CompanyId == firstScope.CompanyId &&
-            operation.ClientOperationId == clientOperationId));
-        Assert.Equal(2, await terminalVerify.Set<OperationalPartyEntity>().CountAsync(party =>
-            party.CompanyId == firstScope.CompanyId &&
-            (party.ClientOperationId == SyncBusinessIdempotencyKey.Create(
-                 firstScope.CompanyId, firstScope.BranchId,
-                 firstScope.RegisteredDeviceId, clientOperationId) ||
-             party.ClientOperationId == SyncBusinessIdempotencyKey.Create(
-                 secondScope.CompanyId, secondScope.BranchId,
-                 secondScope.RegisteredDeviceId, clientOperationId))));
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    [Trait("Acceptance", "T-SYNC-003")]
-    public async Task T_SYNC_003_signed_request_with_mismatched_payload_hash_is_rejected_audited_and_has_no_business_effect()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "HASH");
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-        var operationCorrelationId = Guid.NewGuid();
-        var clientOperationId = $"t-sync-003-{Guid.NewGuid():N}";
-        var payload = PartyPayload(clientOperationId, "T-SYNC-003");
-        var body = BatchBody(scope.DeviceId,
-            Operation("CreateOperationalParty", "CREATE", "OperationalParty", null,
-                clientOperationId, operationCorrelationId, payload, new string('0', 64), null));
-
-        using var response = await SendSignedAsync(client, proofKey, scope.Bearer, body);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await SingleResultAsync(response);
-        Assert.Equal("REJECTED", result.Status);
-        Assert.Equal("HASH_MISMATCH", result.ErrorCode);
-        Assert.Null(result.ServerOperationId);
-
-        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        Assert.False(await verify.SyncOperations.AsNoTracking().AnyAsync(x =>
-            x.CompanyId == scope.CompanyId && x.ClientOperationId == clientOperationId));
-        Assert.False(await verify.Set<OperationalPartyEntity>().AsNoTracking().AnyAsync(x =>
-            x.CompanyId == scope.CompanyId && x.ClientOperationId == clientOperationId));
-
-        // The acceptance contract requires a metadata-only rejection AuditEvent, not merely the
-        // successful proof-claim event.
-        var rejectionAudits = await verify.AuditEvents.AsNoTracking().Where(x =>
-            x.CompanyId == scope.CompanyId &&
-            x.OperationCorrelationId == operationCorrelationId &&
-            x.Outcome == "REJECTED").ToListAsync();
-        Assert.Contains(rejectionAudits, x =>
-            (x.Reason ?? string.Empty).Contains("HASH_MISMATCH", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    [Trait("Acceptance", "T-SYNC-004")]
-    public async Task T_SYNC_004_cross_company_cross_branch_and_missing_party_references_are_indistinguishable_and_replay_safe()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "SCOPE");
-        var targets = await SeedCrossScopeTargetsAsync(seedDb, scope);
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-
-        var companyOperation = UpdateOperation(scope, targets, targets.ForeignCompanyPartyId, "COMPANY");
-        var branchOperation = UpdateOperation(scope, targets, targets.ForeignBranchPartyId, "BRANCH");
-        var missingOperation = UpdateOperation(scope, targets, Guid.NewGuid(), "MISSING");
-        var body = BatchBody(scope.DeviceId, companyOperation, branchOperation, missingOperation);
-
-        using (var accepted = await SendSignedAsync(client, proofKey, scope.Bearer, body))
-        {
-            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
-            var results = await ResultsAsync(accepted);
-            Assert.Equal(3, results.Count);
-            Assert.All(results, result =>
-            {
-                Assert.Equal("QUEUED", result.Status);
-                Assert.Null(result.ErrorCode);
-                Assert.NotNull(result.ServerOperationId);
-            });
-        }
-
-        await ExecuteUntilTerminalAsync(factory, connection,
-            [companyOperation.ClientOperationId, branchOperation.ClientOperationId, missingOperation.ClientOperationId]);
-
-        // Two independently composed hosts replay the same governed business identities against
-        // one PostgreSQL store. Per-device advisory locking must converge without a duplicate
-        // operation or business-transition audit. A separately imported signer avoids sharing ECDSA state.
-        using var secondFactory = CreateFactory(connection);
-        using var secondClient = CreateClient(secondFactory, scope.Bearer);
-        using var secondProofKey = ECDsa.Create(proofKey.ExportParameters(true));
-        var replayResponses = await Task.WhenAll(
-            SendSignedAsync(client, proofKey, scope.Bearer, body),
-            SendSignedAsync(secondClient, secondProofKey, scope.Bearer, body));
-        var replayTexts = new List<string>();
-        foreach (var replay in replayResponses)
-        {
-            using (replay)
-            {
-                Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
-                var replayText = await replay.Content.ReadAsStringAsync();
-                replayTexts.Add(replayText);
-                var replayResults = JsonSerializer.Deserialize<SyncBatchResponse>(replayText,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Results;
-                Assert.Equal(3, replayResults.Count);
-                Assert.All(replayResults, result =>
-                {
-                    Assert.Equal("REJECTED", result.Status);
-                    Assert.Equal("SCOPE_DENIED", result.ErrorCode);
-                });
-            }
-        }
-        var replayWire = string.Join("\n", replayTexts);
-        Assert.DoesNotContain(targets.ForeignCompanyPartyId.ToString("D"), replayWire, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(targets.ForeignBranchPartyId.ToString("D"), replayWire, StringComparison.OrdinalIgnoreCase);
-
-        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        var operations = await verify.SyncOperations.AsNoTracking().Where(x =>
-            x.CompanyId == scope.CompanyId &&
-            new[] { companyOperation.ClientOperationId, branchOperation.ClientOperationId, missingOperation.ClientOperationId }
-                .Contains(x.ClientOperationId)).ToListAsync();
-        Assert.Equal(3, operations.Count);
-        Assert.All(operations, operation =>
-        {
-            Assert.Equal("REJECTED", operation.Status);
-            Assert.Equal("SCOPE_DENIED", operation.ErrorCode);
-            Assert.Equal(0, operation.RetryCount);
-            Assert.Null(operation.NextRetryAt);
-        });
-        var waybill = await verify.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == targets.LocalWaybillId);
-        Assert.Equal(1, waybill.Version);
-        Assert.False(await verify.Set<WaybillPartyEntity>().AsNoTracking()
-            .AnyAsync(x => x.WaybillId == targets.LocalWaybillId));
-
-        var operationIds = operations.Select(x => x.Id).ToArray();
-        var audits = await verify.AuditEvents.AsNoTracking()
-            .Where(x => x.EntityId.HasValue && operationIds.Contains(x.EntityId.Value)).ToListAsync();
-        Assert.Equal(3, audits.Count(x => x.Action == "SyncOperationQueued"));
-        Assert.Equal(3, audits.Count(x => x.Action == "SyncOperationExecutionRejected"));
-        var auditWire = JsonSerializer.Serialize(audits.Select(x => new
-        {
-            x.Action, x.Outcome, x.Reason, x.CompanyId, x.BranchId, x.OperationCorrelationId
-        }));
-        Assert.DoesNotContain(targets.ForeignCompanyPartyId.ToString("D"), auditWire, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(targets.ForeignBranchPartyId.ToString("D"), auditWire, StringComparison.OrdinalIgnoreCase);
-
-        // A replay mutation keeps the original business identity but swaps the target reference.
-        // It is rejected and audited as a fingerprint mismatch without creating a fourth operation.
-        var mutated = companyOperation with
-        {
-            PayloadJson = branchOperation.PayloadJson,
-            PayloadHash = branchOperation.PayloadHash
-        };
-        var rejectionAuditCount = await verify.AuditEvents.CountAsync(x =>
-            x.CompanyId == scope.CompanyId &&
-            x.OperationCorrelationId == companyOperation.OperationCorrelationId &&
-            x.Outcome == "REJECTED");
-        using var mutationResponse = await SendSignedAsync(
-            client, proofKey, scope.Bearer, BatchBody(scope.DeviceId, mutated));
-        var mutationResult = await SingleResultAsync(mutationResponse);
-        Assert.Equal("IDEMPOTENCY_CONFLICT", mutationResult.ErrorCode);
-        var mutationAudits = await verify.AuditEvents.AsNoTracking().Where(x =>
-            x.CompanyId == scope.CompanyId &&
-            x.OperationCorrelationId == companyOperation.OperationCorrelationId &&
-            x.Outcome == "REJECTED").ToListAsync();
-        Assert.Equal(rejectionAuditCount + 1, mutationAudits.Count);
-        Assert.Contains(mutationAudits, x =>
-            (x.Reason ?? string.Empty).Contains("IDEMPOTENCY_CONFLICT", StringComparison.Ordinal));
-        Assert.Equal(3, await verify.SyncOperations.CountAsync(x =>
-            x.CompanyId == scope.CompanyId &&
-            new[] { companyOperation.ClientOperationId, branchOperation.ClientOperationId, missingOperation.ClientOperationId }
-                .Contains(x.ClientOperationId)));
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    [Trait("Acceptance", "T-SYNC-006")]
-    public async Task T_SYNC_006_posting_and_unavailable_accounting_actions_are_rejected_before_enqueue_and_audited()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "POST");
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-        var postCorrelation = Guid.NewGuid();
-        var createCorrelation = Guid.NewGuid();
-        var postedEntryId = Guid.NewGuid();
-        var body = BatchBody(scope.DeviceId,
-            Operation("PostJournalEntry", "COMMAND", "JournalEntry", postedEntryId,
-                $"post-entry-{Guid.NewGuid():N}", postCorrelation, "{}", Sha256("{}"), null),
-            Operation("CreateJournalEntry", "CREATE", "JournalEntry", null,
-                $"create-entry-{Guid.NewGuid():N}", createCorrelation, "{}", Sha256("{}"), null));
-
-        using var response = await SendSignedAsync(client, proofKey, scope.Bearer, body);
-        var results = await ResultsAsync(response);
-        Assert.Equal("ONLINE_REQUIRED", results[0].ErrorCode);
-        Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", results[1].ErrorCode);
-        Assert.All(results, result =>
-        {
-            Assert.Equal("REJECTED", result.Status);
-            Assert.Null(result.ServerOperationId);
-        });
-
-        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        Assert.False(await verify.SyncOperations.AsNoTracking().AnyAsync(x =>
-            x.OperationCorrelationId == postCorrelation || x.OperationCorrelationId == createCorrelation));
-        var rejectionAudits = await verify.AuditEvents.AsNoTracking().Where(x =>
-            x.CompanyId == scope.CompanyId && x.Outcome == "REJECTED" &&
-            (x.OperationCorrelationId == postCorrelation || x.OperationCorrelationId == createCorrelation))
-            .ToListAsync();
-        Assert.Contains(rejectionAudits, x =>
-            x.OperationCorrelationId == postCorrelation &&
-            (x.Reason ?? string.Empty).Contains("ONLINE_REQUIRED", StringComparison.Ordinal));
-        Assert.Contains(rejectionAudits, x =>
-            x.OperationCorrelationId == createCorrelation &&
-            (x.Reason ?? string.Empty).Contains("ACTION_RUNTIME_UNAVAILABLE", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    public async Task Attachment_and_pod_contracts_remain_metadata_only_and_unapproved_binary_never_reaches_sync_storage()
-    {
-        var contractProperties = typeof(AttachmentDescriptor).GetProperties();
-        Assert.DoesNotContain(contractProperties, property =>
-            property.PropertyType == typeof(byte[]) ||
-            typeof(Stream).IsAssignableFrom(property.PropertyType) ||
-            property.Name.Contains("Base64", StringComparison.OrdinalIgnoreCase) ||
-            property.Name.Contains("Binary", StringComparison.OrdinalIgnoreCase));
-
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "BINARY");
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-
-        var rawCorrelation = Guid.NewGuid();
-        using (var request = new HttpRequestMessage(HttpMethod.Post, BatchPath)
-        {
-            Content = new ByteArrayContent(RandomNumberGenerator.GetBytes(128))
-        })
-        {
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            request.Headers.Add("X-Correlation-Id", rawCorrelation.ToString("D"));
-            using var rawResponse = await client.SendAsync(request);
-            Assert.Equal(HttpStatusCode.UnsupportedMediaType, rawResponse.StatusCode);
-        }
-
-        var binary = Convert.ToBase64String(RandomNumberGenerator.GetBytes(96));
-        var attachmentCorrelation = Guid.NewGuid();
-        var podCorrelation = Guid.NewGuid();
-        var attachmentOperation = Operation("AddWaybillAttachment", "CREATE", "Waybill", Guid.NewGuid(),
-            $"attachment-binary-{Guid.NewGuid():N}", attachmentCorrelation,
-            JsonSerializer.Serialize(new { storageRef = "local://pending", contentHash = Sha256(binary), binaryBase64 = binary }),
-            null, null);
-        attachmentOperation = attachmentOperation with { PayloadHash = Sha256(attachmentOperation.PayloadJson) };
-        var podOperation = Operation("RecordProofOfDelivery", "CREATE", "Delivery", Guid.NewGuid(),
-            $"pod-binary-{Guid.NewGuid():N}", podCorrelation,
-            JsonSerializer.Serialize(new { storageRef = "local://pending", contentHash = Sha256(binary), signatureBinary = binary }),
-            null, null);
-        podOperation = podOperation with { PayloadHash = Sha256(podOperation.PayloadJson) };
-
-        using var response = await SendSignedAsync(client, proofKey, scope.Bearer,
-            BatchBody(scope.DeviceId, attachmentOperation, podOperation));
-        var results = await ResultsAsync(response);
-        Assert.All(results, result =>
-        {
-            Assert.Equal("REJECTED", result.Status);
-            Assert.Equal("ACTION_RUNTIME_UNAVAILABLE", result.ErrorCode);
-            Assert.Null(result.ServerOperationId);
-        });
-
-        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        Assert.False(await verify.SyncOperations.AsNoTracking().AnyAsync(x =>
-            x.OperationCorrelationId == attachmentCorrelation || x.OperationCorrelationId == podCorrelation));
-        var persisted = JsonSerializer.Serialize(new
-        {
-            Operations = await verify.SyncOperations.AsNoTracking().Where(x => x.CompanyId == scope.CompanyId).ToListAsync(),
-            Audits = await verify.AuditEvents.AsNoTracking().Where(x => x.CompanyId == scope.CompanyId).ToListAsync()
-        });
-        Assert.DoesNotContain(binary, persisted, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    [Trait("Acceptance", "G4-END-TO-END")]
-    public async Task Authenticated_sync_activation_returns_only_scoped_policy_and_public_key_binding()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "ACTIVATION");
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-
-        using var response = await client.GetAsync("/api/v1/sync/activation");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        using var document = JsonDocument.Parse(body);
-        var root = document.RootElement;
-        Assert.True(root.GetProperty("enabled").GetBoolean());
-        Assert.Equal(scope.CompanyId, root.GetProperty("companyId").GetGuid());
-        Assert.Equal(scope.BranchId, root.GetProperty("branchId").GetGuid());
-        Assert.Equal(scope.UserId, root.GetProperty("userId").GetGuid());
-        Assert.Equal(scope.RegisteredDeviceId, root.GetProperty("registeredDeviceId").GetGuid());
-        Assert.Equal(scope.SessionId, root.GetProperty("sessionId").GetGuid());
-        Assert.Equal(scope.DeviceId, root.GetProperty("deviceId").GetString());
-        Assert.Equal(BatchHtu, root.GetProperty("batchEndpoint").GetString());
-        Assert.Equal(1, root.GetProperty("proofKeyVersion").GetInt32());
-        Assert.Equal("EC", root.GetProperty("proofPublicJwk").GetProperty("kty").GetString());
-        Assert.True(root.GetProperty("canRetryFailedOperations").GetBoolean());
-        Assert.True(root.GetProperty("canResolveConflicts").GetBoolean());
-        Assert.False(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
-        Assert.True(root.GetProperty("keyRecoveryAllowed").GetBoolean());
-        Assert.True(root.GetProperty("allowedActions").GetArrayLength() > 0);
-        Assert.Equal(25, root.GetProperty("maxBatchOperations").GetInt32());
-        Assert.Equal(2_097_152, root.GetProperty("maximumRequestBodyBytes").GetInt32());
-        Assert.Equal(16_384, root.GetProperty("maximumPayloadBytes").GetInt32());
-        Assert.Equal(2, root.GetProperty("clientTransportMaxRetryCount").GetInt32());
-        Assert.Equal(10, root.GetProperty("clientTransportBaseSeconds").GetInt32());
-        Assert.Equal(20, root.GetProperty("clientTransportMaxDelayMinutes").GetInt32());
-        Assert.Equal(12, root.GetProperty("localSuccessHours").GetInt32());
-        Assert.Equal(4, root.GetProperty("localRejectedDays").GetInt32());
-        Assert.Equal(45, root.GetProperty("serverPayloadDays").GetInt32());
-        Assert.Equal(8, root.GetProperty("cacheMaxAgeHours").GetInt32());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("activationImplementationSha").ValueKind);
-        Assert.Equal(TestBuildIdentity.Platform,
-            root.GetProperty("authorizedBuildIdentity").GetProperty("platform").GetString());
-        Assert.Equal(TestBuildIdentity.ArtifactSha256,
-            root.GetProperty("authorizedBuildIdentity").GetProperty("artifactSha256").GetString());
-        Assert.Equal("test-policy-open-v1", root.GetProperty("policySourceVersion").GetString());
-        Assert.Equal(new string('a', 64), root.GetProperty("policySourceFingerprint").GetString());
-        Assert.DoesNotContain("credentialHash", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("rawBearer", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("nonce", body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("jti", body, StringComparison.OrdinalIgnoreCase);
-
-        using var anonymousClient = factory.CreateClient(new WebApplicationFactoryClientOptions
-            { BaseAddress = PublicOrigin });
-        using var anonymous = await anonymousClient.GetAsync("/api/v1/sync/activation");
-        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    [Trait("Acceptance", "G4-END-TO-END")]
-    public async Task Governed_activation_authorizes_explicit_key_enrollment_without_opening_write_runtime()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "ENROLL", bindProofKey: false);
-        using var factory = CreateFactory(connection);
-        using var client = CreateClient(factory, scope.Bearer);
-
-        using var response = await client.GetAsync("/api/v1/sync/activation");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        Assert.True(root.GetProperty("enabled").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("proofPublicJwk").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("proofKeyVersion").ValueKind);
-        Assert.True(root.GetProperty("keyEnrollmentAllowed").GetBoolean());
-        Assert.False(root.GetProperty("keyRecoveryAllowed").GetBoolean());
-        Assert.Equal("PROOF_KEY_BINDING_REQUIRED", root.GetProperty("closedReason").GetString());
-    }
-
-    [Theory]
-    [InlineData("missing")]
-    [InlineData("wrong-platform")]
-    [InlineData("wrong-digest")]
-    [InlineData("unexpected-signer")]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    public async Task Activation_rejects_missing_or_mismatched_measured_build_identity(string mismatch)
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "BUILD-IDENTITY-" + mismatch);
-        using var factory = CreateFactory(connection);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
-            { BaseAddress = PublicOrigin });
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
-        if (mismatch != "missing")
-        {
-            client.DefaultRequestHeaders.TryAddWithoutValidation(
-                BuildIdentityV1.PlatformHeader,
-                mismatch == "wrong-platform" ? BuildIdentityV1.AndroidPlatform : TestBuildIdentity.Platform);
-            client.DefaultRequestHeaders.TryAddWithoutValidation(
-                BuildIdentityV1.ArtifactSha256Header,
-                mismatch == "wrong-digest" ? new string('f', 64) : TestBuildIdentity.ArtifactSha256);
-            if (mismatch == "unexpected-signer")
-                client.DefaultRequestHeaders.TryAddWithoutValidation(
-                    BuildIdentityV1.SignerCertificateSha256Header, new string('1', 64));
-        }
-
-        using var response = await client.GetAsync("/api/v1/sync/activation");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("BUILD_IDENTITY_MISMATCH",
-            document.RootElement.GetProperty("errorCode").GetString());
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    public async Task Activation_selects_the_exact_Android_identity_from_the_multi_platform_allowlist()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "ANDROID-BUILD-IDENTITY");
-        var android = new BuildIdentityV1(
-            BuildIdentityV1.AndroidPlatform, new string('2', 64), new string('3', 64));
-        using var factory = CreateFactory(connection, [TestBuildIdentity, android]);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
-            { BaseAddress = PublicOrigin });
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, android.Platform);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.SignerCertificateSha256Header, android.SignerCertificateSha256);
-
-        using var response = await client.GetAsync("/api/v1/sync/activation");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var accepted = document.RootElement.GetProperty("authorizedBuildIdentity");
-        Assert.Equal(android.Platform, accepted.GetProperty("platform").GetString());
-        Assert.Equal(android.ArtifactSha256, accepted.GetProperty("artifactSha256").GetString());
-        Assert.Equal(android.SignerCertificateSha256,
-            accepted.GetProperty("signerCertificateSha256").GetString());
-
-        using var wrongSigner = factory.CreateClient(new WebApplicationFactoryClientOptions
-            { BaseAddress = PublicOrigin });
-        wrongSigner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
-        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(BuildIdentityV1.PlatformHeader, android.Platform);
-        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
-        wrongSigner.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.SignerCertificateSha256Header, new string('4', 64));
-        using var denied = await wrongSigner.GetAsync("/api/v1/sync/activation");
-        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-
-        using var missingSigner = factory.CreateClient(new WebApplicationFactoryClientOptions
-            { BaseAddress = PublicOrigin });
-        missingSigner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", scope.Bearer);
-        missingSigner.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.PlatformHeader, android.Platform);
-        missingSigner.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.ArtifactSha256Header, android.ArtifactSha256);
-        using var missingSignerResponse = await missingSigner.GetAsync("/api/v1/sync/activation");
-        Assert.Equal(HttpStatusCode.Forbidden, missingSignerResponse.StatusCode);
-    }
-
-    [Fact]
-    [Trait("Category", "PostgreSQL")]
-    [Trait("Category", "HTTP")]
-    public async Task Batch_handler_reapplies_narrowed_effective_body_limit_before_envelope_processing()
-    {
-        var connection = PostgreSqlTestEnvironment.RequireConnection();
-        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        await seedDb.Database.MigrateAsync();
-        using var proofKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var scope = await SeedAsync(seedDb, proofKey, "NARROW-BODY");
-        const int narrowedLimit = 1_024;
-        var marker = "must-not-enter-audit-" + Guid.NewGuid().ToString("N");
-        var body = "{\"padding\":\"" + marker + new string('x', narrowedLimit) + "\"}";
-        Assert.True(Encoding.UTF8.GetByteCount(body) > narrowedLimit);
-        Assert.True(Encoding.UTF8.GetByteCount(body) < SyncApiModule.MaximumRequestBodyBytes);
-
-        using var factory = CreateFactory(connection).WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<ISyncPopHttpRequestAuthenticator>();
-                services.AddSingleton<ISyncPopHttpRequestAuthenticator>(
-                    new AcceptedRawBodyAuthenticator(scope, NarrowedBodyPolicy(narrowedLimit)));
-            }));
-        using var client = CreateClient(factory, scope.Bearer);
-        using var request = new HttpRequestMessage(HttpMethod.Post, BatchPath)
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
-        };
-        request.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString("D"));
-
-        using var response = await client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("REQUEST_BODY_TOO_LARGE",
-            document.RootElement.GetProperty("errorCode").GetString());
-        await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-        Assert.False(await verify.SyncOperations.AsNoTracking()
-            .AnyAsync(x => x.CompanyId == scope.CompanyId));
-        var rejection = Assert.Single(await verify.AuditEvents.AsNoTracking().Where(x =>
-            x.CompanyId == scope.CompanyId && x.Action == "SyncOperationRejected" &&
-            x.Reason == "REQUEST_BODY_TOO_LARGE").ToListAsync());
-        Assert.Null(rejection.OperationCorrelationId);
-        Assert.Null(rejection.BeforeJson);
-        Assert.Null(rejection.AfterJson);
-        Assert.DoesNotContain(marker, JsonSerializer.Serialize(rejection), StringComparison.Ordinal);
-    }
-
-    private static HttpClient CreateClient(WebApplicationFactory<Program> factory, string bearer)
-    {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = PublicOrigin });
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.PlatformHeader, TestBuildIdentity.Platform);
-        client.DefaultRequestHeaders.TryAddWithoutValidation(
-            BuildIdentityV1.ArtifactSha256Header, TestBuildIdentity.ArtifactSha256);
-        return client;
-    }
-
-    private static EffectiveSyncPolicy NarrowedBodyPolicy(int maximumRequestBodyBytes)
-    {
-        var actions = SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue)
-            .ToHashSet(StringComparer.Ordinal);
-        return new EffectiveSyncPolicy(
-            true, actions, new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
-            25, maximumRequestBodyBytes, Math.Min(512, maximumRequestBodyBytes),
-            2, 5, 10, 5, 20, 30, 12, 4, 45, 8,
-            null, "device-narrow-body-v1", new string('b', 64));
-    }
-
-    private static WebApplicationFactory<Program> CreateFactory(
-        string connection,
-        IReadOnlyList<BuildIdentityV1>? authorizedBuilds = null)
-        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("ConnectionStrings:TransportErp", connection);
-            builder.UseSetting("Auth:Mode", "LocalSessions");
-            builder.UseSetting("Auth:Issuer", Issuer);
-            builder.UseSetting("Auth:Audience", Audience);
-            builder.UseSetting("Auth:SigningKey", SigningKey);
-            builder.UseSetting("Auth:SigningKeyId", "stage4-g4-http-current");
-            builder.UseSetting("Sync:Proof:PublicOrigin", PublicOrigin.ToString().TrimEnd('/'));
-            builder.UseSetting("AllowedHosts", PublicOrigin.Host);
-            builder.UseSetting("Sync:ServerExecution:Enabled", "false");
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<ISyncRuntimeGate>();
-                services.AddScoped<ISyncRuntimeGate, IsolatedOpenSyncRuntimeGate>();
-                services.RemoveAll<IOptions<SyncRuntimePolicyOptions>>();
-                services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(new SyncRuntimePolicyOptions
-                {
-                    OfflineAuthorizedBuilds = (authorizedBuilds ?? new[] { TestBuildIdentity }).ToArray()
-                }));
-                services.RemoveAll<IEffectiveSyncPolicyProvider>();
-                services.AddScoped<IEffectiveSyncPolicyProvider, IsolatedOpenEffectivePolicyProvider>();
-                services.RemoveAll<ISyncRetryPolicyResolver>();
-                services.AddSingleton<ISyncRetryPolicyResolver>(new FixedSyncRetryPolicyResolver(
-                    new SyncRetryPolicy(5, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(30))));
-            });
-        });
-
-    private static async Task<HttpResponseMessage> SendSignedAsync(
-        HttpClient client,
-        ECDsa key,
-        string bearer,
-        string body)
-    {
-        using var nonceRequest = JsonRequest(body, Guid.NewGuid());
-        using var nonceResponse = await client.SendAsync(nonceRequest);
-        Assert.Equal(HttpStatusCode.Unauthorized, nonceResponse.StatusCode);
-        Assert.True(nonceResponse.Headers.TryGetValues("DPoP-Nonce", out var nonceValues));
-        var nonce = Assert.Single(nonceValues);
-        var correlationId = Guid.NewGuid();
-        var proof = CreateProof(key, Encoding.UTF8.GetBytes(body), bearer, nonce, correlationId);
-        using var request = JsonRequest(body, correlationId, proof);
-        return await client.SendAsync(request);
-    }
-
-    private static HttpRequestMessage JsonRequest(string body, Guid correlationId, string? proof = null)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, BatchPath)
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
-        };
-        request.Headers.Add("X-Correlation-Id", correlationId.ToString("D"));
-        if (proof is not null) request.Headers.Add("DPoP", proof);
-        return request;
-    }
-
-    private static string CreateProof(
-        ECDsa key,
-        byte[] body,
-        string bearer,
-        string nonce,
-        Guid correlationId)
-    {
-        var parameters = key.ExportParameters(false);
-        var header = JsonSerializer.Serialize(new
-        {
-            typ = "dpop+jwt",
-            alg = "ES256",
-            jwk = new
-            {
-                kty = "EC", crv = "P-256", x = Base64Url(parameters.Q.X!), y = Base64Url(parameters.Q.Y!)
-            }
-        }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-        var payload = JsonSerializer.Serialize(new
-        {
-            jti = Guid.NewGuid().ToString("D"), htm = "POST", htu = BatchHtu,
-            iat = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-            ath = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(bearer))), nonce,
-            tbh = Base64Url(SHA256.HashData(body)), cid = correlationId.ToString("D")
-        });
-        var headerSegment = Base64Url(Encoding.UTF8.GetBytes(header));
-        var payloadSegment = Base64Url(Encoding.UTF8.GetBytes(payload));
-        var signingInput = Encoding.ASCII.GetBytes(headerSegment + "." + payloadSegment);
-        var signature = key.SignData(signingInput, HashAlgorithmName.SHA256,
-            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        return headerSegment + "." + payloadSegment + "." + Base64Url(signature);
-    }
-
-    private static string BatchBody(string deviceId, params TestOperation[] operations)
-        => JsonSerializer.Serialize(new
-        {
-            deviceId,
-            protocolVersion = "sync-v1",
-            buildIdentity = TestBuildIdentity,
-            operations = operations.Select(x => new
-            {
-                actionCode = x.ActionCode,
-                operationType = x.OperationType,
-                entityType = x.EntityType,
-                entityId = x.EntityId,
-                clientOperationId = x.ClientOperationId,
-                payloadJson = x.PayloadJson,
-                payloadHash = x.PayloadHash,
-                clientOccurredAt = "2026-08-26T00:00:00.123456Z",
-                operationCorrelationId = x.OperationCorrelationId,
-                baseVersion = x.BaseVersion
-            }).ToArray()
-        });
-
-    private static TestOperation Operation(
-        string actionCode,
-        string operationType,
-        string entityType,
-        Guid? entityId,
-        string clientOperationId,
-        Guid operationCorrelationId,
-        string payloadJson,
-        string? payloadHash,
-        long? baseVersion)
-        => new(actionCode, operationType, entityType, entityId, clientOperationId,
-            operationCorrelationId, payloadJson, payloadHash ?? Sha256(payloadJson), baseVersion);
-
-    private static TestOperation UpdateOperation(
-        TestScope scope,
-        CrossScopeTargets targets,
-        Guid partyId,
-        string suffix)
-    {
-        var operationId = $"t-sync-004-{suffix.ToLowerInvariant()}-{Guid.NewGuid():N}";
-        var payload = JsonSerializer.Serialize(new UpdateWaybillDraftRequest(
-            1, targets.WaybillDateTime, targets.OriginId, targets.DestinationId, scope.CurrencyId,
-            1m, 10m, 0m, "STANDARD", "NORMAL",
-            [new WaybillPartyInput("SENDER", partyId, "scope-neutral", "700000001", null, null,
-                new GeoAddressSnapshot(null, null, null, null, "scope-neutral"))],
-            [new WaybillItemInput(null, 1, "GENERAL", "scope-neutral", 1m, 1,
-                null, null, null, null, null, null, [], null)],
-            operationId));
-        return Operation("UpdateWaybillDraft", "UPDATE", "Waybill", targets.LocalWaybillId,
-            operationId, Guid.NewGuid(), payload, Sha256(payload), 1);
-    }
-
-    private static string PartyPayload(string operationId, string suffix)
-        => JsonSerializer.Serialize(new OperationalPartyCreateRequest(
-            $"Party {suffix}", "700000001", null, null,
-            new GeoAddressSnapshot(null, null, null, null, "metadata only"), operationId));
-
-    private static async Task<SyncBatchOperationResult> SingleResultAsync(HttpResponseMessage response)
-        => Assert.Single(await ResultsAsync(response));
-
-    private static async Task<IReadOnlyList<SyncBatchOperationResult>> ResultsAsync(HttpResponseMessage response)
-    {
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var json = await response.Content.ReadAsStringAsync();
-        var envelope = JsonSerializer.Deserialize<SyncBatchResponse>(json,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        Assert.NotNull(envelope);
-        return envelope!.Results;
-    }
-
-    private static async Task ExecuteUntilTerminalAsync(
-        WebApplicationFactory<Program> factory,
-        string connection,
-        IReadOnlyCollection<string> operationIds)
-    {
-        for (var attempt = 0; attempt < 30; attempt++)
-        {
-            await using (var scope = factory.Services.CreateAsyncScope())
-                _ = await scope.ServiceProvider.GetRequiredService<SyncExecutionProcessor>()
-                    .ExecuteNextAsync(TimeSpan.FromSeconds(30));
-
-            await using var verify = PostgreSqlTestEnvironment.CreateDbContext(connection);
-            var statuses = await verify.SyncOperations.AsNoTracking()
-                .Where(x => operationIds.Contains(x.ClientOperationId))
-                .Select(x => x.Status).ToListAsync();
-            if (statuses.Count == operationIds.Count && statuses.All(x => x is "SUCCEEDED" or "REJECTED" or "CONFLICT"))
-                return;
-        }
-        throw new Xunit.Sdk.XunitException("The governed operations did not reach terminal states.");
-    }
-
-    private static async Task<TestScope> SeedAsync(
-        TransportErpDbContext db,
-        ECDsa proofKey,
-        string suffix,
-        bool bindProofKey = true)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var currency = new Currency
-        {
-            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
-            NameAr = "Ø¹Ù…Ù„Ø© G4 HTTP", MinorUnit = 2, IsBase = true, Status = "ACTIVE",
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var company = new Company
-        {
-            Id = Guid.NewGuid(), Code = $"G4H-{suffix}-{Guid.NewGuid():N}"[..18],
-            LegalNameAr = "Ø´Ø±ÙƒØ© G4 HTTP", BaseCurrencyId = currency.Id,
-            DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
-            RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var branch = new Branch
-        {
-            Id = Guid.NewGuid(), CompanyId = company.Id, Code = "MAIN", NameAr = "Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ",
-            Timezone = "Asia/Riyadh", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
-            RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var user = new User
-        {
-            Id = Guid.NewGuid(), UserName = $"g4-http-{Guid.NewGuid():N}",
-            NormalizedUserName = $"G4HTTP{Guid.NewGuid():N}", DisplayName = "Ù…Ø³ØªØ®Ø¯Ù… G4 HTTP",
-            PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1,
-            Status = "ACTIVE", CompanyId = company.Id, BranchId = branch.Id,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var role = new Role
-        {
-            Id = Guid.NewGuid(), Code = $"G4H-{suffix}-{Guid.NewGuid():N}", NameAr = "Ø¯ÙˆØ± G4 HTTP",
-            CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
-            RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var sessionId = Guid.NewGuid();
-        var registeredDeviceId = Guid.NewGuid();
-        var deviceId = $"g4-http-{suffix.ToLowerInvariant()}-{Guid.NewGuid():N}";
-        db.AddRange(currency, company, branch, user, role);
-        db.UserRoles.Add(new UserRole
-        {
-            UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        foreach (var code in new[]
-                 {
-                     "sync.operations.execute", "party.create", "waybill.create", "waybill.edit",
-                     "accounting.journal.create", "waybill.attachment.add", "waybill.pod.capture",
-                     "sync.conflicts.resolve", "devices.manage"
-                 })
-        {
-            var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == code);
-            if (permission is null)
-            {
-                permission = new Permission
-                {
-                    Id = Guid.NewGuid(), Code = code, NameAr = code, Resource = code.Split('.')[0],
-                    Action = code.Split('.')[^1], ScopeType = "BRANCH", Status = "ACTIVE",
-                    CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-                };
-                db.Permissions.Add(permission);
-            }
-            db.RolePermissions.Add(new RolePermission
-            {
-                RoleId = role.Id, PermissionId = permission.Id, ScopeType = permission.ScopeType,
-                CompanyId = permission.ScopeType == "PLATFORM" ? null : company.Id,
-                BranchId = permission.ScopeType == "BRANCH" ? branch.Id : null,
-                CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-            });
-        }
-
-        var publicParameters = proofKey.ExportParameters(false);
-        var x = Base64Url(publicParameters.Q.X!);
-        var y = Base64Url(publicParameters.Q.Y!);
-        var canonicalJwk = $"{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{x}\",\"y\":\"{y}\"}}";
-        var thumbprint = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(canonicalJwk)));
-        db.RegisteredDevices.Add(new RegisteredDevice
-        {
-            Id = registeredDeviceId, CompanyId = company.Id, DeviceId = deviceId,
-            DisplayName = "G4 HTTP device", Platform = "TEST", AppVersion = "1.0",
-            RegistrationRequestId = "g4-http-" + Guid.NewGuid().ToString("N"),
-            CredentialHash = new string('a', 64), CredentialVersion = 1, Status = "ACTIVE",
-            RegisteredByUserId = user.Id, ApprovedByUserId = user.Id, ApprovedAt = now, LastSeenAt = now,
-            ProofPublicJwkCanonicalJson = bindProofKey ? canonicalJwk : null,
-            ProofKeyThumbprint = bindProofKey ? thumbprint : null,
-            ProofKeyVersion = bindProofKey ? 1 : null,
-            ProofKeyChangedAt = bindProofKey ? now : null,
-            ProofKeyChangedByUserId = bindProofKey ? user.Id : null,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        db.RegisteredDeviceAssignments.Add(new RegisteredDeviceAssignment
-        {
-            Id = Guid.NewGuid(), RegisteredDeviceId = registeredDeviceId, UserId = user.Id,
-            CompanyId = company.Id, BranchId = branch.Id, Status = "ACTIVE", AssignedByUserId = user.Id,
-            AssignedAt = now, CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        db.AuthSessions.Add(new AuthSession
-        {
-            Id = sessionId, UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id,
-            DeviceId = deviceId, RegisteredDeviceId = registeredDeviceId, DeviceCredentialVersion = 1,
-            Mode = "LOCAL", SecurityStampAtIssue = user.SecurityStamp, AuthVersionAtIssue = 1,
-            RefreshTokenHash = Convert.ToHexString(SHA256.HashData(sessionId.ToByteArray())).ToLowerInvariant(),
-            RefreshTokenFamilyId = Guid.NewGuid(), IssuedAt = now, AccessTokenExpiresAt = now.AddMinutes(15),
-            RefreshTokenExpiresAt = now.AddDays(1), CreatedAt = now, UpdatedAt = now,
-            RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        await db.SaveChangesAsync();
-
-        return new TestScope(company.Id, branch.Id, user.Id, sessionId, registeredDeviceId,
-            deviceId, currency.Id, CreateToken(user, company.Id, branch.Id, sessionId, registeredDeviceId, deviceId));
-    }
-
-    private static async Task<TestScope> SeedSecondDeviceAsync(
-        TransportErpDbContext db,
-        TestScope scope,
-        ECDsa proofKey)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var user = await db.Users.SingleAsync(candidate => candidate.Id == scope.UserId);
-        var registeredDeviceId = Guid.NewGuid();
-        var sessionId = Guid.NewGuid();
-        var deviceId = $"g4-http-device-b-{Guid.NewGuid():N}";
-        var publicParameters = proofKey.ExportParameters(false);
-        var x = Base64Url(publicParameters.Q.X!);
-        var y = Base64Url(publicParameters.Q.Y!);
-        var canonicalJwk = $"{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{x}\",\"y\":\"{y}\"}}";
-        var thumbprint = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(canonicalJwk)));
-        db.RegisteredDevices.Add(new RegisteredDevice
-        {
-            Id = registeredDeviceId, CompanyId = scope.CompanyId, DeviceId = deviceId,
-            DisplayName = "G4 HTTP second device", Platform = "TEST", AppVersion = "1.0",
-            RegistrationRequestId = "g4-http-second-" + Guid.NewGuid().ToString("N"),
-            CredentialHash = new string('b', 64), CredentialVersion = 1, Status = "ACTIVE",
-            RegisteredByUserId = scope.UserId, ApprovedByUserId = scope.UserId,
-            ApprovedAt = now, LastSeenAt = now,
-            ProofPublicJwkCanonicalJson = canonicalJwk, ProofKeyThumbprint = thumbprint,
-            ProofKeyVersion = 1, ProofKeyChangedAt = now, ProofKeyChangedByUserId = scope.UserId,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        db.RegisteredDeviceAssignments.Add(new RegisteredDeviceAssignment
-        {
-            Id = Guid.NewGuid(), RegisteredDeviceId = registeredDeviceId, UserId = scope.UserId,
-            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Status = "ACTIVE",
-            AssignedByUserId = scope.UserId, AssignedAt = now,
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        db.AuthSessions.Add(new AuthSession
-        {
-            Id = sessionId, UserId = scope.UserId, CompanyId = scope.CompanyId,
-            BranchId = scope.BranchId, DeviceId = deviceId,
-            RegisteredDeviceId = registeredDeviceId, DeviceCredentialVersion = 1,
-            Mode = "LOCAL", SecurityStampAtIssue = user.SecurityStamp, AuthVersionAtIssue = user.AuthVersion,
-            RefreshTokenHash = Convert.ToHexString(SHA256.HashData(sessionId.ToByteArray())).ToLowerInvariant(),
-            RefreshTokenFamilyId = Guid.NewGuid(), IssuedAt = now,
-            AccessTokenExpiresAt = now.AddMinutes(15), RefreshTokenExpiresAt = now.AddDays(1),
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        });
-        await db.SaveChangesAsync();
-        return new TestScope(
-            scope.CompanyId, scope.BranchId, scope.UserId, sessionId, registeredDeviceId,
-            deviceId, scope.CurrencyId,
-            CreateToken(user, scope.CompanyId, scope.BranchId, sessionId, registeredDeviceId, deviceId));
-    }
-
-    private static async Task<CrossScopeTargets> SeedCrossScopeTargetsAsync(
-        TransportErpDbContext db,
-        TestScope scope)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var foreignBranch = new Branch
-        {
-            Id = Guid.NewGuid(), CompanyId = scope.CompanyId, Code = $"B{Guid.NewGuid():N}"[..12],
-            NameAr = "ÙØ±Ø¹ Ø¢Ø®Ø±", Timezone = "Asia/Riyadh", Status = "ACTIVE",
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var foreignCompany = new Company
-        {
-            Id = Guid.NewGuid(), Code = $"FC-{Guid.NewGuid():N}"[..18], LegalNameAr = "Ø´Ø±ÙƒØ© Ø£Ø®Ø±Ù‰",
-            BaseCurrencyId = scope.CurrencyId, DefaultCalendarId = Guid.NewGuid(), Status = "ACTIVE",
-            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var foreignCompanyBranch = new Branch
-        {
-            Id = Guid.NewGuid(), CompanyId = foreignCompany.Id, Code = "MAIN", NameAr = "ÙØ±Ø¹ Ø§Ù„Ø´Ø±ÙƒØ© Ø§Ù„Ø£Ø®Ø±Ù‰",
-            Timezone = "Asia/Riyadh", Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
-            RowVersion = RandomNumberGenerator.GetBytes(16)
-        };
-        var branchParty = Party(scope.CompanyId, foreignBranch.Id, "BRANCH", now);
-        var companyParty = Party(foreignCompany.Id, foreignCompanyBranch.Id, "COMPANY", now);
-        var waybillDateTime = now;
-        var originId = Guid.NewGuid();
-        var destinationId = Guid.NewGuid();
-        var waybill = new WaybillEntity
-        {
-            Id = Guid.NewGuid(), CompanyId = scope.CompanyId, BranchId = scope.BranchId,
-            DraftNo = "D-G4-" + Guid.NewGuid().ToString("N"), WaybillDateTime = waybillDateTime,
-            ServiceType = "STANDARD", Priority = "NORMAL", OriginId = originId,
-            DestinationId = destinationId, CurrencyId = scope.CurrencyId, ExchangeRate = 1,
-            FreightTotal = 0, DiscountTotal = 0, Status = "DRAFT", FinancialStatus = "UNPAID",
-            CreateClientOperationId = "seed-" + Guid.NewGuid().ToString("N"),
-            LastClientOperationId = "seed-" + Guid.NewGuid().ToString("N"),
-            Version = 1, CreatedAt = now, UpdatedAt = now
-        };
-        db.AddRange(foreignBranch, foreignCompany, foreignCompanyBranch, branchParty, companyParty, waybill);
-        await db.SaveChangesAsync();
-        return new CrossScopeTargets(waybill.Id, branchParty.Id, companyParty.Id,
-            waybillDateTime, originId, destinationId);
-    }
-
-    private static OperationalPartyEntity Party(Guid companyId, Guid branchId, string suffix, DateTimeOffset now)
-        => new()
-        {
-            Id = Guid.NewGuid(), CompanyId = companyId, BranchId = branchId,
-            PartyNo = $"P-{suffix}-{Guid.NewGuid():N}"[..30], Name = $"Party {suffix}",
-            Mobile = "700000001", Status = "ACTIVE", ClientOperationId = $"party-{suffix}-{Guid.NewGuid():N}",
-            Version = 1, CreatedAt = now, UpdatedAt = now
-        };
-
-    private static string CreateToken(
-        User user,
-        Guid companyId,
-        Guid branchId,
-        Guid sessionId,
-        Guid registeredDeviceId,
-        string deviceId)
-    {
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity([
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString("D")),
-                new Claim("company_id", companyId.ToString("D")),
-                new Claim("branch_id", branchId.ToString("D")),
-                new Claim("sid", sessionId.ToString("D")),
-                new Claim("device_id", deviceId),
-                new Claim("registered_device_id", registeredDeviceId.ToString("D")),
-                new Claim("device_credential_version", "1"),
-                new Claim("security_stamp", user.SecurityStamp!),
-                new Claim("auth_version", "1")
-            ]),
-            Issuer = Issuer,
-            Audience = Audience,
-            Expires = DateTime.UtcNow.AddMinutes(10),
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey))
-                    { KeyId = "stage4-g4-http-current" }, SecurityAlgorithms.HmacSha256)
-        };
-        return new JwtSecurityTokenHandler().WriteToken(
-            new JwtSecurityTokenHandler().CreateToken(descriptor));
-    }
-
-    private static string Sha256(string value)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
-
-    private static string Base64Url(ReadOnlySpan<byte> value)
-        => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-    private sealed record TestOperation(
-        string ActionCode,
-        string OperationType,
-        string EntityType,
-        Guid? EntityId,
-        string ClientOperationId,
-        Guid OperationCorrelationId,
-        string PayloadJson,
-        string PayloadHash,
-        long? BaseVersion);
-
-    private sealed record TestScope(
-        Guid CompanyId,
-        Guid BranchId,
-        Guid UserId,
-        Guid SessionId,
-        Guid RegisteredDeviceId,
-        string DeviceId,
-        Guid CurrencyId,
-        string Bearer);
-
-    private sealed class AcceptedRawBodyAuthenticator(
-        TestScope scope,
-        EffectiveSyncPolicy effectivePolicy) : ISyncPopHttpRequestAuthenticator
-    {
-        public async Task<SyncHttpAuthenticationResult> AuthenticateAsync(
-            HttpContext http,
-            string canonicalPath,
-            TryReadSyncRequestDeviceId? tryReadBodyDeviceId,
-            CancellationToken cancellationToken)
-        {
-            await using var buffer = new MemoryStream();
-            await http.Request.Body.CopyToAsync(buffer, cancellationToken);
-            var attemptCorrelationId = Guid.TryParse(
-                http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var supplied)
-                ? supplied
-                : Guid.NewGuid();
-            var current = new CurrentSecurityContext(
-                scope.UserId, scope.CompanyId, scope.BranchId, scope.SessionId,
-                scope.DeviceId, true, scope.RegisteredDeviceId, 1);
-            var security = new SyncProofSecurityContext(
-                scope.UserId, scope.CompanyId, scope.BranchId,
-                scope.RegisteredDeviceId, scope.DeviceId);
-            var proof = new AcceptedSyncProofContext(
-                Guid.NewGuid(), scope.UserId, scope.CompanyId, scope.BranchId,
-                scope.RegisteredDeviceId, scope.DeviceId, 1, 1,
-                new string('t', 43), attemptCorrelationId);
-            return new SyncHttpAuthenticationResult(
-                new AcceptedSyncHttpRequest(
-                    current, security, proof, buffer.ToArray(), attemptCorrelationId, effectivePolicy),
-                null);
-        }
-    }
-
-    private sealed class IsolatedOpenEffectivePolicyProvider : IEffectiveSyncPolicyProvider
-    {
-        public Task<EffectiveSyncPolicy> ResolveAsync(
-            CurrentSecurityContext current,
-            CancellationToken cancellationToken = default)
-        {
-            var actions = SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue)
-                .ToHashSet(StringComparer.Ordinal);
-            return Task.FromResult(new EffectiveSyncPolicy(
-                true, actions, new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
-                25, 2_097_152, 16_384, 2, 5, 10, 5, 20, 30, 12, 4, 45, 8,
-                null, "test-policy-open-v1", new string('a', 64)));
-        }
-    }
-
-    private sealed record CrossScopeTargets(
-        Guid LocalWaybillId,
-        Guid ForeignBranchPartyId,
-        Guid ForeignCompanyPartyId,
-        DateTimeOffset WaybillDateTime,
-        Guid OriginId,
-        Guid DestinationId);
-
-    private sealed class IsolatedOpenSyncRuntimeGate : ISyncRuntimeGate
-    {
-        public Task<EffectiveSyncPolicy> ResolveAsync(
-            CurrentSecurityContext current,
-            CancellationToken cancellationToken)
-            => Task.FromResult(new EffectiveSyncPolicy(
-                true,
-                new HashSet<string>(SyncActionCatalog.Definitions.Select(x => x.ActionCodeValue), StringComparer.Ordinal),
-                new HashSet<string>(["sync-v1"], StringComparer.Ordinal),
-                100, 2_097_152, 16_384, 5, 5, 5, 5, 30, 30, 24, 7, 90, 24, null));
-    }
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíÛm·Ù:-jZ.¶›­–)Þ³WW6–ær7—7FVÒä–FVçF—G”ÖöFVÂåFö¶Vç2ä§wC°§W6–ær7—7FVÒäæWC°§W6–ær7—7FVÒäæWBä‡GGä†VFW'3°§W6–ær7—7FVÒå6V7W&—G’ä6Æ–×3°§W6–ær7—7FVÒå6V7W&—G’ä7'—Föw&‡“°§W6–ær7—7FVÒåFW‡C°§W6–ær7—7FVÒåFW‡BäVæ6öF–æw2åvV#°§W6–ær7—7FVÒåFW‡Bä§6öã°§W6–ærÖ–7&÷6ögBä7æWD6÷&Rä†÷7F–æs°§W6–ærÖ–7&÷6ögBä7æWD6÷&Rä‡GG°§W6–ærÖ–7&÷6ögBä7æWD6÷&Rä×f2åFW7F–æs°§W6–ærÖ–7&÷6ögBäVçF—G”g&ÖWv÷&´6÷&S°§W6–ærÖ–7&÷6ögBäW‡FVç6–öç2äFWVæFVæ7”–æ¦V7F–öã°§W6–ærÖ–7&÷6ögBäW‡FVç6–öç2äFWVæFVæ7”–æ¦V7F–öâäW‡FVç6–öç3°§W6–ærÖ–7&÷6ögBäW‡FVç6–öç2ä÷F–öç3°§W6–ærÖ–7&÷6ögBä–FVçF—G”ÖöFVÂåFö¶Vç3°§W6–ærG&ç7÷'DU%ä’å6V7W&—G“°§W6–ærG&ç7÷'DU%ä’å7–æ3°§W6–ærG&ç7÷'DU%äÆ–6F–öâå7–æ3°§W6–ærG&ç7÷'DU%ä6öçG&7G2äGF6†ÖVçG3°§W6–ærG&ç7÷'DU%ä6öçG&7G2ävVó°§W6–ærG&ç7÷'DU%ä6öçG&7G2åv–&–ÆÇ3°§W6–ærG&ç7÷'DU%ä–æg&7G'V7GW&RåW'6—7FVæ6S° ¦æÖW76RG&ç7÷'DU%åFW7G3° ¢òòòÇ7VÖÖ'“à¢òòòW†7B…EEõ÷7Fw&U5ÂæVvF—fRWf–FVæ6Rf÷"F†R&VÖ–æ–ærsB7–æ2×c66WFæ6R66W2à¢òòòF†R&öGV7F–öâöffÆ–æRæB6W'fW"v÷&¶W"7v—F6†W2&VÖ–â6Æ÷6VC²F†—2—6öÆFVBFW7E6W'fW ¢òòò÷Vç2öæÇ’F†R&WVW7BvFRæBG&—fW2F†R&VÂ&ö6W76÷"FWFW&Ö–æ—7F–6ÆÇ’à¢òòòÂ÷7VÖÖ'“à¥´6öÆÆV7F–öâ‚%÷7Fw&U7Â"•Ð§V&Æ–26VÆVB6Æ727FvSDsD‡GGæVvF—fU÷7Fw&U7ÅFW7G0§°¢&—fFR7FF–2&VFöæÇ’§6öå6W&–Æ—¦W$÷F–öç2v—&T§6öâÒæWr„§6öå6W&–Æ—¦W$FVfVÇG2åvV"“°¢&—fFR7FF–2&VFöæÇ’'V–ÆD–FVçF—G•cFW7D'V–ÆD–FVçF—G’ÒæWr€¢'V–ÆD–FVçF—G•cäFW6·F÷v–æF÷w5ÆFf÷&ÒÂæWr7G&–ær‚vRrÂcB’“°¢&—fFR6öç7B7G&–ær—77VW"Ò%G&ç7÷'DU%å7FvSBäsBä‡GGæVvF—fR#°¢&—fFR6öç7B7G&–ærVF–Væ6RÒ%G&ç7÷'DU%å7FvSBäsBä‡GGæVvF—fRä’#°¢&—fFR6öç7B7G&–ær6–væ–æt¶W’Ò'G&ç7÷'BÖW'×7FvSBÖsBÖ‡GGÖæVvF—fR×6–væ–ærÖ¶W’ÖÖ–æ–×VÒÓ3"#°¢&—fFR7FF–2&VFöæÇ’W&’V&Æ–4÷&–v–âÒæWr‚&‡GG3¢ò÷7–æ2æW†×ÆRçFW7B"“°¢&—fFR6öç7B7G&–ær&F6…F‚Ò"ö’÷c÷7–æ2ö÷W&F–öç3¦&F6‚#°¢&—fFR6öç7B7G&–ær&F6„‡GRÒ&‡GG3¢ò÷7–æ2æW†×ÆRçFW7Bö’÷c÷7–æ2ö÷W&F–öç3¦&F6‚#° ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢V&Æ–27–æ2F6²'W6–æW75ö–FV×÷FVæ7•ö—5öFWf–6U÷66÷VE÷F‡&÷Vv…ô…EEõ÷7Fw&U7ÅöæE÷F†U÷&VÅöFöÖ–åöFFW"‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"f—'7D¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢W6–ærf"6V6öæD¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"f—'7E66÷RÒv—B6VVD7–æ2‡6VVDF"Âf—'7D¶W’Â$DUd”4RÔ”DTÕõDTä5’"“°¢f"6V6öæE66÷RÒv—B6VVE6V6öæDFWf–6T7–æ2‡6VVDF"Âf—'7E66÷RÂ6V6öæD¶W’“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"f—'7D6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Âf—'7E66÷Rä&V&W"“°¢W6–ærf"6V6öæD6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â6V6öæE66÷Rä&V&W"“° ¢f"6Æ–VçD÷W&F–öä–BÒB'6†&VBÖFWf–6RÖ¶W’×´wV–BäæWtwV–B‚“¤çÒ#°¢f"f—'7D÷W&F–öâÒ÷W&F–öâ€¢$7&VFT÷W&F–öæÅ'G’"Â$5$TDR"Â$÷W&F–öæÅ'G’"ÂçVÆÂÀ¢6Æ–VçD÷W&F–öä–BÂwV–BäæWtwV–B‚’À¢'G•–ÆöB†6Æ–VçD÷W&F–öä–BÂ$DUd”4RÔ"’ÂçVÆÂÂçVÆÂ“°¢f"6V6öæD÷W&F–öâÒ÷W&F–öâ€¢$7&VFT÷W&F–öæÅ'G’"Â$5$TDR"Â$÷W&F–öæÅ'G’"ÂçVÆÂÀ¢6Æ–VçD÷W&F–öä–BÂwV–BäæWtwV–B‚’À¢'G•–ÆöB†6Æ–VçD÷W&F–öä–BÂ$DUd”4RÔ""’ÂçVÆÂÂçVÆÂ“° ¢wV–Bf—'7E6W'fW$÷W&F–öä–C°¢wV–B6V6öæE6W'fW$÷W&F–öä–C°¢W6–ær‡f"f—'7E&W7öç6RÒv—B6VæE6–væVD7–æ2€¢f—'7D6Æ–VçBÂf—'7D¶W’Âf—'7E66÷Rä&V&W"À¢&F6„&öG’†f—'7E66÷RäFWf–6T–BÂf—'7D÷W&F–öâ’’¢W6–ær‡f"6V6öæE&W7öç6RÒv—B6VæE6–væVD7–æ2€¢6V6öæD6Æ–VçBÂ6V6öæD¶W’Â6V6öæE66÷Rä&V&W"À¢&F6„&öG’‡6V6öæE66÷RäFWf–6T–BÂ6V6öæD÷W&F–öâ’’¢°¢f"f—'7E&W7VÇBÒv—B6–ævÆU&W7VÇD7–æ2†f—'7E&W7öç6R“°¢f"6V6öæE&W7VÇBÒv—B6–ævÆU&W7VÇD7–æ2‡6V6öæE&W7öç6R“°¢76W'BäWVÂ‚%TUTTB"Âf—'7E&W7VÇBå7FGW2“°¢76W'BäWVÂ‚%TUTTB"Â6V6öæE&W7VÇBå7FGW2“°¢f—'7E6W'fW$÷W&F–öä–BÒ76W'Bä—5G—SÄwV–Câ†f—'7E&W7VÇBå6W'fW$÷W&F–öä–B“°¢6V6öæE6W'fW$÷W&F–öä–BÒ76W'Bä—5G—SÄwV–Câ‡6V6öæE&W7VÇBå6W'fW$÷W&F–öä–B“°¢76W'Bäæ÷DWVÂ†f—'7E6W'fW$÷W&F–öä–BÂ6V6öæE6W'fW$÷W&F–öä–B“°¢Ð ¢v—BW†V7WFUVçF–ÅFW&Ö–æÄ7–æ2†f7F÷'’Â6öææV7F–öâÀ¢¶6Æ–VçD÷W&F–öä–BÂ6Æ–VçD÷W&F–öä–EÒ“° ¢v—BW6–ær‡f"fW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ’¢°¢f"÷W&F–öç2Òv—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’åv†W&R†÷W&F–öâÓà¢÷W&F–öâä6ö×ç”–BÓÒf—'7E66÷Rä6ö×ç”–Bb`¢÷W&F–öâä6Æ–VçD÷W&F–öä–BÓÒ6Æ–VçD÷W&F–öä–B’åFôÆ—7D7–æ2‚“°¢76W'BäWVÂƒ"Â÷W&F–öç2ä6÷VçB“°¢76W'Bä6öçF–ç2†÷W&F–öç2Â÷W&F–öâÓà¢÷W&F–öâå&Vv—7FW&VDFWf–6T–BÓÒf—'7E66÷Rå&Vv—7FW&VDFWf–6T–Bb`¢÷W&F–öâä–BÓÒf—'7E6W'fW$÷W&F–öä–Bbb÷W&F–öâå7FGW2ÓÒ%5T44TTDTB"“°¢76W'Bä6öçF–ç2†÷W&F–öç2Â÷W&F–öâÓà¢÷W&F–öâå&Vv—7FW&VDFWf–6T–BÓÒ6V6öæE66÷Rå&Vv—7FW&VDFWf–6T–Bb`¢÷W&F–öâä–BÓÒ6V6öæE6W'fW$÷W&F–öä–Bbb÷W&F–öâå7FGW2ÓÒ%5T44TTDTB"“° ¢f"W‡V7FVD'W6–æW74¶W—2ÒæWuµÐ¢°¢7–æ4'W6–æW74–FV×÷FVæ7”¶W’ä7&VFR€¢f—'7E66÷Rä6ö×ç”–BÂf—'7E66÷Rä'&æ6„–BÀ¢f—'7E66÷Rå&Vv—7FW&VDFWf–6T–BÂ6Æ–VçD÷W&F–öä–B’À¢7–æ4'W6–æW74–FV×÷FVæ7”¶W’ä7&VFR€¢6V6öæE66÷Rä6ö×ç”–BÂ6V6öæE66÷Rä'&æ6„–BÀ¢6V6öæE66÷Rå&Vv—7FW&VDFWf–6T–BÂ6Æ–VçD÷W&F–öä–B¢Ó°¢f"'F–W2Òv—BfW&–g’å6WCÄ÷W&F–öæÅ'G”VçF—G“â‚’ä4æõG&6¶–ær‚’åv†W&R‡'G’Óà¢'G’ä6ö×ç”–BÓÒf—'7E66÷Rä6ö×ç”–Bb`¢W‡V7FVD'W6–æW74¶W—2ä6öçF–ç2‡'G’ä6Æ–VçD÷W&F–öä–B’’åFôÆ—7D7–æ2‚“°¢76W'BäWVÂƒ"Â'F–W2ä6÷VçB“°¢76W'BäWVÂƒ"Â'F–W2å6VÆV7B‡'G’Óâ'G’ä–B’äF—7F–æ7B‚’ä6÷VçB‚’“°¢Ð ¢W6–ær‡f"&WÆ•&W7öç6RÒv—B6VæE6–væVD7–æ2€¢f—'7D6Æ–VçBÂf—'7D¶W’Âf—'7E66÷Rä&V&W"À¢&F6„&öG’†f—'7E66÷RäFWf–6T–BÂf—'7D÷W&F–öâ’’¢°¢f"&WÆ’Òv—B6–ævÆU&W7VÇD7–æ2‡&WÆ•&W7öç6R“°¢76W'BäWVÂ‚%5T44TTDTB"Â&WÆ’å7FGW2“°¢76W'BäWVÂ†f—'7E6W'fW$÷W&F–öä–BÂ&WÆ’å6W'fW$÷W&F–öä–B“°¢Ð ¢f"×WFFVE–ÆöBÒ'G•–ÆöB†6Æ–VçD÷W&F–öä–BÂ$DUd”4RÔÔÕUDDTB"“°¢f"×WFFVBÒf—'7D÷W&F–öâv—F€¢°¢–ÆöD§6öâÒ×WFFVE–ÆöBÀ¢–ÆöD†6‚Ò6†#Sb†×WFFVE–ÆöB¢Ó°¢W6–ær‡f"×WFF–öå&W7öç6RÒv—B6VæE6–væVD7–æ2€¢f—'7D6Æ–VçBÂf—'7D¶W’Âf—'7E66÷Rä&V&W"À¢&F6„&öG’†f—'7E66÷RäFWf–6T–BÂ×WFFVB’’¢°¢f"×WFF–öâÒv—B6–ævÆU&W7VÇD7–æ2†×WFF–öå&W7öç6R“°¢76W'BäWVÂ‚%$T¤T5DTB"Â×WFF–öâå7FGW2“°¢76W'BäWVÂ‚$”DTÕõDTä5•ô4ôädÄ”5B"Â×WFF–öâäW'&÷$6öFR“°¢76W'BäçVÆÂ†×WFF–öâå6W'fW$÷W&F–öä–B“°¢Ð ¢v—BW6–ærf"FW&Ö–æÅfW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢76W'BäWVÂƒ"Âv—BFW&Ö–æÅfW&–g’å7–æ4÷W&F–öç2ä6÷VçD7–æ2†÷W&F–öâÓà¢÷W&F–öâä6ö×ç”–BÓÒf—'7E66÷Rä6ö×ç”–Bb`¢÷W&F–öâä6Æ–VçD÷W&F–öä–BÓÒ6Æ–VçD÷W&F–öä–B’“°¢76W'BäWVÂƒ"Âv—BFW&Ö–æÅfW&–g’å6WCÄ÷W&F–öæÅ'G”VçF—G“â‚’ä6÷VçD7–æ2‡'G’Óà¢'G’ä6ö×ç”–BÓÒf—'7E66÷Rä6ö×ç”–Bb`¢‡'G’ä6Æ–VçD÷W&F–öä–BÓÒ7–æ4'W6–æW74–FV×÷FVæ7”¶W’ä7&VFR€¢f—'7E66÷Rä6ö×ç”–BÂf—'7E66÷Rä'&æ6„–BÀ¢f—'7E66÷Rå&Vv—7FW&VDFWf–6T–BÂ6Æ–VçD÷W&F–öä–B’ÇÀ¢'G’ä6Æ–VçD÷W&F–öä–BÓÒ7–æ4'W6–æW74–FV×÷FVæ7”¶W’ä7&VFR€¢6V6öæE66÷Rä6ö×ç”–BÂ6V6öæE66÷Rä'&æ6„–BÀ¢6V6öæE66÷Rå&Vv—7FW&VDFWf–6T–BÂ6Æ–VçD÷W&F–öä–B’’’“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢µG&—B‚$66WFæ6R"Â%BÕ5”ä2Ó2"•Ð¢V&Æ–27–æ2F6²Eõ5”ä5ó5÷6–væVE÷&WVW7E÷v—F…öÖ—6ÖF6†VE÷–ÆöEö†6…ö—5÷&V¦V7FVEöVF—FVEöæEö†5öæõö'W6–æW75öVffV7B‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â$„4‚"“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“°¢f"÷W&F–öä6÷'&VÆF–öä–BÒwV–BäæWtwV–B‚“°¢f"6Æ–VçD÷W&F–öä–BÒB'B×7–æ2Ó2×´wV–BäæWtwV–B‚“¤çÒ#°¢f"–ÆöBÒ'G•–ÆöB†6Æ–VçD÷W&F–öä–BÂ%BÕ5”ä2Ó2"“°¢f"&öG’Ò&F6„&öG’‡66÷RäFWf–6T–BÀ¢÷W&F–öâ‚$7&VFT÷W&F–öæÅ'G’"Â$5$TDR"Â$÷W&F–öæÅ'G’"ÂçVÆÂÀ¢6Æ–VçD÷W&F–öä–BÂ÷W&F–öä6÷'&VÆF–öä–BÂ–ÆöBÂæWr7G&–ær‚srÂcB’ÂçVÆÂ’“° ¢W6–ærf"&W7öç6RÒv—B6VæE6–væVD7–æ2†6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"Â&öG’“° ¢76W'BäWVÂ„‡GG7FGW46öFRäô²Â&W7öç6Rå7FGW46öFR“°¢f"&W7VÇBÒv—B6–ævÆU&W7VÇD7–æ2‡&W7öç6R“°¢76W'BäWVÂ‚%$T¤T5DTB"Â&W7VÇBå7FGW2“°¢76W'BäWVÂ‚$„4…ôÔ•4ÔD4‚"Â&W7VÇBäW'&÷$6öFR“°¢76W'BäçVÆÂ‡&W7VÇBå6W'fW$÷W&F–öä–B“° ¢v—BW6–ærf"fW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢76W'BäfÇ6R†v—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’äç”7–æ2‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bbb‚ä6Æ–VçD÷W&F–öä–BÓÒ6Æ–VçD÷W&F–öä–B’“°¢76W'BäfÇ6R†v—BfW&–g’å6WCÄ÷W&F–öæÅ'G”VçF—G“â‚’ä4æõG&6¶–ær‚’äç”7–æ2‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bbb‚ä6Æ–VçD÷W&F–öä–BÓÒ6Æ–VçD÷W&F–öä–B’“° ¢òòF†R66WFæ6R6öçG&7B&WV—&W2ÖWFFFÖöæÇ’&V¦V7F–öâVF—DWfVçBÂæ÷BÖW&VÇ’F†P¢òò7V66W76gVÂ&ööbÖ6Æ–ÒWfVçBà¢f"&V¦V7F–öäVF—G2Òv—BfW&–g’äVF—DWfVçG2ä4æõG&6¶–ær‚’åv†W&R‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bb`¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ÷W&F–öä6÷'&VÆF–öä–Bb`¢‚ä÷WF6öÖRÓÒ%$T¤T5DTB"’åFôÆ—7D7–æ2‚“°¢76W'Bä6öçF–ç2‡&V¦V7F–öäVF—G2Â‚Óà¢‡‚å&V6öâóò7G&–æräV×G’’ä6öçF–ç2‚$„4…ôÔ•4ÔD4‚"Â7G&–æt6ö×&—6öâä÷&F–æÂ’“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢µG&—B‚$66WFæ6R"Â%BÕ5”ä2ÓB"•Ð¢V&Æ–27–æ2F6²Eõ5”ä5óEö7&÷75ö6ö×ç•ö7&÷75ö'&æ6…öæEöÖ—76–æu÷'G•÷&VfW&Væ6W5ö&Uö–æF—7F–æwV—6†&ÆUöæE÷&WÆ•÷6fR‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â%44õR"“°¢f"F&vWG2Òv—B6VVD7&÷7566÷UF&vWG47–æ2‡6VVDF"Â66÷R“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“° ¢f"6ö×ç”÷W&F–öâÒWFFT÷W&F–öâ‡66÷RÂF&vWG2ÂF&vWG2äf÷&V–vä6ö×ç•'G”–BÂ$4ôÕå’"“°¢f"'&æ6„÷W&F–öâÒWFFT÷W&F–öâ‡66÷RÂF&vWG2ÂF&vWG2äf÷&V–vä'&æ6…'G”–BÂ$%$ä4‚"“°¢f"Ö—76–æt÷W&F–öâÒWFFT÷W&F–öâ‡66÷RÂF&vWG2ÂwV–BäæWtwV–B‚’Â$Ô•54”är"“°¢f"&öG’Ò&F6„&öG’‡66÷RäFWf–6T–BÂ6ö×ç”÷W&F–öâÂ'&æ6„÷W&F–öâÂÖ—76–æt÷W&F–öâ“° ¢W6–ær‡f"66WFVBÒv—B6VæE6–væVD7–æ2†6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"Â&öG’’¢°¢76W'BäWVÂ„‡GG7FGW46öFRäô²Â66WFVBå7FGW46öFR“°¢f"&W7VÇG2Òv—B&W7VÇG47–æ2†66WFVB“°¢76W'BäWVÂƒ2Â&W7VÇG2ä6÷VçB“°¢76W'BäÆÂ‡&W7VÇG2Â&W7VÇBÓà¢°¢76W'BäWVÂ‚%TUTTB"Â&W7VÇBå7FGW2“°¢76W'BäçVÆÂ‡&W7VÇBäW'&÷$6öFR“°¢76W'Bäæ÷DçVÆÂ‡&W7VÇBå6W'fW$÷W&F–öä–B“°¢Ò“°¢Ð ¢v—BW†V7WFUVçF–ÅFW&Ö–æÄ7–æ2†f7F÷'’Â6öææV7F–öâÀ¢¶6ö×ç”÷W&F–öâä6Æ–VçD÷W&F–öä–BÂ'&æ6„÷W&F–öâä6Æ–VçD÷W&F–öä–BÂÖ—76–æt÷W&F–öâä6Æ–VçD÷W&F–öä–EÒ“° ¢òòGvò–æFWVæFVçFÇ’6ö×÷6VB†÷7G2&WÆ’F†R6ÖRv÷fW&æVB'W6–æW72–FVçF—F–W2v–ç7@¢òòöæR÷7Fw&U5Â7F÷&RâW"ÖFWf–6RGf—6÷'’Æö6¶–ær×W7B6öçfW&vRv—F†÷WBGWÆ–6FP¢òò÷W&F–öâ÷"'W6–æW72×G&ç6—F–öâVF—Bâ6W&FVÇ’–×÷'FVB6–væW"fö–G26†&–ærT4E47FFRà¢W6–ærf"6V6öæDf7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6V6öæD6Æ–VçBÒ7&VFT6Æ–VçB‡6V6öæDf7F÷'’Â66÷Rä&V&W"“°¢W6–ærf"6V6öæE&ööd¶W’ÒT4G6ä7&VFR‡&ööd¶W’äW‡÷'E&ÖWFW'2‡G'VR’“°¢f"&WÆ•&W7öç6W2Òv—BF6²åv†VäÆÂ€¢6VæE6–væVD7–æ2†6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"Â&öG’’À¢6VæE6–væVD7–æ2‡6V6öæD6Æ–VçBÂ6V6öæE&ööd¶W’Â66÷Rä&V&W"Â&öG’’“°¢f"&WÆ•FW‡G2ÒæWrÆ—7CÇ7G&–æsâ‚“°¢f÷&V6‚‡f"&WÆ’–â&WÆ•&W7öç6W2¢°¢W6–ær‡&WÆ’¢°¢76W'BäWVÂ„‡GG7FGW46öFRäô²Â&WÆ’å7FGW46öFR“°¢f"&WÆ•FW‡BÒv—B&WÆ’ä6öçFVçBå&VD57G&–æt7–æ2‚“°¢&WÆ•FW‡G2äFB‡&WÆ•FW‡B“°¢f"&WÆ•&W7VÇG2Ò§6öå6W&–Æ—¦W"äFW6W&–Æ—¦SÅ7–æ4&F6…&W7öç6Sâ‡&WÆ•FW‡BÀ¢æWr§6öå6W&–Æ—¦W$÷F–öç2„§6öå6W&–Æ—¦W$FVfVÇG2åvV"’’å&W7VÇG3°¢76W'BäWVÂƒ2Â&WÆ•&W7VÇG2ä6÷VçB“°¢76W'BäÆÂ‡&WÆ•&W7VÇG2Â&W7VÇBÓà¢°¢76W'BäWVÂ‚%$T¤T5DTB"Â&W7VÇBå7FGW2“°¢76W'BäWVÂ‚%44õUôDTä”TB"Â&W7VÇBäW'&÷$6öFR“°¢Ò“°¢Ð¢Ð¢f"&WÆ•v—&RÒ7G&–ærä¦ö–â‚%Æâ"Â&WÆ•FW‡G2“°¢76W'BäFöW4æ÷D6öçF–â‡F&vWG2äf÷&V–vä6ö×ç•'G”–BåFõ7G&–ær‚$B"’Â&WÆ•v—&RÂ7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“°¢76W'BäFöW4æ÷D6öçF–â‡F&vWG2äf÷&V–vä'&æ6…'G”–BåFõ7G&–ær‚$B"’Â&WÆ•v—&RÂ7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“° ¢v—BW6–ærf"fW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢f"÷W&F–öç2Òv—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’åv†W&R‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bb`¢æWuµÒ²6ö×ç”÷W&F–öâä6Æ–VçD÷W&F–öä–BÂ'&æ6„÷W&F–öâä6Æ–VçD÷W&F–öä–BÂÖ—76–æt÷W&F–öâä6Æ–VçD÷W&F–öä–BÐ¢ä6öçF–ç2‡‚ä6Æ–VçD÷W&F–öä–B’’åFôÆ—7D7–æ2‚“°¢76W'BäWVÂƒ2Â÷W&F–öç2ä6÷VçB“°¢76W'BäÆÂ†÷W&F–öç2Â÷W&F–öâÓà¢°¢76W'BäWVÂ‚%$T¤T5DTB"Â÷W&F–öâå7FGW2“°¢76W'BäWVÂ‚%44õUôDTä”TB"Â÷W&F–öâäW'&÷$6öFR“°¢76W'BäWVÂƒÂ÷W&F–öâå&WG'”6÷VçB“°¢76W'BäçVÆÂ†÷W&F–öâäæW‡E&WG'”B“°¢Ò“°¢f"v–&–ÆÂÒv—BfW&–g’å6WCÅv–&–ÆÄVçF—G“â‚’ä4æõG&6¶–ær‚’å6–ævÆT7–æ2‡‚Óâ‚ä–BÓÒF&vWG2äÆö6Åv–&–ÆÄ–B“°¢76W'BäWVÂƒÂv–&–ÆÂåfW'6–öâ“°¢76W'BäfÇ6R†v—BfW&–g’å6WCÅv–&–ÆÅ'G”VçF—G“â‚’ä4æõG&6¶–ær‚¢äç”7–æ2‡‚Óâ‚åv–&–ÆÄ–BÓÒF&vWG2äÆö6Åv–&–ÆÄ–B’“° ¢f"÷W&F–öä–G2Ò÷W&F–öç2å6VÆV7B‡‚Óâ‚ä–B’åFô'&’‚“°¢f"VF—G2Òv—BfW&–g’äVF—DWfVçG2ä4æõG&6¶–ær‚¢åv†W&R‡‚Óâ‚äVçF—G”–Bä†5fÇVRbb÷W&F–öä–G2ä6öçF–ç2‡‚äVçF—G”–BåfÇVR’’åFôÆ—7D7–æ2‚“°¢76W'BäWVÂƒ2ÂVF—G2ä6÷VçB‡‚Óâ‚ä7F–öâÓÒ%7–æ4÷W&F–öåVWVVB"’“°¢76W'BäWVÂƒ2ÂVF—G2ä6÷VçB‡‚Óâ‚ä7F–öâÓÒ%7–æ4÷W&F–öäW†V7WF–öå&V¦V7FVB"’“°¢f"VF—Ev—&RÒ§6öå6W&–Æ—¦W"å6W&–Æ—¦R†VF—G2å6VÆV7B‡‚ÓâæWp¢°¢‚ä7F–öâÂ‚ä÷WF6öÖRÂ‚å&V6öâÂ‚ä6ö×ç”–BÂ‚ä'&æ6„–BÂ‚ä÷W&F–öä6÷'&VÆF–öä–@¢Ò’“°¢76W'BäFöW4æ÷D6öçF–â‡F&vWG2äf÷&V–vä6ö×ç•'G”–BåFõ7G&–ær‚$B"’ÂVF—Ev—&RÂ7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“°¢76W'BäFöW4æ÷D6öçF–â‡F&vWG2äf÷&V–vä'&æ6…'G”–BåFõ7G&–ær‚$B"’ÂVF—Ev—&RÂ7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“° ¢òò&WÆ’×WFF–öâ¶VW2F†R÷&–v–æÂ'W6–æW72–FVçF—G’'WB7v2F†RF&vWB&VfW&Væ6Rà¢òò—B—2&V¦V7FVBæBVF—FVB2f–ævW'&–çBÖ—6ÖF6‚v—F†÷WB7&VF–ærf÷W'F‚÷W&F–öâà¢f"×WFFVBÒ6ö×ç”÷W&F–öâv—F€¢°¢–ÆöD§6öâÒ'&æ6„÷W&F–öâå–ÆöD§6öâÀ¢–ÆöD†6‚Ò'&æ6„÷W&F–öâå–ÆöD†6€¢Ó°¢f"&V¦V7F–öäVF—D6÷VçBÒv—BfW&–g’äVF—DWfVçG2ä6÷VçD7–æ2‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bb`¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ6ö×ç”÷W&F–öâä÷W&F–öä6÷'&VÆF–öä–Bb`¢‚ä÷WF6öÖRÓÒ%$T¤T5DTB"“°¢W6–ærf"×WFF–öå&W7öç6RÒv—B6VæE6–væVD7–æ2€¢6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"Â&F6„&öG’‡66÷RäFWf–6T–BÂ×WFFVB’“°¢f"×WFF–öå&W7VÇBÒv—B6–ævÆU&W7VÇD7–æ2†×WFF–öå&W7öç6R“°¢76W'BäWVÂ‚$”DTÕõDTä5•ô4ôädÄ”5B"Â×WFF–öå&W7VÇBäW'&÷$6öFR“°¢f"×WFF–öäVF—G2Òv—BfW&–g’äVF—DWfVçG2ä4æõG&6¶–ær‚’åv†W&R‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bb`¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ6ö×ç”÷W&F–öâä÷W&F–öä6÷'&VÆF–öä–Bb`¢‚ä÷WF6öÖRÓÒ%$T¤T5DTB"’åFôÆ—7D7–æ2‚“°¢76W'BäWVÂ‡&V¦V7F–öäVF—D6÷VçB²Â×WFF–öäVF—G2ä6÷VçB“°¢76W'Bä6öçF–ç2†×WFF–öäVF—G2Â‚Óà¢‡‚å&V6öâóò7G&–æräV×G’’ä6öçF–ç2‚$”DTÕõDTä5•ô4ôädÄ”5B"Â7G&–æt6ö×&—6öâä÷&F–æÂ’“°¢76W'BäWVÂƒ2Âv—BfW&–g’å7–æ4÷W&F–öç2ä6÷VçD7–æ2‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bb`¢æWuµÒ²6ö×ç”÷W&F–öâä6Æ–VçD÷W&F–öä–BÂ'&æ6„÷W&F–öâä6Æ–VçD÷W&F–öä–BÂÖ—76–æt÷W&F–öâä6Æ–VçD÷W&F–öä–BÐ¢ä6öçF–ç2‡‚ä6Æ–VçD÷W&F–öä–B’’“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢µG&—B‚$66WFæ6R"Â%BÕ5”ä2Ób"•Ð¢V&Æ–27–æ2F6²Eõ5”ä5óe÷÷7F–æuöæE÷Væf–Æ&ÆUö66÷VçF–æuö7F–öç5ö&U÷&V¦V7FVEö&Vf÷&UöVçVWVUöæEöVF—FVB‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â%õ5B"“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“°¢f"÷7D6÷'&VÆF–öâÒwV–BäæWtwV–B‚“°¢f"7&VFT6÷'&VÆF–öâÒwV–BäæWtwV–B‚“°¢f"÷7FVDVçG'”–BÒwV–BäæWtwV–B‚“°¢f"&öG’Ò&F6„&öG’‡66÷RäFWf–6T–BÀ¢÷W&F–öâ‚%÷7D¦÷W&æÄVçG'’"Â$4ôÔÔäB"Â$¦÷W&æÄVçG'’"Â÷7FVDVçG'”–BÀ¢B'÷7BÖVçG'’×´wV–BäæWtwV–B‚“¤çÒ"Â÷7D6÷'&VÆF–öâÂ'·Ò"Â6†#Sb‚'·Ò"’ÂçVÆÂ’À¢÷W&F–öâ‚$7&VFT¦÷W&æÄVçG'’"Â$5$TDR"Â$¦÷W&æÄVçG'’"ÂçVÆÂÀ¢B&7&VFRÖVçG'’×´wV–BäæWtwV–B‚“¤çÒ"Â7&VFT6÷'&VÆF–öâÂ'·Ò"Â6†#Sb‚'·Ò"’ÂçVÆÂ’“° ¢W6–ærf"&W7öç6RÒv—B6VæE6–væVD7–æ2†6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"Â&öG’“°¢f"&W7VÇG2Òv—B&W7VÇG47–æ2‡&W7öç6R“°¢76W'BäWVÂ‚$ôäÄ”äUõ$UT•$TB"Â&W7VÇG5³ÒäW'&÷$6öFR“°¢76W'BäWVÂ‚$5D”ôåõ%TåD”ÔUõTäd”Ä$ÄR"Â&W7VÇG5³ÒäW'&÷$6öFR“°¢76W'BäÆÂ‡&W7VÇG2Â&W7VÇBÓà¢°¢76W'BäWVÂ‚%$T¤T5DTB"Â&W7VÇBå7FGW2“°¢76W'BäçVÆÂ‡&W7VÇBå6W'fW$÷W&F–öä–B“°¢Ò“° ¢v—BW6–ærf"fW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢76W'BäfÇ6R†v—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’äç”7–æ2‡‚Óà¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ÷7D6÷'&VÆF–öâÇÂ‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ7&VFT6÷'&VÆF–öâ’“°¢f"&V¦V7F–öäVF—G2Òv—BfW&–g’äVF—DWfVçG2ä4æõG&6¶–ær‚’åv†W&R‡‚Óà¢‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–Bbb‚ä÷WF6öÖRÓÒ%$T¤T5DTB"b`¢‡‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ÷7D6÷'&VÆF–öâÇÂ‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ7&VFT6÷'&VÆF–öâ’¢åFôÆ—7D7–æ2‚“°¢76W'Bä6öçF–ç2‡&V¦V7F–öäVF—G2Â‚Óà¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ÷7D6÷'&VÆF–öâb`¢‡‚å&V6öâóò7G&–æräV×G’’ä6öçF–ç2‚$ôäÄ”äUõ$UT•$TB"Â7G&–æt6ö×&—6öâä÷&F–æÂ’“°¢76W'Bä6öçF–ç2‡&V¦V7F–öäVF—G2Â‚Óà¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒ7&VFT6÷'&VÆF–öâb`¢‡‚å&V6öâóò7G&–æräV×G’’ä6öçF–ç2‚$5D”ôåõ%TåD”ÔUõTäd”Ä$ÄR"Â7G&–æt6ö×&—6öâä÷&F–æÂ’“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢V&Æ–27–æ2F6²GF6†ÖVçEöæE÷öEö6öçG&7G5÷&VÖ–åöÖWFFFööæÇ•öæE÷Væ&÷fVEö&–æ'•öæWfW%÷&V6†W5÷7–æ5÷7F÷&vR‚¢°¢f"6öçG&7E&÷W'F–W2ÒG—Vöb„GF6†ÖVçDFW67&—F÷"’ävWE&÷W'F–W2‚“°¢76W'BäFöW4æ÷D6öçF–â†6öçG&7E&÷W'F–W2Â&÷W'G’Óà¢&÷W'G’å&÷W'G•G—RÓÒG—Vöb†'—FUµÒ’ÇÀ¢G—Vöb…7G&VÒ’ä—476–væ&ÆTg&öÒ‡&÷W'G’å&÷W'G•G—R’ÇÀ¢&÷W'G’äæÖRä6öçF–ç2‚$&6ScB"Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R’ÇÀ¢&÷W'G’äæÖRä6öçF–ç2‚$&–æ'’"Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R’“° ¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â$$”ä%’"“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“° ¢f"&t6÷'&VÆF–öâÒwV–BäæWtwV–B‚“°¢W6–ær‡f"&WVW7BÒæWr‡GG&WVW7DÖW76vR„‡GGÖWF†öBå÷7BÂ&F6…F‚¢°¢6öçFVçBÒæWr'—FT'&”6öçFVçB…&æFöÔçVÖ&W$vVæW&F÷"ävWD'—FW2ƒ#‚’¢Ò¢°¢&WVW7Bä6öçFVçBä†VFW'2ä6öçFVçEG—RÒæWrÖVF–G—T†VFW%fÇVR‚&Æ–6F–öâöö7FWB×7G&VÒ"“°¢&WVW7Bä†VFW'2äFB‚%‚Ô6÷'&VÆF–öâÔ–B"Â&t6÷'&VÆF–öâåFõ7G&–ær‚$B"’“°¢W6–ærf"&u&W7öç6RÒv—B6Æ–VçBå6VæD7–æ2‡&WVW7B“°¢76W'BäWVÂ„‡GG7FGW46öFRåVç7W÷'FVDÖVF–G—RÂ&u&W7öç6Rå7FGW46öFR“°¢Ð ¢f"&–æ'’Ò6öçfW'BåFô&6ScE7G&–ær…&æFöÔçVÖ&W$vVæW&F÷"ävWD'—FW2ƒ“b’“°¢f"GF6†ÖVçD6÷'&VÆF–öâÒwV–BäæWtwV–B‚“°¢f"öD6÷'&VÆF–öâÒwV–BäæWtwV–B‚“°¢f"GF6†ÖVçD÷W&F–öâÒ÷W&F–öâ‚$FEv–&–ÆÄGF6†ÖVçB"Â$5$TDR"Â%v–&–ÆÂ"ÂwV–BäæWtwV–B‚’À¢B&GF6†ÖVçBÖ&–æ'’×´wV–BäæWtwV–B‚“¤çÒ"ÂGF6†ÖVçD6÷'&VÆF–öâÀ¢§6öå6W&–Æ—¦W"å6W&–Æ—¦R†æWr²7F÷&vU&VbÒ&Æö6Ã¢ò÷VæF–ær"Â6öçFVçD†6‚Ò6†#Sb†&–æ'’’Â&–æ'”&6ScBÒ&–æ'’Ò’À¢çVÆÂÂçVÆÂ“°¢GF6†ÖVçD÷W&F–öâÒGF6†ÖVçD÷W&F–öâv—F‚²–ÆöD†6‚Ò6†#Sb†GF6†ÖVçD÷W&F–öâå–ÆöD§6öâ’Ó°¢f"öD÷W&F–öâÒ÷W&F–öâ‚%&V6÷&E&öödödFVÆ—fW'’"Â$5$TDR"Â$FVÆ—fW'’"ÂwV–BäæWtwV–B‚’À¢B'öBÖ&–æ'’×´wV–BäæWtwV–B‚“¤çÒ"ÂöD6÷'&VÆF–öâÀ¢§6öå6W&–Æ—¦W"å6W&–Æ—¦R†æWr²7F÷&vU&VbÒ&Æö6Ã¢ò÷VæF–ær"Â6öçFVçD†6‚Ò6†#Sb†&–æ'’’Â6–væGW&T&–æ'’Ò&–æ'’Ò’À¢çVÆÂÂçVÆÂ“°¢öD÷W&F–öâÒöD÷W&F–öâv—F‚²–ÆöD†6‚Ò6†#Sb‡öD÷W&F–öâå–ÆöD§6öâ’Ó° ¢W6–ærf"&W7öç6RÒv—B6VæE6–væVD7–æ2†6Æ–VçBÂ&ööd¶W’Â66÷Rä&V&W"À¢&F6„&öG’‡66÷RäFWf–6T–BÂGF6†ÖVçD÷W&F–öâÂöD÷W&F–öâ’“°¢f"&W7VÇG2Òv—B&W7VÇG47–æ2‡&W7öç6R“°¢76W'BäÆÂ‡&W7VÇG2Â&W7VÇBÓà¢°¢76W'BäWVÂ‚%$T¤T5DTB"Â&W7VÇBå7FGW2“°¢76W'BäWVÂ‚$5D”ôåõ%TåD”ÔUõTäd”Ä$ÄR"Â&W7VÇBäW'&÷$6öFR“°¢76W'BäçVÆÂ‡&W7VÇBå6W'fW$÷W&F–öä–B“°¢Ò“° ¢v—BW6–ærf"fW&–g’Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢76W'BäfÇ6R†v—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’äç”7–æ2‡‚Óà¢‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒGF6†ÖVçD6÷'&VÆF–öâÇÂ‚ä÷W&F–öä6÷'&VÆF–öä–BÓÒöD6÷'&VÆF–öâ’“°¢f"W'6—7FVBÒ§6öå6W&–Æ—¦W"å6W&–Æ—¦R†æWp¢°¢÷W&F–öç2Òv—BfW&–g’å7–æ4÷W&F–öç2ä4æõG&6¶–ær‚’åv†W&R‡‚Óâ‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–B’åFôÆ—7D7–æ2‚’À¢VF—G2Òv—BfW&–g’äVF—DWfVçG2ä4æõG&6¶–ær‚’åv†W&R‡‚Óâ‚ä6ö×ç”–BÓÒ66÷Rä6ö×ç”–B’åFôÆ—7D7–æ2‚¢Ò“°¢76W'BäFöW4æ÷D6öçF–â†&–æ'’ÂW'6—7FVBÂ7G&–æt6ö×&—6öâä÷&F–æÂ“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢µG&—B‚$66WFæ6R"Â$sBÔTäBÕDòÔTäB"•Ð¢V&Æ–27–æ2F6²WF†VçF–6FVE÷7–æ5ö7F—fF–öå÷&WGW&ç5ööæÇ•÷66÷VE÷öÆ–7•öæE÷V&Æ–5ö¶W•ö&–æF–ær‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â$5D•dD”ôâ"“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“° ¢W6–ærf"&W7öç6RÒv—B6Æ–VçBävWD7–æ2‚"ö’÷c÷7–æ2ö7F—fF–öâ"“° ¢76W'BäWVÂ„‡GG7FGW46öFRäô²Â&W7öç6Rå7FGW46öFR“°¢f"&öG’Òv—B&W7öç6Rä6öçFVçBå&VD57G&–æt7–æ2‚“°¢W6–ærf"Fö7VÖVçBÒ§6öäFö7VÖVçBå'6R†&öG’“°¢f"&ö÷BÒFö7VÖVçBå&ö÷DVÆVÖVçC°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&Væ&ÆVB"’ävWD&ööÆVâ‚’“°¢76W'BäWVÂ‡66÷Rä6ö×ç”–BÂ&ö÷BävWE&÷W'G’‚&6ö×ç”–B"’ävWDwV–B‚’“°¢76W'BäWVÂ‡66÷Rä'&æ6„–BÂ&ö÷BävWE&÷W'G’‚&'&æ6„–B"’ävWDwV–B‚’“°¢76W'BäWVÂ‡66÷RåW6W$–BÂ&ö÷BävWE&÷W'G’‚'W6W$–B"’ävWDwV–B‚’“°¢76W'BäWVÂ‡66÷Rå&Vv—7FW&VDFWf–6T–BÂ&ö÷BävWE&÷W'G’‚'&Vv—7FW&VDFWf–6T–B"’ävWDwV–B‚’“°¢76W'BäWVÂ‡66÷Rå6W76–öä–BÂ&ö÷BävWE&÷W'G’‚'6W76–öä–B"’ävWDwV–B‚’“°¢76W'BäWVÂ‡66÷RäFWf–6T–BÂ&ö÷BävWE&÷W'G’‚&FWf–6T–B"’ävWE7G&–ær‚’“°¢76W'BäWVÂ„&F6„‡GRÂ&ö÷BävWE&÷W'G’‚&&F6„VæGö–çB"’ävWE7G&–ær‚’“°¢76W'BäWVÂƒÂ&ö÷BävWE&÷W'G’‚'&ööd¶W•fW'6–öâ"’ävWD–çC3"‚’“°¢76W'BäWVÂ‚$T2"Â&ö÷BävWE&÷W'G’‚'&ööeV&Æ–4§v²"’ävWE&÷W'G’‚&·G’"’ävWE7G&–ær‚’“°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&6å&WG'”f–ÆVD÷W&F–öç2"’ävWD&ööÆVâ‚’“°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&6å&W6öÇfT6öæfÆ–7G2"’ävWD&ööÆVâ‚’“°¢76W'BäfÇ6R‡&ö÷BävWE&÷W'G’‚&¶W”Vç&öÆÆÖVçDÆÆ÷vVB"’ävWD&ööÆVâ‚’“°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&¶W•&V6÷fW'”ÆÆ÷vVB"’ävWD&ööÆVâ‚’“°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&ÆÆ÷vVD7F–öç2"’ävWD'&”ÆVæwF‚‚’â“°¢76W'BäWVÂƒ#RÂ&ö÷BävWE&÷W'G’‚&Ö„&F6„÷W&F–öç2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒ%ó“uóS"Â&ö÷BävWE&÷W'G’‚&Ö†–×VÕ&WVW7D&öG”'—FW2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒeó3ƒBÂ&ö÷BävWE&÷W'G’‚&Ö†–×VÕ–ÆöD'—FW2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒ"Â&ö÷BävWE&÷W'G’‚&6Æ–VçEG&ç7÷'DÖ…&WG'”6÷VçB"’ävWD–çC3"‚’“°¢76W'BäWVÂƒÂ&ö÷BävWE&÷W'G’‚&6Æ–VçEG&ç7÷'D&6U6V6öæG2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒ#Â&ö÷BävWE&÷W'G’‚&6Æ–VçEG&ç7÷'DÖ„FVÆ”Ö–çWFW2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒ"Â&ö÷BävWE&÷W'G’‚&Æö6Å7V66W74†÷W'2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒBÂ&ö÷BävWE&÷W'G’‚&Æö6Å&V¦V7FVDF—2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒCRÂ&ö÷BävWE&÷W'G’‚'6W'fW%–ÆöDF—2"’ävWD–çC3"‚’“°¢76W'BäWVÂƒ‚Â&ö÷BävWE&÷W'G’‚&66†TÖ„vT†÷W'2"’ävWD–çC3"‚’“°¢76W'BäWVÂ„§6öåfÇVT¶–æBäçVÆÂÂ&ö÷BävWE&÷W'G’‚&7F—fF–öä–×ÆVÖVçFF–öå6†"’åfÇVT¶–æB“°¢76W'BäWVÂ…FW7D'V–ÆD–FVçF—G’åÆFf÷&ÒÀ¢&ö÷BävWE&÷W'G’‚&WF†÷&—¦VD'V–ÆD–FVçF—G’"’ävWE&÷W'G’‚'ÆFf÷&Ò"’ävWE7G&–ær‚’“°¢76W'BäWVÂ…FW7D'V–ÆD–FVçF—G’ä'F–f7E6†#SbÀ¢&ö÷BävWE&÷W'G’‚&WF†÷&—¦VD'V–ÆD–FVçF—G’"’ävWE&÷W'G’‚&'F–f7E6†#Sb"’ävWE7G&–ær‚’“°¢76W'BäWVÂ‚'FW7B×öÆ–7’Ö÷Vâ×c"Â&ö÷BävWE&÷W'G’‚'öÆ–7•6÷W&6UfW'6–öâ"’ävWE7G&–ær‚’“°¢76W'BäWVÂ†æWr7G&–ær‚vrÂcB’Â&ö÷BävWE&÷W'G’‚'öÆ–7•6÷W&6Tf–ævW'&–çB"’ävWE7G&–ær‚’“°¢76W'BäFöW4æ÷D6öçF–â‚&7&VFVçF–Ä†6‚"Â&öG’Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“°¢76W'BäFöW4æ÷D6öçF–â‚'&t&V&W""Â&öG’Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“°¢76W'BäFöW4æ÷D6öçF–â‚&æöæ6R"Â&öG’Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“°¢76W'BäFöW4æ÷D6öçF–â‚&§F’"Â&öG’Â7G&–æt6ö×&—6öâä÷&F–æÄ–væ÷&T66R“° ¢W6–ærf"æöç–Ö÷W46Æ–VçBÒf7F÷'’ä7&VFT6Æ–VçB†æWrvV$Æ–6F–öäf7F÷'”6Æ–VçD÷F–öç0¢²&6TFG&W72ÒV&Æ–4÷&–v–âÒ“°¢W6–ærf"æöç–Ö÷W2Òv—Bæöç–Ö÷W46Æ–VçBävWD7–æ2‚"ö’÷c÷7–æ2ö7F—fF–öâ"“°¢76W'BäWVÂ„‡GG7FGW46öFRåVæWF†÷&—¦VBÂæöç–Ö÷W2å7FGW46öFR“°¢Ð ¢´f7EÐ¢µG&—B‚$6FVv÷'’"Â%÷7Fw&U5Â"•Ð¢µG&—B‚$6FVv÷'’"Â$…EE"•Ð¢µG&—B‚$66WFæ6R"Â$sBÔTäBÕDòÔTäB"•Ð¢V&Æ–27–æ2F6²v÷fW&æVEö7F—fF–öåöWF†÷&—¦W5öW‡Æ–6—Eö¶W•öVç&öÆÆÖVçE÷v—F†÷WEö÷Væ–æu÷w&—FU÷'VçF–ÖR‚¢°¢f"6öææV7F–öâÒ÷7Fw&U7ÅFW7DVçf—&öæÖVçBå&WV—&T6öææV7F–öâ‚“°¢v—BW6–ærf"6VVDF"Ò÷7Fw&U7ÅFW7DVçf—&öæÖVçBä7&VFTF$6öçFW‡B†6öææV7F–öâ“°¢v—B6VVDF"äFF&6RäÖ–w&FT7–æ2‚“°¢W6–ærf"&ööd¶W’ÒT4G6ä7&VFR„T47W'fRäæÖVD7W'fW2ææ—7E#Sb“°¢f"66÷RÒv—B6VVD7–æ2‡6VVDF"Â&ööd¶W’Â$Tå$ôÄÂ"Â&–æE&ööd¶W“¢fÇ6R“°¢W6–ærf"f7F÷'’Ò7&VFTf7F÷'’†6öææV7F–öâ“°¢W6–ærf"6Æ–VçBÒ7&VFT6Æ–VçB†f7F÷'’Â66÷Rä&V&W"“° ¢W6–ærf"&W7öç6RÒv—B6Æ–VçBävWD7–æ2‚"ö’÷c÷7–æ2ö7F—fF–öâ"“° ¢76W'BäWVÂ„‡GG7FGW46öFRäô²Â&W7öç6Rå7FGW46öFR“°¢W6–ærf"Fö7VÖVçBÒ§6öäFö7VÖVçBå'6R†v—B&W7öç6Rä6öçFVçBå&VD57G&–æt7–æ2‚’“°¢f"&ö÷BÒFö7VÖVçBå&ö÷DVÆVÖVçC°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&Væ&ÆVB"’ävWD&ööÆVâ‚’“°¢76W'BäWVÂ„§6öåfÇVT¶–æBäçVÆÂÂ&ö÷BävWE&÷W'G’‚'&ööeV&Æ–4§v²"’åfÇVT¶–æB“°¢76W'BäWVÂ„§6öåfÇVT¶–æBäçVÆÂÂ&ö÷BävWE&÷W'G’‚'&ööd¶W•fW'6–öâ"’åfÇVT¶–æB“°¢76W'BåG'VR‡&ö÷BävWE&÷W'G’‚&¶W”Vç&öÆÆÖVçDÆÆ÷vVB"’ävWD&ööÆVâ‚’“°¢76W'Bí¶ßkh‘éì¶»§q«^uÕ•ÍÑ	½‘å	åÑ•Ì¤ì((€€€€€€€ÕÍ¥¹œÙ…È™…Ñ½Éä€ôÉ•…Ñ•…Ñ½Éä¡½¹¹•Ñ¥½¸¤¹]¥Ñ¡]•‰!½ÍÑ	Õ¥±‘•È¡‰Õ¥±‘•È€ôø(€€€€€€€€€€€‰Õ¥±‘•È¹½¹™¥ÕÉ•M•ÉÙ¥•Ì¡Í•ÉÙ¥•Ì€ôø(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹I•µ½Ù•±°ñ%Må¹A½Á!ÑÑÁI•ÅÕ•ÍÑÕÑ¡•¹Ñ¥…Ñ½Èø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹‘‘M¥¹±•Ñ½¸ñ%Må¹A½Á!ÑÑÁI•ÅÕ•ÍÑÕÑ¡•¹Ñ¥…Ñ½Èø (€€€€€€€€€€€€€€€€€€€¹•Ü•ÁÑ•‘I…Ý	½‘åÕÑ¡•¹Ñ¥…Ñ½È¡Í½Á”°9…ÉÉ½Ý•‘	½‘åA½±¥ä¡¹…ÉÉ½Ý•‘1¥µ¥Ð¤¤¤ì(€€€€€€€€€€€ô¤¤ì(€€€€€€€ÕÍ¥¹œÙ…È±¥•¹Ð€ôÉ•…Ñ•±¥•¹Ð¡™…Ñ½Éä°Í½Á”¹	•…É•È¤ì(€€€€€€€ÕÍ¥¹œÙ…ÈÉ•ÅÕ•ÍÐ€ô¹•Ü!ÑÑÁI•ÅÕ•ÍÑ5•ÍÍ…”¡!ÑÑÁ5•Ñ¡½¹A½ÍÐ°	…Ñ¡A…Ñ ¤(€€€€€€€ì(€€€€€€€€€€€½¹Ñ•¹Ð€ô¹•ÜMÑÉ¥¹½¹Ñ•¹Ð¡‰½‘ä°¹½‘¥¹œ¹UQà°€‰…ÁÁ±¥…Ñ¥½¸½©Í½¸ˆ¤(€€€€€€€ôì(€€€€€€€É•ÅÕ•ÍÐ¹!•…‘•ÉÌ¹‘ ‰`µ½ÉÉ•±…Ñ¥½¸µ%ˆ°Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰ˆ¤¤ì((€€€€€€€ÕÍ¥¹œÙ…ÈÉ•ÍÁ½¹Í”€ô…Ý…¥Ð±¥•¹Ð¹M•¹‘Íå¹Œ¡É•ÅÕ•ÍÐ¤ì((€€€€€€€ÍÍ•ÉÐ¹ÅÕ…°¡!ÑÑÁMÑ…ÑÕÍ½‘”¹I•ÅÕ•ÍÑ¹Ñ¥ÑåQ½½1…É”°É•ÍÁ½¹Í”¹MÑ…ÑÕÍ½‘”¤ì(€€€€€€€ÕÍ¥¹œÙ…È‘½Õµ•¹Ð€ô)Í½¹½Õµ•¹Ð¹A…ÉÍ”¡…Ý…¥ÐÉ•ÍÁ½¹Í”¹½¹Ñ•¹Ð¹I•…‘ÍMÑÉ¥¹Íå¹Œ ¤¤ì(€€€€€€€ÍÍ•ÉÐ¹ÅÕ…° ‰IEUMQ}	=e}Q==}1Iˆ°(€€€€€€€€€€€‘½Õµ•¹Ð¹I½½Ñ±•µ•¹Ð¹•ÑAÉ½Á•ÉÑä ‰•ÉÉ½É½‘”ˆ¤¹•ÑMÑÉ¥¹œ ¤¤ì(€€€€€€€…Ý…¥ÐÕÍ¥¹œÙ…ÈÙ•É¥™ä€ôA½ÍÑÉ•MÅ±Q•ÍÑ¹Ù¥É½¹µ•¹Ð¹É•…Ñ•‰½¹Ñ•áÐ¡½¹¹•Ñ¥½¸¤ì(€€€€€€€ÍÍ•ÉÐ¹…±Í”¡…Ý…¥ÐÙ•É¥™ä¹Må¹=Á•É…Ñ¥½¹Ì¹Í9½QÉ…­¥¹œ ¤(€€€€€€€€€€€€¹¹åÍå¹Œ¡à€ôøà¹½µÁ…¹å%€ôôÍ½Á”¹½µÁ…¹å%¤¤ì(€€€€€€€Ù…ÈÉ•©•Ñ¥½¸€ôÍÍ•ÉÐ¹M¥¹±”¡…Ý…¥ÐÙ•É¥™ä¹Õ‘¥ÑÙ•¹ÑÌ¹Í9½QÉ…­¥¹œ ¤¹]¡•É”¡à€ôø(€€€€€€€€€€€à¹½µÁ…¹å%€ôôÍ½Á”¹½µÁ…¹å%€˜˜à¹Ñ¥½¸€ôô€‰Må¹=Á•É…Ñ¥½¹I•©•Ñ•ˆ€˜˜(€€€€€€€€€€€à¹I•…Í½¸€ôô€‰IEUMQ}	=e}Q==}1Iˆ¤¹Q½1¥ÍÑÍå¹Œ ¤¤ì(€€€€€€€ÍÍ•ÉÐ¹9Õ±°¡É•©•Ñ¥½¸¹=Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%¤ì(€€€€€€€ÍÍ•ÉÐ¹9Õ±°¡É•©•Ñ¥½¸¹	•™½É•)Í½¸¤ì(€€€€€€€ÍÍ•ÉÐ¹9Õ±°¡É•©•Ñ¥½¸¹™Ñ•É)Í½¸¤ì(€€€€€€€ÍÍ•ÉÐ¹½•Í9½Ñ½¹Ñ…¥¸¡µ…É­•È°)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡É•©•Ñ¥½¸¤°MÑÉ¥¹½µÁ…É¥Í½¸¹=É‘¥¹…°¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ!ÑÑÁ±¥•¹ÐÉ•…Ñ•±¥•¹Ð¡]•‰ÁÁ±¥…Ñ¥½¹…Ñ½ÉäñAÉ½É…´ø™…Ñ½Éä°ÍÑÉ¥¹œ‰•…É•È¤(€€€ì(€€€€€€€Ù…È±¥•¹Ð€ô™…Ñ½Éä¹É•…Ñ•±¥•¹Ð¡¹•Ü]•‰ÁÁ±¥…Ñ¥½¹…Ñ½Éå±¥•¹Ñ=ÁÑ¥½¹Ìì	…Í•‘‘É•ÍÌ€ôAÕ‰±¥=É¥¥¸ô¤ì(€€€€€€€±¥•¹Ð¹•™…Õ±ÑI•ÅÕ•ÍÑ!•…‘•ÉÌ¹ÕÑ¡½É¥é…Ñ¥½¸€ô¹•ÜÕÑ¡•¹Ñ¥…Ñ¥½¹!•…‘•ÉY…±Õ” ‰	•…É•Èˆ°‰•…É•È¤ì(€€€€€€€±¥•¹Ð¹•™…Õ±ÑI•ÅÕ•ÍÑ!•…‘•ÉÌ¹QÉå‘‘]¥Ñ¡½ÕÑY…±¥‘…Ñ¥½¸ (€€€€€€€€€€€	Õ¥±‘%‘•¹Ñ¥ÑåXÄ¹A±…Ñ™½Éµ!•…‘•È°Q•ÍÑ	Õ¥±‘%‘•¹Ñ¥Ñä¹A±…Ñ™½É´¤ì(€€€€€€€±¥•¹Ð¹•™…Õ±ÑI•ÅÕ•ÍÑ!•…‘•ÉÌ¹QÉå‘‘]¥Ñ¡½ÕÑY…±¥‘…Ñ¥½¸ (€€€€€€€€€€€	Õ¥±‘%‘•¹Ñ¥ÑåXÄ¹ÉÑ¥™…ÑM¡„ÈÔÙ!•…‘•È°Q•ÍÑ	Õ¥±‘%‘•¹Ñ¥Ñä¹ÉÑ¥™…ÑM¡„ÈÔØ¤ì(€€€€€€€É•ÑÕÉ¸±¥•¹Ðì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ™™•Ñ¥Ù•Må¹A½±¥ä9…ÉÉ½Ý•‘	½‘åA½±¥ä¡¥¹Ðµ…á¥µÕµI•ÅÕ•ÍÑ	½‘å	åÑ•Ì¤(€€€ì(€€€€€€€Ù…È…Ñ¥½¹Ì€ôMå¹Ñ¥½¹…Ñ…±½œ¹•™¥¹¥Ñ¥½¹Ì¹M•±•Ð¡à€ôøà¹Ñ¥½¹½‘•Y…±Õ”¤(€€€€€€€€€€€€¹Q½!…Í¡M•Ð¡MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤ì(€€€€€€€É•ÑÕÉ¸¹•Ü™™•Ñ¥Ù•Må¹A½±¥ä (€€€€€€€€€€€ÑÉÕ”°…Ñ¥½¹Ì°¹•Ü!…Í¡M•ÐñÍÑÉ¥¹œø¡l‰Íå¹ŒµØÄ‰t°MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤°(€€€€€€€€€€€€ÈÔ°µ…á¥µÕµI•ÅÕ•ÍÑ	½‘å	åÑ•Ì°5…Ñ ¹5¥¸ ÔÄÈ°µ…á¥µÕµI•ÅÕ•ÍÑ	½‘å	åÑ•Ì¤°(€€€€€€€€€€€€È°€Ô°€ÄÀ°€Ô°€ÈÀ°€ÌÀ°€ÄÈ°€Ð°€ÐÔ°€à°(€€€€€€€€€€€¹Õ±°°€‰‘•Ù¥”µ¹…ÉÉ½Üµ‰½‘äµØÄˆ°¹•ÜÍÑÉ¥¹œ ˆœ°€ØÐ¤¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ]•‰ÁÁ±¥…Ñ¥½¹…Ñ½ÉäñAÉ½É…´øÉ•…Ñ•…Ñ½Éä (€€€€€€€ÍÑÉ¥¹œ½¹¹•Ñ¥½¸°(€€€€€€€%I•…‘=¹±å1¥ÍÐñ	Õ¥±‘%‘•¹Ñ¥ÑåXÄøü…ÕÑ¡½É¥é•‘	Õ¥±‘Ì€ô¹Õ±°¤(€€€€€€€€ôø¹•Ü]•‰ÁÁ±¥…Ñ¥½¹…Ñ½ÉäñAÉ½É…´ø ¤¹]¥Ñ¡]•‰!½ÍÑ	Õ¥±‘•È¡‰Õ¥±‘•È€ôø(€€€€€€€ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰½¹¹•Ñ¥½¹MÑÉ¥¹ÌéQÉ…¹ÍÁ½ÉÑÉÀˆ°½¹¹•Ñ¥½¸¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰ÕÑ é5½‘”ˆ°€‰1½…±M•ÍÍ¥½¹Ìˆ¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰ÕÑ é%ÍÍÕ•Èˆ°%ÍÍÕ•È¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰ÕÑ éÕ‘¥•¹”ˆ°Õ‘¥•¹”¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰ÕÑ éM¥¹¥¹-•äˆ°M¥¹¥¹-•ä¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰ÕÑ éM¥¹¥¹-•å%ˆ°€‰ÍÑ…”ÐµœÐµ¡ÑÑÀµÕÉÉ•¹Ðˆ¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰Må¹ŒéAÉ½½˜éAÕ‰±¥=É¥¥¸ˆ°AÕ‰±¥=É¥¥¸¹Q½MÑÉ¥¹œ ¤¹QÉ¥µ¹ œ¼œ¤¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰±±½Ý•‘!½ÍÑÌˆ°AÕ‰±¥=É¥¥¸¹!½ÍÐ¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹UÍ•M•ÑÑ¥¹œ ‰Må¹ŒéM•ÉÙ•Éá•ÕÑ¥½¸é¹…‰±•ˆ°€‰™…±Í”ˆ¤ì(€€€€€€€€€€€‰Õ¥±‘•È¹½¹™¥ÕÉ•M•ÉÙ¥•Ì¡Í•ÉÙ¥•Ì€ôø(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹I•µ½Ù•±°ñ%Må¹IÕ¹Ñ¥µ•…Ñ”ø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹‘‘M½Á•ñ%Må¹IÕ¹Ñ¥µ•…Ñ”°%Í½±…Ñ•‘=Á•¹Må¹IÕ¹Ñ¥µ•…Ñ”ø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹I•µ½Ù•±°ñ%=ÁÑ¥½¹ÌñMå¹IÕ¹Ñ¥µ•A½±¥å=ÁÑ¥½¹Ìøø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹‘‘M¥¹±•Ñ½¸ñ%=ÁÑ¥½¹ÌñMå¹IÕ¹Ñ¥µ•A½±¥å=ÁÑ¥½¹Ìøø¡=ÁÑ¥½¹Ì¹É•…Ñ”¡¹•ÜMå¹IÕ¹Ñ¥µ•A½±¥å=ÁÑ¥½¹Ì(€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€=™™±¥¹•ÕÑ¡½É¥é•‘	Õ¥±‘Ì€ô€¡…ÕÑ¡½É¥é•‘	Õ¥±‘Ì€üü¹•ÝmtìQ•ÍÑ	Õ¥±‘%‘•¹Ñ¥Ñäô¤¹Q½ÉÉ…ä ¤(€€€€€€€€€€€€€€€ô¤¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹I•µ½Ù•±°ñ%™™•Ñ¥Ù•Må¹A½±¥åAÉ½Ù¥‘•Èø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹‘‘M½Á•ñ%™™•Ñ¥Ù•Må¹A½±¥åAÉ½Ù¥‘•È°%Í½±…Ñ•‘=Á•¹™™•Ñ¥Ù•A½±¥åAÉ½Ù¥‘•Èø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹I•µ½Ù•±°ñ%Må¹I•ÑÉåA½±¥åI•Í½±Ù•Èø ¤ì(€€€€€€€€€€€€€€€Í•ÉÙ¥•Ì¹‘‘M¥¹±•Ñ½¸ñ%Må¹I•ÑÉåA½±¥åI•Í½±Ù•Èø¡¹•Ü¥á•‘Må¹I•ÑÉåA½±¥åI•Í½±Ù•È (€€€€€€€€€€€€€€€€€€€¹•ÜMå¹I•ÑÉåA½±¥ä Ô°Q¥µ•MÁ…¸¹É½µM•½¹‘Ì Ô¤°Q¥µ•MÁ…¸¹É½µ5¥¹ÕÑ•Ì ÌÀ¤¤¤¤ì(€€€€€€€€€€€ô¤ì(€€€€€€€ô¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñ!ÑÑÁI•ÍÁ½¹Í•5•ÍÍ…”øM•¹‘M¥¹•‘Íå¹Œ (€€€€€€€!ÑÑÁ±¥•¹Ð±¥•¹Ð°(€€€€€€€Í„­•ä°(€€€€€€€ÍÑÉ¥¹œ‰•…É•È°(€€€€€€€ÍÑÉ¥¹œ‰½‘ä¤(€€€ì(€€€€€€€ÕÍ¥¹œÙ…È¹½¹•I•ÅÕ•ÍÐ€ô)Í½¹I•ÅÕ•ÍÐ¡‰½‘ä°Õ¥¹9•ÝÕ¥ ¤¤ì(€€€€€€€ÕÍ¥¹œÙ…È¹½¹•I•ÍÁ½¹Í”€ô…Ý…¥Ð±¥•¹Ð¹M•¹‘Íå¹Œ¡¹½¹•I•ÅÕ•ÍÐ¤ì(€€€€€€€ÍÍ•ÉÐ¹ÅÕ…°¡!ÑÑÁMÑ…ÑÕÍ½‘”¹U¹…ÕÑ¡½É¥é•°¹½¹•I•ÍÁ½¹Í”¹MÑ…ÑÕÍ½‘”¤ì(€€€€€€€ÍÍ•ÉÐ¹QÉÕ”¡¹½¹•I•ÍÁ½¹Í”¹!•…‘•ÉÌ¹QÉå•ÑY…±Õ•Ì ‰A½@µ9½¹”ˆ°½ÕÐÙ…È¹½¹•Y…±Õ•Ì¤¤ì(€€€€€€€Ù…È¹½¹”€ôÍÍ•ÉÐ¹M¥¹±”¡¹½¹•Y…±Õ•Ì¤ì(€€€€€€€Ù…È½ÉÉ•±…Ñ¥½¹%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…ÈÁÉ½½˜€ôÉ•…Ñ•AÉ½½˜¡­•ä°¹½‘¥¹œ¹UQà¹•Ñ	åÑ•Ì¡‰½‘ä¤°‰•…É•È°¹½¹”°½ÉÉ•±…Ñ¥½¹%¤ì(€€€€€€€ÕÍ¥¹œÙ…ÈÉ•ÅÕ•ÍÐ€ô)Í½¹I•ÅÕ•ÍÐ¡‰½‘ä°½ÉÉ•±…Ñ¥½¹%°ÁÉ½½˜¤ì(€€€€€€€É•ÑÕÉ¸…Ý…¥Ð±¥•¹Ð¹M•¹‘Íå¹Œ¡É•ÅÕ•ÍÐ¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ!ÑÑÁI•ÅÕ•ÍÑ5•ÍÍ…”)Í½¹I•ÅÕ•ÍÐ¡ÍÑÉ¥¹œ‰½‘ä°Õ¥½ÉÉ•±…Ñ¥½¹%°ÍÑÉ¥¹œüÁÉ½½˜€ô¹Õ±°¤(€€€ì(€€€€€€€Ù…ÈÉ•ÅÕ•ÍÐ€ô¹•Ü!ÑÑÁI•ÅÕ•ÍÑ5•ÍÍ…”¡!ÑÑÁ5•Ñ¡½¹A½ÍÐ°	…Ñ¡A…Ñ ¤(€€€€€€€ì(€€€€€€€€€€€½¹Ñ•¹Ð€ô¹•ÜMÑÉ¥¹½¹Ñ•¹Ð¡‰½‘ä°¹½‘¥¹œ¹UQà°€‰…ÁÁ±¥…Ñ¥½¸½©Í½¸ˆ¤(€€€€€€€ôì(€€€€€€€É•ÅÕ•ÍÐ¹!•…‘•ÉÌ¹‘ ‰`µ½ÉÉ•±…Ñ¥½¸µ%ˆ°½ÉÉ•±…Ñ¥½¹%¹Q½MÑÉ¥¹œ ‰ˆ¤¤ì(€€€€€€€¥˜€¡ÁÉ½½˜¥Ì¹½Ð¹Õ±°¤É•ÅÕ•ÍÐ¹!•…‘•ÉÌ¹‘ ‰A½@ˆ°ÁÉ½½˜¤ì(€€€€€€€É•ÑÕÉ¸É•ÅÕ•ÍÐì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œÉ•…Ñ•AÉ½½˜ (€€€€€€€Í„­•ä°(€€€€€€€‰åÑ•mt‰½‘ä°(€€€€€€€ÍÑÉ¥¹œ‰•…É•È°(€€€€€€€ÍÑÉ¥¹œ¹½¹”°(€€€€€€€Õ¥½ÉÉ•±…Ñ¥½¹%¤(€€€ì(€€€€€€€Ù…ÈÁ…É…µ•Ñ•ÉÌ€ô­•ä¹áÁ½ÉÑA…É…µ•Ñ•ÉÌ¡™…±Í”¤ì(€€€€€€€Ù…È¡•…‘•È€ô)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡¹•Ü(€€€€€€€ì(€€€€€€€€€€€ÑåÀ€ô€‰‘Á½À­©ÝÐˆ°(€€€€€€€€€€€…±œ€ô€‰LÈÔØˆ°(€€€€€€€€€€€©Ý¬€ô¹•Ü(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€­Ñä€ô€‰ˆ°ÉØ€ô€‰@´ÈÔØˆ°à€ô	…Í”ØÑUÉ°¡Á…É…µ•Ñ•ÉÌ¹D¹`„¤°ä€ô	…Í”ØÑUÉ°¡Á…É…µ•Ñ•ÉÌ¹D¹d„¤(€€€€€€€€€€€ô(€€€€€€€ô°¹•Ü)Í½¹M•É¥…±¥é•É=ÁÑ¥½¹Ìì¹½‘•È€ô)…Ù…MÉ¥ÁÑ¹½‘•È¹U¹Í…™•I•±…á•‘)Í½¹Í…Á¥¹œô¤ì(€€€€€€€Ù…ÈÁ…å±½…€ô)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡¹•Ü(€€€€€€€ì(€€€€€€€€€€€©Ñ¤€ôÕ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰ˆ¤°¡Ñ´€ô€‰A=MPˆ°¡ÑÔ€ô	…Ñ¡!ÑÔ°(€€€€€€€€€€€¥…Ð€ô…Ñ•Q¥µ•=™™Í•Ð¹UÑ9½Ü¹Q½U¹¥áQ¥µ•M•½¹‘Ì ¤°(€€€€€€€€€€€…Ñ €ô	…Í”ØÑUÉ°¡M!ÈÔØ¹!…Í¡…Ñ„¡¹½‘¥¹œ¹M%$¹•Ñ	åÑ•Ì¡‰•…É•È¤¤¤°¹½¹”°(€€€€€€€€€€€Ñ‰ €ô	…Í”ØÑUÉ°¡M!ÈÔØ¹!…Í¡…Ñ„¡‰½‘ä¤¤°¥€ô½ÉÉ•±…Ñ¥½¹%¹Q½MÑÉ¥¹œ ‰ˆ¤(€€€€€€€ô¤ì(€€€€€€€Ù…È¡•…‘•ÉM•µ•¹Ð€ô	…Í”ØÑUÉ°¡¹½‘¥¹œ¹UQà¹•Ñ	åÑ•Ì¡¡•…‘•È¤¤ì(€€€€€€€Ù…ÈÁ…å±½…‘M•µ•¹Ð€ô	…Í”ØÑUÉ°¡¹½‘¥¹œ¹UQà¹•Ñ	åÑ•Ì¡Á…å±½…¤¤ì(€€€€€€€Ù…ÈÍ¥¹¥¹%¹ÁÕÐ€ô¹½‘¥¹œ¹M%$¹•Ñ	åÑ•Ì¡¡•…‘•ÉM•µ•¹Ð€¬€ˆ¸ˆ€¬Á…å±½…‘M•µ•¹Ð¤ì(€€€€€€€Ù…ÈÍ¥¹…ÑÕÉ”€ô­•ä¹M¥¹…Ñ„¡Í¥¹¥¹%¹ÁÕÐ°!…Í¡±½É¥Ñ¡µ9…µ”¹M!ÈÔØ°(€€€€€€€€€€€MM¥¹…ÑÕÉ•½Éµ…Ð¹%•••@ÄÌØÍ¥á•‘¥•±‘½¹…Ñ•¹…Ñ¥½¸¤ì(€€€€€€€É•ÑÕÉ¸¡•…‘•ÉM•µ•¹Ð€¬€ˆ¸ˆ€¬Á…å±½…‘M•µ•¹Ð€¬€ˆ¸ˆ€¬	…Í”ØÑUÉ°¡Í¥¹…ÑÕÉ”¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œ	…Ñ¡	½‘ä¡ÍÑÉ¥¹œ‘•Ù¥•%°Á…É…µÌQ•ÍÑ=Á•É…Ñ¥½¹mt½Á•É…Ñ¥½¹Ì¤(€€€€€€€€ôø)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡¹•Ü(€€€€€€€ì(€€€€€€€€€€€‘•Ù¥•%°(€€€€€€€€€€€ÁÉ½Ñ½½±Y•ÉÍ¥½¸€ô€‰Íå¹ŒµØÄˆ°(€€€€€€€€€€€‰Õ¥±‘%‘•¹Ñ¥Ñä€ôQ•ÍÑ	Õ¥±‘%‘•¹Ñ¥Ñä°(€€€€€€€€€€€½Á•É…Ñ¥½¹Ì€ô½Á•É…Ñ¥½¹Ì¹M•±•Ð¡à€ôø¹•Ü(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€…Ñ¥½¹½‘”€ôà¹Ñ¥½¹½‘”°(€€€€€€€€€€€€€€€½Á•É…Ñ¥½¹QåÁ”€ôà¹=Á•É…Ñ¥½¹QåÁ”°(€€€€€€€€€€€€€€€•¹Ñ¥ÑåQåÁ”€ôà¹¹Ñ¥ÑåQåÁ”°(€€€€€€€€€€€€€€€•¹Ñ¥Ñå%€ôà¹¹Ñ¥Ñå%°(€€€€€€€€€€€€€€€±¥•¹Ñ=Á•É…Ñ¥½¹%€ôà¹±¥•¹Ñ=Á•É…Ñ¥½¹%°(€€€€€€€€€€€€€€€Á…å±½…‘)Í½¸€ôà¹A…å±½…‘)Í½¸°(€€€€€€€€€€€€€€€Á…å±½…‘!…Í €ôà¹A…å±½…‘!…Í °(€€€€€€€€€€€€€€€±¥•¹Ñ=ÕÉÉ•‘Ð€ô€ˆÈÀÈØ´Àà´ÈÙPÀÀèÀÀèÀÀ¸ÄÈÌÐÔÙhˆ°(€€€€€€€€€€€€€€€½Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%€ôà¹=Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%°(€€€€€€€€€€€€€€€‰…Í•Y•ÉÍ¥½¸€ôà¹	…Í•Y•ÉÍ¥½¸(€€€€€€€€€€€ô¤¹Q½ÉÉ…ä ¤(€€€€€€€ô°]¥É•)Í½¸¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒQ•ÍÑ=Á•É…Ñ¥½¸=Á•É…Ñ¥½¸ (€€€€€€€ÍÑÉ¥¹œ…Ñ¥½¹½‘”°(€€€€€€€ÍÑÉ¥¹œ½Á•É…Ñ¥½¹QåÁ”°(€€€€€€€ÍÑÉ¥¹œ•¹Ñ¥ÑåQåÁ”°(€€€€€€€Õ¥ü•¹Ñ¥Ñå%°(€€€€€€€ÍÑÉ¥¹œ±¥•¹Ñ=Á•É…Ñ¥½¹%°(€€€€€€€Õ¥½Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%°(€€€€€€€ÍÑÉ¥¹œÁ…å±½…‘)Í½¸°(€€€€€€€ÍÑÉ¥¹œüÁ…å±½…‘!…Í °(€€€€€€€±½¹œü‰…Í•Y•ÉÍ¥½¸¤(€€€€€€€€ôø¹•Ü¡…Ñ¥½¹½‘”°½Á•É…Ñ¥½¹QåÁ”°•¹Ñ¥ÑåQåÁ”°•¹Ñ¥Ñå%°±¥•¹Ñ=Á•É…Ñ¥½¹%°(€€€€€€€€€€€½Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%°Á…å±½…‘)Í½¸°Á…å±½…‘!…Í €üüM¡„ÈÔØ¡Á…å±½…‘)Í½¸¤°‰…Í•Y•ÉÍ¥½¸¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒQ•ÍÑ=Á•É…Ñ¥½¸UÁ‘…Ñ•=Á•É…Ñ¥½¸ (€€€€€€€Q•ÍÑM½Á”Í½Á”°(€€€€€€€É½ÍÍM½Á•Q…É•ÑÌÑ…É•ÑÌ°(€€€€€€€Õ¥Á…ÉÑå%°(€€€€€€€ÍÑÉ¥¹œÍÕ™™¥à¤(€€€ì(€€€€€€€Ù…È½Á•É…Ñ¥½¹%€ô€‰ÐµÍå¹Œ´ÀÀÐµíÍÕ™™¥à¹Q½1½Ý•É%¹Ù…É¥…¹Ð ¥ôµíÕ¥¹9•ÝÕ¥ ¤é9ôˆì(€€€€€€€Ù…ÈÁ…å±½…€ô)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡¹•ÜUÁ‘…Ñ•]…å‰¥±±É…™ÑI•ÅÕ•ÍÐ (€€€€€€€€€€€€Ä°Ñ…É•ÑÌ¹]…å‰¥±±…Ñ•Q¥µ”°Ñ…É•ÑÌ¹=É¥¥¹%°Ñ…É•ÑÌ¹•ÍÑ¥¹…Ñ¥½¹%°Í½Á”¹ÕÉÉ•¹å%°(€€€€€€€€€€€€Å´°€ÄÁ´°€Á´°€‰MQ9Iˆ°€‰9=I50ˆ°(€€€€€€€€€€€m¹•Ü]…å‰¥±±A…ÉÑå%¹ÁÕÐ ‰M9Hˆ°Á…ÉÑå%°€‰Í½Á”µ¹•ÕÑÉ…°ˆ°€ˆÜÀÀÀÀÀÀÀÄˆ°¹Õ±°°¹Õ±°°(€€€€€€€€€€€€€€€¹•Ü•½‘‘É•ÍÍM¹…ÁÍ¡½Ð¡¹Õ±°°¹Õ±°°¹Õ±°°¹Õ±°°€‰Í½Á”µ¹•ÕÑÉ…°ˆ¤¥t°(€€€€€€€€€€€m¹•Ü]…å‰¥±±%Ñ•µ%¹ÁÕÐ¡¹Õ±°°€Ä°€‰9I0ˆ°€‰Í½Á”µ¹•ÕÑÉ…°ˆ°€Å´°€Ä°(€€€€€€€€€€€€€€€¹Õ±°°¹Õ±°°¹Õ±°°¹Õ±°°¹Õ±°°¹Õ±°°mt°¹Õ±°¥t°(€€€€€€€€€€€½Á•É…Ñ¥½¹%¤¤ì(€€€€€€€É•ÑÕÉ¸=Á•É…Ñ¥½¸ ‰UÁ‘…Ñ•]…å‰¥±±É…™Ðˆ°€‰UAQˆ°€‰]…å‰¥±°ˆ°Ñ…É•ÑÌ¹1½…±]…å‰¥±±%°(€€€€€€€€€€€½Á•É…Ñ¥½¹%°Õ¥¹9•ÝÕ¥ ¤°Á…å±½…°M¡„ÈÔØ¡Á…å±½…¤°€Ä¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œA…ÉÑåA…å±½…¡ÍÑÉ¥¹œ½Á•É…Ñ¥½¹%°ÍÑÉ¥¹œÍÕ™™¥à¤(€€€€€€€€ôø)Í½¹M•É¥…±¥é•È¹M•É¥…±¥é”¡¹•Ü=Á•É…Ñ¥½¹…±A…ÉÑåÉ•…Ñ•I•ÅÕ•ÍÐ (€€€€€€€€€€€€‰A…ÉÑäíÍÕ™™¥áôˆ°€ˆÜÀÀÀÀÀÀÀÄˆ°¹Õ±°°¹Õ±°°(€€€€€€€€€€€¹•Ü•½‘‘É•ÍÍM¹…ÁÍ¡½Ð¡¹Õ±°°¹Õ±°°¹Õ±°°¹Õ±°°€‰µ•Ñ…‘…Ñ„½¹±äˆ¤°½Á•É…Ñ¥½¹%¤¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñMå¹	…Ñ¡=Á•É…Ñ¥½¹I•ÍÕ±ÐøM¥¹±•I•ÍÕ±ÑÍå¹Œ¡!ÑÑÁI•ÍÁ½¹Í•5•ÍÍ…”É•ÍÁ½¹Í”¤(€€€€€€€€ôøÍÍ•ÉÐ¹M¥¹±”¡…Ý…¥ÐI•ÍÕ±ÑÍÍå¹Œ¡É•ÍÁ½¹Í”¤¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñ%I•…‘=¹±å1¥ÍÐñMå¹	…Ñ¡=Á•É…Ñ¥½¹I•ÍÕ±ÐøøI•ÍÕ±ÑÍÍå¹Œ¡!ÑÑÁI•ÍÁ½¹Í•5•ÍÍ…”É•ÍÁ½¹Í”¤(€€€ì(€€€€€€€ÍÍ•ÉÐ¹ÅÕ…°¡!ÑÑÁMÑ…ÑÕÍ½‘”¹=,°É•ÍÁ½¹Í”¹MÑ…ÑÕÍ½‘”¤ì(€€€€€€€Ù…È©Í½¸€ô…Ý…¥ÐÉ•ÍÁ½¹Í”¹½¹Ñ•¹Ð¹I•…‘ÍMÑÉ¥¹Íå¹Œ ¤ì(€€€€€€€Ù…È•¹Ù•±½Á”€ô)Í½¹M•É¥…±¥é•È¹•Í•É¥…±¥é”ñMå¹	…Ñ¡I•ÍÁ½¹Í”ø¡©Í½¸°(€€€€€€€€€€€¹•Ü)Í½¹M•É¥…±¥é•É=ÁÑ¥½¹Ì¡)Í½¹M•É¥…±¥é•É•™…Õ±ÑÌ¹]•ˆ¤¤ì(€€€€€€€ÍÍ•ÉÐ¹9½Ñ9Õ±°¡•¹Ù•±½Á”¤ì(€€€€€€€É•ÑÕÉ¸•¹Ù•±½Á”„¹I•ÍÕ±ÑÌì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬á•ÕÑ•U¹Ñ¥±Q•Éµ¥¹…±Íå¹Œ (€€€€€€€]•‰ÁÁ±¥…Ñ¥½¹…Ñ½ÉäñAÉ½É…´ø™…Ñ½Éä°(€€€€€€€ÍÑÉ¥¹œ½¹¹•Ñ¥½¸°(€€€€€€€%I•…‘=¹±å½±±•Ñ¥½¸ñÍÑÉ¥¹œø½Á•É…Ñ¥½¹%‘Ì¤(€€€ì(€€€€€€€™½È€¡Ù…È…ÑÑ•µÁÐ€ô€Àì…ÑÑ•µÁÐ€ð€ÌÀì…ÑÑ•µÁÐ¬¬¤(€€€€€€€ì(€€€€€€€€€€€…Ý…¥ÐÕÍ¥¹œ€¡Ù…ÈÍ½Á”€ô™…Ñ½Éä¹M•ÉÙ¥•Ì¹É•…Ñ•Íå¹M½Á” ¤¤(€€€€€€€€€€€€€€€|€ô…Ý…¥ÐÍ½Á”¹M•ÉÙ¥•AÉ½Ù¥‘•È¹•ÑI•ÅÕ¥É•‘M•ÉÙ¥”ñMå¹á•ÕÑ¥½¹AÉ½•ÍÍ½Èø ¤(€€€€€€€€€€€€€€€€€€€€¹á•ÕÑ•9•áÑÍå¹Œ¡Q¥µ•MÁ…¸¹É½µM•½¹‘Ì ÌÀ¤¤ì((€€€€€€€€€€€…Ý…¥ÐÕÍ¥¹œÙ…ÈÙ•É¥™ä€ôA½ÍÑÉ•MÅ±Q•ÍÑ¹Ù¥É½¹µ•¹Ð¹É•…Ñ•‰½¹Ñ•áÐ¡½¹¹•Ñ¥½¸¤ì(€€€€€€€€€€€Ù…ÈÍÑ…ÑÕÍ•Ì€ô…Ý…¥ÐÙ•É¥™ä¹Må¹=Á•É…Ñ¥½¹Ì¹Í9½QÉ…­¥¹œ ¤(€€€€€€€€€€€€€€€€¹]¡•É”¡à€ôø½Á•É…Ñ¥½¹%‘Ì¹½¹Ñ…¥¹Ì¡à¹±¥•¹Ñ=Á•É…Ñ¥½¹%¤¤(€€€€€€€€€€€€€€€€¹M•±•Ð¡à€ôøà¹MÑ…ÑÕÌ¤¹Q½1¥ÍÑÍå¹Œ ¤ì(€€€€€€€€€€€¥˜€¡ÍÑ…ÑÕÍ•Ì¹½Õ¹Ð€ôô½Á•É…Ñ¥½¹%‘Ì¹½Õ¹Ð€˜˜ÍÑ…ÑÕÍ•Ì¹±°¡à€ôøà¥Ì€‰MUˆ½È€‰I)Qˆ½È€‰=91%Pˆ¤¤(€€€€€€€€€€€€€€€É•ÑÕÉ¸ì(€€€€€€€ô(€€€€€€€Ñ¡É½Ü¹•ÜaÕ¹¥Ð¹M‘¬¹aÕ¹¥Ñá•ÁÑ¥½¸ ‰Q¡”½Ù•É¹•½Á•É…Ñ¥½¹Ì‘¥¹½ÐÉ•… Ñ•Éµ¥¹…°ÍÑ…Ñ•Ì¸ˆ¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñQ•ÍÑM½Á”øM••‘Íå¹Œ (€€€€€€€QÉ…¹ÍÁ½ÉÑÉÁ‰½¹Ñ•áÐ‘ˆ°(€€€€€€€Í„ÁÉ½½™-•ä°(€€€€€€€ÍÑÉ¥¹œÍÕ™™¥à°(€€€€€€€‰½½°‰¥¹‘AÉ½½™-•ä€ôÑÉÕ”¤(€€€ì(€€€€€€€Ù…È¹½Ü€ô…Ñ•Q¥µ•=™™Í•Ð¹UÑ9½Üì(€€€€€€€Ù…ÈÕÉÉ•¹ä€ô¹•ÜÕÉÉ•¹ä(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½‘”€ô…Ý…¥ÐA½ÍÑÉ•MÅ±Q•ÍÑÕÉÉ•¹å½‘•±±½…Ñ½È¹9•áÑÍå¹Œ¡‘ˆ¤°(€€€€€€€€€€€9…µ•È€ô€‹bçffb¤Ð!QQ@ˆ°5¥¹½ÉU¹¥Ð€ô€È°%Í	…Í”€ôÑÉÕ”°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…È½µÁ…¹ä€ô¹•Ü½µÁ…¹ä(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½‘”€ô€‰Ñ ´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¥l¸¸ÄÑt°(€€€€€€€€€€€1•…±9…µ•È€ô€‹bÓbÇfb¤Ð!QQ@ˆ°	…Í•ÕÉÉ•¹å%€ôÕÉÉ•¹ä¹%°(€€€€€€€€€€€•™…Õ±Ñ…±•¹‘…É%€ôÕ¥¹9•ÝÕ¥ ¤°MÑ…ÑÕÌ€ô€‰Q%Yˆ°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°(€€€€€€€€€€€I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…È‰É…¹ €ô¹•Ü	É…¹ (€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½µÁ…¹å%€ô½µÁ…¹ä¹%°½‘”€ô€‰5%8ˆ°9…µ•È€ô€‹bŸffbÇbäƒbŸfbÇb›f+bÏf(ˆ°(€€€€€€€€€€€Q¥µ•é½¹”€ô€‰Í¥„½I¥å…‘ ˆ°MÑ…ÑÕÌ€ô€‰Q%Yˆ°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°(€€€€€€€€€€€I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…ÈÕÍ•È€ô¹•ÜUÍ•È(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°UÍ•É9…µ”€ô€‰œÐµ¡ÑÑÀµíÕ¥¹9•ÝÕ¥ ¤é9ôˆ°(€€€€€€€€€€€9½Éµ…±¥é•‘UÍ•É9…µ”€ô€‰Ñ!QQAíÕ¥¹9•ÝÕ¥ ¤é9ôˆ°¥ÍÁ±…å9…µ”€ô€‹fbÏb«b»b¿fÐ!QQ@ˆ°(€€€€€€€€€€€A…ÍÍÝ½É‘!…Í €ô€‰Ñ•ÍÐµ½¹±äˆ°M•ÕÉ¥ÑåMÑ…µÀ€ôÕ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°ÕÑ¡Y•ÉÍ¥½¸€ô€Ä°(€€€€€€€€€€€MÑ…ÑÕÌ€ô€‰Q%Yˆ°½µÁ…¹å%€ô½µÁ…¹ä¹%°	É…¹¡%€ô‰É…¹ ¹%°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…ÈÉ½±”€ô¹•ÜI½±”(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½‘”€ô€‰Ñ µíÍÕ™™¥áôµíÕ¥¹9•ÝÕ¥ ¤é9ôˆ°9…µ•È€ô€‹b¿f#bÄÐ!QQ@ˆ°(€€€€€€€€€€€½µÁ…¹å%€ô½µÁ…¹ä¹%°MÑ…ÑÕÌ€ô€‰Q%Yˆ°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°(€€€€€€€€€€€I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…ÈÍ•ÍÍ¥½¹%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…ÈÉ•¥ÍÑ•É•‘•Ù¥•%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…È‘•Ù¥•%€ô€‰œÐµ¡ÑÑÀµíÍÕ™™¥à¹Q½1½Ý•É%¹Ù…É¥…¹Ð ¥ôµíÕ¥¹9•ÝÕ¥ ¤é9ôˆì(€€€€€€€‘ˆ¹‘‘I…¹”¡ÕÉÉ•¹ä°½µÁ…¹ä°‰É…¹ °ÕÍ•È°É½±”¤ì(€€€€€€€‘ˆ¹UÍ•ÉI½±•Ì¹‘¡¹•ÜUÍ•ÉI½±”(€€€€€€€ì(€€€€€€€€€€€UÍ•É%€ôÕÍ•È¹%°I½±•%€ôÉ½±”¹%°½µÁ…¹å%€ô½µÁ…¹ä¹%°	É…¹¡%€ô‰É…¹ ¹%°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€™½É•… €¡Ù…È½‘”¥¸¹•Ýmt(€€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€€€‰Íå¹Œ¹½Á•É…Ñ¥½¹Ì¹•á•ÕÑ”ˆ°€‰Á…ÉÑä¹É•…Ñ”ˆ°€‰Ý…å‰¥±°¹É•…Ñ”ˆ°€‰Ý…å‰¥±°¹•‘¥Ðˆ°(€€€€€€€€€€€€€€€€€€€€€‰…½Õ¹Ñ¥¹œ¹©½ÕÉ¹…°¹É•…Ñ”ˆ°€‰Ý…å‰¥±°¹…ÑÑ…¡µ•¹Ð¹…‘ˆ°€‰Ý…å‰¥±°¹Á½¹…ÁÑÕÉ”ˆ°(€€€€€€€€€€€€€€€€€€€€€‰Íå¹Œ¹½¹™±¥ÑÌ¹É•Í½±Ù”ˆ°€‰‘•Ù¥•Ì¹µ…¹…”ˆ(€€€€€€€€€€€€€€€€ô¤(€€€€€€€ì(€€€€€€€€€€€Ù…ÈÁ•Éµ¥ÍÍ¥½¸€ô…Ý…¥Ð‘ˆ¹A•Éµ¥ÍÍ¥½¹Ì¹M¥¹±•=É•™…Õ±ÑÍå¹Œ¡à€ôøà¹½‘”€ôô½‘”¤ì(€€€€€€€€€€€¥˜€¡Á•Éµ¥ÍÍ¥½¸¥Ì¹Õ±°¤(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€Á•Éµ¥ÍÍ¥½¸€ô¹•ÜA•Éµ¥ÍÍ¥½¸(€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½‘”€ô½‘”°9…µ•È€ô½‘”°I•Í½ÕÉ”€ô½‘”¹MÁ±¥Ð œ¸œ¥lÁt°(€€€€€€€€€€€€€€€€€€€Ñ¥½¸€ô½‘”¹MÁ±¥Ð œ¸œ¥mxÅt°M½Á•QåÁ”€ô€‰	I9 ˆ°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€€€€€€€€€ôì(€€€€€€€€€€€€€€€‘ˆ¹A•Éµ¥ÍÍ¥½¹Ì¹‘¡Á•Éµ¥ÍÍ¥½¸¤ì(€€€€€€€€€€€ô(€€€€€€€€€€€‘ˆ¹I½±•A•Éµ¥ÍÍ¥½¹Ì¹‘¡¹•ÜI½±•A•Éµ¥ÍÍ¥½¸(€€€€€€€€€€€ì(€€€€€€€€€€€€€€€I½±•%€ôÉ½±”¹%°A•Éµ¥ÍÍ¥½¹%€ôÁ•Éµ¥ÍÍ¥½¸¹%°M½Á•QåÁ”€ôÁ•Éµ¥ÍÍ¥½¸¹M½Á•QåÁ”°(€€€€€€€€€€€€€€€½µÁ…¹å%€ôÁ•Éµ¥ÍÍ¥½¸¹M½Á•QåÁ”€ôô€‰A1Q=I4ˆ€ü¹Õ±°€è½µÁ…¹ä¹%°(€€€€€€€€€€€€€€€	É…¹¡%€ôÁ•Éµ¥ÍÍ¥½¸¹M½Á•QåÁ”€ôô€‰	I9 ˆ€ü‰É…¹ ¹%€è¹Õ±°°(€€€€€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€€€€€ô¤ì(€€€€€€€ô((€€€€€€€Ù…ÈÁÕ‰±¥A…É…µ•Ñ•ÉÌ€ôÁÉ½½™-•ä¹áÁ½ÉÑA…É…µ•Ñ•ÉÌ¡™…±Í”¤ì(€€€€€€€Ù…Èà€ô	…Í”ØÑUÉ°¡ÁÕ‰±¥A…É…µ•Ñ•ÉÌ¹D¹`„¤ì(€€€€€€€Ù…Èä€ô	…Í”ØÑUÉ°¡ÁÕ‰±¥A…É…µ•Ñ•ÉÌ¹D¹d„¤ì(€€€€€€€Ù…È…¹½¹¥…±)Ý¬€ô€‰ííp‰ÉÙpˆép‰@´ÈÔÙpˆ±p‰­Ñåpˆép‰pˆ±p‰ápˆép‰íáõpˆ±p‰åpˆép‰íåõp‰õôˆì(€€€€€€€Ù…ÈÑ¡Õµ‰ÁÉ¥¹Ð€ô	…Í”ØÑUÉ°¡M!ÈÔØ¹!…Í¡…Ñ„¡¹½‘¥¹œ¹M%$¹•Ñ	åÑ•Ì¡…¹½¹¥…±)Ý¬¤¤¤ì(€€€€€€€‘ˆ¹I•¥ÍÑ•É•‘•Ù¥•Ì¹‘¡¹•ÜI•¥ÍÑ•É•‘•Ù¥”(€€€€€€€ì(€€€€€€€€€€€%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°½µÁ…¹å%€ô½µÁ…¹ä¹%°•Ù¥•%€ô‘•Ù¥•%°(€€€€€€€€€€€¥ÍÁ±…å9…µ”€ô€‰Ð!QQ@‘•Ù¥”ˆ°A±…Ñ™½É´€ô€‰QMPˆ°ÁÁY•ÉÍ¥½¸€ô€ˆÄ¸Àˆ°(€€€€€€€€€€€I•¥ÍÑÉ…Ñ¥½¹I•ÅÕ•ÍÑ%€ô€‰œÐµ¡ÑÑÀ´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°(€€€€€€€€€€€É•‘•¹Ñ¥…±!…Í €ô¹•ÜÍÑÉ¥¹œ „œ°€ØÐ¤°É•‘•¹Ñ¥…±Y•ÉÍ¥½¸€ô€Ä°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€I•¥ÍÑ•É•‘	åUÍ•É%€ôÕÍ•È¹%°ÁÁÉ½Ù•‘	åUÍ•É%€ôÕÍ•È¹%°ÁÁÉ½Ù•‘Ð€ô¹½Ü°1…ÍÑM••¹Ð€ô¹½Ü°(€€€€€€€€€€€AÉ½½™AÕ‰±¥)Ý­…¹½¹¥…±)Í½¸€ô‰¥¹‘AÉ½½™-•ä€ü…¹½¹¥…±)Ý¬€è¹Õ±°°(€€€€€€€€€€€AÉ½½™-•åQ¡Õµ‰ÁÉ¥¹Ð€ô‰¥¹‘AÉ½½™-•ä€üÑ¡Õµ‰ÁÉ¥¹Ð€è¹Õ±°°(€€€€€€€€€€€AÉ½½™-•åY•ÉÍ¥½¸€ô‰¥¹‘AÉ½½™-•ä€ü€Ä€è¹Õ±°°(€€€€€€€€€€€AÉ½½™-•å¡…¹•‘Ð€ô‰¥¹‘AÉ½½™-•ä€ü¹½Ü€è¹Õ±°°(€€€€€€€€€€€AÉ½½™-•å¡…¹•‘	åUÍ•É%€ô‰¥¹‘AÉ½½™-•ä€üÕÍ•È¹%€è¹Õ±°°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€‘ˆ¹I•¥ÍÑ•É•‘•Ù¥•ÍÍ¥¹µ•¹ÑÌ¹‘¡¹•ÜI•¥ÍÑ•É•‘•Ù¥•ÍÍ¥¹µ•¹Ð(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°I•¥ÍÑ•É•‘•Ù¥•%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°UÍ•É%€ôÕÍ•È¹%°(€€€€€€€€€€€½µÁ…¹å%€ô½µÁ…¹ä¹%°	É…¹¡%€ô‰É…¹ ¹%°MÑ…ÑÕÌ€ô€‰Q%Yˆ°ÍÍ¥¹•‘	åUÍ•É%€ôÕÍ•È¹%°(€€€€€€€€€€€ÍÍ¥¹•‘Ð€ô¹½Ü°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€‘ˆ¹ÕÑ¡M•ÍÍ¥½¹Ì¹‘¡¹•ÜÕÑ¡M•ÍÍ¥½¸(€€€€€€€ì(€€€€€€€€€€€%€ôÍ•ÍÍ¥½¹%°UÍ•É%€ôÕÍ•È¹%°½µÁ…¹å%€ô½µÁ…¹ä¹%°	É…¹¡%€ô‰É…¹ ¹%°(€€€€€€€€€€€•Ù¥•%€ô‘•Ù¥•%°I•¥ÍÑ•É•‘•Ù¥•%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°•Ù¥•É•‘•¹Ñ¥…±Y•ÉÍ¥½¸€ô€Ä°(€€€€€€€€€€€5½‘”€ô€‰1=0ˆ°M•ÕÉ¥ÑåMÑ…µÁÑ%ÍÍÕ”€ôÕÍ•È¹M•ÕÉ¥ÑåMÑ…µÀ°ÕÑ¡Y•ÉÍ¥½¹Ñ%ÍÍÕ”€ô€Ä°(€€€€€€€€€€€I•™É•Í¡Q½­•¹!…Í €ô½¹Ù•ÉÐ¹Q½!•áMÑÉ¥¹œ¡M!ÈÔØ¹!…Í¡…Ñ„¡Í•ÍÍ¥½¹%¹Q½	åÑ•ÉÉ…ä ¤¤¤¹Q½1½Ý•É%¹Ù…É¥…¹Ð ¤°(€€€€€€€€€€€I•™É•Í¡Q½­•¹…µ¥±å%€ôÕ¥¹9•ÝÕ¥ ¤°%ÍÍÕ•‘Ð€ô¹½Ü°•ÍÍQ½­•¹áÁ¥É•ÍÐ€ô¹½Ü¹‘‘5¥¹ÕÑ•Ì ÄÔ¤°(€€€€€€€€€€€I•™É•Í¡Q½­•¹áÁ¥É•ÍÐ€ô¹½Ü¹‘‘…åÌ Ä¤°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°(€€€€€€€€€€€I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€…Ý…¥Ð‘ˆ¹M…Ù•¡…¹•ÍÍå¹Œ ¤ì((€€€€€€€É•ÑÕÉ¸¹•ÜQ•ÍÑM½Á”¡½µÁ…¹ä¹%°‰É…¹ ¹%°ÕÍ•È¹%°Í•ÍÍ¥½¹%°É•¥ÍÑ•É•‘•Ù¥•%°(€€€€€€€€€€€‘•Ù¥•%°ÕÉÉ•¹ä¹%°É•…Ñ•Q½­•¸¡ÕÍ•È°½µÁ…¹ä¹%°‰É…¹ ¹%°Í•ÍÍ¥½¹%°É•¥ÍÑ•É•‘•Ù¥•%°‘•Ù¥•%¤¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñQ•ÍÑM½Á”øM••‘M•½¹‘•Ù¥•Íå¹Œ (€€€€€€€QÉ…¹ÍÁ½ÉÑÉÁ‰½¹Ñ•áÐ‘ˆ°(€€€€€€€Q•ÍÑM½Á”Í½Á”°(€€€€€€€Í„ÁÉ½½™-•ä¤(€€€ì(€€€€€€€Ù…È¹½Ü€ô…Ñ•Q¥µ•=™™Í•Ð¹UÑ9½Üì(€€€€€€€Ù…ÈÕÍ•È€ô…Ý…¥Ð‘ˆ¹UÍ•ÉÌ¹M¥¹±•Íå¹Œ¡…¹‘¥‘…Ñ”€ôø…¹‘¥‘…Ñ”¹%€ôôÍ½Á”¹UÍ•É%¤ì(€€€€€€€Ù…ÈÉ•¥ÍÑ•É•‘•Ù¥•%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…ÈÍ•ÍÍ¥½¹%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…È‘•Ù¥•%€ô€‰œÐµ¡ÑÑÀµ‘•Ù¥”µˆµíÕ¥¹9•ÝÕ¥ ¤é9ôˆì(€€€€€€€Ù…ÈÁÕ‰±¥A…É…µ•Ñ•ÉÌ€ôÁÉ½½™-•ä¹áÁ½ÉÑA…É…µ•Ñ•ÉÌ¡™…±Í”¤ì(€€€€€€€Ù…Èà€ô	…Í”ØÑUÉ°¡ÁÕ‰±¥A…É…µ•Ñ•ÉÌ¹D¹`„¤ì(€€€€€€€Ù…Èä€ô	…Í”ØÑUÉ°¡ÁÕ‰±¥A…É…µ•Ñ•ÉÌ¹D¹d„¤ì(€€€€€€€Ù…È…¹½¹¥…±)Ý¬€ô€‰ííp‰ÉÙpˆép‰@´ÈÔÙpˆ±p‰­Ñåpˆép‰pˆ±p‰ápˆép‰íáõpˆ±p‰åpˆép‰íåõp‰õôˆì(€€€€€€€Ù…ÈÑ¡Õµ‰ÁÉ¥¹Ð€ô	…Í”ØÑUÉ°¡M!ÈÔØ¹!…Í¡…Ñ„¡¹½‘¥¹œ¹M%$¹•Ñ	åÑ•Ì¡…¹½¹¥…±)Ý¬¤¤¤ì(€€€€€€€‘ˆ¹I•¥ÍÑ•É•‘•Ù¥•Ì¹‘¡¹•ÜI•¥ÍÑ•É•‘•Ù¥”(€€€€€€€ì(€€€€€€€€€€€%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°½µÁ…¹å%€ôÍ½Á”¹½µÁ…¹å%°•Ù¥•%€ô‘•Ù¥•%°(€€€€€€€€€€€¥ÍÁ±…å9…µ”€ô€‰Ð!QQ@Í•½¹‘•Ù¥”ˆ°A±…Ñ™½É´€ô€‰QMPˆ°ÁÁY•ÉÍ¥½¸€ô€ˆÄ¸Àˆ°(€€€€€€€€€€€I•¥ÍÑÉ…Ñ¥½¹I•ÅÕ•ÍÑ%€ô€‰œÐµ¡ÑÑÀµÍ•½¹´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°(€€€€€€€€€€€É•‘•¹Ñ¥…±!…Í €ô¹•ÜÍÑÉ¥¹œ ˆœ°€ØÐ¤°É•‘•¹Ñ¥…±Y•ÉÍ¥½¸€ô€Ä°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€I•¥ÍÑ•É•‘	åUÍ•É%€ôÍ½Á”¹UÍ•É%°ÁÁÉ½Ù•‘	åUÍ•É%€ôÍ½Á”¹UÍ•É%°(€€€€€€€€€€€ÁÁÉ½Ù•‘Ð€ô¹½Ü°1…ÍÑM••¹Ð€ô¹½Ü°(€€€€€€€€€€€AÉ½½™AÕ‰±¥)Ý­…¹½¹¥…±)Í½¸€ô…¹½¹¥…±)Ý¬°AÉ½½™-•åQ¡Õµ‰ÁÉ¥¹Ð€ôÑ¡Õµ‰ÁÉ¥¹Ð°(€€€€€€€€€€€AÉ½½™-•åY•ÉÍ¥½¸€ô€Ä°AÉ½½™-•å¡…¹•‘Ð€ô¹½Ü°AÉ½½™-•å¡…¹•‘	åUÍ•É%€ôÍ½Á”¹UÍ•É%°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€‘ˆ¹I•¥ÍÑ•É•‘•Ù¥•ÍÍ¥¹µ•¹ÑÌ¹‘¡¹•ÜI•¥ÍÑ•É•‘•Ù¥•ÍÍ¥¹µ•¹Ð(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°I•¥ÍÑ•É•‘•Ù¥•%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°UÍ•É%€ôÍ½Á”¹UÍ•É%°(€€€€€€€€€€€½µÁ…¹å%€ôÍ½Á”¹½µÁ…¹å%°	É…¹¡%€ôÍ½Á”¹	É…¹¡%°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€ÍÍ¥¹•‘	åUÍ•É%€ôÍ½Á”¹UÍ•É%°ÍÍ¥¹•‘Ð€ô¹½Ü°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€‘ˆ¹ÕÑ¡M•ÍÍ¥½¹Ì¹‘¡¹•ÜÕÑ¡M•ÍÍ¥½¸(€€€€€€€ì(€€€€€€€€€€€%€ôÍ•ÍÍ¥½¹%°UÍ•É%€ôÍ½Á”¹UÍ•É%°½µÁ…¹å%€ôÍ½Á”¹½µÁ…¹å%°(€€€€€€€€€€€	É…¹¡%€ôÍ½Á”¹	É…¹¡%°•Ù¥•%€ô‘•Ù¥•%°(€€€€€€€€€€€I•¥ÍÑ•É•‘•Ù¥•%€ôÉ•¥ÍÑ•É•‘•Ù¥•%°•Ù¥•É•‘•¹Ñ¥…±Y•ÉÍ¥½¸€ô€Ä°(€€€€€€€€€€€5½‘”€ô€‰1=0ˆ°M•ÕÉ¥ÑåMÑ…µÁÑ%ÍÍÕ”€ôÕÍ•È¹M•ÕÉ¥ÑåMÑ…µÀ°ÕÑ¡Y•ÉÍ¥½¹Ñ%ÍÍÕ”€ôÕÍ•È¹ÕÑ¡Y•ÉÍ¥½¸°(€€€€€€€€€€€I•™É•Í¡Q½­•¹!…Í €ô½¹Ù•ÉÐ¹Q½!•áMÑÉ¥¹œ¡M!ÈÔØ¹!…Í¡…Ñ„¡Í•ÍÍ¥½¹%¹Q½	åÑ•ÉÉ…ä ¤¤¤¹Q½1½Ý•É%¹Ù…É¥…¹Ð ¤°(€€€€€€€€€€€I•™É•Í¡Q½­•¹…µ¥±å%€ôÕ¥¹9•ÝÕ¥ ¤°%ÍÍÕ•‘Ð€ô¹½Ü°(€€€€€€€€€€€•ÍÍQ½­•¹áÁ¥É•ÍÐ€ô¹½Ü¹‘‘5¥¹ÕÑ•Ì ÄÔ¤°I•™É•Í¡Q½­•¹áÁ¥É•ÍÐ€ô¹½Ü¹‘‘…åÌ Ä¤°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ô¤ì(€€€€€€€…Ý…¥Ð‘ˆ¹M…Ù•¡…¹•ÍÍå¹Œ ¤ì(€€€€€€€É•ÑÕÉ¸¹•ÜQ•ÍÑM½Á” (€€€€€€€€€€€Í½Á”¹½µÁ…¹å%°Í½Á”¹	É…¹¡%°Í½Á”¹UÍ•É%°Í•ÍÍ¥½¹%°É•¥ÍÑ•É•‘•Ù¥•%°(€€€€€€€€€€€‘•Ù¥•%°Í½Á”¹ÕÉÉ•¹å%°(€€€€€€€€€€€É•…Ñ•Q½­•¸¡ÕÍ•È°Í½Á”¹½µÁ…¹å%°Í½Á”¹	É…¹¡%°Í•ÍÍ¥½¹%°É•¥ÍÑ•É•‘•Ù¥•%°‘•Ù¥•%¤¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ…Íå¹ŒQ…Í¬ñÉ½ÍÍM½Á•Q…É•ÑÌøM••‘É½ÍÍM½Á•Q…É•ÑÍÍå¹Œ (€€€€€€€QÉ…¹ÍÁ½ÉÑÉÁ‰½¹Ñ•áÐ‘ˆ°(€€€€€€€Q•ÍÑM½Á”Í½Á”¤(€€€ì(€€€€€€€Ù…È¹½Ü€ô…Ñ•Q¥µ•=™™Í•Ð¹UÑ9½Üì(€€€€€€€Ù…È™½É•¥¹	É…¹ €ô¹•Ü	É…¹ (€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½µÁ…¹å%€ôÍ½Á”¹½µÁ…¹å%°½‘”€ô€‰	íÕ¥¹9•ÝÕ¥ ¤é9ô‰l¸¸ÄÉt°(€€€€€€€€€€€9…µ•È€ô€‹fbÇbäƒb‹b»bÄˆ°Q¥µ•é½¹”€ô€‰Í¥„½I¥å…‘ ˆ°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…È™½É•¥¹½µÁ…¹ä€ô¹•Ü½µÁ…¹ä(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½‘”€ô€‰µíÕ¥¹9•ÝÕ¥ ¤é9ô‰l¸¸Äát°1•…±9…µ•È€ô€‹bÓbÇfb¤ƒbb»bÇf$ˆ°(€€€€€€€€€€€	…Í•ÕÉÉ•¹å%€ôÍ½Á”¹ÕÉÉ•¹å%°•™…Õ±Ñ…±•¹‘…É%€ôÕ¥¹9•ÝÕ¥ ¤°MÑ…ÑÕÌ€ô€‰Q%Yˆ°(€€€€€€€€€€€É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…È™½É•¥¹½µÁ…¹å	É…¹ €ô¹•Ü	É…¹ (€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½µÁ…¹å%€ô™½É•¥¹½µÁ…¹ä¹%°½‘”€ô€‰5%8ˆ°9…µ•È€ô€‹fbÇbäƒbŸfbÓbÇfb¤ƒbŸfbb»bÇf$ˆ°(€€€€€€€€€€€Q¥µ•é½¹”€ô€‰Í¥„½I¥å…‘ ˆ°MÑ…ÑÕÌ€ô€‰Q%Yˆ°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü°(€€€€€€€€€€€I½ÝY•ÉÍ¥½¸€ôI…¹‘½µ9Õµ‰•É•¹•É…Ñ½È¹•Ñ	åÑ•Ì ÄØ¤(€€€€€€€ôì(€€€€€€€Ù…È‰É…¹¡A…ÉÑä€ôA…ÉÑä¡Í½Á”¹½µÁ…¹å%°™½É•¥¹	É…¹ ¹%°€‰	I9 ˆ°¹½Ü¤ì(€€€€€€€Ù…È½µÁ…¹åA…ÉÑä€ôA…ÉÑä¡™½É•¥¹½µÁ…¹ä¹%°™½É•¥¹½µÁ…¹å	É…¹ ¹%°€‰=5A9dˆ°¹½Ü¤ì(€€€€€€€Ù…ÈÝ…å‰¥±±…Ñ•Q¥µ”€ô¹½Üì(€€€€€€€Ù…È½É¥¥¹%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…È‘•ÍÑ¥¹…Ñ¥½¹%€ôÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€Ù…ÈÝ…å‰¥±°€ô¹•Ü]…å‰¥±±¹Ñ¥Ñä(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½µÁ…¹å%€ôÍ½Á”¹½µÁ…¹å%°	É…¹¡%€ôÍ½Á”¹	É…¹¡%°(€€€€€€€€€€€É…™Ñ9¼€ô€‰µÐ´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°]…å‰¥±±…Ñ•Q¥µ”€ôÝ…å‰¥±±…Ñ•Q¥µ”°(€€€€€€€€€€€M•ÉÙ¥•QåÁ”€ô€‰MQ9Iˆ°AÉ¥½É¥Ñä€ô€‰9=I50ˆ°=É¥¥¹%€ô½É¥¥¹%°(€€€€€€€€€€€•ÍÑ¥¹…Ñ¥½¹%€ô‘•ÍÑ¥¹…Ñ¥½¹%°ÕÉÉ•¹å%€ôÍ½Á”¹ÕÉÉ•¹å%°á¡…¹•I…Ñ”€ô€Ä°(€€€€€€€€€€€É•¥¡ÑQ½Ñ…°€ô€À°¥Í½Õ¹ÑQ½Ñ…°€ô€À°MÑ…ÑÕÌ€ô€‰IPˆ°¥¹…¹¥…±MÑ…ÑÕÌ€ô€‰U9A%ˆ°(€€€€€€€€€€€É•…Ñ•±¥•¹Ñ=Á•É…Ñ¥½¹%€ô€‰Í••´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°(€€€€€€€€€€€1…ÍÑ±¥•¹Ñ=Á•É…Ñ¥½¹%€ô€‰Í••´ˆ€¬Õ¥¹9•ÝÕ¥ ¤¹Q½MÑÉ¥¹œ ‰8ˆ¤°(€€€€€€€€€€€Y•ÉÍ¥½¸€ô€Ä°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü(€€€€€€€ôì(€€€€€€€‘ˆ¹‘‘I…¹”¡™½É•¥¹	É…¹ °™½É•¥¹½µÁ…¹ä°™½É•¥¹½µÁ…¹å	É…¹ °‰É…¹¡A…ÉÑä°½µÁ…¹åA…ÉÑä°Ý…å‰¥±°¤ì(€€€€€€€…Ý…¥Ð‘ˆ¹M…Ù•¡…¹•ÍÍå¹Œ ¤ì(€€€€€€€É•ÑÕÉ¸¹•ÜÉ½ÍÍM½Á•Q…É•ÑÌ¡Ý…å‰¥±°¹%°‰É…¹¡A…ÉÑä¹%°½µÁ…¹åA…ÉÑä¹%°(€€€€€€€€€€€Ý…å‰¥±±…Ñ•Q¥µ”°½É¥¥¹%°‘•ÍÑ¥¹…Ñ¥½¹%¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ=Á•É…Ñ¥½¹…±A…ÉÑå¹Ñ¥ÑäA…ÉÑä¡Õ¥½µÁ…¹å%°Õ¥‰É…¹¡%°ÍÑÉ¥¹œÍÕ™™¥à°…Ñ•Q¥µ•=™™Í•Ð¹½Ü¤(€€€€€€€€ôø¹•Ü ¤(€€€€€€€ì(€€€€€€€€€€€%€ôÕ¥¹9•ÝÕ¥ ¤°½µÁ…¹å%€ô½µÁ…¹å%°	É…¹¡%€ô‰É…¹¡%°(€€€€€€€€€€€A…ÉÑå9¼€ô€‰@µíÍÕ™™¥áôµíÕ¥¹9•ÝÕ¥ ¤é9ô‰l¸¸ÌÁt°9…µ”€ô€‰A…ÉÑäíÍÕ™™¥áôˆ°(€€€€€€€€€€€5½‰¥±”€ô€ˆÜÀÀÀÀÀÀÀÄˆ°MÑ…ÑÕÌ€ô€‰Q%Yˆ°±¥•¹Ñ=Á•É…Ñ¥½¹%€ô€‰Á…ÉÑäµíÍÕ™™¥áôµíÕ¥¹9•ÝÕ¥ ¤é9ôˆ°(€€€€€€€€€€€Y•ÉÍ¥½¸€ô€Ä°É•…Ñ•‘Ð€ô¹½Ü°UÁ‘…Ñ•‘Ð€ô¹½Ü(€€€€€€€ôì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œÉ•…Ñ•Q½­•¸ (€€€€€€€UÍ•ÈÕÍ•È°(€€€€€€€Õ¥½µÁ…¹å%°(€€€€€€€Õ¥‰É…¹¡%°(€€€€€€€Õ¥Í•ÍÍ¥½¹%°(€€€€€€€Õ¥É•¥ÍÑ•É•‘•Ù¥•%°(€€€€€€€ÍÑÉ¥¹œ‘•Ù¥•%¤(€€€ì(€€€€€€€Ù…È‘•ÍÉ¥ÁÑ½È€ô¹•ÜM•ÕÉ¥ÑåQ½­•¹•ÍÉ¥ÁÑ½È(€€€€€€€ì(€€€€€€€€€€€MÕ‰©•Ð€ô¹•Ü±…¥µÍ%‘•¹Ñ¥Ñä¡l(€€€€€€€€€€€€€€€¹•Ü±…¥´¡)ÝÑI•¥ÍÑ•É•‘±…¥µ9…µ•Ì¹MÕˆ°ÕÍ•È¹%¹Q½MÑÉ¥¹œ ‰ˆ¤¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰½µÁ…¹å}¥ˆ°½µÁ…¹å%¹Q½MÑÉ¥¹œ ‰ˆ¤¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰‰É…¹¡}¥ˆ°‰É…¹¡%¹Q½MÑÉ¥¹œ ‰ˆ¤¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰Í¥ˆ°Í•ÍÍ¥½¹%¹Q½MÑÉ¥¹œ ‰ˆ¤¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰‘•Ù¥•}¥ˆ°‘•Ù¥•%¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰É•¥ÍÑ•É•‘}‘•Ù¥•}¥ˆ°É•¥ÍÑ•É•‘•Ù¥•%¹Q½MÑÉ¥¹œ ‰ˆ¤¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰‘•Ù¥•}É•‘•¹Ñ¥…±}Ù•ÉÍ¥½¸ˆ°€ˆÄˆ¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰Í•ÕÉ¥Ñå}ÍÑ…µÀˆ°ÕÍ•È¹M•ÕÉ¥ÑåMÑ…µÀ„¤°(€€€€€€€€€€€€€€€¹•Ü±…¥´ ‰…ÕÑ¡}Ù•ÉÍ¥½¸ˆ°€ˆÄˆ¤(€€€€€€€€€€€t¤°(€€€€€€€€€€€%ÍÍÕ•È€ô%ÍÍÕ•È°(€€€€€€€€€€€Õ‘¥•¹”€ôÕ‘¥•¹”°(€€€€€€€€€€€áÁ¥É•Ì€ô…Ñ•Q¥µ”¹UÑ9½Ü¹‘‘5¥¹ÕÑ•Ì ÄÀ¤°(€€€€€€€€€€€M¥¹¥¹É•‘•¹Ñ¥…±Ì€ô¹•ÜM¥¹¥¹É•‘•¹Ñ¥…±Ì (€€€€€€€€€€€€€€€¹•ÜMåµµ•ÑÉ¥M•ÕÉ¥Ñå-•ä¡¹½‘¥¹œ¹UQà¹•Ñ	åÑ•Ì¡M¥¹¥¹-•ä¤¤(€€€€€€€€€€€€€€€€€€€ì-•å%€ô€‰ÍÑ…”ÐµœÐµ¡ÑÑÀµÕÉÉ•¹Ðˆô°M•ÕÉ¥Ñå±½É¥Ñ¡µÌ¹!µ…M¡„ÈÔØ¤(€€€€€€€ôì(€€€€€€€É•ÑÕÉ¸¹•Ü)ÝÑM•ÕÉ¥ÑåQ½­•¹!…¹‘±•È ¤¹]É¥Ñ•Q½­•¸ (€€€€€€€€€€€¹•Ü)ÝÑM•ÕÉ¥ÑåQ½­•¹!…¹‘±•È ¤¹É•…Ñ•Q½­•¸¡‘•ÍÉ¥ÁÑ½È¤¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œM¡„ÈÔØ¡ÍÑÉ¥¹œÙ…±Õ”¤(€€€€€€€€ôø½¹Ù•ÉÐ¹Q½!•áMÑÉ¥¹œ¡M!ÈÔØ¹!…Í¡…Ñ„¡¹½‘¥¹œ¹UQà¹•Ñ	åÑ•Ì¡Ù…±Õ”¤¤¤¹Q½1½Ý•É%¹Ù…É¥…¹Ð ¤ì((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÍÑÉ¥¹œ	…Í”ØÑUÉ°¡I•…‘=¹±åMÁ…¸ñ‰åÑ”øÙ…±Õ”¤(€€€€€€€€ôø½¹Ù•ÉÐ¹Q½	…Í”ØÑMÑÉ¥¹œ¡Ù…±Õ”¤¹QÉ¥µ¹ œôœ¤¹I•Á±…” œ¬œ°€œ´œ¤¹I•Á±…” œ¼œ°€|œ¤ì((€€€ÁÉ¥Ù…Ñ”Í•…±•É•½ÉQ•ÍÑ=Á•É…Ñ¥½¸ (€€€€€€€ÍÑÉ¥¹œÑ¥½¹½‘”°(€€€€€€€ÍÑÉ¥¹œ=Á•É…Ñ¥½¹QåÁ”°(€€€€€€€ÍÑÉ¥¹œ¹Ñ¥ÑåQåÁ”°(€€€€€€€Õ¥ü¹Ñ¥Ñå%°(€€€€€€€ÍÑÉ¥¹œ±¥•¹Ñ=Á•É…Ñ¥½¹%°(€€€€€€€Õ¥=Á•É…Ñ¥½¹½ÉÉ•±…Ñ¥½¹%°(€€€€€€€ÍÑÉ¥¹œA…å±½…‘)Í½¸°(€€€€€€€ÍÑÉ¥¹œA…å±½…‘!…Í °(€€€€€€€±½¹œü	…Í•Y•ÉÍ¥½¸¤ì((€€€ÁÉ¥Ù…Ñ”Í•…±•É•½ÉQ•ÍÑM½Á” (€€€€€€€Õ¥½µÁ…¹å%°(€€€€€€€Õ¥	É…¹¡%°(€€€€€€€Õ¥UÍ•É%°(€€€€€€€Õ¥M•ÍÍ¥½¹%°(€€€€€€€Õ¥I•¥ÍÑ•É•‘•Ù¥•%°(€€€€€€€ÍÑÉ¥¹œ•Ù¥•%°(€€€€€€€Õ¥ÕÉÉ•¹å%°(€€€€€€€ÍÑÉ¥¹œ	•…É•È¤ì((€€€ÁÉ¥Ù…Ñ”Í•…±•±…ÍÌ•ÁÑ•‘I…Ý	½‘åÕÑ¡•¹Ñ¥…Ñ½È (€€€€€€€Q•ÍÑM½Á”Í½Á”°(€€€€€€€™™•Ñ¥Ù•Må¹A½±¥ä•™™•Ñ¥Ù•A½±¥ä¤€è%Må¹A½Á!ÑÑÁI•ÅÕ•ÍÑÕÑ¡•¹Ñ¥…Ñ½È(€€€ì(€€€€€€€ÁÕ‰±¥Œ…Íå¹ŒQ…Í¬ñMå¹!ÑÑÁÕÑ¡•¹Ñ¥…Ñ¥½¹I•ÍÕ±ÐøÕÑ¡•¹Ñ¥…Ñ•Íå¹Œ (€€€€€€€€€€€!ÑÑÁ½¹Ñ•áÐ¡ÑÑÀ°(€€€€€€€€€€€ÍÑÉ¥¹œ…¹½¹¥…±A…Ñ °(€€€€€€€€€€€QÉåI•…‘Må¹I•ÅÕ•ÍÑ•Ù¥•%üÑÉåI•…‘	½‘å•Ù¥•%°(€€€€€€€€€€€…¹•±±…Ñ¥½¹Q½­•¸…¹•±±…Ñ¥½¹Q½­•¸¤(€€€€€€€ì(€€€€€€€€€€€…Ý…¥ÐÕÍ¥¹œÙ…È‰Õ™™•È€ô¹•Ü5•µ½ÉåMÑÉ•…´ ¤ì(€€€€€€€€€€€…Ý…¥Ð¡ÑÑÀ¹I•ÅÕ•ÍÐ¹	½‘ä¹½ÁåQ½Íå¹Œ¡‰Õ™™•È°…¹•±±…Ñ¥½¹Q½­•¸¤ì(€€€€€€€€€€€Ù…È…ÑÑ•µÁÑ½ÉÉ•±…Ñ¥½¹%€ôÕ¥¹QÉåA…ÉÍ” (€€€€€€€€€€€€€€€¡ÑÑÀ¹I•ÅÕ•ÍÐ¹!•…‘•ÉÍl‰`µ½ÉÉ•±…Ñ¥½¸µ%‰t¹¥ÉÍÑ=É•™…Õ±Ð ¤°½ÕÐÙ…ÈÍÕÁÁ±¥•¤(€€€€€€€€€€€€€€€€üÍÕÁÁ±¥•(€€€€€€€€€€€€€€€€èÕ¥¹9•ÝÕ¥ ¤ì(€€€€€€€€€€€Ù…ÈÕÉÉ•¹Ð€ô¹•ÜÕÉÉ•¹ÑM•ÕÉ¥Ñå½¹Ñ•áÐ (€€€€€€€€€€€€€€€Í½Á”¹UÍ•É%°Í½Á”¹½µÁ…¹å%°Í½Á”¹	É…¹¡%°Í½Á”¹M•ÍÍ¥½¹%°(€€€€€€€€€€€€€€€Í½Á”¹•Ù¥•%°ÑÉÕ”°Í½Á”¹I•¥ÍÑ•É•‘•Ù¥•%°€Ä¤ì(€€€€€€€€€€€Ù…ÈÍ•ÕÉ¥Ñä€ô¹•ÜMå¹AÉ½½™M•ÕÉ¥Ñå½¹Ñ•áÐ (€€€€€€€€€€€€€€€Í½Á”¹UÍ•É%°Í½Á”¹½µÁ…¹å%°Í½Á”¹	É…¹¡%°(€€€€€€€€€€€€€€€Í½Á”¹I•¥ÍÑ•É•‘•Ù¥•%°Í½Á”¹•Ù¥•%¤ì(€€€€€€€€€€€Ù…ÈÁÉ½½˜€ô¹•Ü•ÁÑ•‘Må¹AÉ½½™½¹Ñ•áÐ (€€€€€€€€€€€€€€€Õ¥¹9•ÝÕ¥ ¤°Í½Á”¹UÍ•É%°Í½Á”¹½µÁ…¹å%°Í½Á”¹	É…¹¡%°(€€€€€€€€€€€€€€€Í½Á”¹I•¥ÍÑ•É•‘•Ù¥•%°Í½Á”¹•Ù¥•%°€Ä°€Ä°(€€€€€€€€€€€€€€€¹•ÜÍÑÉ¥¹œ Ðœ°€ÐÌ¤°…ÑÑ•µÁÑ½ÉÉ•±…Ñ¥½¹%¤ì(€€€€€€€€€€€É•ÑÕÉ¸¹•ÜMå¹!ÑÑÁÕÑ¡•¹Ñ¥…Ñ¥½¹I•ÍÕ±Ð (€€€€€€€€€€€€€€€¹•Ü•ÁÑ•‘Må¹!ÑÑÁI•ÅÕ•ÍÐ (€€€€€€€€€€€€€€€€€€€ÕÉÉ•¹Ð°Í•ÕÉ¥Ñä°ÁÉ½½˜°‰Õ™™•È¹Q½ÉÉ…ä ¤°…ÑÑ•µÁÑ½ÉÉ•±…Ñ¥½¹%°•™™•Ñ¥Ù•A½±¥ä¤°(€€€€€€€€€€€€€€€¹Õ±°¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”Í•…±•±…ÍÌ%Í½±…Ñ•‘=Á•¹™™•Ñ¥Ù•A½±¥åAÉ½Ù¥‘•È€è%™™•Ñ¥Ù•Må¹A½±¥åAÉ½Ù¥‘•È(€€€ì(€€€€€€€ÁÕ‰±¥ŒQ…Í¬ñ™™•Ñ¥Ù•Må¹A½±¥äøI•Í½±Ù•Íå¹Œ (€€€€€€€€€€€ÕÉÉ•¹ÑM•ÕÉ¥Ñå½¹Ñ•áÐÕÉÉ•¹Ð°(€€€€€€€€€€€…¹•±±…Ñ¥½¹Q½­•¸…¹•±±…Ñ¥½¹Q½­•¸€ô‘•™…Õ±Ð¤(€€€€€€€ì(€€€€€€€€€€€Ù…È…Ñ¥½¹Ì€ôMå¹Ñ¥½¹…Ñ…±½œ¹•™¥¹¥Ñ¥½¹Ì¹M•±•Ð¡à€ôøà¹Ñ¥½¹½‘•Y…±Õ”¤(€€€€€€€€€€€€€€€€¹Q½!…Í¡M•Ð¡MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤ì(€€€€€€€€€€€É•ÑÕÉ¸Q…Í¬¹É½µI•ÍÕ±Ð¡¹•Ü™™•Ñ¥Ù•Må¹A½±¥ä (€€€€€€€€€€€€€€€ÑÉÕ”°…Ñ¥½¹Ì°¹•Ü!…Í¡M•ÐñÍÑÉ¥¹œø¡l‰Íå¹ŒµØÄ‰t°MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤°(€€€€€€€€€€€€€€€€ÈÔ°€É|ÀäÝ|ÄÔÈ°€ÄÙ|ÌàÐ°€È°€Ô°€ÄÀ°€Ô°€ÈÀ°€ÌÀ°€ÄÈ°€Ð°€ÐÔ°€à°(€€€€€€€€€€€€€€€¹Õ±°°€‰Ñ•ÍÐµÁ½±¥äµ½Á•¸µØÄˆ°¹•ÜÍÑÉ¥¹œ „œ°€ØÐ¤¤¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”Í•…±•É•½ÉÉ½ÍÍM½Á•Q…É•ÑÌ (€€€€€€€Õ¥1½…±]…å‰¥±±%°(€€€€€€€Õ¥½É•¥¹	É…¹¡A…ÉÑå%°(€€€€€€€Õ¥½É•¥¹½µÁ…¹åA…ÉÑå%°(€€€€€€€…Ñ•Q¥µ•=™™Í•Ð]…å‰¥±±…Ñ•Q¥µ”°(€€€€€€€Õ¥=É¥¥¹%°(€€€€€€€Õ¥•ÍÑ¥¹…Ñ¥½¹%¤ì((€€€ÁÉ¥Ù…Ñ”Í•…±•±…ÍÌ%Í½±…Ñ•‘=Á•¹Må¹IÕ¹Ñ¥µ•…Ñ”€è%Må¹IÕ¹Ñ¥µ•…Ñ”(€€€ì(€€€€€€€ÁÕ‰±¥ŒQ…Í¬ñ™™•Ñ¥Ù•Må¹A½±¥äøI•Í½±Ù•Íå¹Œ (€€€€€€€€€€€ÕÉÉ•¹ÑM•ÕÉ¥Ñå½¹Ñ•áÐÕÉÉ•¹Ð°(€€€€€€€€€€€…¹•±±…Ñ¥½¹Q½­•¸…¹•±±…Ñ¥½¹Q½­•¸¤(€€€€€€€€€€€€ôøQ…Í¬¹É½µI•ÍÕ±Ð¡¹•Ü™™•Ñ¥Ù•Må¹A½±¥ä (€€€€€€€€€€€€€€€ÑÉÕ”°(€€€€€€€€€€€€€€€¹•Ü!…Í¡M•ÐñÍÑÉ¥¹œø¡Må¹Ñ¥½¹…Ñ…±½œ¹•™¥¹¥Ñ¥½¹Ì¹M•±•Ð¡à€ôøà¹Ñ¥½¹½‘•Y…±Õ”¤°MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤°(€€€€€€€€€€€€€€€¹•Ü!…Í¡M•ÐñÍÑÉ¥¹œø¡l‰Íå¹ŒµØÄ‰t°MÑÉ¥¹½µÁ…É•È¹=É‘¥¹…°¤°(€€€€€€€€€€€€€€€€ÄÀÀ°€É|ÀäÝ|ÄÔÈ°€ÄÙ|ÌàÐ°€Ô°€Ô°€Ô°€Ô°€ÌÀ°€ÌÀ°€ÈÐ°€Ü°€äÀ°€ÈÐ°¹Õ±°¤¤ì(€€€ô)ô

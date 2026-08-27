@@ -62,6 +62,15 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
 {
     private static readonly HashSet<string> ContractActions = SyncActionCatalog.Definitions
         .Select(x => x.ActionCodeValue).ToHashSet(StringComparer.Ordinal);
+    private readonly string? _runningImplementationSha;
+
+    public SyncRuntimePolicyOptionsValidator()
+        : this(SyncServerDeploymentAuthority.ImplementationSha) { }
+
+    public SyncRuntimePolicyOptionsValidator(string? runningImplementationSha)
+    {
+        _runningImplementationSha = runningImplementationSha;
+    }
 
     public ValidateOptionsResult Validate(string? name, SyncRuntimePolicyOptions options)
     {
@@ -97,7 +106,7 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
 
-    private static void ValidateOfflineActivation(
+    private void ValidateOfflineActivation(
         SyncRuntimePolicyOptions options,
         ICollection<string> errors)
     {
@@ -118,6 +127,9 @@ public sealed class SyncRuntimePolicyOptionsValidator : IValidateOptions<SyncRun
             errors.Add("Sync:Offline:ActivationDecisionId must be an explicit safe G5 decision identifier.");
         if (!IsExactCommitSha(implementationSha))
             errors.Add("Sync:Offline:ActivationImplementationSha must bind G5 activation to an exact 40-character commit SHA.");
+        else if (!SyncServerDeploymentAuthority.IsAuthorizedImplementation(
+                     _runningImplementationSha, implementationSha))
+            errors.Add("Sync:Offline:ActivationImplementationSha must match the exact running API build.");
         if (authorizedBuilds.Length == 0 ||
             authorizedBuilds.Any(identity => identity is not { IsValid: true }) ||
             authorizedBuilds.Select(identity => identity.Platform)

@@ -1,4 +1,3 @@
-using Android.App;
 using Android.Content.PM;
 using TransportERP.Application.Sync;
 
@@ -21,12 +20,12 @@ internal static class AndroidBuildIdentityProbe
             global::System.IO.FileShare.Read))
             artifactDigest = BuildIdentityV1.Sha256LowerHex(stream);
 
-        Signature[]? signers;
+        IEnumerable<Signature>? signers;
         if (OperatingSystem.IsAndroidVersionAtLeast(28))
         {
             var packageInfo = context.PackageManager?.GetPackageInfo(
                 context.PackageName!, PackageInfoFlags.SigningCertificates);
-            signers = packageInfo?.SigningInfo?.ApkContentsSigners;
+            signers = packageInfo?.SigningInfo?.GetApkContentsSigners();
         }
         else
         {
@@ -35,9 +34,10 @@ internal static class AndroidBuildIdentityProbe
                 context.PackageName!, PackageInfoFlags.Signatures)?.Signatures;
 #pragma warning restore CS0618
         }
-        if (signers is not { Length: 1 })
+        var signerArray = signers?.ToArray();
+        if (signerArray is not { Length: 1 })
             throw new InvalidOperationException("BUILD_SIGNER_IDENTITY_UNAVAILABLE");
-        var signerBytes = signers[0].ToByteArray();
+        var signerBytes = signerArray[0].ToByteArray();
         if (signerBytes is not { Length: > 0 })
             throw new InvalidOperationException("BUILD_SIGNER_IDENTITY_UNAVAILABLE");
         try

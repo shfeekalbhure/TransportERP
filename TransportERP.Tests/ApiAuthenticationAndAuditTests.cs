@@ -11,8 +11,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Api.Sync;
+using TransportERP.Application.Sync;
 using TransportERP.Contracts.Identity;
 using TransportERP.Infrastructure.Persistence;
 
@@ -21,9 +23,12 @@ namespace TransportERP.Tests;
 [Collection("PostgreSql")]
 public sealed class ApiAuthenticationAndAuditTests
 {
+    private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);
     private const string Issuer = "TransportERP.Test.Identity";
     private const string Audience = "TransportERP.Test.Api";
     private const string SigningKey = "transport-erp-test-signing-key-2026-minimum-32";
+    private static readonly BuildIdentityV1 TestBuildIdentity = new(
+        BuildIdentityV1.DesktopWindowsPlatform, new string('a', 64));
 
     [Fact]
     [Trait("Category", "HTTP")]
@@ -144,6 +149,7 @@ public sealed class ApiAuthenticationAndAuditTests
         {
             deviceId = scope.DeviceId,
             protocolVersion = "sync-v1",
+            buildIdentity = TestBuildIdentity,
             operations = new[]
             {
                 new
@@ -155,7 +161,7 @@ public sealed class ApiAuthenticationAndAuditTests
                     operationCorrelationId = Guid.NewGuid(), baseVersion = (long?)null
                 }
             }
-        });
+        }, WireJson);
 
         using (var multipleProofRequest = JsonRequest(body, Guid.NewGuid()))
         {
@@ -405,6 +411,12 @@ public sealed class ApiAuthenticationAndAuditTests
                 {
                     services.RemoveAll<ISyncRuntimeGate>();
                     services.AddScoped<ISyncRuntimeGate, OpenSyncRuntimeGateForTest>();
+                    services.RemoveAll<IOptions<SyncRuntimePolicyOptions>>();
+                    services.AddSingleton<IOptions<SyncRuntimePolicyOptions>>(Options.Create(
+                        new SyncRuntimePolicyOptions
+                        {
+                            OfflineAuthorizedBuilds = [TestBuildIdentity]
+                        }));
                 });
         });
 
@@ -493,6 +505,7 @@ public sealed class ApiAuthenticationAndAuditTests
         {
             deviceId,
             protocolVersion = "sync-v1",
+            buildIdentity = TestBuildIdentity,
             operations = Enumerable.Range(0, count).Select(_ => new
             {
                 actionCode = "CreateJournalEntry", operationType = "CREATE", entityType = "JournalEntry",
@@ -501,7 +514,7 @@ public sealed class ApiAuthenticationAndAuditTests
                 clientOccurredAt = "2026-08-26T00:00:00.123456Z",
                 operationCorrelationId = Guid.NewGuid(), baseVersion = (long?)null
             }).ToArray()
-        });
+        }, WireJson);
 
     private static string JsonPayload(int utf8Length)
     {

@@ -248,7 +248,8 @@ public sealed class AndroidKeystoreDeviceSigningKey : IDriverNativeDeviceSigning
             .SetAlgorithmParameterSpec(curve)
             .SetDigests(KeyProperties.DigestSha256)
             .SetUserAuthenticationRequired(false)
-            .Build();
+            .Build()
+            ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");
         generator.Initialize(specification);
         using var generated = generator.GenerateKeyPair()
             ?? throw new DriverOfflineUnavailableException("NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE");

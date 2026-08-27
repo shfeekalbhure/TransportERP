@@ -441,7 +441,7 @@ public sealed class OfflineSyncTransportClient
 
         review = new OfflineConflictReview(
             baseVersion,
-            source.ConflictReason,
+            source.ConflictReason!,
             new OfflineConflictLocalSnapshot(local.ActionCode, local.EntityType, local.EntityId, baseVersion),
             new OfflineConflictServerSnapshot(server.EntityType, server.EntityId, server.Exists.Value,
                 server.CurrentVersion),

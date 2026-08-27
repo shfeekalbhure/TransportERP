@@ -90,7 +90,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         AddAuthorizedBuild(values);
 
         var options = SyncRuntimePolicyOptions.Load(Configuration(values));
-        var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
+        var result = new SyncRuntimePolicyOptionsValidator(new string('a', 40)).Validate(null, options);
 
         Assert.True(result.Succeeded);
         Assert.True(options.OfflineEnabled);
@@ -139,6 +139,24 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
     }
 
     [Fact]
+    public void Offline_activation_rejects_configuration_for_a_different_running_API_build()
+    {
+        var values = RequiredSettings();
+        values["Sync:Offline:Enabled"] = "true";
+        values["Sync:ServerExecution:Enabled"] = "true";
+        values["Sync:Offline:ActivationDecisionId"] = "DEC-G5-PR69-SERVER-BINARY";
+        values["Sync:Offline:ActivationImplementationSha"] = new string('a', 40);
+        AddAuthorizedBuild(values);
+
+        var result = new SyncRuntimePolicyOptionsValidator(new string('b', 40)).Validate(null,
+            SyncRuntimePolicyOptions.Load(Configuration(values)));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("running API build", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Offline_activation_authority_accepts_one_exact_identity_for_each_client_platform()
     {
         var values = RequiredSettings();
@@ -152,7 +170,7 @@ public sealed class Stage4SyncRuntimePolicyOptionsTests
         values["Sync:Offline:AuthorizedBuilds:1:SignerCertificateSha256"] = new string('d', 64);
 
         var options = SyncRuntimePolicyOptions.Load(Configuration(values));
-        var result = new SyncRuntimePolicyOptionsValidator().Validate(null, options);
+        var result = new SyncRuntimePolicyOptionsValidator(new string('a', 40)).Validate(null, options);
 
         Assert.True(result.Succeeded);
         Assert.Equal(2, options.OfflineAuthorizedBuilds.Length);
