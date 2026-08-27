@@ -993,6 +993,10 @@ jobs:
           result_name='driver-device-test-result.json'
           apk=$(cat "$RUNNER_TEMP/android-device-test-apk.txt")
           adb_bounded() { timeout 30s adb "$@"; }
+          app_pid() {
+            adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null \
+              | tr -d '\r' || true
+          }
           adb_bounded install -r "$apk"
 
           validate_result() {
@@ -1052,19 +1056,19 @@ jobs:
             -c android.intent.category.LAUNCHER \
             1 >/dev/null
           for attempt in $(seq 1 30); do
-            test -n "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" && break
+            test -n "$(app_pid)" && break
             sleep 1
           done
-          test -n "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')"
+          test -n "$(app_pid)"
 
           run_phase startup
           run_phase seed
-          seed_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          seed_pid=$(app_pid)
           test -n "$seed_pid"
           adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           stopped=false
           for attempt in $(seq 1 30); do
-            if [ -z "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+            if [ -z "$(app_pid)" ]; then
               stopped=true
               break
             fi
@@ -1073,7 +1077,7 @@ jobs:
           test "$stopped" = true
 
           run_phase verify
-          verify_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          verify_pid=$(app_pid)
           test -n "$verify_pid"
           run_phase loss
           adb_bounded shell run-as "$ANDROID_TEST_PACKAGE" dd \
@@ -1083,12 +1087,12 @@ jobs:
             files/driver-device-e2e-input.json
           rm -f "$RUNNER_TEMP/android-e2e-input.json"
           run_phase e2e-submit
-          e2e_submit_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          e2e_submit_pid=$(app_pid)
           test -n "$e2e_submit_pid"
           adb_bounded shell am force-stop "$ANDROID_TEST_PACKAGE"
           e2e_stopped=false
           for attempt in $(seq 1 30); do
-            if [ -z "$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r')" ]; then
+            if [ -z "$(app_pid)" ]; then
               e2e_stopped=true
               break
             fi
@@ -1096,7 +1100,7 @@ jobs:
           done
           test "$e2e_stopped" = true
           run_phase e2e-verify
-          e2e_verify_pid=$(adb_bounded shell pidof "$ANDROID_TEST_PACKAGE" | tr -d '\r')
+          e2e_verify_pid=$(app_pid)
           test -n "$e2e_verify_pid"
           {
             echo 'process_stopped_before_restart=true'

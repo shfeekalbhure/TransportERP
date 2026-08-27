@@ -144,6 +144,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("system-images;android-35;google_apis;x86_64", workflow,
             StringComparison.Ordinal);
         Assert.Contains("adb_bounded() { timeout 30s adb", workflow, StringComparison.Ordinal);
+        Assert.Contains("app_pid()", workflow, StringComparison.Ordinal);
+        Assert.Contains("| tr -d '\\r' || true", workflow, StringComparison.Ordinal);
         Assert.Contains("timeout-minutes: 12", workflow, StringComparison.Ordinal);
         Assert.Contains("adb_bounded shell am force-stop", workflow, StringComparison.Ordinal);
         Assert.Contains("run_phase startup", workflow, StringComparison.Ordinal);
