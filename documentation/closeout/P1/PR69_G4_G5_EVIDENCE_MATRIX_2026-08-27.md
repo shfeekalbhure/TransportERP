@@ -26,6 +26,8 @@ The exact-head manifests in every artifact bind `actual_sha`, `expected_sha`, an
 
 ## 2. T-SYNC-001..010 closure
 
+`P1_ACCEPTANCE_TEST_REGISTER.csv` remains the immutable 203-row specification register and therefore retains `SPECIFIED_NOT_EXECUTED` as required by its governing conformance test. Executed results are recorded separately in `P1_ACCEPTANCE_EXECUTION_ASSESSMENT.csv` and in this exact-SHA matrix.
+
 | ID | Executed test(s) | Result and verifiable effect |
 |---|---|---|
 | `T-SYNC-001` | `Stage4SyncRuntimePostgreSqlTests.Nonce_claim_and_business_replay_are_atomic_and_idempotent`; `Stage5OfflineEndToEndPostgreSqlTests.Encrypted_outbox_reopens_then_nonce_batch_worker_and_status_replay_reach_succeeded` | `PASS`; one accepted server operation, one business result, stored result/version, scoped AuditEvent |
@@ -76,6 +78,7 @@ For these rows, request/response, database state, and AuditEvent assertions are 
 
 - The implementation tree is the immutable code candidate. A later documentation-only commit requires a new exact-head CI run but does not replace the implementation artifacts above.
 - Earlier failed runs are retained and marked `STALE/SUPERSEDED`; assertions were not weakened to obtain green CI.
+- Documentation head `db7a37a39f886665d93a0686859d60f4c6503c2b` exposed the specification-register invariant in P2 W0–3 run `33025307158` (`338 PASS / 1 FAIL`). The register was restored unchanged; executed results remain in the separate assessment and this matrix. The governing assertion was not weakened.
 - The Android runtime result is emulator evidence. Physical-device and iOS runtime evidence are `NOT VERIFIED` and are not claimed as part of the approved Android-first scope.
 - Binary attachment/POD upload is deliberately not implemented; only metadata/hash actions are allowed. Unsupported actions return the governed `ACTION_RUNTIME_UNAVAILABLE` decision.
 - No production deployment, production migration, production secret use, auto-merge, or merge was performed.

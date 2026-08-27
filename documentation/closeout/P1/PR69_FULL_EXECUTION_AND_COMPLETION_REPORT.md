@@ -71,6 +71,7 @@ The following older evidence is `STALE/SUPERSEDED`, not erased:
 | `33022501232` / `93c80311...` | Android signing remained generic | sanitized staged diagnostics added |
 | `33023086607` / `7492aeff...` | `NATIVE_SIGNING_PRODUCTION_SIGN_FAILED` | isolated production signer failure |
 | `33024022586` / `e625bb0...` | `NATIVE_DEVICE_SIGNING_KEY_READ_FAILED` | root cause fixed by typed `KeyStore.PrivateKeyEntry.PrivateKey` |
+| `33025307158` / `db7a37a...` | documentation closure changed ten immutable specification-register statuses; W0–3=`338/339` | raw 203-row register restored; execution PASS remains in the assessment/matrix; governing test unchanged |
 
 A transient diagnostic commit also contained a compile error and was superseded by a typed catch fix before the green candidate. No failing run is cited as PASS, and no governing assertion was weakened merely to obtain green CI.
 
