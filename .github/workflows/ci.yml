@@ -1019,8 +1019,9 @@ jobs:
             local temporary="$RUNNER_TEMP/android-${phase}-result.json"
             local maximum_attempts=60
             if [ "$phase" = e2e-submit ]; then maximum_attempts=150; fi
+            echo "android_phase_start=$phase"
             adb shell run-as "$ANDROID_TEST_PACKAGE" rm -f "files/$result_name"
-            adb shell am start -W \
+            timeout 30s adb shell am start -W \
               -n "$ANDROID_TEST_COMPONENT" \
               --es phase "$phase" >/dev/null
             complete=false
@@ -1040,10 +1041,11 @@ jobs:
             test "$complete" = true
             mv "$temporary" "ci-evidence/android-runtime/${phase}.json"
             validate_result "$phase"
+            echo "android_phase_complete=$phase"
           }
 
           adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
-          adb shell monkey \
+          timeout 30s adb shell monkey \
             -p "$ANDROID_TEST_PACKAGE" \
             -c android.intent.category.LAUNCHER \
             1 >/dev/null
