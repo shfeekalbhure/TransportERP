@@ -583,6 +583,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
                 "(NOT \"LegalHold\" AND \"PayloadJson\" = '{}' AND " +
                 "\"Status\" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND " +
+                "\"RetentionDaysApplied\" IS NOT NULL AND " +
                 "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
                 "\"RedactedAt\" >= \"UpdatedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
             t.HasCheckConstraint("ck_sync_execution_claim_bundle",
@@ -720,6 +721,7 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
                 "(\"RedactedAt\" IS NULL AND \"RetentionDaysApplied\" IS NULL) OR " +
                 "(NOT \"LegalHold\" AND \"DeviceSnapshot\" = '{}' AND \"ServerSnapshot\" = '{}' AND " +
                 "\"Status\" = 'RESOLVED' AND \"ResolvedAt\" IS NOT NULL AND " +
+                "\"RetentionDaysApplied\" IS NOT NULL AND " +
                 "\"RetentionDaysApplied\" BETWEEN 1 AND 90 AND " +
                 "\"RedactedAt\" >= \"ResolvedAt\" + make_interval(days => \"RetentionDaysApplied\"))");
         });

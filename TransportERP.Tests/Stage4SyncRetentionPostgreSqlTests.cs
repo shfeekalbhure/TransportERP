@@ -236,7 +236,7 @@ public sealed class Stage4SyncRetentionPostgreSqlTests
         {
             await AssertDeniedAsync(() => db.Database.ExecuteSqlInterpolatedAsync($$"""
                 UPDATE transport_erp.sync_operations
-                SET "PayloadJson"='{}',"RedactedAt"=clock_timestamp()
+                SET "PayloadJson"='{}',"RetentionDaysApplied"=90,"RedactedAt"=clock_timestamp()
                 WHERE "Id"={{early.Id}}
                 """), "redaction transition denied");
             await AssertDeniedAsync(() => db.Database.ExecuteSqlInterpolatedAsync($$"""

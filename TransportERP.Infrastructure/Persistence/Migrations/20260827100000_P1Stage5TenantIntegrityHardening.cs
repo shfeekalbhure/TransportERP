@@ -29,6 +29,7 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
             ("RedactedAt" IS NULL AND "RetentionDaysApplied" IS NULL) OR
             (NOT "LegalHold" AND "PayloadJson"='{}' AND
              "Status" IN ('SUCCEEDED','FAILED','REJECTED','RESOLVED') AND
+             "RetentionDaysApplied" IS NOT NULL AND
              "RetentionDaysApplied" BETWEEN 1 AND 90 AND
              "RedactedAt">="UpdatedAt"+make_interval(days => "RetentionDaysApplied"))
           );
@@ -48,6 +49,7 @@ public partial class P1Stage5TenantIntegrityHardening : Migration
             ("RedactedAt" IS NULL AND "RetentionDaysApplied" IS NULL) OR
             (NOT "LegalHold" AND "DeviceSnapshot"='{}' AND "ServerSnapshot"='{}' AND
              "Status"='RESOLVED' AND "ResolvedAt" IS NOT NULL AND
+             "RetentionDaysApplied" IS NOT NULL AND
              "RetentionDaysApplied" BETWEEN 1 AND 90 AND
              "RedactedAt">="ResolvedAt"+make_interval(days => "RetentionDaysApplied"))
           );
