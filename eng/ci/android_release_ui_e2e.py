@@ -179,7 +179,19 @@ class Driver:
         # when an input cannot be typed deterministically by Android's standard input command.
         self.run("shell", "input", "text", value, timeout=30)
         if verify_plaintext:
-            self.wait_for(automation_id, lambda node: node.attrib.get("text") == value, 10)
+            try:
+                self.wait_for(automation_id, lambda node: node.attrib.get("text") == value, 10)
+            except UiE2EFailure as error:
+                if str(error) != "UI_WAIT_TIMEOUT":
+                    raise
+                found = self.nodes(automation_id)
+                if len(found) != 1:
+                    raise UiE2EFailure("UI_TEXT_VERIFY_ELEMENT_COUNT_INVALID") from error
+                node = found[0]
+                observed = node.attrib.get("text", "")
+                text_state = "EXACT" if observed == value else "EMPTY" if not observed else "MISMATCH"
+                focus_state = "FOCUSED" if node.attrib.get("focused") == "true" else "NOT_FOCUSED"
+                raise UiE2EFailure(f"UI_TEXT_VERIFY_{text_state}_{focus_state}") from error
 
     def hide_keyboard(self) -> None:
         self.run("shell", "input", "keyevent", "KEYCODE_BACK")

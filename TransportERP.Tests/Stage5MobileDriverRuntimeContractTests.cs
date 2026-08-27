@@ -121,6 +121,13 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("OBSERVATION_UNAVAILABLE", script, StringComparison.Ordinal);
         Assert.DoesNotContain("{phase}:{value}", script, StringComparison.Ordinal);
+        Assert.Contains("UI_TEXT_VERIFY_ELEMENT_COUNT_INVALID", script, StringComparison.Ordinal);
+        Assert.Contains("UI_TEXT_VERIFY_{text_state}_{focus_state}", script,
+            StringComparison.Ordinal);
+        Assert.Contains("observed == value", script, StringComparison.Ordinal);
+        Assert.Contains("else \"EMPTY\" if not observed else \"MISMATCH\"", script,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("{observed}", script, StringComparison.Ordinal);
         Assert.Contains("driver.run(\"shell\", \"am\", \"force-stop\"", script,
             StringComparison.Ordinal);
         Assert.Contains("driver.wait_for_operation_success(operation_id)", script,
