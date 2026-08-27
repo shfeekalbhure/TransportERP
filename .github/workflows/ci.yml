@@ -427,32 +427,119 @@ jobs:
             Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
       - name: Run true Desktop CNG DPAPI SQLCipher HTTP PostgreSQL E2E
-        timeout-minutes: 15
+        timeout-minutes: 35
         shell: pwsh
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          dotnet test TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj `
-            --configuration Release `
-            --no-build `
-            --filter "Acceptance=DESKTOP-E2E" `
-            --logger "trx;LogFileName=ci-desktop-e2e.trx" `
-            -p:TransportERPImplementationSha="$env:EXPECTED_SHA"
-
-          $reports = @(Get-ChildItem 'TransportERP.Desktop.E2ETests/TestResults' `
-            -Recurse -Filter 'ci-desktop-e2e.trx')
-          if ($reports.Count -ne 1) {
-            throw "Expected exactly one Desktop E2E TRX report; found $($reports.Count)."
+          $testClass = 'TransportERP.Desktop.E2ETests.DesktopProductionEndToEndPostgreSqlTests'
+          $testMethods = @(
+            'Measured_deployment_tree_changes_when_any_binary_changes'
+            'WinExe_writes_its_measured_build_identity_to_an_explicit_new_file'
+            'Release_WinExe_starts_closed_and_is_driven_through_stable_UI_Automation_ids'
+            'Same_release_WinExe_UI_Kestrel_SQLCipher_worker_and_PostgreSql_succeed'
+            'Authenticated_producer_CNG_DPAPI_SQLCipher_HTTP_worker_PostgreSql_and_restart_succeed'
+          )
+          $resultsRoot = 'TransportERP.Desktop.E2ETests/TestResults/ci-isolated'
+          if (Test-Path $resultsRoot) {
+            throw 'The isolated Desktop E2E results directory already exists.'
           }
-          [xml]$trx = Get-Content -Raw $reports[0].FullName
-          $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
-          if ($null -eq $counters) { throw 'Desktop E2E TRX has no counters.' }
-          $total = [int]$counters.total
-          $passed = [int]$counters.passed
-          $failed = [int]$counters.failed
-          $notExecuted = [int]$counters.notExecuted
-          if ($total -ne 5 -or $passed -ne 5 -or $failed -ne 0 -or $notExecuted -ne 0) {
-            throw "Desktop E2E did not execute exactly five tests and pass: total=$total passed=$passed failed=$failed skipped=$notExecuted."
+          New-Item -ItemType Directory -Force -Path $resultsRoot | Out-Null
+
+          $failures = [System.Collections.Generic.List[string]]::new()
+          for ($index = 0; $index -lt $testMethods.Count; $index++) {
+            $fullyQualifiedName = "$testClass.$($testMethods[$index])"
+            $reportName = 'ci-desktop-e2e-{0:d2}.trx' -f ($index + 1)
+            $arguments = @(
+              'test'
+              'TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj'
+              '--configuration'
+              'Release'
+              '--no-build'
+              '--filter'
+              "FullyQualifiedName=$fullyQualifiedName"
+              '--logger'
+              "trx;LogFileName=$reportName"
+              '--results-directory'
+              $resultsRoot
+              "-p:TransportERPImplementationSha=$env:EXPECTED_SHA"
+            )
+
+            Write-Host "Running isolated Desktop E2E $($index + 1)/$($testMethods.Count): $fullyQualifiedName"
+            try {
+              $process = Start-Process -FilePath 'dotnet' -ArgumentList $arguments `
+                -PassThru -NoNewWindow
+            }
+            catch {
+              $failures.Add("$fullyQualifiedName could not start: $($_.Exception.GetType().Name).")
+              break
+            }
+
+            $completed = $process.WaitForExit(300000)
+            if (-not $completed) {
+              $failures.Add("$fullyQualifiedName exceeded its five-minute timeout.")
+              $taskKill = Start-Process `
+                -FilePath (Join-Path $env:SystemRoot 'System32/taskkill.exe') `
+                -ArgumentList @('/PID', "$($process.Id)", '/T', '/F') `
+                -PassThru -NoNewWindow
+              $taskKillCompleted = $taskKill.WaitForExit(30000)
+              if (-not $taskKillCompleted) {
+                try { $taskKill.Kill($true) } catch { }
+                $failures.Add("$fullyQualifiedName taskkill command timed out.")
+              }
+              $process.Refresh()
+              if ($taskKillCompleted -and $taskKill.ExitCode -ne 0 -and -not $process.HasExited) {
+                $failures.Add("$fullyQualifiedName process tree could not be terminated.")
+              }
+              if (-not $process.HasExited) {
+                try { $process.Kill($true) }
+                catch {
+                  $failures.Add(
+                    "$fullyQualifiedName fallback termination failed: " +
+                    "$($_.Exception.GetType().Name).")
+                }
+              }
+              if (-not $process.HasExited -and -not $process.WaitForExit(30000)) {
+                $failures.Add("$fullyQualifiedName remained alive after termination attempts.")
+              }
+              break
+            }
+
+            if ($process.ExitCode -ne 0) {
+              $failures.Add("$fullyQualifiedName exited with code $($process.ExitCode).")
+              break
+            }
+          }
+
+          $reports = @(Get-ChildItem $resultsRoot -Recurse -Filter 'ci-desktop-e2e-*.trx')
+          if ($reports.Count -ne 5) {
+            $failures.Add("Expected exactly five isolated Desktop E2E TRX reports; found $($reports.Count).")
+          }
+          foreach ($report in $reports) {
+            try {
+              [xml]$trx = Get-Content -Raw $report.FullName
+              $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
+              if ($null -eq $counters) {
+                $failures.Add("$($report.Name) has no TRX counters.")
+                continue
+              }
+              $total = [int]$counters.total
+              $passed = [int]$counters.passed
+              $failed = [int]$counters.failed
+              $notExecuted = [int]$counters.notExecuted
+              if ($total -ne 1 -or $passed -ne 1 -or $failed -ne 0 -or $notExecuted -ne 0) {
+                $failures.Add(
+                  "$($report.Name) did not execute exactly once and pass: " +
+                  "total=$total passed=$passed failed=$failed skipped=$notExecuted.")
+              }
+            }
+            catch {
+              $failures.Add("$($report.Name) is not a readable TRX report: $($_.Exception.GetType().Name).")
+            }
+          }
+
+          if ($failures.Count -ne 0) {
+            throw ("Desktop E2E isolation gate failed:`n - " + ($failures -join "`n - "))
           }
           'desktop_e2e=PASS' | Add-Content -Encoding utf8 'ci-evidence/desktop/build-identity.txt'
 
@@ -819,6 +906,15 @@ jobs:
             echo 'Android apksigner executable was not found.'
             exit 1
           fi
+          apksigner_cli_version=$("$apksigner" version 2>/dev/null || true)
+          apksigner_build_tools_version=$(basename "$(dirname "$apksigner")")
+          if [[ ! "$apksigner_cli_version" =~ ^[0-9]+([.][0-9]+){1,3}([-+][A-Za-z0-9.]+)?$ ]]; then
+            apksigner_cli_version=unavailable
+          fi
+          if [[ ! "$apksigner_build_tools_version" =~ ^[0-9]+([.][0-9]+){1,3}([-+][A-Za-z0-9.]+)?$ ]]; then
+            apksigner_build_tools_version=unavailable
+          fi
+          echo "Android apksigner cli_version=$apksigner_cli_version build_tools_version=$apksigner_build_tools_version"
           signer_stdout="$RUNNER_TEMP/mobile-release-apksigner.stdout"
           signer_stderr="$RUNNER_TEMP/mobile-release-apksigner.stderr"
           if ! "$apksigner" verify --print-certs "$release_apk" \
@@ -834,10 +930,13 @@ jobs:
               r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
               r"([0-9A-Fa-f]{64})[ \t]*$")
           matches = []
+          reports = []
           for name in sys.argv[1:]:
               path = pathlib.Path(name)
-              for line_number, line in enumerate(
-                      path.read_text(encoding="utf-8", errors="strict").splitlines(), 1):
+              raw = path.read_bytes()
+              lines = raw.decode("utf-8", errors="strict").splitlines()
+              reports.append((path, raw, lines))
+              for line_number, line in enumerate(lines, 1):
                   if not prefix.match(line):
                       continue
                   match = field.fullmatch(line)
@@ -847,6 +946,43 @@ jobs:
                           f"{path.name}:{line_number}.")
                   matches.append(match.group(1).lower())
           if len(matches) != 1:
+              for path, raw, lines in reports:
+                  print(
+                      f"{path.name}: bytes={len(raw)} lines={len(lines)}",
+                      file=sys.stderr)
+                  for line_number, line in enumerate(lines[:50], 1):
+                      label, separator, value = line.partition(":")
+                      if not separator:
+                          print(
+                              f"{path.name}:{line_number}: no-colon "
+                              f"length={len(line)}",
+                              file=sys.stderr)
+                          continue
+                      normalized_label = " ".join(label.strip().split())
+                      if re.fullmatch(
+                              r"Signer #[1-9][0-9]* certificate SHA-256 digest",
+                              normalized_label):
+                          label_category = "NUMBERED_SIGNER_CERT_SHA256"
+                      elif re.fullmatch(
+                              r"V[1-9][0-9]*(?:\.[0-9]+)? Signer",
+                              normalized_label):
+                          label_category = "VERSIONED_SIGNER"
+                      else:
+                          label_category = "UNRECOGNIZED"
+                      normalized_value = value.strip()
+                      if normalized_value.startswith(
+                              "certificate SHA-256 digest:"):
+                          value_category = "CERT_SHA256_FIELD"
+                      elif normalized_value.startswith("certificate DN:"):
+                          value_category = "CERT_DN_FIELD"
+                      else:
+                          value_category = "UNRECOGNIZED"
+                      print(
+                          f"{path.name}:{line_number}: has_colon=true "
+                          f"label_length={len(label)} value_length={len(normalized_value)} "
+                          f"label_category={label_category} "
+                          f"value_category={value_category}",
+                          file=sys.stderr)
               raise SystemExit(
                   "Expected exactly one signer SHA-256 field across apksigner "
                   f"stdout/stderr; found {len(matches)}.")
@@ -1189,6 +1325,15 @@ jobs:
             echo 'Android apksigner executable was not found for the device-test APK.'
             exit 1
           fi
+          apksigner_cli_version=$("$apksigner" version 2>/dev/null || true)
+          apksigner_build_tools_version=$(basename "$(dirname "$apksigner")")
+          if [[ ! "$apksigner_cli_version" =~ ^[0-9]+([.][0-9]+){1,3}([-+][A-Za-z0-9.]+)?$ ]]; then
+            apksigner_cli_version=unavailable
+          fi
+          if [[ ! "$apksigner_build_tools_version" =~ ^[0-9]+([.][0-9]+){1,3}([-+][A-Za-z0-9.]+)?$ ]]; then
+            apksigner_build_tools_version=unavailable
+          fi
+          echo "Android apksigner cli_version=$apksigner_cli_version build_tools_version=$apksigner_build_tools_version"
           signer_stdout="$RUNNER_TEMP/android-device-test-apksigner.stdout"
           signer_stderr="$RUNNER_TEMP/android-device-test-apksigner.stderr"
           if ! "$apksigner" verify --print-certs "$test_apk" \
@@ -1204,10 +1349,13 @@ jobs:
               r"^Signer #[1-9][0-9]* certificate SHA-256 digest:[ \t]*"
               r"([0-9A-Fa-f]{64})[ \t]*$")
           matches = []
+          reports = []
           for name in sys.argv[1:]:
               path = pathlib.Path(name)
-              for line_number, line in enumerate(
-                      path.read_text(encoding="utf-8", errors="strict").splitlines(), 1):
+              raw = path.read_bytes()
+              lines = raw.decode("utf-8", errors="strict").splitlines()
+              reports.append((path, raw, lines))
+              for line_number, line in enumerate(lines, 1):
                   if not prefix.match(line):
                       continue
                   match = field.fullmatch(line)
@@ -1217,6 +1365,43 @@ jobs:
                           f"{path.name}:{line_number}.")
                   matches.append(match.group(1).lower())
           if len(matches) != 1:
+              for path, raw, lines in reports:
+                  print(
+                      f"{path.name}: bytes={len(raw)} lines={len(lines)}",
+                      file=sys.stderr)
+                  for line_number, line in enumerate(lines[:50], 1):
+                      label, separator, value = line.partition(":")
+                      if not separator:
+                          print(
+                              f"{path.name}:{line_number}: no-colon "
+                              f"length={len(line)}",
+                              file=sys.stderr)
+                          continue
+                      normalized_label = " ".join(label.strip().split())
+                      if re.fullmatch(
+                              r"Signer #[1-9][0-9]* certificate SHA-256 digest",
+                              normalized_label):
+                          label_category = "NUMBERED_SIGNER_CERT_SHA256"
+                      elif re.fullmatch(
+                              r"V[1-9][0-9]*(?:\.[0-9]+)? Signer",
+                              normalized_label):
+                          label_category = "VERSIONED_SIGNER"
+                      else:
+                          label_category = "UNRECOGNIZED"
+                      normalized_value = value.strip()
+                      if normalized_value.startswith(
+                              "certificate SHA-256 digest:"):
+                          value_category = "CERT_SHA256_FIELD"
+                      elif normalized_value.startswith("certificate DN:"):
+                          value_category = "CERT_DN_FIELD"
+                      else:
+                          value_category = "UNRECOGNIZED"
+                      print(
+                          f"{path.name}:{line_number}: has_colon=true "
+                          f"label_length={len(label)} value_length={len(normalized_value)} "
+                          f"label_category={label_category} "
+                          f"value_category={value_category}",
+                          file=sys.stderr)
               raise SystemExit(
                   "Expected exactly one signer SHA-256 field across apksigner "
                   f"stdout/stderr; found {len(matches)}.")
