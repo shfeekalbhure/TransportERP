@@ -1,3 +1,4 @@
+using TransportERP.Application.Sync;
 using TransportERP.Desktop.Offline;
 
 namespace TransportERP.Desktop.Application;
@@ -24,6 +25,7 @@ internal sealed record DesktopAuthenticatedOfflineActivation(
     DesktopAuthenticatedSessionScope AuthenticatedScope,
     DesktopAuthenticatedSessionScope AuthorizedOfflineScope,
     bool OfflineRuntimeAuthorized,
+    SyncClientEffectivePolicy EffectivePolicy,
     Func<CancellationToken, Task<DesktopOfflineRuntime>> CreateRuntimeAsync);
 
 internal interface IDesktopAuthenticatedSessionSource : IDisposable

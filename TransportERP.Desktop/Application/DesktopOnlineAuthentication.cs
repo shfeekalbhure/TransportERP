@@ -132,7 +132,8 @@ internal sealed class DesktopOnlineSessionAuthenticator : IDesktopOnlineSessionA
                     scope,
                     scope,
                     OfflineRuntimeAuthorized: true,
-                    cancellation => DesktopOfflineComposition.CreateAsync(
+                    EffectivePolicy: effectivePolicy!,
+                    CreateRuntimeAsync: cancellation => DesktopOfflineComposition.CreateAsync(
                         options, dependencies, cancellationToken: cancellation));
 
                 _origin = origin;

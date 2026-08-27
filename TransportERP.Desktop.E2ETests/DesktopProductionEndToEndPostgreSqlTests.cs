@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -63,15 +64,59 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             Guid localOperationId;
             string clientOperationId;
             Guid correlationId;
+            SyncClientEffectivePolicy effectivePolicy;
             using (var authenticator = new DesktopOnlineSessionAuthenticator(factory.Server.CreateHandler))
             {
                 var authentication = await authenticator.AuthenticateAsync(request, CancellationToken.None);
                 Assert.True(authentication.Succeeded,
                     $"Desktop online authentication failed closed with {authentication.Code}.");
                 Assert.NotNull(authentication.Activation);
+                effectivePolicy = authentication.Activation!.EffectivePolicy;
                 using var runtime = await authentication.Activation!.CreateRuntimeAsync(CancellationToken.None);
                 Assert.Equal(DesktopOfflineRuntimeMode.Ready, runtime.Status.Mode);
                 Assert.True(runtime.CanQueueOperationalParties);
+                Assert.Equal(effectivePolicy, runtime.EffectivePolicy);
+                Assert.Equal(1, effectivePolicy.MaxBatchOperations);
+                Assert.Equal(2, effectivePolicy.ClientTransportMaxRetryCount);
+                Assert.Equal(9, effectivePolicy.ClientTransportBaseSeconds);
+                Assert.Equal(30, effectivePolicy.ClientTransportMaxDelayMinutes);
+                Assert.Equal(12, effectivePolicy.LocalSuccessHours);
+                Assert.Equal(3, effectivePolicy.LocalRejectedDays);
+                Assert.Equal(30, effectivePolicy.ServerPayloadDays);
+                Assert.Equal(1, effectivePolicy.CacheMaxAgeHours);
+                Assert.Equal(4096, effectivePolicy.MaximumRequestBodyBytes);
+                Assert.Equal(1024, effectivePolicy.MaximumPayloadBytes);
+                Assert.Equal("desktop-e2e-v1", effectivePolicy.SourceVersion);
+                Assert.Matches("^[0-9a-f]{64}$", effectivePolicy.SourceFingerprint);
+                Assert.Equal(implementationSha, effectivePolicy.ActivationImplementationSha);
+
+                await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => runtime.SynchronizeAsync(2));
+                var cacheDenied = await Assert.ThrowsAsync<OfflineStoreException>(() =>
+                    runtime.PutReadCacheAsync(
+                        "policy", "too-long", "{}", TimeSpan.FromHours(1).Add(TimeSpan.FromSeconds(1))));
+                Assert.Equal("READ_CACHE_POLICY_DENIED", cacheDenied.Code);
+                var actionDenied = await Assert.ThrowsAsync<OfflineStoreException>(() => runtime.QueueAsync(
+                    new OfflineOperationEnqueueTemplate(
+                        Guid.NewGuid(), seeded.CompanyId, seeded.BranchId, seeded.UserId,
+                        seeded.RegisteredDeviceId, "CreateWaybillDraft", "CREATE",
+                        "Waybill", null, null, DateTimeOffset.UtcNow),
+                    identity => JsonSerializer.Serialize(new { clientOperationId = identity.ClientOperationId })));
+                Assert.Equal("OFFLINE_ACTION_NOT_AUTHORIZED", actionDenied.Code);
+                var oversized = await runtime.QueueAsync(
+                    new OfflineOperationEnqueueTemplate(
+                        Guid.NewGuid(), seeded.CompanyId, seeded.BranchId, seeded.UserId,
+                        seeded.RegisteredDeviceId, "CreateOperationalParty", "CREATE",
+                        "OperationalParty", null, null, DateTimeOffset.UtcNow),
+                    identity => JsonSerializer.Serialize(new
+                    {
+                        clientOperationId = identity.ClientOperationId,
+                        oversized = new string('x', 1100)
+                    }));
+                var localRejection = await runtime.SynchronizeAsync();
+                Assert.Equal(1, localRejection.Rejected);
+                var rejected = await runtime.GetOperationAsync(oversized.Operation.LocalOperationId);
+                Assert.Equal(OfflineOperationStatus.Rejected, rejected?.Status);
+                Assert.Equal("PAYLOAD_TOO_LARGE", rejected?.ResultCode);
 
                 var enqueued = await runtime.CreateBusinessProducer().QueueOperationalPartyAsync(
                     "Desktop PostgreSQL E2E", "700000000", "CNG DPAPI SQLCipher HTTP worker");
@@ -108,7 +153,8 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
                 Assert.Equal(correlationId, persisted.OperationCorrelationId);
             }
 
-            await AssertPostgreSqlEvidenceAsync(connection, seeded, clientOperationId, correlationId);
+            await AssertPostgreSqlEvidenceAsync(
+                connection, seeded, clientOperationId, correlationId, effectivePolicy);
         }
         finally
         {
@@ -179,11 +225,40 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             builder.UseSetting("Sync:Offline:ActivationImplementationSha", implementationSha);
             builder.UseSetting("Sync:ServerExecution:Enabled", "true");
             builder.UseSetting("Sync:EffectivePolicy:SourceVersion", "desktop-e2e-v1");
+            var companyPolicy = $"Sync:EffectivePolicy:Companies:{seeded.CompanyId:D}";
+            builder.UseSetting($"{companyPolicy}:MaxBatchOperations", "20");
+            builder.UseSetting($"{companyPolicy}:MaximumRequestBodyBytes", "1048576");
+            builder.UseSetting($"{companyPolicy}:MaximumPayloadBytes", "8192");
+            builder.UseSetting($"{companyPolicy}:ClientTransportMaxRetryCount", "4");
+            builder.UseSetting($"{companyPolicy}:ClientTransportBaseSeconds", "6");
+            builder.UseSetting($"{companyPolicy}:LocalSuccessHours", "20");
+            builder.UseSetting($"{companyPolicy}:LocalRejectedDays", "6");
+            builder.UseSetting($"{companyPolicy}:ServerPayloadDays", "80");
+            builder.UseSetting($"{companyPolicy}:CacheMaxAgeHours", "12");
+            var branchPolicy = $"Sync:EffectivePolicy:Branches:{seeded.CompanyId:D}:{seeded.BranchId:D}";
+            builder.UseSetting($"{branchPolicy}:MaxBatchOperations", "5");
+            builder.UseSetting($"{branchPolicy}:MaximumRequestBodyBytes", "65536");
+            builder.UseSetting($"{branchPolicy}:MaximumPayloadBytes", "4096");
+            builder.UseSetting($"{branchPolicy}:ClientTransportMaxRetryCount", "3");
+            builder.UseSetting($"{branchPolicy}:ClientTransportBaseSeconds", "8");
+            builder.UseSetting($"{branchPolicy}:LocalSuccessHours", "18");
+            builder.UseSetting($"{branchPolicy}:LocalRejectedDays", "5");
+            builder.UseSetting($"{branchPolicy}:ServerPayloadDays", "60");
+            builder.UseSetting($"{branchPolicy}:CacheMaxAgeHours", "4");
             var devicePolicy = $"Sync:EffectivePolicy:Devices:{seeded.RegisteredDeviceId:D}";
             builder.UseSetting($"{devicePolicy}:CompanyId", seeded.CompanyId.ToString("D"));
             builder.UseSetting($"{devicePolicy}:BranchId", seeded.BranchId.ToString("D"));
             builder.UseSetting($"{devicePolicy}:DeviceId", seeded.DeviceId);
             builder.UseSetting($"{devicePolicy}:AllowedActions:0", "CreateOperationalParty");
+            builder.UseSetting($"{devicePolicy}:MaxBatchOperations", "1");
+            builder.UseSetting($"{devicePolicy}:MaximumRequestBodyBytes", "4096");
+            builder.UseSetting($"{devicePolicy}:MaximumPayloadBytes", "1024");
+            builder.UseSetting($"{devicePolicy}:ClientTransportMaxRetryCount", "2");
+            builder.UseSetting($"{devicePolicy}:ClientTransportBaseSeconds", "9");
+            builder.UseSetting($"{devicePolicy}:LocalSuccessHours", "12");
+            builder.UseSetting($"{devicePolicy}:LocalRejectedDays", "3");
+            builder.UseSetting($"{devicePolicy}:ServerPayloadDays", "30");
+            builder.UseSetting($"{devicePolicy}:CacheMaxAgeHours", "1");
         });
 
     private static async Task<SeededScope> SeedAsync(
@@ -275,7 +350,8 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
         string connection,
         SeededScope seeded,
         string clientOperationId,
-        Guid correlationId)
+        Guid correlationId,
+        SyncClientEffectivePolicy effectivePolicy)
     {
         await using var db = CreateDbContext(connection);
         var operation = await db.SyncOperations.AsNoTracking().SingleAsync(x =>
@@ -283,6 +359,12 @@ public sealed class DesktopProductionEndToEndPostgreSqlTests
             x.ClientOperationId == clientOperationId);
         Assert.Equal("SUCCEEDED", operation.Status);
         Assert.Equal(correlationId, operation.OperationCorrelationId);
+        var queuedAudit = await db.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "SyncOperationQueued" && x.OperationCorrelationId == correlationId);
+        Assert.Equal(
+            $"PolicySourceVersion={effectivePolicy.SourceVersion};" +
+            $"PolicySourceFingerprint={effectivePolicy.SourceFingerprint}",
+            queuedAudit.Reason);
         var businessKey = SyncBusinessIdempotencyKey.Create(
             seeded.CompanyId, seeded.BranchId, seeded.RegisteredDeviceId, clientOperationId);
         Assert.Single(await db.Set<OperationalPartyEntity>().AsNoTracking().Where(x =>

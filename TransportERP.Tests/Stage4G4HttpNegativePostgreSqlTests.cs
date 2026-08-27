@@ -41,6 +41,121 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
     [Fact]
     [Trait("Category", "PostgreSQL")]
     [Trait("Category", "HTTP")]
+    public async Task Business_idempotency_is_device_scoped_through_HTTP_PostgreSql_and_the_real_domain_adapter()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var seedDb = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        await seedDb.Database.MigrateAsync();
+        using var firstKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var secondKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var firstScope = await SeedAsync(seedDb, firstKey, "DEVICE-IDEMPOTENCY");
+        var secondScope = await SeedSecondDeviceAsync(seedDb, firstScope, secondKey);
+        using var factory = CreateFactory(connection);
+        using var firstClient = CreateClient(factory, firstScope.Bearer);
+        using var secondClient = CreateClient(factory, secondScope.Bearer);
+
+        var clientOperationId = $"shared-device-key-{Guid.NewGuid():N}";
+        var firstOperation = Operation(
+            "CreateOperationalParty", "CREATE", "OperationalParty", null,
+            clientOperationId, Guid.NewGuid(),
+            PartyPayload(clientOperationId, "DEVICE-A"), null, null);
+        var secondOperation = Operation(
+            "CreateOperationalParty", "CREATE", "OperationalParty", null,
+            clientOperationId, Guid.NewGuid(),
+            PartyPayload(clientOperationId, "DEVICE-B"), null, null);
+
+        Guid firstServerOperationId;
+        Guid secondServerOperationId;
+        using (var firstResponse = await SendSignedAsync(
+                   firstClient, firstKey, firstScope.Bearer,
+                   BatchBody(firstScope.DeviceId, firstOperation)))
+        using (var secondResponse = await SendSignedAsync(
+                   secondClient, secondKey, secondScope.Bearer,
+                   BatchBody(secondScope.DeviceId, secondOperation)))
+        {
+            var firstResult = await SingleResultAsync(firstResponse);
+            var secondResult = await SingleResultAsync(secondResponse);
+            Assert.Equal("QUEUED", firstResult.Status);
+            Assert.Equal("QUEUED", secondResult.Status);
+            firstServerOperationId = Assert.IsType<Guid>(firstResult.ServerOperationId);
+            secondServerOperationId = Assert.IsType<Guid>(secondResult.ServerOperationId);
+            Assert.NotEqual(firstServerOperationId, secondServerOperationId);
+        }
+
+        await ExecuteUntilTerminalAsync(factory, connection,
+            [clientOperationId, clientOperationId]);
+
+        await using (var verify = PostgreSqlTestEnvironment.CreateDbContext(connection))
+        {
+            var operations = await verify.SyncOperations.AsNoTracking().Where(operation =>
+                operation.CompanyId == firstScope.CompanyId &&
+                operation.ClientOperationId == clientOperationId).ToListAsync();
+            Assert.Equal(2, operations.Count);
+            Assert.Contains(operations, operation =>
+                operation.RegisteredDeviceId == firstScope.RegisteredDeviceId &&
+                operation.Id == firstServerOperationId && operation.Status == "SUCCEEDED");
+            Assert.Contains(operations, operation =>
+                operation.RegisteredDeviceId == secondScope.RegisteredDeviceId &&
+                operation.Id == secondServerOperationId && operation.Status == "SUCCEEDED");
+
+            var expectedBusinessKeys = new[]
+            {
+                SyncBusinessIdempotencyKey.Create(
+                    firstScope.CompanyId, firstScope.BranchId,
+                    firstScope.RegisteredDeviceId, clientOperationId),
+                SyncBusinessIdempotencyKey.Create(
+                    secondScope.CompanyId, secondScope.BranchId,
+                    secondScope.RegisteredDeviceId, clientOperationId)
+            };
+            var parties = await verify.Set<OperationalPartyEntity>().AsNoTracking().Where(party =>
+                party.CompanyId == firstScope.CompanyId &&
+                expectedBusinessKeys.Contains(party.ClientOperationId)).ToListAsync();
+            Assert.Equal(2, parties.Count);
+            Assert.Equal(2, parties.Select(party => party.Id).Distinct().Count());
+        }
+
+        using (var replayResponse = await SendSignedAsync(
+                   firstClient, firstKey, firstScope.Bearer,
+                   BatchBody(firstScope.DeviceId, firstOperation)))
+        {
+            var replay = await SingleResultAsync(replayResponse);
+            Assert.Equal("SUCCEEDED", replay.Status);
+            Assert.Equal(firstServerOperationId, replay.ServerOperationId);
+        }
+
+        var mutatedPayload = PartyPayload(clientOperationId, "DEVICE-A-MUTATED");
+        var mutated = firstOperation with
+        {
+            PayloadJson = mutatedPayload,
+            PayloadHash = Sha256(mutatedPayload)
+        };
+        using (var mutationResponse = await SendSignedAsync(
+                   firstClient, firstKey, firstScope.Bearer,
+                   BatchBody(firstScope.DeviceId, mutated)))
+        {
+            var mutation = await SingleResultAsync(mutationResponse);
+            Assert.Equal("REJECTED", mutation.Status);
+            Assert.Equal("IDEMPOTENCY_CONFLICT", mutation.ErrorCode);
+            Assert.Null(mutation.ServerOperationId);
+        }
+
+        await using var terminalVerify = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        Assert.Equal(2, await terminalVerify.SyncOperations.CountAsync(operation =>
+            operation.CompanyId == firstScope.CompanyId &&
+            operation.ClientOperationId == clientOperationId));
+        Assert.Equal(2, await terminalVerify.Set<OperationalPartyEntity>().CountAsync(party =>
+            party.CompanyId == firstScope.CompanyId &&
+            (party.ClientOperationId == SyncBusinessIdempotencyKey.Create(
+                 firstScope.CompanyId, firstScope.BranchId,
+                 firstScope.RegisteredDeviceId, clientOperationId) ||
+             party.ClientOperationId == SyncBusinessIdempotencyKey.Create(
+                 secondScope.CompanyId, secondScope.BranchId,
+                 secondScope.RegisteredDeviceId, clientOperationId))));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    [Trait("Category", "HTTP")]
     [Trait("Acceptance", "T-SYNC-003")]
     public async Task T_SYNC_003_signed_request_with_mismatched_payload_hash_is_rejected_audited_and_has_no_business_effect()
     {
@@ -763,6 +878,58 @@ public sealed class Stage4G4HttpNegativePostgreSqlTests
 
         return new TestScope(company.Id, branch.Id, user.Id, sessionId, registeredDeviceId,
             deviceId, currency.Id, CreateToken(user, company.Id, branch.Id, sessionId, registeredDeviceId, deviceId));
+    }
+
+    private static async Task<TestScope> SeedSecondDeviceAsync(
+        TransportErpDbContext db,
+        TestScope scope,
+        ECDsa proofKey)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var user = await db.Users.SingleAsync(candidate => candidate.Id == scope.UserId);
+        var registeredDeviceId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var deviceId = $"g4-http-device-b-{Guid.NewGuid():N}";
+        var publicParameters = proofKey.ExportParameters(false);
+        var x = Base64Url(publicParameters.Q.X!);
+        var y = Base64Url(publicParameters.Q.Y!);
+        var canonicalJwk = $"{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{x}\",\"y\":\"{y}\"}}";
+        var thumbprint = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(canonicalJwk)));
+        db.RegisteredDevices.Add(new RegisteredDevice
+        {
+            Id = registeredDeviceId, CompanyId = scope.CompanyId, DeviceId = deviceId,
+            DisplayName = "G4 HTTP second device", Platform = "TEST", AppVersion = "1.0",
+            RegistrationRequestId = "g4-http-second-" + Guid.NewGuid().ToString("N"),
+            CredentialHash = new string('b', 64), CredentialVersion = 1, Status = "ACTIVE",
+            RegisteredByUserId = scope.UserId, ApprovedByUserId = scope.UserId,
+            ApprovedAt = now, LastSeenAt = now,
+            ProofPublicJwkCanonicalJson = canonicalJwk, ProofKeyThumbprint = thumbprint,
+            ProofKeyVersion = 1, ProofKeyChangedAt = now, ProofKeyChangedByUserId = scope.UserId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        });
+        db.RegisteredDeviceAssignments.Add(new RegisteredDeviceAssignment
+        {
+            Id = Guid.NewGuid(), RegisteredDeviceId = registeredDeviceId, UserId = scope.UserId,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Status = "ACTIVE",
+            AssignedByUserId = scope.UserId, AssignedAt = now,
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        });
+        db.AuthSessions.Add(new AuthSession
+        {
+            Id = sessionId, UserId = scope.UserId, CompanyId = scope.CompanyId,
+            BranchId = scope.BranchId, DeviceId = deviceId,
+            RegisteredDeviceId = registeredDeviceId, DeviceCredentialVersion = 1,
+            Mode = "LOCAL", SecurityStampAtIssue = user.SecurityStamp, AuthVersionAtIssue = user.AuthVersion,
+            RefreshTokenHash = Convert.ToHexString(SHA256.HashData(sessionId.ToByteArray())).ToLowerInvariant(),
+            RefreshTokenFamilyId = Guid.NewGuid(), IssuedAt = now,
+            AccessTokenExpiresAt = now.AddMinutes(15), RefreshTokenExpiresAt = now.AddDays(1),
+            CreatedAt = now, UpdatedAt = now, RowVersion = RandomNumberGenerator.GetBytes(16)
+        });
+        await db.SaveChangesAsync();
+        return new TestScope(
+            scope.CompanyId, scope.BranchId, scope.UserId, sessionId, registeredDeviceId,
+            deviceId, scope.CurrencyId,
+            CreateToken(user, scope.CompanyId, scope.BranchId, sessionId, registeredDeviceId, deviceId));
     }
 
     private static async Task<CrossScopeTargets> SeedCrossScopeTargetsAsync(
