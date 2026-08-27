@@ -765,6 +765,31 @@ public sealed class OfflineSyncTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task Json_failure_from_the_proof_provider_stays_at_the_proof_boundary()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\proof-json";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var failingKey = new FailingSigningKey(key, new JsonException(secret));
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                captured.AttemptCorrelationId);
+        }));
+
+        var outcome = await Client(http, store, failingKey, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_PROOF_CREATE_FAILURE", persisted.ResultCode);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Governed_signing_failure_keeps_its_sync_transport_code_and_retry_decision()
     {
         var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
@@ -826,6 +851,34 @@ public sealed class OfflineSyncTransportTests : IDisposable
         Assert.NotNull(persisted.NextRetryAt);
         Assert.Null(persisted.LeaseOwner);
         Assert.Null(persisted.LeaseExpiresAt);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Json_failure_from_the_signed_http_adapter_stays_at_the_send_boundary()
+    {
+        const string secret = "fake-bearer|fake-pfx-password|D:\\private\\send-json";
+        var clock = new MutableTimeProvider(new DateTimeOffset(2026, 8, 27, 10, 0, 0, TimeSpan.Zero));
+        var store = await CreateStoreAsync(clock);
+        var queued = await EnqueueRequestAsync(store, Request());
+        using var key = new TestSigningKey();
+        var calls = 0;
+        using var http = new HttpClient(new DelegateHandler(async (request, cancellationToken) =>
+        {
+            var captured = await CaptureAsync(request, cancellationToken);
+            if (++calls == 1)
+                return Challenge(Base64Url(RandomNumberGenerator.GetBytes(32)),
+                    captured.AttemptCorrelationId);
+            throw new JsonException(secret);
+        }));
+
+        var outcome = await Client(http, store, key, clock, "token").ProcessNextBatchAsync();
+        var persisted = await store.GetAsync(queued.Operation.LocalOperationId, Scope());
+
+        Assert.Equal(2, calls);
+        Assert.Equal(1, outcome.RetryScheduled);
+        Assert.Equal(OfflineOperationStatus.Failed, persisted!.Status);
+        Assert.Equal("CLIENT_SIGNED_SEND_FAILURE", persisted.ResultCode);
         Assert.DoesNotContain(secret, JsonSerializer.Serialize(persisted), StringComparison.Ordinal);
     }
 

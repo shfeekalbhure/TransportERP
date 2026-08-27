@@ -216,7 +216,7 @@ public sealed class OfflineSyncTransportClient
         }
         catch (JsonException)
         {
-            requestError = "CLIENT_SIGNED_JSON_INVALID";
+            requestError = "CLIENT_PIPELINE_FAILURE";
             requestErrorRetryable = true;
         }
         catch (SyncTransportException exception)
@@ -305,7 +305,10 @@ public sealed class OfflineSyncTransportClient
             }
             catch (OperationCanceledException) { throw; }
             catch (HttpRequestException) { throw; }
-            catch (JsonException) { throw; }
+            catch (JsonException)
+            {
+                return (null, "CLIENT_PROOF_CREATE_FAILURE", true);
+            }
             catch (SyncTransportException) { throw; }
             catch (CryptographicException) { throw; }
             catch
@@ -321,7 +324,10 @@ public sealed class OfflineSyncTransportClient
             }
             catch (OperationCanceledException) { throw; }
             catch (HttpRequestException) { throw; }
-            catch (JsonException) { throw; }
+            catch (JsonException)
+            {
+                return (null, "CLIENT_SIGNED_SEND_FAILURE", true);
+            }
             catch (SyncTransportException) { throw; }
             catch (CryptographicException) { throw; }
             catch
