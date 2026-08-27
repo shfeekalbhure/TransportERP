@@ -162,6 +162,7 @@ public sealed class Stage5DesktopOfflineContractTests
             "TransportERP.Desktop.E2ETests", "DesktopProductionEndToEndPostgreSqlTests.cs");
         var uiAutomation = Read(
             "TransportERP.Desktop.E2ETests", "DesktopReleaseUiAutomation.cs");
+        var shell = Read("TransportERP.Desktop", "Application", "DesktopShellForm.cs");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("StartupFailureClassifier", releaseHost, StringComparison.Ordinal);
