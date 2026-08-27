@@ -305,6 +305,22 @@ public sealed class DesktopStartupFailureClassifierTests
         Assert.Equal("DESKTOP_E2E_API_STARTUP_FORMAT", classifier.Code);
     }
 
+    [Theory]
+    [InlineData("DESKTOP_OPERATIONS_CREATE_STARTED", "DESKTOP_E2E_OPERATIONS_TIMEOUT_CREATE_STARTED")]
+    [InlineData("DESKTOP_OPERATIONS_CREATED", "DESKTOP_E2E_OPERATIONS_TIMEOUT_CREATED")]
+    [InlineData("DESKTOP_OPERATIONS_SHOW_STARTED", "DESKTOP_E2E_OPERATIONS_TIMEOUT_SHOW_STARTED")]
+    [InlineData("DESKTOP_OPERATIONS_WINDOW_SHOWN", "DESKTOP_E2E_OPERATIONS_TIMEOUT_WINDOW_SHOWN")]
+    [InlineData("DESKTOP_OPERATIONS_SHOW_RETURNED", "DESKTOP_E2E_OPERATIONS_WINDOW_UNDISCOVERABLE_AFTER_SHOW")]
+    [InlineData("DESKTOP_OPERATIONS_READY", "DESKTOP_E2E_OPERATIONS_WINDOW_ABSENT")]
+    [InlineData("DESKTOP_OPERATIONS_INVOKED", "DESKTOP_E2E_OPERATIONS_WINDOW_ABSENT")]
+    [InlineData("UNRECOGNIZED", "DESKTOP_E2E_OPERATIONS_DIAGNOSTIC_INVALID")]
+    public void Operations_window_diagnostic_state_maps_to_a_fixed_code(
+        string state,
+        string expected)
+    {
+        Assert.Equal(expected, DesktopReleaseUiAutomation.ClassifyOperationsWindowTimeout(state));
+    }
+
     [Fact]
     public async Task Bounded_normal_exit_accepts_only_exit_code_zero()
     {

@@ -429,7 +429,7 @@ jobs:
           $passed = [int]$counters.passed
           $failed = [int]$counters.failed
           $notExecuted = [int]$counters.notExecuted
-          if ($total -ne 67 -or $passed -ne 67 -or $failed -ne 0 -or $notExecuted -ne 0) {
+          if ($total -ne 75 -or $passed -ne 75 -or $failed -ne 0 -or $notExecuted -ne 0) {
             throw "Desktop startup classifier execution mismatch: total=$total passed=$passed failed=$failed skipped=$notExecuted."
           }
 

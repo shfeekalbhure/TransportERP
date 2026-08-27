@@ -15,6 +15,7 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
 {
     private static readonly TimeSpan NormalCloseTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan CleanupExitTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan OperationsWindowDiagnosticDelay = TimeSpan.FromSeconds(15);
     private readonly Process _process;
     private AutomationElement? _window;
 
@@ -251,18 +252,81 @@ internal sealed class DesktopReleaseUiAutomation : IAsyncDisposable
     {
         var processCondition = new PropertyCondition(
             AutomationElement.ProcessIdProperty, _process.Id);
+        var diagnosticAt = DateTimeOffset.UtcNow + OperationsWindowDiagnosticDelay;
+        var diagnosticEmitted = false;
+        var consecutiveUnexpectedWindowSamples = 0;
         while (!_process.HasExited)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var diagnosticState = ReadOperationsDiagnosticState();
+            if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_SUPERVISOR_STOPPED",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DESKTOP_E2E_SUPERVISOR_STOPPED");
+            if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_RUNTIME_MISSING",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DESKTOP_E2E_OPERATIONS_RUNTIME_MISSING");
+            if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_CREATE_FAILED",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DESKTOP_E2E_OPERATIONS_CREATE_FAILURE");
+            if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_SHOW_FAILED",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DESKTOP_E2E_OPERATIONS_SHOW_FAILURE");
+            if (string.Equals(diagnosticState, "DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DESKTOP_E2E_OPERATIONS_WINDOW_NOT_VISIBLE");
+
             var windows = AutomationElement.RootElement.FindAll(TreeScope.Children, processCondition);
+            var unexpectedWindowObserved = false;
             foreach (AutomationElement window in windows)
-                if (string.Equals(window.Current.AutomationId, SyncOperationsAutomationIds.Form,
+            {
+                var automationId = window.Current.AutomationId;
+                if (string.Equals(automationId, SyncOperationsAutomationIds.Form,
                         StringComparison.Ordinal))
                     return window;
+                if (!string.Equals(automationId, DesktopAutomationIds.Shell,
+                        StringComparison.Ordinal))
+                    unexpectedWindowObserved = true;
+            }
+            consecutiveUnexpectedWindowSamples = unexpectedWindowObserved
+                ? consecutiveUnexpectedWindowSamples + 1
+                : 0;
+
+            if (!diagnosticEmitted && DateTimeOffset.UtcNow >= diagnosticAt)
+            {
+                var code = consecutiveUnexpectedWindowSamples >= 2
+                    ? "DESKTOP_E2E_UNEXPECTED_WINDOW"
+                    : ClassifyOperationsWindowTimeout(diagnosticState);
+                Console.WriteLine($"DESKTOP_OPERATIONS_DIAGNOSTIC:{code}");
+                diagnosticEmitted = true;
+            }
             await Task.Delay(100, cancellationToken);
         }
         throw new InvalidOperationException($"DESKTOP_E2E_PROCESS_EXITED_{_process.ExitCode}");
     }
+
+    private string ReadOperationsDiagnosticState()
+    {
+        var value = Element(DesktopAutomationIds.Operations).GetCurrentPropertyValue(
+            AutomationElement.HelpTextProperty, ignoreDefaultValue: true);
+        return value as string ?? "";
+    }
+
+    internal static string ClassifyOperationsWindowTimeout(string diagnosticState) =>
+        diagnosticState switch
+        {
+            "DESKTOP_OPERATIONS_CREATE_STARTED" =>
+                "DESKTOP_E2E_OPERATIONS_TIMEOUT_CREATE_STARTED",
+            "DESKTOP_OPERATIONS_CREATED" => "DESKTOP_E2E_OPERATIONS_TIMEOUT_CREATED",
+            "DESKTOP_OPERATIONS_SHOW_STARTED" =>
+                "DESKTOP_E2E_OPERATIONS_TIMEOUT_SHOW_STARTED",
+            "DESKTOP_OPERATIONS_WINDOW_SHOWN" =>
+                "DESKTOP_E2E_OPERATIONS_TIMEOUT_WINDOW_SHOWN",
+            "DESKTOP_OPERATIONS_SHOW_RETURNED" =>
+                "DESKTOP_E2E_OPERATIONS_WINDOW_UNDISCOVERABLE_AFTER_SHOW",
+            "DESKTOP_OPERATIONS_READY" or "DESKTOP_OPERATIONS_INVOKED" =>
+                "DESKTOP_E2E_OPERATIONS_WINDOW_ABSENT",
+            _ => "DESKTOP_E2E_OPERATIONS_DIAGNOSTIC_INVALID"
+        };
 
     private void SetValue(string automationId, string value)
     {

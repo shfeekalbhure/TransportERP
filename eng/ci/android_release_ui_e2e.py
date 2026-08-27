@@ -303,43 +303,62 @@ def main() -> int:
         "persistedAfterReleaseRestart": False,
         "signedOutClosed": False,
     }
+    phase = "INITIAL_LAUNCH"
     try:
         driver.launch_ordinary_activity()
         evidence["nonDebuggableRelease"] = True
+        phase = "INITIAL_CLOSED_MODE"
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
+        phase = "INITIAL_CLOSED_REASON"
         driver.wait_text("driver_reason", "Reason: OFFLINE_CLOSED")
         if driver.find("driver_queue_party").attrib.get("enabled") != "false":
             raise UiE2EFailure("CLOSED_DEFAULT_WRITE_ENABLED")
         evidence["closedDefault"] = True
 
+        phase = "INITIAL_SIGN_IN"
         sign_in_and_activate(driver, secret_input)
         evidence["authenticatedActivation"] = True
 
+        phase = "INITIAL_OPERATION_LIST"
         existing = operation_ids(driver.operation_summaries())
         suffix = uuid.uuid4().hex[:12]
+        phase = "QUEUE_PARTY_NAME"
         driver.set_text("driver_party_name", "UIE2E-" + suffix)
+        phase = "QUEUE_PARTY_MOBILE"
         driver.set_text("driver_party_mobile", "700" + suffix[:6])
+        phase = "QUEUE_PARTY_ADDRESS"
         driver.set_text("driver_party_address", "UIE2E-Address-" + suffix)
         driver.hide_keyboard()
+        phase = "QUEUE_PARTY_ACTION"
         driver.click("driver_queue_party")
+        phase = "QUEUE_PARTY_RESULT"
         driver.wait_text("driver_action_result", "Result: BUSINESS_OPERATION_QUEUED")
         evidence["businessOperationQueued"] = True
 
+        phase = "NEW_OPERATION_VISIBLE"
         operation_id = driver.wait_for_new_operation(existing)
+        phase = "INITIAL_OPERATION_SUCCESS"
         driver.wait_for_operation_success(operation_id)
         evidence["businessOperationSucceeded"] = True
 
         # Android's ordinary force-stop is the crash/restart boundary. Relaunch the same installed
         # non-debuggable package, reauthenticate through the normal UI, and prove the exact local
         # operation/result survived encrypted storage without a test activity or internal hook.
+        phase = "RESTART_FORCE_STOP"
         driver.run("shell", "am", "force-stop", arguments.package)
+        phase = "RESTART_LAUNCH"
         driver.launch_ordinary_activity()
+        phase = "RESTART_CLOSED_MODE"
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
+        phase = "RESTART_SIGN_IN"
         sign_in_and_activate(driver, secret_input)
+        phase = "PERSISTED_OPERATION_SUCCESS"
         driver.wait_for_operation_success(operation_id)
         evidence["persistedAfterReleaseRestart"] = True
 
+        phase = "SIGN_OUT_ACTION"
         driver.click("driver_sign_out")
+        phase = "SIGN_OUT_CLOSED_MODE"
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
         if driver.find("driver_queue_party").attrib.get("enabled") != "false":
             raise UiE2EFailure("SIGNED_OUT_WRITE_ENABLED")
@@ -350,6 +369,8 @@ def main() -> int:
             encoding="utf-8",
         )
         return 0
+    except UiE2EFailure as error:
+        raise UiE2EFailure(f"{phase}:{error}") from error
     finally:
         # A process stop is not a success substitute. It only guarantees volatile bearer teardown
         # when a UI assertion fails before the normal sign-out path.

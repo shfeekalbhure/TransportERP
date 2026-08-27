@@ -72,6 +72,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
             Name = DesktopAutomationIds.Operations,
             Text = "عمليات المزامنة",
             Enabled = false,
+            AccessibleDescription = "DESKTOP_OPERATIONS_CLOSED",
             AutoSize = true,
             Margin = new Padding(16)
         };
@@ -132,6 +133,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _signIn.Enabled = false;
         _logout.Enabled = true;
         _operations.Enabled = true;
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_READY";
         _queueParty.Enabled = _businessProducer is not null;
     }
 
@@ -150,6 +152,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _runtimeAuthorized = false;
         _runtime = null;
         _businessProducer = null;
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SUPERVISOR_STOPPED";
         _logout.Enabled = true;
         _operations.Enabled = false;
         _queueParty.Enabled = false;
@@ -162,6 +165,7 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
         _runtime = null;
         _businessProducer = null;
         _runtimeAuthorized = false;
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SESSION_ENDED";
         ClearSecrets();
         _signIn.Enabled = false;
         _logout.Enabled = false;
@@ -173,10 +177,52 @@ internal sealed class DesktopShellForm : Form, IDesktopOnlineSignInSurface
 
     private void ShowOperations()
     {
-        if (_runtime is null)
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_INVOKED";
+        var runtime = _runtime;
+        if (runtime is null)
+        {
+            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_RUNTIME_MISSING";
             return;
-        var operations = _runtime.CreateOperationsForm();
-        operations.Show(this);
+        }
+
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATE_STARTED";
+        SyncOperationsForm operations;
+        try
+        {
+            operations = runtime.CreateOperationsForm();
+        }
+        catch
+        {
+            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATE_FAILED";
+            return;
+        }
+
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_CREATED";
+        operations.Shown += (_, _) =>
+            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_WINDOW_SHOWN";
+        _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_STARTED";
+        try
+        {
+            operations.Show(this);
+            if (!operations.IsHandleCreated || !operations.Visible)
+            {
+                DisposeOperationsForm(operations);
+                _operations.AccessibleDescription = "DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE";
+                return;
+            }
+            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_RETURNED";
+        }
+        catch
+        {
+            DisposeOperationsForm(operations);
+            _operations.AccessibleDescription = "DESKTOP_OPERATIONS_SHOW_FAILED";
+        }
+    }
+
+    private static void DisposeOperationsForm(SyncOperationsForm operations)
+    {
+        try { operations.Dispose(); }
+        catch { }
     }
 
     private async Task QueueOperationalPartyAsync()

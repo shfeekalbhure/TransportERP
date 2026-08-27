@@ -209,7 +209,7 @@ public sealed class Stage5DesktopOfflineContractTests
             StringComparison.Ordinal);
         Assert.Contains("FullyQualifiedName~DesktopStartupFailureClassifierTests", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("$total -ne 67", workflow, StringComparison.Ordinal);
+        Assert.Contains("$total -ne 75", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("override string Message", startupExceptions,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_API_STARTUP_CRYPTOGRAPHIC", releaseHost,
@@ -246,6 +246,41 @@ public sealed class Stage5DesktopOfflineContractTests
         Assert.Contains("DESKTOP_E2E_PROCESS_EXITED_BEFORE_CLOSE", uiAutomation,
             StringComparison.Ordinal);
         Assert.Contains("DESKTOP_E2E_PROCESS_KILL_TIMEOUT", uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("OperationsWindowDiagnosticDelay = TimeSpan.FromSeconds(15)",
+            uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_SUPERVISOR_STOPPED", uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_RUNTIME_MISSING", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_CREATE_FAILURE", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_SHOW_FAILURE", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_WINDOW_NOT_VISIBLE", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_UNEXPECTED_WINDOW", uiAutomation, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_WINDOW_UNDISCOVERABLE_AFTER_SHOW", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_E2E_OPERATIONS_WINDOW_ABSENT", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("AccessibleDescription = \"DESKTOP_OPERATIONS_CLOSED\"", shell,
+            StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_READY", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_SUPERVISOR_STOPPED", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_RUNTIME_MISSING", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_CREATE_STARTED", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_CREATE_FAILED", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_SHOW_STARTED", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_SHOW_FAILED", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_WINDOW_NOT_VISIBLE", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_WINDOW_SHOWN", shell, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_OPERATIONS_SHOW_RETURNED", shell, StringComparison.Ordinal);
+        Assert.Contains("AutomationElement.HelpTextProperty", uiAutomation, StringComparison.Ordinal);
+        Assert.DoesNotContain("CancelAfter(OperationsWindowDiagnosticDelay)", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.Contains("await Task.Delay(100, cancellationToken)", uiAutomation,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", shell, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception.StackTrace", shell, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("await _process.WaitForExitAsync();", uiAutomation,
             StringComparison.Ordinal);
         Assert.Contains("SyncActionCatalog.Definitions", productionE2E, StringComparison.Ordinal);

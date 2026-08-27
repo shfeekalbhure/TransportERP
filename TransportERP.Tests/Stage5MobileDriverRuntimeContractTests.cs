@@ -95,6 +95,19 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("ordinary-launcher", script, StringComparison.Ordinal);
         Assert.Contains("businessOperationSucceeded", script, StringComparison.Ordinal);
         Assert.Contains("persistedAfterReleaseRestart", script, StringComparison.Ordinal);
+        foreach (var phase in new[]
+                 {
+                     "INITIAL_LAUNCH", "INITIAL_CLOSED_MODE", "INITIAL_CLOSED_REASON",
+                     "INITIAL_SIGN_IN", "INITIAL_OPERATION_LIST", "QUEUE_PARTY_NAME",
+                     "QUEUE_PARTY_MOBILE", "QUEUE_PARTY_ADDRESS", "QUEUE_PARTY_ACTION",
+                     "QUEUE_PARTY_RESULT", "NEW_OPERATION_VISIBLE", "INITIAL_OPERATION_SUCCESS",
+                     "RESTART_FORCE_STOP", "RESTART_LAUNCH", "RESTART_CLOSED_MODE",
+                     "RESTART_SIGN_IN", "PERSISTED_OPERATION_SUCCESS", "SIGN_OUT_ACTION",
+                     "SIGN_OUT_CLOSED_MODE"
+                 })
+            Assert.Contains($"phase = \"{phase}\"", script, StringComparison.Ordinal);
+        Assert.Contains("raise UiE2EFailure(f\"{phase}:{error}\") from error", script,
+            StringComparison.Ordinal);
         Assert.Contains("driver.run(\"shell\", \"am\", \"force-stop\"", script,
             StringComparison.Ordinal);
         Assert.Contains("driver.wait_for_operation_success(operation_id)", script,
