@@ -1156,13 +1156,20 @@ jobs:
         shell: bash
         run: |
           mkdir -p ci-evidence/android-runtime
-          adb logcat -d -v brief \
-            | { grep -E 'AndroidRuntime|monodroid|DOTNET|libc|com\.transporterp\.mobile\.driver' || true; } \
-            | tail -n 600 \
-            > ci-evidence/android-runtime/android-runtime-errors.txt
+          if adb get-state >/dev/null 2>&1; then
+            adb logcat -d -v brief \
+              | { grep -E 'AndroidRuntime|monodroid|DOTNET|libc|com\.transporterp\.mobile\.driver' || true; } \
+              | tail -n 600 \
+              > ci-evidence/android-runtime/android-runtime-errors.txt
+            adb shell dumpsys activity exit-info "$ANDROID_TEST_PACKAGE" \
+              > ci-evidence/android-runtime/android-process-exit-info.txt
+          else
+            echo 'android_device_state=unavailable_before_emulator_start' \
+              > ci-evidence/android-runtime/android-runtime-errors.txt
+            echo 'android_process_exit_info=unavailable_before_emulator_start' \
+              > ci-evidence/android-runtime/android-process-exit-info.txt
+          fi
           cat ci-evidence/android-runtime/android-runtime-errors.txt
-          adb shell dumpsys activity exit-info "$ANDROID_TEST_PACKAGE" \
-            > ci-evidence/android-runtime/android-process-exit-info.txt
           sed -n '1,240p' ci-evidence/android-runtime/android-process-exit-info.txt
           if [ -f "$RUNNER_TEMP/android-e2e-api.log" ]; then
             grep -oE '(APPLICATION_|DEVICE_|OFFLINE_|SYNC_|PROOF_|PAYLOAD_|RUNTIME_)[A-Z0-9_]+' \

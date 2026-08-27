@@ -80,7 +80,8 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             Assert.NotNull(pendingLocal.ServerOperationId);
 
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "QUEUED", partyCount: 0);
-            Assert.True(await ExecuteOneServerOperationAsync(factory));
+            Assert.True(await ExecuteServerOperationAsync(
+                factory, connection, pendingLocal.ServerOperationId!.Value));
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "SUCCEEDED", partyCount: 1);
 
             time.Advance(TimeSpan.FromSeconds(1));
@@ -136,7 +137,9 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             Assert.Equal(1, failedLocal.ClientTransportRetryCount);
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "QUEUED", partyCount: 0);
 
-            Assert.True(await ExecuteOneServerOperationAsync(factory));
+            Assert.True(await ExecuteServerOperationAsync(
+                factory, connection, await GetServerOperationIdAsync(
+                    connection, scope, enqueued.Operation)));
             await AssertServerStateAsync(connection, scope, enqueued.Operation, "SUCCEEDED", partyCount: 1);
 
             time.Advance(TimeSpan.FromSeconds(2));
@@ -217,11 +220,39 @@ public sealed class Stage5OfflineEndToEndPostgreSqlTests
             $"Offline E2E {suffix}", "700000000", "Encrypted offline E2E");
     }
 
-    private static async Task<bool> ExecuteOneServerOperationAsync(WebApplicationFactory<Program> factory)
+    private static async Task<bool> ExecuteServerOperationAsync(
+        WebApplicationFactory<Program> factory,
+        string connection,
+        Guid operationId)
     {
-        await using var scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<SyncExecutionProcessor>()
-            .ExecuteNextAsync(TimeSpan.FromSeconds(30));
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<SyncExecutionProcessor>()
+                .ExecuteNextAsync(TimeSpan.FromSeconds(30));
+            await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+            var status = await db.SyncOperations.AsNoTracking()
+                .Where(operation => operation.Id == operationId)
+                .Select(operation => operation.Status)
+                .SingleAsync();
+            if (status == "SUCCEEDED") return true;
+            if (status is "REJECTED" or "CONFLICT") return false;
+        }
+        return false;
+    }
+
+    private static async Task<Guid> GetServerOperationIdAsync(
+        string connection,
+        E2eScope scope,
+        OfflineOperation local)
+    {
+        await using var db = PostgreSqlTestEnvironment.CreateDbContext(connection);
+        return await db.SyncOperations.AsNoTracking()
+            .Where(operation => operation.CompanyId == scope.CompanyId &&
+                                operation.RegisteredDeviceId == scope.RegisteredDeviceId &&
+                                operation.ClientOperationId == local.ClientOperationId)
+            .Select(operation => operation.Id)
+            .SingleAsync();
     }
 
     private static async Task AssertServerStateAsync(
