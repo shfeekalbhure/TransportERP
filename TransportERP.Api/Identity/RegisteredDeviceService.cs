@@ -56,11 +56,11 @@ public sealed class RegisteredDeviceService(TransportErpDbContext db, AuditEvent
                     x.DeviceModel == deviceModel && x.OsVersion == osVersion);
                 if (replay is null || candidates.Count != 1)
                     throw new RegisteredDeviceException("DEVICE_REGISTRATION_CONFLICT");
-                var revokedUnboundSessions = await RevokeUnboundSessionsForRegistrationAsync(
+                var replayRevokedUnboundSessions = await RevokeUnboundSessionsForRegistrationAsync(
                     current.CompanyId, deviceId, DateTimeOffset.UtcNow, ct);
                 await db.SaveChangesAsync(ct);
                 await AppendRegistrationSessionRevocationAuditAsync(
-                    replay, current, correlationId, revokedUnboundSessions, ct);
+                    replay, current, correlationId, replayRevokedUnboundSessions, ct);
                 await transaction.CommitAsync(ct);
                 return ToResponse(replay);
             }
