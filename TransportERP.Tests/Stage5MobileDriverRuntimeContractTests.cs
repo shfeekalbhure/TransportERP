@@ -368,6 +368,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             "AndroidKeystoreDeviceSigningKey.cs");
         var network = Read("TransportERP.Mobile.Driver", "Platforms", "Android",
             "AndroidDriverSyncNetworkProvider.cs");
+        var script = Read("eng", "ci", "android_release_ui_e2e.py");
         var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("Condition=\"'$(TransportERPDeviceTests)' == 'true'\"", project,
