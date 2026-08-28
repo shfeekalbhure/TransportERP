@@ -1,0 +1,54 @@
+name: MISSION-03 DBP-002 Policy Catalog Assertion Fix
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+    paths:
+      - .github/workflows/mission-03-dbp002-policy-catalog-assertion-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-policy-assertions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Replace multiline textual policy greps with pg_policy catalog assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/mission-03-dbp002-rehearsal-v3.sh')
+          s = p.read_text()
+          old = '''grep -q 'users.*current_membership_id' evidence/dbp002-sensitive-policies.txt
+grep -q 'users.*current_security_version' evidence/dbp002-sensitive-policies.txt
+grep -q 'role_permissions.*current_membership_id' evidence/dbp002-sensitive-policies.txt
+grep -q 'role_permissions.*current_security_version' evidence/dbp002-sensitive-policies.txt
+grep -q 'role_permissions.*IS NOT DISTINCT FROM.*current_branch_id' evidence/dbp002-sensitive-policies.txt
+grep -q 'user_permission_grants.*current_security_version' evidence/dbp002-sensitive-policies.txt
+grep -q 'user_role_grants.*current_security_version' evidence/dbp002-sensitive-policies.txt'''
+          new = '''policy_expr() { q "SELECT regexp_replace(COALESCE(pg_get_expr(p.polqual,p.polrelid),''), E'[\\n\\r\\t ]+', ' ', 'g') FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname='$1' AND p.polname='tenant_scope';"; }
+users_policy="$(policy_expr users)"
+role_permissions_policy="$(policy_expr role_permissions)"
+permission_grants_policy="$(policy_expr user_permission_grants)"
+role_grants_policy="$(policy_expr user_role_grants)"
+[[ "$users_policy" == *"current_membership_id"* && "$users_policy" == *"current_security_version"* && "$users_policy" == *"current_company_id"* && "$users_policy" == *"current_branch_id"* ]]
+[[ "$role_permissions_policy" == *"current_membership_id"* && "$role_permissions_policy" == *"current_security_version"* && "$role_permissions_policy" == *"current_company_id"* && "$role_permissions_policy" == *"current_branch_id"* && "$role_permissions_policy" == *"IS DISTINCT FROM"* ]]
+[[ "$permission_grants_policy" == *"current_membership_id"* && "$permission_grants_policy" == *"current_security_version"* && "$permission_grants_policy" == *"current_company_id"* && "$permission_grants_policy" == *"current_branch_id"* ]]
+[[ "$role_grants_policy" == *"current_membership_id"* && "$role_grants_policy" == *"current_security_version"* && "$role_grants_policy" == *"current_company_id"* && "$role_grants_policy" == *"current_branch_id"* ]]
+printf '%s\\n' "users|$users_policy" "role_permissions|$role_permissions_policy" "user_permission_grants|$permission_grants_policy" "user_role_grants|$role_grants_policy" > evidence/dbp002-sensitive-policy-assertions.normalized.txt'''
+          if old not in s:
+              raise SystemExit('Expected policy grep block not found')
+          p.write_text(s.replace(old, new))
+          PY
+          git diff --check
+          git add scripts/mission-03-dbp002-rehearsal-v3.sh
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'MISSION-03 DBP-002: assert sensitive policies from pg_policy catalog'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
