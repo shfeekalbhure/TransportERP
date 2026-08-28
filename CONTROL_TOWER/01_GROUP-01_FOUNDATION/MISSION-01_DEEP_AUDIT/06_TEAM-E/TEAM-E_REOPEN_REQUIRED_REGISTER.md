@@ -1,0 +1,23 @@
+# TEAM-E Reopen Required Register
+
+- Status: `CLOSED — REOPEN CHAIN COMPLETED AND REVALIDATED`
+- Scope: evidence discovered during the authorized TEAM-E multidisciplinary review
+- Authoritative current line: `UNKNOWN — REQUIRES OWNER/REPOSITORY VERIFICATION`
+- Rule: predecessor sealed bytes are not modified; every correction requires a new version, detached SHA-256 list, seal, and handoff.
+
+| Reopen ID | Affected package / finding | New evidence | Required cycle | Current effect |
+|---|---|---|---|---|
+| `E-REOPEN-001` | TEAM-C1 v1.0 | `TEAM-C1_ARCHITECTURE_INVENTORY.md:122` and `TEAM-C1_CURRENT_ARCHITECTURE_ASSESSMENT.md:204` claim a source-coded design-time connection-string fallback, while `TransportErpDbContextFactory.cs:10-15` fails closed when `TRANSPORTERP_DESIGN_CONNSTR` is absent. | TEAM-C1 v1.1 limited correction, new hashes/seal/handoff; downstream note that D/C2 did not rely on the false statement. | RESOLVED: accepted C1 v1.1, 14/14 hashes, `C1-CORR-001`. |
+| `E-REOPEN-002` | TEAM-D v1.0 seal chronology | `04_TEAM-D/EVIDENCE_INDEX.md:3` declares collection through `2026-08-28T02:02:00Z`, but D Manifest/Seal close at `2026-08-28T01:59:56Z`. | TEAM-D vNext must correct provenance chronology without silently editing v1.0, then issue new hashes/seal/handoff. | RESOLVED: accepted D v1.1, valid chronology, 14/14 hashes. |
+| `E-REOPEN-003` | TEAM-D v1.0 Crosswalk completeness | MISSION-01 section 34 requires each reconciliation record to include the teams' positions/evidence, C1 relation, direct recheck, governing evidence, determination, implementation, verification, temporal state, confidence, impact, and proposed action. The 62-row D Crosswalk omits per-record `Impact` and `Proposed Action` and compresses predecessor positions/evidence into `Counterparts`. | TEAM-D vNext must complete the Finding-by-Finding contract and preserve all original IDs/determinations or explain any revised determination. | RESOLVED: D v1.1 has 64 complete rows and all mandatory fields. |
+| `E-REOPEN-004` | `A-OFF-002` / `TB-F-004` reconciliation scope | `SyncOperationService.cs:145-149,187-190,263-266,309-324` uses tenant-only checks for transition/retry/conflict lifecycle actions, while owner binding exists only in `EnsureSameOwnerScope` at `376-380` and is used for enqueue replay. A same-tenant different user/device context can reach these service methods without operation-owner validation if they become composed/exposed. No current API route for these lifecycle methods was proven, so exploitability is conditional. | TEAM-D reopens the affected Finding scope, classifies the static authorization gap and runtime limit, and issues a new determination/version. TEAM-C2 then reassesses the explicit per-operation ownership/negative-test requirement if affected; TEAM-E re-reviews. | RESOLVED: D v1.1 `D-SEC-SYNC-001`; C2 v1.1 `C2-TARGET-027/C2-BLK-017`; TEAM-E reconfirmed P1/static and conditional exposure. |
+| `E-REOPEN-005` | TEAM-C2 v1.0 seal chronology | `05_TEAM-C2/EVIDENCE_INDEX.md:4` declares collection through `2026-08-28T02:19:00Z`, while C2 Manifest/Seal close at `2026-08-28T02:12:51Z` and its Source Access window also ends then. | TEAM-C2 vNext after accepted TEAM-D vNext; new hashes/seal/handoff; no silent timestamp edit. | RESOLVED: accepted C2 v1.1, valid chronology, 16/16 hashes. |
+| `E-REOPEN-006` | TEAM-C2 transaction-boundary design | C2 separates Accounting, Waybills, Shipping, and Audit ownership and prohibits direct cross-module entity/table access, while also requiring source link/state, balanced journal, audit, and outbox in one transaction. It does not name the orchestration/UoW ownership that makes those rules compatible. | TEAM-E assessed whether this changes the target proposal or should remain an implementation ADR. | DISPOSITION: no reopen. C2 v1.1 remains a conditional proposal and explicitly keeps cross-module settlement and DB enforcement unresolved. Carry as `E-BLK-013` before implementation planning. |
+
+## Cascade state
+
+The required path is:
+
+`TEAM-C1 LIMITED CORRECTION + TEAM-D REOPEN → TEAM-D v1.1 → TEAM-C2 v1.1 → TEAM-E RE-REVIEW → TEAM-E SEAL → MASTER/GATE`
+
+The predecessor reopen chain is closed. MASTER/GATE remains a separate next-stage decision and still cannot claim READY while the authoritative current line and other critical gate evidence remain unresolved.

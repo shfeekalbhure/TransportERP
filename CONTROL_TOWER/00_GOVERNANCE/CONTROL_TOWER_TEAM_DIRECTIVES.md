@@ -51,11 +51,11 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-E
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `CONTINUE`
+- `CURRENT DIRECTIVE`: `RETURN FOR REWORK`
 - Prerequisite: TEAM-C2 must be sealed and handed off.
 - Required scope: Multidisciplinary advisory review of sealed TEAM-D reconciliation and TEAM-C2 target proposal; review every P0/P1 and a justified P2/P3 sample; preserve assurance and authority limitations.
-- Recorded disposition: `IN PROGRESS — FINAL ADVISORY RE-REVIEW`; accepted C1/D/C2 v1.1 inputs handed off at `2026-08-28T02:50:28Z`.
-- Next permitted action: Revalidate every P0/P1 and justified P2/P3 sample, dispose `BLK-B-001` truthfully, then issue complete final TEAM-E package.
+- Recorded disposition: `v1.0 PRESERVED — CENTRAL ACCEPTANCE REJECTED`; hashes are valid, but two final P0/P1 matrix rows retain stale `REOPEN REQUIRED` wording after the governed D/C2 reopen chain was resolved.
+- Next permitted action: Preserve v1.0 unchanged and issue complete TEAM-E v1.1 under `06_TEAM-E/v1.1/` with reconciled dispositions and a new seal chain.
 
 ## MASTER REPORT + RECONCILIATION GATE
 
