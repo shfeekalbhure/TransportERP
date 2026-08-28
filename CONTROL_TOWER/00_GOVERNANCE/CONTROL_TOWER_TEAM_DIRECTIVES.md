@@ -30,23 +30,23 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `CONTINUE`
+- `CURRENT DIRECTIVE`: `STOP`
 - Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
 - Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
 - Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
-- Recorded disposition: `REOPENED — v1.1 IN PROGRESS`; corrected TEAM-C1 v1.1 input accepted at `2026-08-28T02:31:30Z`.
+- Recorded disposition: `v1.1 SEALED — DELIVERED TO CONTROL TOWER — STOP`; v1.0 is preserved and superseded for downstream use.
 - Reopen basis: Seal chronology defect; §34 Crosswalk field omissions; newly observed Sync lifecycle user/device ownership scope; mandatory-register contract recheck.
-- Next permitted action: Issue complete D v1.1 under `04_TEAM-D/v1.1/` with corrected chronology, full §34 Crosswalk fields, new Sync ownership determination, conforming registers, hashes, seal, and handoff.
+- Next permitted action: None unless new evidence causes `REOPEN REQUIRED`.
 
 ## TEAM-C2
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `WAIT`
+- `CURRENT DIRECTIVE`: `CONTINUE`
 - Prerequisite: TEAM-D must be sealed and handed off.
 - Required scope: Build the target architecture proposal from the sealed TEAM-D reconciliation and predecessor packages without treating proposals as implemented state.
 - Governing limitations: `AUTHORITATIVE CURRENT LINE` remains `UNKNOWN`; confirmed P0 risks and `DB-GOV-001` must be preserved as design constraints, not silently remediated.
-- Recorded disposition: `REOPENED — RETURN FOR REWORK`; v1.0 hashes/content were complete, but its internal evidence-collection end time `02:19:00Z` postdates its declared closure `02:12:51Z`.
-- Next permitted action: Preserve v1.0 and its unsealed v1.1 draft; wait for accepted C1/D v1.1, then reassess and seal a complete C2 v1.1.
+- Recorded disposition: `v1.1 IN PROGRESS`; TEAM-D v1.1 accepted and handed off at `2026-08-28T02:40:21Z`.
+- Next permitted action: Preserve v1.0; reassess accepted C1/D v1.1 and seal a complete chronology-correct C2 v1.1.
 
 ## TEAM-E
 
