@@ -2,10 +2,10 @@
 
 | Order | Mission | Team | Prerequisite | Required Output | State | Blocker |
 |---:|---|---|---|---|---|---|
-| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | SEALED | All three packages centrally received and hash-verified; teams stopped; reported findings and limitations carried to the next gate |
-| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report + complete Crosswalk/register/manifest/seal/handoff package | SEALED | All 13 detached hashes, 62 Crosswalk IDs, seal, and handoff verified; TEAM-D stopped; authoritative line remains unknown and is carried to MASTER/GATE |
-| 3 | MISSION-01 | TEAM-C2 | TEAM-D SEALED | Target architecture proposal + complete evidence/manifest/seal/handoff package | IN PROGRESS | Session started `2026-08-28T02:02:53Z`; target design must preserve confirmed P0, unknown-line, preservation, and DB-GOV-001 constraints |
-| 4 | MISSION-01 | TEAM-E | TEAM-C2 SEALED | Advisory review | WAITING | |
+| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | REOPENED | A/B remain sealed; C1 v1.0 preserved but factual fallback claim requires corrected v1.1 and new seal |
+| 2 | MISSION-01 | TEAM-D | Accepted C1 v1.1 plus A/B sealed inputs | Complete v1.1 reconciliation package satisfying every §34 field and new Sync evidence | REOPENED | v1.0 preserved; chronology, Crosswalk contract, and ownership-scope evidence require v1.1 after C1 handoff |
+| 3 | MISSION-01 | TEAM-C2 | TEAM-D SEALED | Corrected v1.1 target package with truthful chronology and full seal chain | REOPENED | v1.0 evidence window ends `02:19:00Z` after declared closure `02:12:51Z`; preserve v1.0 and reissue v1.1 |
+| 4 | MISSION-01 | TEAM-E | Accepted C1/D/C2 v1.1 chain | Multidisciplinary advisory report + complete evidence/manifest/seal/handoff package | HOLD | Review evidence preserved; final seal withheld pending upstream reissues and re-review; MASTER remains WAIT |
 | 5 | MISSION-01 | MASTER | TEAM-E SEALED | Master report + gate | WAITING | |
 | 6 | MISSION-02 | Planning Team | MISSION-01 closed | Remediation plan | WAITING | |
 | 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | WAITING | |

@@ -5,7 +5,7 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-A
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `STOP`
+- `CURRENT DIRECTIVE`: `REOPEN`
 - Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - Reason: Package, manifest hashes, seal, and handoff were verified and centrally received.
 - Next permitted action: None unless Control Tower records `REOPEN`.
@@ -22,37 +22,40 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-C1
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `STOP`
-- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
-- Reason: All nine sealed outputs, seal, manifest, and handoff were verified and centrally received.
-- Next permitted action: None unless Control Tower records `REOPEN`.
+- `CURRENT DIRECTIVE`: `REOPEN`
+- Recorded disposition: `REOPENED — LIMITED v1.1 CORRECTION REQUIRED`.
+- Reason: TEAM-E proved v1.0 incorrectly describes a source-coded design-time connection fallback; source fails closed when `TRANSPORTERP_DESIGN_CONNSTR` is absent. Preserve v1.0.
+- Next permitted action: Issue complete corrected v1.1 under `03_TEAM-C1/v1.1/` with truthful source claim and complete required registers/seal chain.
 
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `STOP`
+- `CURRENT DIRECTIVE`: `REOPEN`
 - Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
 - Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
 - Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
-- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`; 13 detached hashes and the 62-record Crosswalk verified by Control Tower.
-- Next permitted action: None unless Control Tower records `REOPEN`.
+- Recorded disposition: `REOPENED — v1.1 REQUIRED AFTER TEAM-C1 v1.1`; v1.0 remains preserved.
+- Reopen basis: Seal chronology defect; §34 Crosswalk field omissions; newly observed Sync lifecycle user/device ownership scope; mandatory-register contract recheck.
+- Next permitted action: After C1 v1.1 handoff, issue complete D v1.1 under `04_TEAM-D/v1.1/`.
 
 ## TEAM-C2
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `CONTINUE`
+- `CURRENT DIRECTIVE`: `WAIT`
 - Prerequisite: TEAM-D must be sealed and handed off.
 - Required scope: Build the target architecture proposal from the sealed TEAM-D reconciliation and predecessor packages without treating proposals as implemented state.
 - Governing limitations: `AUTHORITATIVE CURRENT LINE` remains `UNKNOWN`; confirmed P0 risks and `DB-GOV-001` must be preserved as design constraints, not silently remediated.
-- Recorded disposition: `IN PROGRESS — TEAM-C2 SESSION STARTED 2026-08-28T02:02:53Z`.
-- Next permitted action: Continue TEAM-C2 target-architecture work inside `05_TEAM-C2/` only and produce the complete report/register/manifest/seal/handoff package.
+- Recorded disposition: `REOPENED — RETURN FOR REWORK`; v1.0 hashes/content were complete, but its internal evidence-collection end time `02:19:00Z` postdates its declared closure `02:12:51Z`.
+- Next permitted action: Preserve v1.0 and its unsealed v1.1 draft; wait for accepted C1/D v1.1, then reassess and seal a complete C2 v1.1.
 
 ## TEAM-E
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `WAIT`
+- `CURRENT DIRECTIVE`: `HOLD`
 - Prerequisite: TEAM-C2 must be sealed and handed off.
-- Next permitted action: Wait for a Control Tower `START` directive.
+- Required scope: Multidisciplinary advisory review of sealed TEAM-D reconciliation and TEAM-C2 target proposal; review every P0/P1 and a justified P2/P3 sample; preserve assurance and authority limitations.
+- Recorded disposition: `HOLD FINAL SEAL — REOPEN CHAIN C1 → D → C2 REQUIRED`; current review evidence is preserved.
+- Next permitted action: Resume/re-review after accepted C1 v1.1, D v1.1, and C2 v1.1 handoffs; do not seal now.
 
 ## MASTER REPORT + RECONCILIATION GATE
 
