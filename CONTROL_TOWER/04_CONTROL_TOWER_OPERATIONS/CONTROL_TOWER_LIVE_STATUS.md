@@ -1,46 +1,53 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T18:59:51Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T21:59:51+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T20:03:19Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T23:03:19+03:00`
 - `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
 - `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
-- MISSION-03 bounded execution baseline: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
+- MISSION-03 execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | IN PROGRESS | owner-decision files independently re-read; current execution branch unchanged; v0.9 remains open | keep M03 active; route only external/DB-GOV gates; require new hash-bound checkpoint after modified v0.9 files | N/A |
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | Greenfield owner decision and DB-GOV proposal evidence independently re-read | second Greenfield DB-GOV review completed; central records rebound | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | internal head `5d1352b...`; recovery and baseline runs pass; no Product DB model delta | `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED` | NOT SEALED; v1.0 checkpoint/hash set required |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; 153/153 baseline + disposable recovery remain accepted | `CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS` | NOT SEALED; no final handoff |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
-## W2 package decisions
+## Material transition this check
 
-| Package | Decision | Evidence boundary |
+Owner decision `DB-BASELINE-001` was applied to the central DB-GOV register through an independent second review:
+
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+
+Result:
+
+`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
+
+The following are no longer target-database prerequisites: legacy target-row/backfill evidence, legacy PasswordHash/verifier/rehash compatibility, legacy accounting/audit row reconciliation, and a safe-copy of a pre-existing target database.
+
+## Current DB-GOV package states
+
+| Package | Decision | Remaining boundary |
 |---|---|---|
-| W2-A1 | `ADOPT — REBOUND TO SEALED PLAN` | stored Sync Company/Branch/User scope; code-only |
-| W2-A2 | `ADOPT — REBOUND TO SEALED PLAN` | shared Product API stored-scope resolver; code-only |
-| W2-B1 | `ADOPT — REBOUND TO SEALED PLAN` | persistent Sync RBAC; code-only |
-| W2-B2A | `ADOPT — REBOUND TO SEALED PLAN` | authority-neutral Product API RBAC; code-only |
-| W2-C1 | `ADOPT — REBOUND TO SEALED PLAN` | existing Sync mutation owner enforcement; code-only |
-| W2-F1 | `ADOPT — REBOUND TO SEALED PLAN` | bounded negatives and 128/128 exact-head regression |
-| W2-B2B code-only | `ADOPT — EXACT DIFF/RAW CI REVALIDATED` | `cc67ad2...`; 146/146; no persistence delta |
-| DBP-003A / W2-B2B persistence | `REVISED PACKAGE SUBMITTED — DB-GOV HOLD REMAINS` | independent resubmission review and authorized PasswordHash/safe-copy evidence still required before any rehearsal authority |
-| W2-C2 / DBP-003B/C | `DEFERRED — DEPENDS ON DBP-002/006` | registry/assignment/PoP/nonce/replay/retention evidence |
-| W2-D | `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` | DBP-002 |
-| W2-E | `BLOCKED — DBP-003 HOLD AT REHEARSAL ENTRY` | no PostgreSQL session persistence authority |
-| W2-F2 | `BLOCKED` | full security matrix depends on B2B/C2/D/E |
+| DBP-002 | `REVISE BEFORE REHEARSAL` | exact membership/grant physical schema, tenant-consistent keys/FKs/checks/indexes, RLS/equivalent bootstrap and recovery tests |
+| DBP-003A | `REVISE BEFORE REHEARSAL` | final caller-owned audit/UoW, exact persistence mapping, new-system password hash/verify/lockout policy |
+| DBP-003B/C | `DEFERRED — DEPENDS ON DBP-002/006` | membership-bound device registry/assignment and proof/nonce/replay/retention design |
+| DBP-004 | `REVISE BEFORE REHEARSAL` | exact V2 audit schema/canonicalizer/stream/append-only/UoW acceptance |
+| DBP-005 | `REVISE BEFORE REHEARSAL` | exact Settlement/journal/source-link constraints, mapping/FX/rounding/period/SoD/concurrency/reversal contract |
+| DBP-006 | `REVISE BEFORE REHEARSAL` | exact typed Offline persistence, version/fingerprint, claim/lease, retention/legal-hold and device dependencies |
 
-## Owner decisions verified in repository
+No proposal currently has disposable/Greenfield rehearsal authority. No Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data or Production database change is authorized.
 
-- `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY SELECTED FOR PRODUCTION TARGET`.
-- `ACC-001 = RESOLVED — OPERATIONAL COLLECTION; GOVERNED SETTLEMENT POSTS THE LEDGER`.
-- `OFFLINE-001 = RESOLVED — DEFAULT DENY; EXPLICIT QUEUE FOR BOUNDED OPERATIONAL CAPTURE`.
-- `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS IS DEFERRED`.
+## Remaining non-DB gates
 
-The execution branch points to exact `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / tree `00512125311306a43474638195d2cad97b76118e`. `DBP-003 = HOLD AT REHEARSAL ENTRY`; DBP-002/003/004/005/006 remain blocked for material persistence changes. PR #69 remains unmerged evidence only. No current owner-decision blocker exists; all remaining blockers require authorized external evidence or independent DB-GOV. MISSION-04 remains WAIT.
+- canonical post-DEPART Shipping/Ticketing/screen programming authority;
+- real Windows/Android executable runtime and secure-store proof;
+- protected Production signing custody;
+- Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals;
+- complete Git worktree/stash/local-only preservation inventory before W8 destructive/global cleanup.
 
-The v0.9 package was explicitly `OPEN — NOT SEALED`. Its detached SHA-256 register was generated before the later owner-decision modifications to `MISSION03_COMPLETION_GATE_ASSESSMENT.md` and `CURRENT_DIRECTIVE.md`; it therefore remains historical checkpoint evidence and must not be used as a current integrity claim. A later checkpoint/final package must regenerate its manifest/hash set after content stabilization.
+There is no active `OWNER DECISION REQUIRED` for the immediate next work. It is non-destructive proposal/design refinement. MISSION-04 remains WAIT because MISSION-03 has no final valid seal/handoff.
