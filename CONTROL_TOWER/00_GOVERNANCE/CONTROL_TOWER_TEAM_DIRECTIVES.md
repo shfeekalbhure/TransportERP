@@ -30,11 +30,12 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `START`
+- `CURRENT DIRECTIVE`: `CONTINUE`
 - Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
 - Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
 - Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
-- Next permitted action: Begin TEAM-D reconciliation inside `04_TEAM-D/` only and produce the full report/register/manifest/seal/handoff package.
+- Recorded disposition: `IN PROGRESS — TEAM-D SESSION STARTED 2026-08-28T01:52:48Z`.
+- Next permitted action: Continue TEAM-D reconciliation inside `04_TEAM-D/` only and produce the full report/register/manifest/seal/handoff package.
 
 ## TEAM-C2
 

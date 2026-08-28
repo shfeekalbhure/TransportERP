@@ -3,7 +3,7 @@
 | Order | Mission | Team | Prerequisite | Required Output | State | Blocker |
 |---:|---|---|---|---|---|---|
 | 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | SEALED | All three packages centrally received and hash-verified; teams stopped; reported findings and limitations carried to the next gate |
-| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report + complete Crosswalk/register/manifest/seal/handoff package | READY | `START` issued. Authoritative current line remains unknown and must not be inferred; it blocks final CURRENT-state/gate judgment, not TEAM-D evidence reconciliation |
+| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report + complete Crosswalk/register/manifest/seal/handoff package | IN PROGRESS | TEAM-D session started `2026-08-28T01:52:48Z`. Authoritative current line remains unknown and must not be inferred; it blocks final CURRENT-state/gate judgment, not TEAM-D evidence reconciliation |
 | 3 | MISSION-01 | TEAM-C2 | TEAM-D SEALED | Target architecture proposal | WAITING | |
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 SEALED | Advisory review | WAITING | |
 | 5 | MISSION-01 | MASTER | TEAM-E SEALED | Master report + gate | WAITING | |
