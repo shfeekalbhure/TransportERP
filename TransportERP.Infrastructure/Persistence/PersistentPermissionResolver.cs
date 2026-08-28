@@ -67,6 +67,10 @@ public sealed class PersistentPermissionResolver(TransportErpDbContext db) : IEf
         if (direct.Any(x => x == "ALLOW")) return true;
         if (direct.Any(x => x is not ("ALLOW" or "DENY"))) return false;
 
+        // Deliberately repeat CompanyId/BranchId predicates on RolePermission even
+        // though PostgreSQL RLS also protects the table. This keeps authorization
+        // fail-closed when the resolver is executed by a migration/test/admin role
+        // that can bypass RLS.
         return await (
             from grant in db.Set<UserRoleGrant>().AsNoTracking()
             join role in db.Roles.AsNoTracking() on grant.RoleId equals role.Id
@@ -78,7 +82,9 @@ public sealed class PersistentPermissionResolver(TransportErpDbContext db) : IEf
                   role.Status == "ACTIVE" &&
                   (!role.CompanyId.HasValue || role.CompanyId == companyId) &&
                   rolePermission.PermissionId == permission.Id &&
-                  rolePermission.ScopeType == permission.ScopeType
+                  rolePermission.ScopeType == permission.ScopeType &&
+                  rolePermission.CompanyId == companyId &&
+                  rolePermission.BranchId == branchId
             select grant.Id)
             .AnyAsync(cancellationToken);
     }
