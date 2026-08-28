@@ -1,17 +1,17 @@
 # CONTROL TOWER STATUS
 
 - Snapshot Asia/Aden: `2026-08-28`
-- Workspace: `CONTROL TOWER — MISSION-03 INTERNAL WORK EXHAUSTED / EXTERNAL EVIDENCE REQUIRED`
+- Workspace: `CONTROL TOWER — MISSION-03 GREENFIELD DB RE-ROUTING / DB-GOV REQUIRED`
 - Branch: `governance/control-tower-20260828`
 - Governance update scope: `CONTROL_TOWER files only`
 - Group 01: `IN PROGRESS`
 - Mission 01 Deep Audit: `SEALED — COMPLETE`
 - MASTER/GATE v2.0: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - MISSION-02: `v1.2 SEALED — DELIVERED TO CONTROL TOWER — STOP`
-- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; ALL INTERNAL WORK EXHAUSTED; AUTHORIZED EXTERNAL EVIDENCE + DB-GOV REQUIRED`
+- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; GREENFIELD TARGET CONFIRMED; DB-GOV RE-REVIEW REQUIRED`
 - MISSION-04: `WAITING — MISSION-03 NOT SEALED`
 - MISSION-05: `WAITING`
-- Database Governance DB-GOV-001: `ACTIVE — DBP-003 HOLD AT REHEARSAL ENTRY; NO UNAUTHORIZED MIGRATION AUTHORITY`
+- Database Governance DB-GOV-001: `ACTIVE — RE-REVIEW DBP-002/003/004/005/006 AGAINST GREENFIELD BASIS`
 - Product Source modifications by Control Tower: `NONE`
 
 ## Authoritative lines
@@ -20,47 +20,57 @@
 - MISSION-03 execution: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
 - PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f — UNMERGED EVIDENCE ONLY`.
 
-No merge, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit or unauthorized database/data change is authorized by this status.
+## Owner decisions — RESOLVED
 
-## Accepted execution evidence
-
-- W2-A1/A2/B1/B2A/C1/F1: `ADOPT — REBOUND TO SEALED PLAN`.
-- B2B code-only: `ADOPT — EXACT DIFF/RAW CI REVALIDATED`.
-- Run `33191269475`: `146/146 PASS`; PostgreSQL 18.6; ten existing migrations; no model drift; expected API HTTP 401; Desktop/Mobile x3 build surfaces pass; executable client runtime is not yet proved.
-- Historical failed evidence remains preserved.
-
-## Owner decisions — ALL CURRENT BOUNDED ITEMS RESOLVED
-
-- `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY SELECTED FOR PRODUCTION TARGET`.
+- `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY`.
 - `ACC-001 = RESOLVED — OPERATIONAL COLLECTION; GOVERNED SETTLEMENT POSTS THE LEDGER`.
 - `OFFLINE-001 = RESOLVED — DEFAULT DENY; EXPLICIT QUEUE FOR BOUNDED OPERATIONAL CAPTURE`.
-- `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS IS DEFERRED`.
+- `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS; IOS DEFERRED`.
+- `DB-BASELINE-001 = RESOLVED — GREENFIELD / NEW / EMPTY TARGET DATABASE; NO LEGACY TABLES OR DATA`.
 
-Decision files are under `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/`.
+## Greenfield target database
 
-## Execution consequences
+Binding decision:
 
-- W3 must use governed Settlement as the accounting posting boundary, with configured account roles, FX/rounding, maker-checker and period rules.
-- W4 must materialize the exact action matrix from OFFLINE-001; anything not explicitly allowed remains DENY.
-- W5 targets Windows x64 Desktop plus Android Admin/Customer/Driver and must prove real executable/runtime behavior; library builds alone do not pass.
-- MISSION-03 must not return for ACC-001/OFFLINE-001/CLIENT-001 again unless a materially new scope requires a superseding owner decision.
+`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/DB-BASELINE-001_GREENFIELD_TARGET_DATABASE_2026-08-28.md`
 
-## Remaining true blockers
+Consequences:
 
-- PasswordHash sanitized/verifier/legacy/lockout evidence.
-- Named non-Production safe copy with migration history, roles/RLS, sanitized data shape, backup/restore and reconciliation evidence.
-- DB-GOV approval for any Entity/DbContext/Migration/Schema/Data work, including DBP-002/003/004/005/006 and later proposals.
-- Sanitized legacy audit/accounting reconciliation population.
-- Latest canonical Kurrasa/Ticketing/post-departure Shipping authority.
-- External deploy/recovery/RPO-RTO/signing-custody/dependency/privacy/KMS evidence.
-- Complete external workspace/stash/local-only inventory before W8 cleanup.
+- no legacy target database exists to copy or preserve;
+- no legacy users/password hashes exist in the target database;
+- no legacy accounting/audit/business rows exist in the target database;
+- legacy PasswordHash verifier/rehash inventory is `NOT APPLICABLE`;
+- legacy target-data reconciliation is `NOT APPLICABLE`;
+- existing ten committed migrations remain the bootstrap lineage for an empty PostgreSQL target;
+- any new DBP migration remains under `DB-GOV-001`.
+
+## Accepted internal evidence
+
+- Run `33201720896`: `153/153 PASS`; PostgreSQL 18.6; ten existing migrations; no model drift; expected API HTTP 401; Desktop/Mobile build probes pass but executable runtime remains unproved.
+- Run `33201720878`: disposable PostgreSQL backup/restore `PASS`; migration reconciliation `10/10`.
+- Historical failed runs and fixes remain preserved.
+
+## DB-GOV next action
+
+Re-review `DBP-002/003/004/005/006` independently using the Greenfield fact pattern. Remove blockers that depended solely on legacy/live target rows, a legacy PasswordHash population, legacy accounting/audit rows or a pre-existing target database.
+
+A bounded approval may be issued only when proposal-specific gates are satisfied, for example:
+
+`APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`
+
+This status does not itself authorize Entity, DbContext, Migration, Schema, Seed, Data or Production changes.
+
+## Remaining true blockers after Greenfield decision
+
+- new-system PasswordHash/lockout policy and security tests before login activation;
+- PostgreSQL roles/RLS-equivalent and proposal-specific DB-GOV design/rehearsal;
+- canonical programming authority for post-DEPART Shipping, Ticketing and screen routes;
+- Windows/Android executable runtime, secure-store integration and protected signing custody;
+- Production recovery/RPO-RTO, privacy/retention, KMS/key custody and dependency/license/provenance approvals;
+- complete external Git worktree/stash/local-only inventory before W8 cleanup.
 
 ## Current directive
 
-`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED; KEEP MISSION-03 OPEN`
+`CONTINUE — GREENFIELD TARGET DATABASE CONFIRMED; RE-ROUTE DB-GOV; KEEP MISSION-03 OPEN`
 
-MISSION-03 preserves `5d1352b...`. Final internal runs `33201720878` and
-`33201720896` pass the disposable recovery and 153-test baseline surfaces. No
-further lawful internal package remains; material DB/client/business/release
-and preservation exits require the named external evidence. MISSION-04 remains
-WAIT until a valid MISSION-03 seal and handoff.
+No merge, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit or unauthorized database/data change is authorized. MISSION-04 remains WAIT until a valid MISSION-03 seal and handoff.
