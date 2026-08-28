@@ -78,6 +78,12 @@ public sealed record LocalRefreshRotationResult(
     LocalRefreshRotationStatus Status,
     LocalSessionRecord? Session = null);
 
+public sealed record LocalSessionAuditIntent(
+    Guid EventId,
+    string Action,
+    string Reason,
+    DateTimeOffset OccurredAt);
+
 public sealed record LocalAccessTokenDescriptor(
     Guid SessionId,
     Guid UserId,
@@ -130,13 +136,18 @@ public interface ILocalIdentityAuthority
 }
 
 /// <summary>
-/// Persistence boundary for DBP-003. RotateAsync must be atomic: a reused or
-/// concurrently consumed refresh token revokes the complete token family.
-/// No production implementation is registered until DBP-003 is approved.
+/// Persistence boundary for DBP-003. Every mutation and its audit intent must
+/// commit atomically or leave no state change. A reused or concurrently
+/// consumed refresh token revokes the complete token family in that same
+/// transaction. No production implementation is registered until DBP-003 is
+/// approved.
 /// </summary>
 public interface ILocalSessionStore
 {
-    Task CreateAsync(LocalSessionRecord session, CancellationToken cancellationToken = default);
+    Task CreateWithAuditAsync(
+        LocalSessionRecord session,
+        LocalSessionAuditIntent audit,
+        CancellationToken cancellationToken = default);
 
     Task<LocalSessionRecord?> FindByRefreshTokenHashAsync(
         string refreshTokenHash,
@@ -146,20 +157,23 @@ public interface ILocalSessionStore
         Guid sessionId,
         CancellationToken cancellationToken = default);
 
-    Task<LocalRefreshRotationResult> RotateAsync(
+    Task<LocalRefreshRotationResult> RotateWithAuditAsync(
         LocalRefreshRotationRequest request,
+        LocalSessionAuditIntent audit,
         CancellationToken cancellationToken = default);
 
-    Task RevokeSessionAsync(
+    Task RevokeSessionWithAuditAsync(
         Guid sessionId,
         string reason,
         DateTimeOffset now,
+        LocalSessionAuditIntent audit,
         CancellationToken cancellationToken = default);
 
-    Task RevokeFamilyAsync(
+    Task RevokeFamilyWithAuditAsync(
         Guid familyId,
         string reason,
         DateTimeOffset now,
+        LocalSessionAuditIntent audit,
         CancellationToken cancellationToken = default);
 }
 
@@ -281,17 +295,17 @@ public sealed class LocalSessionLifecycleService(
             return LocalSessionTokenResult.Denied(LocalSessionFailure.RefreshInvalid);
         if (current.RevokedAt.HasValue || current.ReplacedBySessionId.HasValue)
         {
-            await sessions.RevokeFamilyAsync(current.FamilyId, "REFRESH_REUSE", now, cancellationToken);
+            await RevokeFamilyAsync(current.FamilyId, "REFRESH_REUSE", now, cancellationToken);
             return LocalSessionTokenResult.Denied(LocalSessionFailure.RefreshReuseDetected);
         }
         if (current.RefreshTokenExpiresAt <= now)
         {
-            await sessions.RevokeFamilyAsync(current.FamilyId, "REFRESH_EXPIRED", now, cancellationToken);
+            await RevokeFamilyAsync(current.FamilyId, "REFRESH_EXPIRED", now, cancellationToken);
             return LocalSessionTokenResult.Denied(LocalSessionFailure.RefreshExpired);
         }
         if (!string.Equals(current.DeviceId, request.DeviceId.Trim(), StringComparison.Ordinal))
         {
-            await sessions.RevokeFamilyAsync(current.FamilyId, "DEVICE_MISMATCH", now, cancellationToken);
+            await RevokeFamilyAsync(current.FamilyId, "DEVICE_MISMATCH", now, cancellationToken);
             return LocalSessionTokenResult.Denied(LocalSessionFailure.DeviceMismatch);
         }
 
@@ -299,15 +313,16 @@ public sealed class LocalSessionLifecycleService(
             current.UserId, current.CompanyId, current.BranchId, cancellationToken);
         if (!AuthorityMatches(current, authority))
         {
-            await sessions.RevokeFamilyAsync(current.FamilyId, "SECURITY_CONTEXT_CHANGED", now, cancellationToken);
+            await RevokeFamilyAsync(current.FamilyId, "SECURITY_CONTEXT_CHANGED", now, cancellationToken);
             return LocalSessionTokenResult.Denied(LocalSessionFailure.SecurityContextChanged);
         }
 
         var refreshToken = NewRefreshToken();
         var replacement = NewSession(
             authority!, current.DeviceId, current.FamilyId, refreshToken.Hash, now);
-        var rotation = await sessions.RotateAsync(
+        var rotation = await sessions.RotateWithAuditAsync(
             new LocalRefreshRotationRequest(presentedHash, current.SessionId, replacement, now),
+            Audit("SESSION_REFRESH_ROTATED", "ROTATED", now),
             cancellationToken);
         if (rotation.Status != LocalRefreshRotationStatus.Rotated || rotation.Session is null)
             return LocalSessionTokenResult.Denied(rotation.Status switch
@@ -325,16 +340,24 @@ public sealed class LocalSessionLifecycleService(
     public Task LogoutAsync(
         Guid currentSessionId,
         CancellationToken cancellationToken = default)
-        => sessions.RevokeSessionAsync(
-            currentSessionId, "LOGOUT", timeProvider.GetUtcNow(), cancellationToken);
+    {
+        var now = timeProvider.GetUtcNow();
+        return sessions.RevokeSessionWithAuditAsync(
+            currentSessionId, "LOGOUT", now,
+            Audit("SESSION_LOGOUT", "LOGOUT", now), cancellationToken);
+    }
 
     public Task RevokeCurrentSessionAsync(
         Guid currentSessionId,
         string reason,
         CancellationToken cancellationToken = default)
-        => sessions.RevokeSessionAsync(
-            currentSessionId, NormalizeReason(reason, "CURRENT_SESSION_REVOKED"),
-            timeProvider.GetUtcNow(), cancellationToken);
+    {
+        var now = timeProvider.GetUtcNow();
+        var normalizedReason = NormalizeReason(reason, "CURRENT_SESSION_REVOKED");
+        return sessions.RevokeSessionWithAuditAsync(
+            currentSessionId, normalizedReason, now,
+            Audit("SESSION_REVOKED", normalizedReason, now), cancellationToken);
+    }
 
     public async Task RevokeSessionFamilyAsync(
         Guid currentSessionId,
@@ -343,9 +366,12 @@ public sealed class LocalSessionLifecycleService(
     {
         var session = await sessions.FindBySessionIdAsync(currentSessionId, cancellationToken);
         if (session is not null)
-            await sessions.RevokeFamilyAsync(
+        {
+            var now = timeProvider.GetUtcNow();
+            await RevokeFamilyAsync(
                 session.FamilyId, NormalizeReason(reason, "SESSION_FAMILY_REVOKED"),
-                timeProvider.GetUtcNow(), cancellationToken);
+                now, cancellationToken);
+        }
     }
 
     public async Task<LocalAccessValidation> ValidateAccessAsync(
@@ -371,7 +397,7 @@ public sealed class LocalSessionLifecycleService(
             session.UserId, session.CompanyId, session.BranchId, cancellationToken);
         if (!AuthorityMatches(session, authority))
         {
-            await sessions.RevokeFamilyAsync(
+            await RevokeFamilyAsync(
                 session.FamilyId, "SECURITY_CONTEXT_CHANGED", now, cancellationToken);
             return LocalAccessValidation.Deny(LocalSessionFailure.SecurityContextChanged);
         }
@@ -393,9 +419,25 @@ public sealed class LocalSessionLifecycleService(
     {
         var refreshToken = NewRefreshToken();
         var session = NewSession(authority, deviceId, familyId, refreshToken.Hash, now);
-        await sessions.CreateAsync(session, cancellationToken);
+        await sessions.CreateWithAuditAsync(
+            session, Audit("SESSION_CREATED", "LOGIN", now), cancellationToken);
         return Issue(session, authority, refreshToken.Raw, now);
     }
+
+    private Task RevokeFamilyAsync(
+        Guid familyId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+        => sessions.RevokeFamilyWithAuditAsync(
+            familyId, reason, now,
+            Audit("SESSION_FAMILY_REVOKED", reason, now), cancellationToken);
+
+    private static LocalSessionAuditIntent Audit(
+        string action,
+        string reason,
+        DateTimeOffset now)
+        => new(Guid.NewGuid(), action, reason, now);
 
     private LocalSessionTokenResult Issue(
         LocalSessionRecord session,

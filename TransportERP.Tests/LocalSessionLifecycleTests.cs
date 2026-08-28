@@ -193,6 +193,7 @@ public sealed class LocalSessionLifecycleTests
 
         Assert.Single(results.Where(x => x.Succeeded));
         Assert.Single(results.Where(x => x.Failure == LocalSessionFailure.RefreshReuseDetected));
+        Assert.Equal(2, fixture.Store.Family(login.Tokens.SessionFamilyId).Count);
         Assert.All(fixture.Store.Family(login.Tokens.SessionFamilyId), x => Assert.NotNull(x.RevokedAt));
     }
 
@@ -267,6 +268,50 @@ public sealed class LocalSessionLifecycleTests
 
         Assert.Equal(LocalSessionFailure.DeviceMismatch, refresh.Failure);
         Assert.True(fixture.Store.IsFamilyRevoked(login.Tokens.SessionId));
+    }
+
+    [Fact]
+    public async Task Session_mutations_commit_their_audit_intent_atomically()
+    {
+        var fixture = Fixture.Create();
+        var login = await fixture.Service.LoginAsync(fixture.Login());
+        var refresh = await fixture.Service.RefreshAsync(
+            new LocalRefreshRequest(login.Tokens!.RefreshToken, login.Tokens.DeviceId));
+        await fixture.Service.LogoutAsync(refresh.Tokens!.SessionId);
+
+        Assert.Equal(
+            ["SESSION_CREATED", "SESSION_REFRESH_ROTATED", "SESSION_LOGOUT"],
+            fixture.Store.AuditActions);
+    }
+
+    [Fact]
+    public async Task Audit_failure_leaves_login_session_state_unchanged()
+    {
+        var fixture = Fixture.Create();
+        fixture.Store.FailNextAudit = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Service.LoginAsync(fixture.Login()));
+
+        Assert.Empty(fixture.Store.AllSessions);
+        Assert.Empty(fixture.Store.AuditActions);
+    }
+
+    [Fact]
+    public async Task Audit_failure_leaves_refresh_rotation_state_unchanged()
+    {
+        var fixture = Fixture.Create();
+        var login = await fixture.Service.LoginAsync(fixture.Login());
+        fixture.Store.FailNextAudit = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.RefreshAsync(
+            new LocalRefreshRequest(login.Tokens!.RefreshToken, login.Tokens.DeviceId)));
+
+        var family = fixture.Store.Family(login.Tokens.SessionFamilyId);
+        Assert.Single(family);
+        Assert.Null(family[0].RevokedAt);
+        Assert.Null(family[0].ReplacedBySessionId);
+        Assert.Equal(["SESSION_CREATED"], fixture.Store.AuditActions);
     }
 
     private sealed class Fixture
@@ -372,6 +417,7 @@ public sealed class LocalSessionLifecycleTests
         private readonly object gate = new();
         private readonly Dictionary<Guid, LocalSessionRecord> sessions = new();
         private readonly Dictionary<string, Guid> refreshIndex = new(StringComparer.Ordinal);
+        private readonly List<LocalSessionAuditIntent> audits = [];
         private TaskCompletionSource? coordinatedReads;
         private int remainingCoordinatedReads;
 
@@ -381,12 +427,29 @@ public sealed class LocalSessionLifecycleTests
             remainingCoordinatedReads = 2;
         }
 
-        public Task CreateAsync(LocalSessionRecord session, CancellationToken cancellationToken = default)
+        public bool FailNextAudit { get; set; }
+
+        public IReadOnlyList<LocalSessionRecord> AllSessions
+        {
+            get { lock (gate) return sessions.Values.ToArray(); }
+        }
+
+        public IReadOnlyList<string> AuditActions
+        {
+            get { lock (gate) return audits.Select(x => x.Action).ToArray(); }
+        }
+
+        public Task CreateWithAuditAsync(
+            LocalSessionRecord session,
+            LocalSessionAuditIntent audit,
+            CancellationToken cancellationToken = default)
         {
             lock (gate)
             {
+                EnsureAuditCanCommit();
                 sessions.Add(session.SessionId, session);
                 refreshIndex.Add(session.RefreshTokenHash, session.SessionId);
+                audits.Add(audit);
             }
             return Task.CompletedTask;
         }
@@ -419,8 +482,9 @@ public sealed class LocalSessionLifecycleTests
                 return Task.FromResult(sessions.GetValueOrDefault(sessionId));
         }
 
-        public Task<LocalRefreshRotationResult> RotateAsync(
+        public Task<LocalRefreshRotationResult> RotateWithAuditAsync(
             LocalRefreshRotationRequest request,
+            LocalSessionAuditIntent audit,
             CancellationToken cancellationToken = default)
         {
             lock (gate)
@@ -430,21 +494,28 @@ public sealed class LocalSessionLifecycleTests
                     return Task.FromResult(new LocalRefreshRotationResult(LocalRefreshRotationStatus.Invalid));
                 if (old.RevokedAt.HasValue || old.ReplacedBySessionId.HasValue)
                 {
+                    EnsureAuditCanCommit();
                     RevokeFamilyCore(old.FamilyId, "REFRESH_REUSE", request.Now);
+                    audits.Add(audit with { Action = "SESSION_FAMILY_REVOKED", Reason = "REFRESH_REUSE" });
                     return Task.FromResult(new LocalRefreshRotationResult(
                         LocalRefreshRotationStatus.ReuseDetectedAndFamilyRevoked));
                 }
                 if (old.RefreshTokenExpiresAt <= request.Now)
                 {
+                    EnsureAuditCanCommit();
                     RevokeFamilyCore(old.FamilyId, "REFRESH_EXPIRED", request.Now);
+                    audits.Add(audit with { Action = "SESSION_FAMILY_REVOKED", Reason = "REFRESH_EXPIRED" });
                     return Task.FromResult(new LocalRefreshRotationResult(LocalRefreshRotationStatus.Expired));
                 }
                 if (!string.Equals(old.DeviceId, request.Replacement.DeviceId, StringComparison.Ordinal))
                 {
+                    EnsureAuditCanCommit();
                     RevokeFamilyCore(old.FamilyId, "DEVICE_MISMATCH", request.Now);
+                    audits.Add(audit with { Action = "SESSION_FAMILY_REVOKED", Reason = "DEVICE_MISMATCH" });
                     return Task.FromResult(new LocalRefreshRotationResult(LocalRefreshRotationStatus.DeviceMismatch));
                 }
 
+                EnsureAuditCanCommit();
                 sessions[old.SessionId] = old with
                 {
                     RevokedAt = request.Now,
@@ -453,31 +524,42 @@ public sealed class LocalSessionLifecycleTests
                 };
                 sessions.Add(request.Replacement.SessionId, request.Replacement);
                 refreshIndex.Add(request.Replacement.RefreshTokenHash, request.Replacement.SessionId);
+                audits.Add(audit);
                 return Task.FromResult(new LocalRefreshRotationResult(
                     LocalRefreshRotationStatus.Rotated, request.Replacement));
             }
         }
 
-        public Task RevokeSessionAsync(
+        public Task RevokeSessionWithAuditAsync(
             Guid sessionId,
             string reason,
             DateTimeOffset now,
+            LocalSessionAuditIntent audit,
             CancellationToken cancellationToken = default)
         {
             lock (gate)
+            {
+                EnsureAuditCanCommit();
                 if (sessions.TryGetValue(sessionId, out var session) && !session.RevokedAt.HasValue)
                     sessions[sessionId] = session with { RevokedAt = now, RevokeReason = reason };
+                audits.Add(audit);
+            }
             return Task.CompletedTask;
         }
 
-        public Task RevokeFamilyAsync(
+        public Task RevokeFamilyWithAuditAsync(
             Guid familyId,
             string reason,
             DateTimeOffset now,
+            LocalSessionAuditIntent audit,
             CancellationToken cancellationToken = default)
         {
             lock (gate)
+            {
+                EnsureAuditCanCommit();
                 RevokeFamilyCore(familyId, reason, now);
+                audits.Add(audit);
+            }
             return Task.CompletedTask;
         }
 
@@ -499,6 +581,15 @@ public sealed class LocalSessionLifecycleTests
         {
             foreach (var session in sessions.Values.Where(x => x.FamilyId == familyId).ToArray())
                 sessions[session.SessionId] = session with { RevokedAt = now, RevokeReason = reason };
+        }
+
+        private void EnsureAuditCanCommit()
+        {
+            if (!FailNextAudit)
+                return;
+
+            FailNextAudit = false;
+            throw new InvalidOperationException("Injected audit write failure.");
         }
     }
 }
