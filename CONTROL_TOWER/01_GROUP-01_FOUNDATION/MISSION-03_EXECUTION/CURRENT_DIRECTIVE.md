@@ -1,5 +1,20 @@
 # CURRENT DIRECTIVE — MISSION-03
 
+## v0.9 execution checkpoint routing
+
+`MISSION-03 OPEN — REPOSITORY-RESOLVABLE PREPARATION EXHAUSTED; ROUTE BOUNDED OWNER DECISIONS AND AUTHORIZED EXTERNAL EVIDENCE`
+
+Execution remains bound to `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` /
+tree `ea940e592cb11f5fff736e68055ebf77d2eece88`. No new Product baseline is
+proposed. The revised DBP-003A design is submitted for independent review, but
+rehearsal remains unauthorized. W3–W7 preparation is complete at the evidence/
+design level; their Product exits remain blocked by the exact owner/external
+items in `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. W8 is not entered.
+
+This routing note does not supersede any DB-GOV hold, grant Product/DB/
+Production authority, seal MISSION-03 or start MISSION-04. The detailed prior
+bounded execution directive remains below as preserved operational context.
+
 `CONTINUE — CODE-ONLY BASELINE ADOPTED; DBP-003 HOLD AT REHEARSAL ENTRY`
 
 ## Accepted execution basis

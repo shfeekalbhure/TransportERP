@@ -22,6 +22,27 @@ Control Tower independently revalidated and adopted the authority-neutral code-o
 
 No Entity, DbContext, Migration, Seed, Schema, data or Production credential was changed. Applying the existing ten migrations to an empty disposable database was verification only. The proposal is `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md`; the independent disposition and exact evidence are in `DBP-003_DB_GOV_REVIEW_DECISION.md`.
 
+## v0.9 resubmission preparation
+
+`DBP-003A_REHEARSAL_RESUBMISSION.md` addresses the repository-resolvable design
+review findings: exact proposed keys/checks/indexes, failure/lockout state,
+tenant boundary, serializable family locking and re-read, one-successor
+invariants, atomic caller-owned audit, SQLSTATE/constraint retry, ambiguous
+commit recovery and failure injection. Read-only inventory/reconciliation SQL
+and a safe-copy/backup/restore runbook are prepared.
+
+This does not supersede the independent HOLD. Actual PasswordHash format,
+authorized safe-copy outputs/backup restore, live roles/RLS and DBP-002/006
+dependencies remain absent. Therefore:
+
+- `DBP-003A = RESUBMITTED DESIGN — AWAITING INDEPENDENT REVIEW; REHEARSAL NOT AUTHORIZED`;
+- `DBP-003B/C = DEFERRED — DEPENDS ON DBP-002/006`;
+- permitted Entity/DbContext/Migration/persistent-adapter/data execution: `NONE`.
+
+W3/W4/W6 revalidation additionally confirms DBP-004/005/006/007/008 remain
+blocked at proposal/external-authority gates. Reporting ownership under DBP-009
+is a bounded plan-deviation item, not an execution authority.
+
 ## DBP-003 review boundary
 
 - Reviewed execution head/tree: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / `ea940e592cb11f5fff736e68055ebf77d2eece88`.
@@ -30,3 +51,7 @@ No Entity, DbContext, Migration, Seed, Schema, data or Production credential was
 - `NO NEW PERSISTENCE CHANGE` in Git; `DISPOSABLE TEST DATABASE MUTATION OCCURRED AS PART OF VALIDATION` in CI.
 - Overall: `DBP-003 = HOLD AT REHEARSAL ENTRY`.
 - No `OWNER DECISION REQUIRED`; all current next actions are proposal/evidence/rehearsal preparation and are non-destructive.
+
+The v0.9 end-to-end assessment now raises bounded non-DB business decisions for
+accounting, Offline actions and client delivery/signing. It does not raise or
+self-decide any DB-GOV approval.

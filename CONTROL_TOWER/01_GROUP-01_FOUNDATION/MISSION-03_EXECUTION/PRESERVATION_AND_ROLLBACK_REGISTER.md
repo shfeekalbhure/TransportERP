@@ -45,3 +45,18 @@ The entries below document recovery paths only. The candidate is adopted for bou
 - W2 A1/B1/C1 rollback: from `04a875a...`, revert `04a875a...` only to remove manual dispatch capability if required, then revert `a157c34d6767deeb5544adf456a2a36946a599a9` to restore the W1 code tree. No schema/data rollback exists. Stop and preserve evidence if rollback would re-open a security exposure in an environment where this branch has been deployed.
 - W2-B2B code-only rollback: normally revert `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, restoring exact adopted baseline `9c5b7a1...`. The API never registered the new lifecycle or a temporary store, so rollback has no token/session/data cleanup. If later DBP-003 work activates local sessions, use its feature-disable/family-revoke/forward-recovery path instead of destructive schema rollback.
 - Recovery source remains authoritative master plus the verified preservation bundle. No merge, deletion, force-push or history rewrite was performed.
+
+## v0.9 preparation preservation
+
+- Product execution head/tree remained exactly `cc67ad2...` / `ea940e59...`;
+  no Product or workflow file changed.
+- No Entity, DbContext, Migration, schema, seed, data, Production configuration,
+  credential or secret changed.
+- PR #69, P2-D, legacy design identities, historical failures, current migration
+  lineage and all client scaffolds were inspected only and retained.
+- New SQL artifacts are explicitly read-only inventory/reconciliation templates
+  under MISSION-03 governance. They were not run against any database.
+- W8 was not entered; no move, rename, delete, branch cleanup or structural
+  refactor occurred.
+- Rollback for this checkpoint is a normal revert of the governance-only v0.9
+  commit. Product/database rollback is not applicable.

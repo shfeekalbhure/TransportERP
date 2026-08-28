@@ -1,14 +1,14 @@
 # CONTROL TOWER STATUS
 
 - Snapshot Asia/Aden: `2026-08-28`
-- Workspace: `CONTROL TOWER — MISSION-03 IN PROGRESS / DBP-003 REVIEWED`
+- Workspace: `CONTROL TOWER — MISSION-03 IN PROGRESS / END-TO-END GATE CHECKPOINT SUBMITTED`
 - Branch: `governance/control-tower-20260828`
 - Governance update scope: `CONTROL_TOWER files only`
 - Group 01: `IN PROGRESS`
 - Mission 01 Deep Audit: `SEALED — COMPLETE`
 - MASTER/GATE v2.0: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - MISSION-02: `v1.2 SEALED — DELIVERED TO CONTROL TOWER — STOP`
-- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; W2-B2B CODE-ONLY ADOPTED AT cc67ad2; DBP-003 HOLD AT REHEARSAL ENTRY`
+- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; W2-B2B CODE-ONLY ADOPTED; REPOSITORY-RESOLVABLE W2-W8 PREPARATION EXHAUSTED; OWNER/EXTERNAL GATES`
 - MISSION-04: `WAITING — MISSION-03 NOT SEALED`
 - MISSION-05: `WAITING`
 - Database Governance DB-GOV-001: `ACTIVE — DBP-003A REVISE BEFORE REHEARSAL; DBP-003B/C DEFERRED; NO MIGRATION AUTHORITY`
@@ -62,3 +62,14 @@ Effect:
 - External workspace/local-only inventory remains unknown for destructive/merge/delete operations.
 
 MISSION-03 may continue from `cc67ad2...` into independently satisfied non-destructive packages and may revise DB-GOV evidence/proposals without executing prohibited Entity/DbContext/Migration/schema/persistent-adapter/data changes. No DBP-003 package is open for rehearsal authoring. No `OWNER DECISION REQUIRED` is raised. Before each material Product commit, the worker must re-fetch the latest governance directive. MISSION-04 must not start before `MISSION-03 = SEALED — DELIVERED TO CONTROL TOWER`.
+
+## v0.9 completion gate
+
+The execution team exhausted reachable repository/history evidence and prepared
+DBP-003A plus W3–W8 design/gate packages without Product or DB mutation. The
+checkpoint now raises bounded owner decisions for accounting posting, per-action
+Offline authority and client delivery/signing scope, plus authorized external
+PasswordHash/safe-copy/audit/business/Kurrasa/Ticketing/release/privacy evidence.
+See `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. The earlier statement that no
+owner decision was raised is historical to v0.8 and is superseded for this
+checkpoint only. MISSION-03 remains open and MISSION-04 remains waiting.

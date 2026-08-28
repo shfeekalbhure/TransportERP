@@ -51,5 +51,14 @@
 | `M03-EV-047` | independent DB-GOV raw-log/artifact review | run `33191269475`; jobs `98917044706`/`98917044568`; artifacts `9693887564`/`9693865549` | exact SHA/tree, PostgreSQL 18.6, ten existing migrations/no drift, 146/146 and HTTP 401 confirmed; client probes are Library-mode; warnings/errors classified |
 | `M03-EV-048` | exact DBP-003 source/model/dependency review | `9c5b7a1...cc67ad2`; User/Branch/DbContext/migration lineage/PasswordHash/session store | no persistence delta; User tenant FKs are not composite; hash policy and durable PostgreSQL rotation/audit proof absent |
 | `M03-EV-049` | DBP-003 independent decision | `DBP-003_DB_GOV_REVIEW_DECISION.md` | `003A REVISE BEFORE REHEARSAL; 003B/C DEFERRED; HOLD AT REHEARSAL ENTRY`; B2B code-only baseline adopted |
+| `M03-EV-050` | latest ref rebind before end-to-end continuation | governance `cafcab0...`; execution `cc67ad2...`; master `2ec6ccc...` | exact refs unchanged; execution workspace clean/detached |
+| `M03-EV-051` | PasswordHash repository/history exhaustion | current tree, all reachable history/docs and PR69 comparison | only varchar(500)/test fixtures on current line; W1 `AUTH-REUSE-PENDING`; no authoritative verifier/format |
+| `M03-EV-052` | DBP-003A design resubmission and read-only safe-copy tooling | v0.9 DBP-003A resubmission/runbook/SQL | repository-resolvable design gaps addressed; no rehearsal/DB execution authority claimed |
+| `M03-EV-053` | W3 source/authority revalidation | current voucher/journal/Waybill/audit/Sync source and PR69 | status-only posting, non-atomic audit and incomplete hash confirmed; bounded accounting choice isolated |
+| `M03-EV-054` | W4 source/authority revalidation | current Sync source, P1 contract, FLOW01 authority and PR69 | generic intake/no worker; current Offline authority default closed; action matrix external |
+| `M03-EV-055` | W5 executable truth inventory | client trees/csproj/test references and run 33191269475 | Desktop/Mobile are Libraries/scaffolds; no auth/storage/offline runtime |
+| `M03-EV-056` | W6 business authority revalidation | current Shipping, P2-D, Ticketing search, screen registries/Kurrasa references | current ends at DEPART; Ticketing absent; screen authority conflict/external inputs confirmed |
+| `M03-EV-057` | W7/W8 readiness revalidation | workflows/project graph/release/privacy source and sealed ordering | release/recovery/supply/privacy gaps confirmed; W8 not entered and no cleanup authority |
+| `M03-EV-058` | end-to-end completion gate assessment | `MISSION03_COMPLETION_GATE_ASSESSMENT.md` | true bounded decisions and authorized external evidence prevent legal W2-W7 exit/final seal |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

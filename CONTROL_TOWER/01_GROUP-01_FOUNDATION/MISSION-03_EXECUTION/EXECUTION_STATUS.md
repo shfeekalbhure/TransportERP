@@ -2,9 +2,9 @@
 
 - Mission: `MISSION-03 — EXECUTION AND REMEDIATION`
 - Directive: `START — EXECUTION UNDER SEALED MISSION-02 PLAN`
-- Status: `IN PROGRESS — OPEN — NOT SEALED; W2-B2B CODE-ONLY ADOPTED; DBP-003 HOLD AT REHEARSAL ENTRY`
-- Checkpoint: `MISSION-03-W2-B2B-CODE-ONLY-CHECKPOINT-v0.7`
-- Last evidence time: `2026-08-28T16:44:49Z` / `2026-08-28T19:44:49+03:00`
+- Status: `IN PROGRESS — OPEN — NOT SEALED; REPOSITORY-RESOLVABLE W2-W8 PREPARATION EXHAUSTED; EXTERNAL/OWNER GATES BLOCK COMPLETION`
+- Checkpoint: `MISSION-03-END-TO-END-GATE-ASSESSMENT-v0.9`
+- Last evidence time: `2026-08-28T17:58:45Z` / `2026-08-28T20:58:45+03:00`
 - Authoritative product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Authoritative tree: `516247dd320cfc0ef71607cd3d8e7946fe9375ab`
 - Execution branch: `codex/mission-03-execution-20260828`
@@ -43,3 +43,23 @@ AUTH-001 selected local application authority. From exact adopted baseline `9c5b
 Exact-head disposable run `33191269475` completed successfully: 146/146 tests, all ten existing migrations on PostgreSQL 18.6 with no model drift, API protected boundary HTTP 401, Desktop build/probe and Mobile Admin/Customer/Driver builds/probes. The diff from `9c5b7a1...` is three new code/test files only. No Entity, DbContext, Migration, Seed, Schema, data or Production configuration change exists.
 
 `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` has been independently reviewed. Decision: DBP-003A `REVISE BEFORE REHEARSAL`; DBP-003B/C `DEFERRED — DEPENDS ON DBP-002/006`; overall `DBP-003 = HOLD AT REHEARSAL ENTRY`. No Entity/DbContext/Migration/schema/persistent-adapter authoring is open. `W2_C2_PREPARATION.md` and `W2_F2_TEST_MATRIX.md` remain inputs only. W2-C2/D/E and the persistence/client portions of F2 remain separately blocked; MISSION-03 is not sealed.
+
+## End-to-end continuation checkpoint
+
+The current directive, complete sealed MISSION-02 package, all execution/DB-GOV/
+test/preservation registers, ADRs, owner decisions and reachable source/history
+were re-read at governance `cafcab0...` and execution `cc67ad2...`. No newer
+Product or governance ref was observed.
+
+DBP-003A's repository-resolvable PostgreSQL transaction, one-successor,
+atomic-audit, retry, failure-injection and safe-copy design defects are addressed
+in `DBP-003A_REHEARSAL_RESUBMISSION.md`; read-only inventory/reconciliation and
+the rehearsal runbook are prepared. PasswordHash and actual safe-copy evidence
+remain externally inaccessible, so rehearsal authority is still absent.
+
+W3–W7 source/history revalidation and non-destructive preparation are recorded
+without entering their unmet Product gates. W8 was not entered and no cleanup
+was performed. `MISSION03_COMPLETION_GATE_ASSESSMENT.md` isolates the true
+bounded accounting/Offline/client decisions and the exact authorized external
+evidence required. No Product, Entity, DbContext, Migration, schema, seed, data,
+Production configuration or secret changed in this checkpoint.

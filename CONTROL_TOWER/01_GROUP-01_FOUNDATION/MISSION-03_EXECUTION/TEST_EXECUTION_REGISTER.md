@@ -170,3 +170,17 @@ The test-only atomic store validates the code contract and is not registered by 
 - Raw PostgreSQL errors were reviewed: missing migration history is expected on the initial empty database; unique/serialization and append-only errors arise from bounded negative/concurrency tests and the full job exits success. They are not DBP-003 session-store evidence.
 - The B2B concurrency test uses `InMemoryAtomicSessionStore` and a process-local lock. No PostgreSQL session adapter, transaction or atomic audit path was tested.
 - DB-GOV disposition: code-only evidence `PASS`; `DBP-003 = HOLD AT REHEARSAL ENTRY`.
+
+## v0.9 governance-only continuation
+
+- Product SHA/tree remained `cc67ad2...` / `ea940e59...`; no Product delta was
+  created, so prior exact-head run `33191269475` remains factual only for the
+  already adopted code-only baseline.
+- No PASS was carried forward to DBP-003 persistence, W3–W8 or executable
+  clients.
+- `git diff --check` and detached governance-file SHA-256 validation are the
+  applicable checks for this preparation checkpoint.
+- The DBP003A SQL files are read-only templates and were `NOT RUN` because no
+  named authorized safe copy or rehearsal authorization exists.
+- Final MISSION-03 regression is `BLOCKED — W2-W7 EXIT GATES NOT SATISFIED`; it
+  was not represented by reusing an earlier run.

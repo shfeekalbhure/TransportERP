@@ -1,7 +1,7 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T17:23:48Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T20:23:48+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T17:58:45Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T20:58:45+03:00`
 - `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
 - `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
@@ -10,10 +10,10 @@
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | IN PROGRESS | DBP-003 independent review complete; governance checkpoint recorded | resume on revised DBP-003A or other admissible MISSION-03 evidence | N/A |
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | revised DBP-003A and end-to-end completion-gate checkpoint submitted | independently review resubmission and route bounded owner/external evidence | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | B2B code-only head `cc67ad2...` independently adopted; DBP-003 review issued | `CONTINUE NON-DESTRUCTIVE WORK; DBP-003 HOLD AT REHEARSAL ENTRY` | NOT SEALED; DB-GOV checkpoint received |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | B2B code-only retained; repository-resolvable W2-W8 preparation exhausted; external/owner gates isolated | `DBP-003 HOLD RETAINED; ROUTE OWNER/EXTERNAL GATES` | NOT SEALED; v0.9 checkpoint submitted |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
@@ -35,3 +35,7 @@
 | W2-F2 | `BLOCKED` | full security matrix depends on B2B/C2/D/E |
 
 The exact `9c5b7a1...cc67ad2...` diff adds code/contracts/tests only and contains no Entity, DbContext model, Migration, schema, seed, data repair, or Production config change. `DBP-003 = HOLD AT REHEARSAL ENTRY`; DBP-002/003/006 remain blocked for material persistence changes. PR #69 remains open/Draft/unmerged candidate evidence only. No `OWNER DECISION REQUIRED` exists for the current non-destructive next actions. MISSION-04 remains WAIT.
+
+The v0.9 checkpoint preserves those facts and adds the bounded decisions/external
+evidence in `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. No new Product SHA, DB
+authority or seal is asserted.

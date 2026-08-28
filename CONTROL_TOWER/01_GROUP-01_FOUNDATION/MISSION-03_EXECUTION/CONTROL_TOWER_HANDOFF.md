@@ -1,6 +1,6 @@
-# MISSION-03 DB-GOV Checkpoint to Control Tower
+# MISSION-03 End-to-End Gate Checkpoint to Control Tower
 
-- Handoff type: `DBP-003 INDEPENDENT REVIEW DECISION — NOT FINAL HANDOFF`
+- Handoff type: `REPOSITORY-RESOLVABLE WORK EXHAUSTED — OWNER/EXTERNAL GATES — NOT FINAL HANDOFF`
 - Mission: `IN PROGRESS — OPEN — NOT SEALED`
 - Product baseline: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Execution branch/head: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
@@ -46,4 +46,29 @@ Run `33191269475` passed both jobs, 146/146 tests, the existing ten migrations/n
 7. Preserve PR #69 as open/Draft/unmerged evidence only; do not merge/rebase/cherry-pick/force-push.
 8. Do not start MISSION-04 until MISSION-03 is validly sealed and delivered.
 
-This checkpoint adopts the B2B code-only head and issues a negative DBP-003 rehearsal gate with exhaustively verified blockers. It is not a migration authorization, full W2 exit, mission seal, master merge, or MISSION-04 handoff.
+## v0.9 completion-gate handoff
+
+MISSION-03 continued through the remaining sealed waves at preparation/gate
+level without crossing their unmet dependencies. DBP-003A was revised with an
+executable PostgreSQL transaction design and read-only safe-copy/reconciliation
+tooling, but no rehearsal is authorized and no DB/schema/adapter work occurred.
+
+W3–W7 source and authority gaps are now package-specific, and W8 remains
+unentered. The exact bounded owner decisions and external evidence are in
+`MISSION03_COMPLETION_GATE_ASSESSMENT.md`. Principal gates are:
+
+- accounting posting model/mappings/SoD/FX/period authority;
+- accepted per-action Offline matrix;
+- client delivery/signing scope;
+- authorized PasswordHash and safe-copy/live-role/audit/accounting evidence;
+- canonical Kurrasa/Ticketing/post-departure Shipping inputs;
+- deploy/recovery/signing/license/privacy/KMS evidence.
+
+Control Tower must route the bounded owner decisions and external evidence,
+then independently review the revised DBP packages. MISSION-03 cannot issue a
+final exact-head regression or seal until those wave exits are met. MISSION-04
+remains WAIT.
+
+This checkpoint preserves the B2B code-only head and the negative DBP-003
+rehearsal gate. It is not a migration authorization, full W2 exit, mission seal,
+master merge, or MISSION-04 handoff.
