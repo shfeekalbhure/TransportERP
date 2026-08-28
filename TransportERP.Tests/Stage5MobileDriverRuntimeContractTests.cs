@@ -128,13 +128,16 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("OBSERVATION_UNAVAILABLE", script, StringComparison.Ordinal);
         Assert.Contains("driver.wait_result_code(\"driver_action_result\", \"OFFLINE_ACTIVATED\")", script,
             StringComparison.Ordinal);
-        foreach (var safeResultDiagnostic in new[]
-                 {
-                     "RESULT_COUNT_", "RESULT_INITIAL_PROMPT", "RESULT_EMPTY", "RESULT_OTHER",
-                     "MODE_COUNT_", "MODE_CLOSED", "MODE_READY", "MODE_OTHER",
-                     "SIGN_IN_COUNT_", "SIGN_IN_ENABLED_"
-                 })
-            Assert.Contains(safeResultDiagnostic, script, StringComparison.Ordinal);
+        Assert.Contains("RESULT_COUNT_{result_count}:RESULT_{result_state}:", script,
+            StringComparison.Ordinal);
+        Assert.Contains("MODE_COUNT_{mode_count}:MODE_{mode_state}:", script,
+            StringComparison.Ordinal);
+        Assert.Contains("SIGN_IN_COUNT_{sign_in_count}:SIGN_IN_ENABLED_{sign_in_state}", script,
+            StringComparison.Ordinal);
+        Assert.Contains("else \"INITIAL_PROMPT\"", script, StringComparison.Ordinal);
+        Assert.Contains("else \"EMPTY\"", script, StringComparison.Ordinal);
+        Assert.Contains("mode_state = match.group(1) if match is not None else \"OTHER\"", script,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("{phase}:{value}", script, StringComparison.Ordinal);
         Assert.Contains("UI_TEXT_VERIFY_ELEMENT_COUNT_INVALID", script, StringComparison.Ordinal);
         Assert.Contains("UI_TEXT_VERIFY_{text_state}_{focus_state}", script,
