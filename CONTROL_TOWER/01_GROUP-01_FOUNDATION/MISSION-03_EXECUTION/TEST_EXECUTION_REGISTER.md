@@ -65,3 +65,66 @@ Historical exact-SHA success is retained as evidence but does not close T-000's 
 | `T-100/regression` | complete suite | `PASS — 125/125; 0 failed/skipped` |
 | `T-100/migrations` | model drift + 10 existing migrations | `PASS` |
 | `T-100/API/clients` | API boot/HTTP plus Desktop/Mobile probes | `PASS` |
+
+## W2 code-only exact-head verification — run 33183870737
+
+- Exact SHA/tree/parent: `04a875a2973c1ed0f3c05457707e1c7eec7b2823` / `a134646ce714dcebf976e3f4cc532d8c0055e4e6` / security commit `a157c34d6767deeb5544adf456a2a36946a599a9`.
+- Security commit parent: W1 head `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`.
+- Environment: GitHub-hosted Ubuntu/Windows; .NET SDK 10.0.400; disposable PostgreSQL 18.6; synthetic test data only.
+- Linux artifact: `9690897815`, SHA-256 `5226683ec74bda978fd98eddf93fb6776ae77a15db00371ea219799819339635`.
+- Desktop artifact: `9690854262`, SHA-256 `8c61095c410f7a8554264a1d4412728cc1905782fd174834d68c14ffe57b871c`.
+
+| Test ID | Exact-head evidence | Result |
+|---|---|---|
+| `T-210/Sync membership` | HTTP cross-company claim vs stored user; branch mismatch service negative | `PASS` |
+| `T-200/persistent RBAC` | claim-only without DB grant denied; explicit DB deny after grant denied; valid persistent grant retained | `PASS` |
+| `T-220/lifecycle owner` | different user/device denied for transition, retry, conflict create/resolve and foreign replacement | `PASS` |
+| `T-220/pending retries` | query now predicates Company + User + Device + optional Branch | `PASS BY FULL REGRESSION; dedicated expansion remains in F2` |
+| `T-W2/regression` | `dotnet test TransportERP.Tests/... --configuration Release --no-build` | `PASS — 128/128; 0 failed/skipped` |
+| `T-W2/migrations` | EF list, pending-model check, database update | `PASS — existing 10/10; no pending model change` |
+| `T-W2/API/clients` | API protected boundary HTTP 401; Desktop Windows and Mobile x3 builds/probes | `PASS` |
+
+Warnings were non-blocking existing runner/nullable warnings; no W2 test or build failure was hidden.
+
+## W2 A2/B2A first attempt — run 33184771338
+
+- Exact SHA/tree/parent: `d1c0a2571bf3d240b9134e8614186acd70a6bd5d` / `59ac61e5e22a7bb8466575aa1f64530b2ef65581` / `04a875a...`.
+- Core job `98894801318`: `FAIL` in `Build core runtime, tests, API, and Mobile probes` with CS0246 at `CurrentRequestSecurity.cs`; `OperationContext` was imported from the wrong namespace.
+- Desktop job `98894801198`: `PASS`.
+- Tests/migration/API: `SKIPPED/BLOCKED BY BUILD`; no PASS was claimed.
+- DB mode: disposable PostgreSQL 18.6 container; the build failed before migration application or test Product mutations and the container was removed.
+- Recovery: no history rewrite or force push. The one-line import correction was committed at `d740740...` and the full matrix was rerun. No partial DB/data state remained.
+
+`EXECUTION FAILED — CORRECTED AND REVERIFIED`; the failed run remains retained evidence.
+
+## W2 A2/B2A corrected exact-head verification — run 33184994576
+
+- Exact SHA/tree/parent: `d74074045491ed2259c4ed3f411f84b0bd82356a` / `071d4adf9a5c96be65ad7fe1681db1906d8ccf94` / `d1c0a257...`.
+- Environment: GitHub-hosted Ubuntu 24.04 and Windows; .NET SDK 10.0.400; disposable PostgreSQL 18.6; synthetic test data only.
+- Core job `98895572695`: `PASS`; Desktop job `98895572296`: `PASS`.
+- Linux artifact: `9691350327`, SHA-256 `dddbdbbf301816fc55f411d3f6a62ff68810c4bff2abdb1b1b110f2e984a8a47`.
+- Desktop artifact: `9691310607`, SHA-256 `d66ed26704c459e8b3f688ff0dd582e57dd944b10dbb80cb95ad068e0744db62`.
+
+| Test ID | Exact-head evidence | Result |
+|---|---|---|
+| `T-210/API stored scope` | all three Product API modules use one resolver; foreign active-user/branch claims are denied before Product service execution | `PASS` |
+| `T-200/API persistent RBAC` | claim-only user without persistent branch grant denied; valid token hint plus grant allowed | `PASS` |
+| `T-W2/regression` | complete Release test suite against PostgreSQL | `PASS — 128/128; 0 failed/skipped` |
+| `T-W2/migrations` | EF list, pending-model check, database update | `PASS — existing 10/10; no pending model change` |
+| `T-W2/API boot` | built API protected-boundary probe | `PASS — HTTP 401 expected` |
+| `T-W2/clients` | Desktop Windows plus Mobile Admin/Customer/Driver builds/probes | `PASS` |
+
+The run emitted existing analyzer/runner warnings (xUnit2031, Desktop nullable and Node action deprecation); none was a failed gate. No Entity, DbContext, Migration, Seed, Schema or data change was present.
+
+## W2 final cross-company exact-head verification — run 33185419917
+
+- Exact SHA/tree/parent: `9c5b7a12e59d2c42e682717b8e90c491f8699b96` / `452b37f1e2c68d9f3dae6e18f1cf1b67645105af` / `d740740...`.
+- Delta: one explicit PostgreSQL API assertion that user A carrying company/branch B claims receives HTTP 403; no Product or DB model change.
+- Core job `98897056951`: `PASS`; Desktop job `98897057221`: `PASS`.
+- Linux artifact: `9691527827`, SHA-256 `d24109795a2c4f9aff1d82465d7178f2f4eba410b8bd68f86edc504d1ae8357d`.
+- Desktop artifact: `9691490016`, SHA-256 `4010eeee6c1e4eb504b27e9b14a5af94851528d6ee19c7c582c9f6806f243c1b`.
+- Complete suite: `PASS — 128/128; 0 failed/skipped`.
+- EF: all ten existing migrations applied to disposable PostgreSQL 18.6; `No changes have been made to the model since the last migration`.
+- API: protected boot probe returned expected HTTP 401. Desktop and Mobile Admin/Customer/Driver builds/probes passed.
+
+This is the current exact-head W2 evidence. Earlier successful and failed runs remain historical evidence and are not substituted for it.

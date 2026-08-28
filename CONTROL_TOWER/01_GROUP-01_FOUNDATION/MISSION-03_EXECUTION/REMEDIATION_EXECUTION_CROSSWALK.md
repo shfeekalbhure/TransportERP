@@ -5,9 +5,9 @@
 | `REM-000` | W0 | `CLOSED FOR ISOLATED EXECUTION / GLOBAL UNKNOWN` | repository-visible refs preserved and recovery-tested; external workspace ownership remains access-blocked but no external asset is touched |
 | `REM-001` | W0 | `VERIFIED LOCALLY/DISPOSABLE` | exact-lineage run 33181045881 covers restore/build/PostgreSQL migrations/124 tests/API boot/Desktop/Mobile probes with retained artifacts |
 | `REM-100` | W1 | `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION` | mapper fixed at 069a311; 125/125 pass including focused persist/reload Volume and shipping allocation tests; no DB/data change |
-| `REM-200` | W2 | `BLOCKED` | DEP-005/006 and IdP authority absent |
-| `REM-210` | W2 | `BLOCKED` | tenant cardinality ADR absent; DBP-002 is design-intake only and execution-blocked |
-| `REM-220` | W2 | `BLOCKED` | owner/override caller inventory absent; DBP-003/006 execution gates blocked |
+| `REM-200` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | B1/B2A technical evidence exists, but superseding Control Tower hold prevents adoption; AUTH-001/DBP-003 remain |
+| `REM-210` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | A1/A2 technical evidence exists, but superseding Control Tower hold requires independent ADR verification/rebinding; DBP-002 remains |
+| `REM-220` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | C1 technical evidence exists; registry/PoP/override/DBP-003/006 remain blocked and candidate adoption is held |
 | `REM-300` | W3 | `BLOCKED` | UoW/module-ownership ADR absent |
 | `REM-310` | W3 | `BLOCKED` | canonical accounting authority and DBP-005 absent |
 | `REM-320` | W3 | `BLOCKED` | UoW ADR, legacy samples and DBP-004 absent |
@@ -21,6 +21,6 @@
 | `REM-720` | W7 | `BLOCKED` | deploy/upgrade/rollback/restore topology absent |
 | `REM-730` | W7 | `BLOCKED` | Production/legal/privacy evidence absent |
 | `REM-800` | W8 | `BLOCKED` | W8 parity entry gate not reached |
-| `REM-900` | W0/W7 | `IN PROGRESS` | provenance retained; EF tooling execution remains blocked by absent SDK |
+| `REM-900` | W0/W7 | `PARTIAL — DISPOSABLE TOOLCHAIN VERIFIED` | provenance retained; .NET/EF restore, migration apply/model-drift check and exact-head tests passed in disposable CI, while later release/SBOM/deploy controls remain W7 work |
 
 No finding is marked closed by this checkpoint.

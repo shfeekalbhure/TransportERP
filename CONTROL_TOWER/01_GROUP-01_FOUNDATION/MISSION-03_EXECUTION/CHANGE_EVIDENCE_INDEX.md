@@ -24,6 +24,20 @@
 | `M03-EV-020` | W0 runtime results | .NET SDK 10.0.400; PostgreSQL 18.6; Windows and Ubuntu runners | restore/build PASS; 10 migrations PASS; 124/124 tests; API listening + HTTP 401; Desktop and Mobile x3 probes PASS |
 | `M03-EV-021` | REM-100 exact diff | before `a48b680...`; after `069a311...`; tree `561d5862...` | one mapper assignment plus one focused PostgreSQL test; no DB/migration change |
 | `M03-EV-022` | REM-100 exact-head verification | run `33181376288`; Linux artifact `9689871882`, SHA-256 `a68e0948...` | 125/125 PASS; focused Volume and split allocation/shipping tests PASS; API/client/migration gates PASS |
-| `M03-EV-023` | W2 dependency revalidation | M02 dependencies/waves plus central DB register at `ebe74e0...` | DEP-005/006/007 and DBP-002/003 remain blocked; no W2 implementation authorized |
+| `M03-EV-023` | W2 dependency revalidation at W1 checkpoint | M02 dependencies/waves plus central DB register at `ebe74e0...` | recorded the then-current entry blockers; superseded for DEP-005/006/007 by M03-EV-024..028, while DBP-002/003 mutation gates remain blocked |
+| `M03-EV-024` | W2 current-source/migration and PR69 comparative review | exact before `069a311...`; PR69 `601f2d1...` | Company root/Branch child/current singular user assignment; claim-driven auth and absent registry/PoP re-proved |
+| `M03-EV-025` | ADR-W2-001/002/003 and package plan/matrix | M03 governance checkpoint | DEP-005 resolved for design; DEP-006/007 resolved for bounded implementation; AUTH-001 and DB gates isolated |
+| `M03-EV-026` | W2 code-only exact diff | security commit `a157c34...`; parent `069a311...`; tree `2c02f7a...` | five source/test files; no Entity/DbContext/Migration/Seed/Schema/data change |
+| `M03-EV-027` | W2 exact-head run | run `33183870737`; head/tree `04a875a...` / `a134646c...` | both jobs success; 128/128; ten migrations/no model drift; API/Desktop/Mobile pass |
+| `M03-EV-028` | W2 retained artifacts | Linux `9690897815`; Desktop `9690854262` | SHA-256 `5226683e...`; `8c61095c...` |
+| `M03-EV-029` | W2 API-wide authority-neutral diff | commit `d1c0a257...`; parent `04a875a...`; tree `59ac61e5...` | shared resolver plus three API modules and PostgreSQL/contract test support; no DB model change |
+| `M03-EV-030` | W2 failed first A2/B2A run | run `33184771338`; head `d1c0a257...`; core job `98894801318` | `EXECUTION FAILED` at compile: missing OperationContext namespace; Desktop passed; no migration/test/API; disposable DB discarded |
+| `M03-EV-031` | bounded corrective commit | `d740740...`; parent `d1c0a257...`; tree `071d4adf...` | one import corrected; no schema/data delta |
+| `M03-EV-032` | W2 corrected-head run | run `33184994576`; head/tree `d740740...` / `071d4adf...` | both jobs success; 128/128; ten migrations/no model drift; API/Desktop/Mobile pass |
+| `M03-EV-033` | corrected-head retained artifacts | Linux `9691350327`; Desktop `9691310607` | SHA-256 `dddbdbbf...`; `d66ed267...` |
+| `M03-EV-034` | explicit API cross-company negative | commit `9c5b7a1...`; parent `d740740...`; tree `452b37f1...` | user A with company/branch B claims is denied; test-only delta, no DB model change |
+| `M03-EV-035` | W2 final exact-head run | run `33185419917`; head/tree `9c5b7a1...` / `452b37f1...` | both jobs success; 128/128; ten migrations/no model drift; API/Desktop/Mobile pass |
+| `M03-EV-036` | final retained artifacts | Linux `9691527827`; Desktop `9691490016` | SHA-256 `d2410979...`; `4010eeee...` |
+| `M03-EV-037` | superseding governance fetch | worker base `b3c5787...`; newly observed Control Tower `c274f9a...` | newer CURRENT_DIRECTIVE imposes W2 STOP/REPLAN; Product work stopped and candidate lineage preserved |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

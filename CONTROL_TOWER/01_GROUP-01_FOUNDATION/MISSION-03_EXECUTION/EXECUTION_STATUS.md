@@ -2,20 +2,25 @@
 
 - Mission: `MISSION-03 — EXECUTION AND REMEDIATION`
 - Directive: `START — EXECUTION UNDER SEALED MISSION-02 PLAN`
-- Status: `IN PROGRESS — W0 EXIT CLOSED FOR ISOLATED EXECUTION; W1 IMPLEMENTED; W2 ENTRY BLOCKED`
-- Checkpoint: `MISSION-03-W1-CHECKPOINT-v0.2`
-- Last evidence time: `2026-08-28T14:43:25Z` / `2026-08-28T17:43:25+03:00`
+- Status: `IN PROGRESS — W1 PRESERVED; W2 CANDIDATE PRESERVED; CONTROL TOWER HOLD — REVALIDATION REQUIRED`
+- Checkpoint: `MISSION-03-W2-REVALIDATION-HOLD-CHECKPOINT-v0.5`
+- Last evidence time: `2026-08-28T15:31:53Z` / `2026-08-28T18:31:53+03:00`
 - Authoritative product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Authoritative tree: `516247dd320cfc0ef71607cd3d8e7946fe9375ab`
 - Execution branch: `codex/mission-03-execution-20260828`
 - Exact execution checkout: `/workspace/scratch/2cc4cde701d9/TransportERP-M03-EXACT` (detached at the remote execution-branch head)
-- Execution head: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`
-- Execution tree: `561d5862916c76432aa845d20ca85809e4430fde`
-- Governance branch observed: `governance/control-tower-20260828@ebe74e0ff889a728351fb9e2727062ce413e44af`
+- Execution head: `9c5b7a12e59d2c42e682717b8e90c491f8699b96`
+- Execution tree: `452b37f1e2c68d9f3dae6e18f1cf1b67645105af`
+- Security implementation commits: `a157c34d6767deeb5544adf456a2a36946a599a9`, `d1c0a2571bf3d240b9134e8614186acd70a6bd5d`, `d74074045491ed2259c4ed3f411f84b0bd82356a`, `9c5b7a12e59d2c42e682717b8e90c491f8699b96`
+- Governance execution base initially observed: `b3c57873c609e6209dcebcb0de6751ce8963c39a`; superseding hold observed before handoff: `c274f9ab66a507e59eaf31cd850d88d9e1ff17d2`
 - PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f` — `UNMERGED EVIDENCE ONLY`
-- Product files changed: `2` (`ConcurrencySafeWaybillRepository.cs`, one PostgreSQL integration test file)
+- W2 distinct source/test files changed: `14`; evidence workflow changed separately by `1` line
 - Database changes: `NONE`
 - Production access/change: `NONE`
+
+## Superseding Control Tower hold
+
+Governance advanced during execution from the worker's fetched base `b3c5787...` to `c274f9a...`. The newer `CURRENT_DIRECTIVE.md` orders `HOLD — NO FURTHER W2 PRODUCT MODIFICATION — STOP/REPLAN`. Product work stopped immediately when the new head was observed. All post-W1 commits are preserved, exact-head technical evidence is retained, and their current governance disposition is `PRESERVED CANDIDATE — NOT ADOPTED/NOT AUTHORIZED PENDING CONTROL TOWER REVALIDATION`. See `W2_PLAN_DEVIATION.md`.
 
 ## Current gate
 
@@ -25,4 +30,8 @@ External workspaces, stashes and local-only assets outside this worker remain `A
 
 REM-100 then added the missing `Volume = x.Volume` mapping and one PostgreSQL create/update/persist/reload regression test. Exact-head run `33181376288` passed 125/125 tests, including the new Volume test and existing allocation/shipping measure tests. Status is `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION`.
 
-W2 was entered only as a dependency check and is blocked by absent tenant-cardinality, IdP/session and device/PoP authority (`DEP-005/006/007`, `DBP-002/003`). No W2 code or DB change was attempted. MISSION-03 remains open and is not sealed.
+DEP-005, DEP-006 and DEP-007 are now resolved for bounded execution design in ADR-W2-001/002/003. The unresolved Production auth-mode choice is isolated as `AUTH-001`; live schema/roles/RLS and all persistence changes remain behind DBP-002/003.
+
+Code-only packages W2-A1/B1/C1 first bound Sync to stored Company/Branch and persistent RBAC and applied owner checks to transition, retry, conflict and replacement paths. W2-A2/B2A then replaced duplicated claim-only authorization in all three Product API modules with one request-time resolver that reconciles active User/Company/Branch and persistent RBAC; token permission claims can only narrow the result. Issuer-specific login/refresh/session work remains the bounded W2-B2B item behind AUTH-001/DBP-003.
+
+The first A2/B2A exact-head attempt `d1c0a257...` failed build in run `33184771338` because the new resolver imported the wrong `OperationContext` namespace. No migration, test, API or Product mutation ran; the disposable DB/container was discarded. Commit `d740740...` corrected the import, and `9c5b7a1...` added an explicit API cross-company denial assertion. Exact-head run `33185419917` passed 128/128 tests, all ten existing migrations with no model drift, API boot, Desktop and three Mobile probes. These are technical candidate facts, not Control Tower acceptance. No Entity, DbContext, Migration, Seed, Schema or data change exists. W2 is held for revalidation; MISSION-03 is not sealed.
