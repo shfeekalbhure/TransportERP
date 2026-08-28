@@ -8,8 +8,8 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — W1 VERIFIED; W2 HOLD — STOP/REPLAN | W0 bounded exit and W1 `REM-100` checkpoint at `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a` independently reverified: exact-head run `33181376288` succeeded and retained artifacts. After that checkpoint, the execution branch advanced through W2-scope Product changes beginning at `a157c34d6767deeb5544adf456a2a36946a599a9` and later `d1c0a2571bf3d240b9134e8614186acd70a6bd5d` while `DEP-005/006/007` and `DBP-002/003` remained unsatisfied in the governing records. Successful CI does not replace authority/dependency gates. Preserve the isolated candidate; no further W2 Product implementation, merge, delete, rewrite, DB/data mutation, or M04 handoff until W2 is replanned/rebound to proven gates. |
-| 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 is open/not sealed; W2 governance hold unresolved |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — W1 VERIFIED; W2 HOLD RETAINED AFTER REVALIDATION | W1 `REM-100` checkpoint at `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a` remains accepted. W2 v0.5 checkpoint received at `9c5b7a12e59d2c42e682717b8e90c491f8699b96`; exact-head run `33185419917` and retained artifacts independently confirm a technical PASS, and the W1→W2 compare is code/test/workflow only with no Entity/DbContext/Migration/Seed/Schema/Data/Production change. Control Tower revalidation nevertheless retains the W2 hold: sealed MISSION-02 requires live-role evidence for `DEP-005`, IdP mode/config plus DEP-005 for `DEP-006`, DEP-005/006 for `DEP-007`, and W2 entry evidence including `DBP-002/003`; those gates are not fully satisfied. Candidate null/company-wide branch-scope semantics are also not proven against authoritative live role/user evidence. Decision: `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/MISSION_03_W2_REVALIDATION_DECISION_2026-08-28.md`. Preserve `9c5b7a1...`; no further W2 Product modification, merge, delete, rewrite, DB/data mutation, or M04 handoff. |
+| 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 is open/not sealed; W2 hold remains in force after Control Tower revalidation |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
 ## Governing line decision
@@ -20,7 +20,7 @@ Authoritative current product line:
 
 MISSION-03 execution branch:
 
-`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint is `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; later W2-scope commits are preserved as unaccepted candidate evidence pending gate reconciliation.
+`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint remains `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`. The later head `9c5b7a12e59d2c42e682717b8e90c491f8699b96` is a preserved technical W2 candidate, not an adopted execution baseline; W2 hold was independently revalidated and retained.
 
 MISSION-02 accepted package:
 
