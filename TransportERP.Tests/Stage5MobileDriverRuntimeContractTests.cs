@@ -124,6 +124,17 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("ordinary-launcher", script, StringComparison.Ordinal);
         Assert.Contains("businessOperationSucceeded", script, StringComparison.Ordinal);
         Assert.Contains("persistedAfterReleaseRestart", script, StringComparison.Ordinal);
+        Assert.Contains("OPERATION_SUFFIX = re.compile(r\"^[0-9a-f]{12}$\")", script,
+            StringComparison.Ordinal);
+        Assert.Contains("def mobile_for_operation_suffix(suffix: str)", script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "driver.set_text(\"driver_party_mobile\", mobile_for_operation_suffix(suffix))",
+            script, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"700\" + suffix[:6]", script, StringComparison.Ordinal);
+        Assert.Contains("class OperationMobileTests", stateMachineTests, StringComparison.Ordinal);
+        Assert.Contains("^700[0-9]{6}$", stateMachineTests, StringComparison.Ordinal);
+        Assert.Contains("^OPERATION_SUFFIX_INVALID$", stateMachineTests, StringComparison.Ordinal);
         foreach (var phase in new[]
                  {
                      "INITIAL_LAUNCH", "INITIAL_CLOSED_MODE", "INITIAL_CLOSED_REASON",

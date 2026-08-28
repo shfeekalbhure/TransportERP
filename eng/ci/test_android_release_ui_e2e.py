@@ -18,6 +18,22 @@ HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
 
+class OperationMobileTests(unittest.TestCase):
+    def test_hex_operation_suffix_is_mapped_to_telephone_safe_digits(self) -> None:
+        mobile = HARNESS.mobile_for_operation_suffix("abcdef123456")
+        self.assertRegex(mobile, r"^700[0-9]{6}$")
+        self.assertEqual(9, len(mobile))
+
+    def test_invalid_operation_suffix_fails_closed_without_echoing_input(self) -> None:
+        for suffix in ("", "abcdef", "ABCDEF123456", "abcdef12345g"):
+            with self.subTest(suffix=suffix):
+                with self.assertRaisesRegex(
+                    HARNESS.UiE2EFailure,
+                    "^OPERATION_SUFFIX_INVALID$",
+                ):
+                    HARNESS.mobile_for_operation_suffix(suffix)
+
+
 class ConditionalImeDismissalTests(unittest.TestCase):
     def driver(
         self,

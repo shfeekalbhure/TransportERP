@@ -33,6 +33,7 @@ CONSCRYPT_ALIAS = re.compile(r"^[0-9a-f]{8}\.[0-9]{1,2}$")
 LOWER_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 OPERATION_ID = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \|")
+OPERATION_SUFFIX = re.compile(r"^[0-9a-f]{12}$")
 SAFE_RESULT = re.compile(r"Result: ([A-Z0-9_]{1,64})")
 INITIAL_ACTION_PROMPT = "Sign in and explicitly activate an authorized scope to use synchronization."
 SAFE_SIGN_IN_RESULT_CODES = frozenset(
@@ -107,6 +108,12 @@ SCROLL_OBSERVATION_IDS = tuple(candidate for candidate, _ in FOCUS_OWNER_ALLOWLI
 
 class UiE2EFailure(RuntimeError):
     pass
+
+
+def mobile_for_operation_suffix(suffix: str) -> str:
+    if not OPERATION_SUFFIX.fullmatch(suffix):
+        raise UiE2EFailure("OPERATION_SUFFIX_INVALID")
+    return f"700{int(suffix, 16) % 1_000_000:06d}"
 
 
 class Driver:
@@ -753,7 +760,7 @@ def main() -> int:
         phase = "QUEUE_PARTY_NAME"
         driver.set_text("driver_party_name", "UIE2E-" + suffix)
         phase = "QUEUE_PARTY_MOBILE"
-        driver.set_text("driver_party_mobile", "700" + suffix[:6])
+        driver.set_text("driver_party_mobile", mobile_for_operation_suffix(suffix))
         phase = "QUEUE_PARTY_ADDRESS"
         driver.set_text("driver_party_address", "UIE2E-Address-" + suffix)
         driver.hide_keyboard()
