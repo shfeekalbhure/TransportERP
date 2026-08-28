@@ -2,14 +2,14 @@
 
 | Order | Mission | Team | Prerequisite | Required Output | State | Blocker |
 |---:|---|---|---|---|---|---|
-| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | SEALED | All three packages centrally received and hash-verified; teams stopped; findings/limitations carried forward |
-| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report | READY — START AUTHORIZED | No blocker to reconciliation. `AUTHORITATIVE CURRENT LINE` uncertainty, TEAM-A P0 findings, TEAM-B zero-confirmed-P0 result, preservation risk, and `BLK-B-001` are required reconciliation inputs. |
+| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | SEALED | All three packages centrally received and hash-verified; teams stopped; reported findings and limitations carried to the next gate |
+| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report + complete Crosswalk/register/manifest/seal/handoff package | READY | `START` issued. Authoritative current line remains unknown and must not be inferred; it blocks final CURRENT-state/gate judgment, not TEAM-D evidence reconciliation |
 | 3 | MISSION-01 | TEAM-C2 | TEAM-D SEALED | Target architecture proposal | WAITING | |
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 SEALED | Advisory review | WAITING | |
 | 5 | MISSION-01 | MASTER | TEAM-E SEALED | Master report + gate | WAITING | |
-| 6 | MISSION-02 | Planning Team | MISSION-01 closed/gate permits planning | Remediation plan | WAITING | |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed + execution authority | Implemented changes/evidence | WAITING | |
+| 6 | MISSION-02 | Planning Team | MISSION-01 closed | Remediation plan | WAITING | |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | WAITING | |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | |
 
-Ordinary analytical disagreements are routed forward to the designated reconciliation/advisory team. Non-urgent owner decisions are accumulated for final GROUP-01 delivery. Immediate owner hold is reserved for an actual destructive/Production/irreversible action or another explicitly owner-reserved action.
+Ordinary analytical disagreements move to the designated reconciliation/advisory stage. Non-urgent owner decisions are carried to final GROUP-01 delivery; immediate owner hold is reserved for an actual destructive, Production, irreversible, or explicitly owner-reserved action.

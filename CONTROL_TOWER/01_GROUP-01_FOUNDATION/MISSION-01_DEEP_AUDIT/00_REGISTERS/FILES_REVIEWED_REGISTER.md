@@ -3,4 +3,4 @@
 | File ID | Source path | Project / Module / Domain | Ref / Full SHA | Reviewer | Purpose | Classes / Methods / Sections | Findings | Coverage | Not reviewed |
 |---|---|---|---|---|---|---|---|---|---|
 
-`LOCKED FOR INITIAL INDEPENDENCE` — the central register remains empty until TEAM-D reconciliation. Initial review records must remain inside each team's folder.
+`UNLOCKED FOR TEAM-D RECONCILIATION — READY` — initial private review records are sealed in each team's folder. TEAM-D records only its own re-verification coverage and retains links to the sealed source registers.

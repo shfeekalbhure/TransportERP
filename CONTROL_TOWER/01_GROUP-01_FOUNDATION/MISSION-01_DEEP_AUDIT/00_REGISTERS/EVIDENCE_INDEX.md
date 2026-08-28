@@ -3,4 +3,4 @@
 | Evidence ID | Finding ID | Source ID | Evidence type | Exact location | Ref / Branch / Full SHA | Collected UTC | Result and limits | SHA-256 | Collector |
 |---|---|---|---|---|---|---|---|---|---|
 
-`LOCKED FOR INITIAL INDEPENDENCE` — TEAM-A, TEAM-B, and TEAM-C1 maintain private evidence indexes in their own folders. This central index remains empty until their initial reports are sealed and TEAM-D begins governed reconciliation.
+`UNLOCKED FOR TEAM-D RECONCILIATION — READY` — TEAM-A, TEAM-B, and TEAM-C1 private evidence indexes are sealed and remain immutable in their folders. TEAM-D must create the governed Crosswalk and consolidated reconciliation evidence without overwriting original IDs or treating report claims as facts.

@@ -2,6 +2,6 @@
 
 `WAIT`
 
-Prerequisite: TEAM-D reconciliation report must be SEALED and handed to Control Tower.
+Prerequisite: TEAM-D reconciliation package must be `SEALED — DELIVERED TO CONTROL TOWER — STOP` with verified handoff.
 
-Before starting or resuming, re-read `CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_TEAM_DIRECTIVES.md`. Do not design the target architecture until the directive changes to `START`.
+Before starting or resuming, read the mandatory governance files and this directive. Do not design the target architecture until Control Tower changes the directive to `START`.

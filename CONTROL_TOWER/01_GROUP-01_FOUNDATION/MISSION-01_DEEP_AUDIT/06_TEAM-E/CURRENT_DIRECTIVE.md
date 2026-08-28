@@ -2,6 +2,6 @@
 
 `WAIT`
 
-Prerequisite: TEAM-C2 target architecture proposal must be SEALED and handed to Control Tower.
+Prerequisite: TEAM-C2 target architecture package must be `SEALED — DELIVERED TO CONTROL TOWER — STOP` with verified handoff.
 
-Before starting or resuming, re-read `CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_TEAM_DIRECTIVES.md`. Do not begin advisory review until the directive changes to `START`.
+Before starting or resuming, read the mandatory governance files and this directive. Do not begin advisory review until Control Tower changes the directive to `START`.

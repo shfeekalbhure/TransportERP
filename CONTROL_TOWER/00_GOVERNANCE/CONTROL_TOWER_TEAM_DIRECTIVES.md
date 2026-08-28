@@ -1,14 +1,12 @@
 # CONTROL TOWER TEAM DIRECTIVES
 
-Every team or mission must read its own section here before starting or resuming work. Only Control Tower changes a `CURRENT DIRECTIVE`. A sealed team must not modify its output unless this file issues `REOPEN` or `RETURN FOR REWORK`.
-
-During an active Control Tower session, teams should re-check this file approximately every 10 minutes and immediately after a known upstream handoff. If no active session is running, no continuous monitoring may be assumed.
+Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWNER_DELEGATION_AND_OPERATING_DIRECTIVE.md`, its own section here, its mission order, and all required sealed predecessor outputs. Only Control Tower changes a `CURRENT DIRECTIVE`. A team at `WAIT`, `HOLD`, or `STOP` must not work. A sealed team must not modify its output unless this file issues `REOPEN` or `RETURN FOR REWORK`.
 
 ## TEAM-A
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `STOP`
-- Recorded disposition: `SEALED — STOP`
+- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - Reason: Package, manifest hashes, seal, and handoff were verified and centrally received.
 - Next permitted action: None unless Control Tower records `REOPEN`.
 
@@ -16,16 +14,16 @@ During an active Control Tower session, teams should re-check this file approxim
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `STOP`
-- Recorded disposition: `SEALED — STOP`
+- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - Reason: Package, detached hashes, seal, and handoff were verified and centrally received.
-- Governing carry-forward: `BLK-B-001 — SINGLE-SESSION TEAM-B — MULTI-REVIEWER ASSURANCE NOT SATISFIED`.
+- Governing carry-forward: `SINGLE-SESSION TEAM-B — MULTI-REVIEWER ASSURANCE LIMITATION RECORDED` (`BLK-B-001`).
 - Next permitted action: None unless Control Tower records `REOPEN`. TEAM-B may not begin a later stage itself.
 
 ## TEAM-C1
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `STOP`
-- Recorded disposition: `SEALED — STOP`
+- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - Reason: All nine sealed outputs, seal, manifest, and handoff were verified and centrally received.
 - Next permitted action: None unless Control Tower records `REOPEN`.
 
@@ -33,12 +31,10 @@ During an active Control Tower session, teams should re-check this file approxim
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `START`
-- Prerequisite status: `SATISFIED — TEAM-A, TEAM-B, TEAM-C1 SEALED AND HASH-VERIFIED`.
-- Required work: Perform full Finding-by-Finding reconciliation, including agreement, disagreement, single-team findings, P0/P1 classification conflicts, preservation findings, assurance limitations, and authoritative-line candidates.
-- Special instruction: The unresolved `AUTHORITATIVE CURRENT LINE` and TEAM-A/TEAM-B P0 disagreement are **inputs to reconciliation**, not owner holds at this stage.
-- Authoritative-line task: classify candidate refs/SHAs, recommend the governing candidate, and explicitly mark anything unresolved. Do not guess.
-- Required output: `TEAM-D_EVIDENCE_RECONCILIATION_REPORT.md` plus crosswalk/evidence/unknown registers required by the governing command.
-- Next permitted action after completion: Seal and hand off to Control Tower. Do not start TEAM-C2 yourself.
+- Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
+- Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
+- Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
+- Next permitted action: Begin TEAM-D reconciliation inside `04_TEAM-D/` only and produce the full report/register/manifest/seal/handoff package.
 
 ## TEAM-C2
 
@@ -58,7 +54,7 @@ During an active Control Tower session, teams should re-check this file approxim
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `WAIT`
-- Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed or explicitly carried as final decision items.
+- Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed.
 - Next permitted action: Wait for a Control Tower `START` directive.
 
 ## MISSION-02
