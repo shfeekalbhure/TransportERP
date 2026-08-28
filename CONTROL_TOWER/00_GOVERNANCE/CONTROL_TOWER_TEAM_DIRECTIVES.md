@@ -35,7 +35,7 @@ Target database authority:
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS; KEEP MISSION-03 OPEN`.
+- `CURRENT DIRECTIVE`: `CONTINUE — DB REHEARSAL ENTRY HOLD; RESOLVE DBP-003B/C ↔ DBP-006 ORDER CONFLICT; KEEP MISSION-03 OPEN`.
 - MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`.
 - Product authority remains `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
 - Current execution branch/head: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
@@ -49,7 +49,7 @@ Target database authority:
 - Final current internal head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`.
 - Run `33201720896`: `153/153 PASS`, PostgreSQL 18.6, ten existing migrations, no model drift, expected API HTTP 401; Desktop/Mobile probes remain build/scaffold evidence rather than executable runtime proof.
 - Run `33201720878`: disposable PostgreSQL backup/restore `PASS`, source/restored migration-history `10/10`.
-- No Entity, DbContext model, Migration, Schema, Seed, persistent adapter, Product data or Production configuration delta is authorized or claimed by Control Tower.
+- No candidate Entity, DbContext model, Migration, Schema, Seed, persistent adapter, Product data or Production configuration delta exists after this baseline.
 
 ### Binding owner decisions
 
@@ -59,37 +59,43 @@ Target database authority:
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
 - `DB-BASELINE-001 = RESOLVED — GREENFIELD / NEW / EMPTY TARGET DATABASE`.
 
-### Greenfield DB-GOV re-review
+### Greenfield DB-GOV post-resubmission revalidation
 
-Control Tower completed the second independent Greenfield review in:
+The exact v1.0 physical design and Greenfield acceptance specification are present. A mission-local review decision nominally approves coordinated disposable/Greenfield non-Production rehearsal, but repository chronology shows the review decision existed at `fc2e28f86b297203be9f857f507d40629d9bbb35` before the exact v1.0 physical resubmission was committed in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+Control Tower independently revalidated the current package and recorded:
 
-Result:
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
 
-`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
+Current DB-GOV result:
 
-Therefore legacy target-row/backfill evidence, legacy PasswordHash/verifier/rehash compatibility, legacy audit/accounting row reconciliation, and a safe-copy of a pre-existing target database are no longer MISSION-03 target-database prerequisites.
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
 
-Current DB-GOV dispositions:
+The evidence-bound conflict is exact:
 
-- `DBP-002 = REVISE BEFORE REHEARSAL`.
-- `DBP-003A = REVISE BEFORE REHEARSAL`.
-- `DBP-003B/C = DEFERRED — DEPENDS ON DBP-002/006`.
-- `DBP-004 = REVISE BEFORE REHEARSAL`.
-- `DBP-005 = REVISE BEFORE REHEARSAL`.
-- `DBP-006 = REVISE BEFORE REHEARSAL`.
-- no proposal is currently `APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`.
+- physical design: `DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`;
+- earlier review decision: `DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`;
+- the physical design makes DBP-006 depend on device/proof persistence introduced by DBP-003B/C.
+
+Therefore no candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring and no candidate migration application is authorized until one corrected post-resubmission dependency decision removes the contradiction.
 
 ### Required continuation
 
-MISSION-03 must continue non-destructive design/governance refinement: exact candidate physical specifications for DBP-002/003A/004/005/006; new-system password hash/verify/lockout policy; shared caller-owned transaction/audit boundary; Greenfield PostgreSQL role/RLS-equivalent bootstrap; retention/legal-hold/cleanup/recovery for device proof, nonce/replay, Offline queue and audit; then re-submit to independent DB-GOV.
+MISSION-03 must continue; the analytical chain is not stopped. The immediate delegated work is non-destructive:
+
+1. reconcile DBP-003B/C ↔ DBP-006 ordering by either retaining device/proof before Offline persistence and correcting the review order, or splitting DBP-006 into a physically independent pre-device core plus a later device/proof-bound extension;
+2. bind the corrected package to the exact execution parent SHA/tree, candidate-unit identities, FK/index dependencies and acceptance tests;
+3. obtain a fresh independent DB-GOV decision after the corrected repository package exists;
+4. continue unrelated non-destructive W5/W6/W7 preparation where its own gates permit;
+5. keep W8 last and preserve all worktree/stash/local-only evidence before any destructive/global cleanup.
+
+`MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` remains an open historical checkpoint. Because Control Tower directives/registers changed after it, the next worker checkpoint must produce a new manifest and detached SHA-256 set before any later acceptance or seal claim.
 
 Remaining non-DB gates include canonical post-DEPART Shipping/Ticketing/screen authority, real Windows/Android executable runtime and secure-store proof, protected signing custody, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and complete Git worktree/stash/local-only preservation inventory before destructive/global W8 cleanup.
 
-Do not merge, delete, reset, rewrite, force-push, cherry-pick, mutate Production, commit secrets, or perform Entity/DbContext/Migration/Schema/Seed/Data work without the exact independently opened gate.
+Do not merge, delete, reset, rewrite, force-push, cherry-pick, mutate Production, commit secrets, or perform Entity/DbContext/Migration/Schema/Seed/Data work while the DB-GOV rehearsal-entry hold is active.
 
-No `OWNER DECISION REQUIRED` is active from the Greenfield DB-GOV re-review; the next permitted work is non-destructive.
+No `OWNER DECISION REQUIRED` is active; the next permitted action is delegated non-destructive DB-GOV correction/revalidation.
 
 ## MISSION-04
 
