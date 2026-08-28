@@ -7,6 +7,14 @@
 - Owner database authority: `DB-BASELINE-001 = GREENFIELD / NEW / EMPTY / NO LEGACY TABLES OR DATA`
 - Product/Tests/Migrations/Production/Database mutation by this review: `NONE`
 
+## Precedence / reconciliation
+
+This decision is later and controlling. It **supersedes** the earlier mission-local file:
+
+`CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/DBP-002_003_004_005_006_GREENFIELD_DB_GOV_REVIEW_DECISION.md`
+
+only where that earlier file granted `APPROVED FOR ... REHEARSAL`. The earlier file remains preserved as historical review evidence, but it grants **no current execution authority**. Current authority is exactly the result below and the synchronized `CURRENT_DIRECTIVE.md` / central proposal register.
+
 ## Controlling result
 
 `GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
