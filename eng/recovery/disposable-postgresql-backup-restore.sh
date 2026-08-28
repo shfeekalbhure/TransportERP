@@ -60,8 +60,8 @@ pg18 pg_restore -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" \
 
 source_marker="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${SOURCE_DB}" -c "SELECT marker_text FROM mission03_recovery_probe.marker WHERE marker_id='00000000-0000-0000-0000-000000000003'")"
 restored_marker="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${RESTORE_DB}" -c "SELECT marker_text FROM mission03_recovery_probe.marker WHERE marker_id='00000000-0000-0000-0000-000000000003'")"
-source_migrations="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${SOURCE_DB}" -c 'SELECT COUNT(*) FROM "__EFMigrationsHistory"')"
-restored_migrations="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${RESTORE_DB}" -c 'SELECT COUNT(*) FROM "__EFMigrationsHistory"')"
+source_migrations="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${SOURCE_DB}" -c 'SELECT COUNT(*) FROM transport_erp."__EFMigrationsHistory"')"
+restored_migrations="$(pg18 psql -At -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${RESTORE_DB}" -c 'SELECT COUNT(*) FROM transport_erp."__EFMigrationsHistory"')"
 
 test "${source_marker}" = "MISSION-03-DISPOSABLE-RECOVERY"
 test "${restored_marker}" = "${source_marker}"
