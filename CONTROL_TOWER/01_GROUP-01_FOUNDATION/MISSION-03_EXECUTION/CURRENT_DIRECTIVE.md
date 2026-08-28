@@ -1,6 +1,6 @@
 # CURRENT DIRECTIVE — MISSION-03
 
-`CONTINUE — EXACT GREENFIELD PHYSICAL DESIGNS RESUBMITTED; INDEPENDENT DB-GOV DECISION REQUIRED; KEEP MISSION-03 OPEN`
+`CONTINUE — DB REHEARSAL ENTRY HOLD; RESOLVE DBP-003B/C ↔ DBP-006 ORDER CONFLICT; KEEP MISSION-03 OPEN`
 
 ## Current execution basis
 
@@ -8,7 +8,7 @@
 - Product authority: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
 - Execution branch/head: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`.
 - Execution tree: `00512125311306a43474638195d2cad97b76118e`.
-- PR #69 remains `UNMERGED EVIDENCE ONLY`.
+- PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f — OPEN / DRAFT / UNMERGED — EVIDENCE ONLY`.
 - Exact internal baseline evidence remains: run `33201720896 = 153/153 PASS`; PostgreSQL 18.6; ten existing migrations; no model drift; API HTTP 401; client build probes only. Recovery run `33201720878 = PASS` on disposable PostgreSQL.
 
 ## Binding owner decisions
@@ -19,75 +19,47 @@
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
 - `DB-BASELINE-001 = RESOLVED — TARGET DATABASE IS GREENFIELD / NEW / EMPTY / NO LEGACY TABLES OR DATA`.
 
-Greenfield decision file:
+## Post-resubmission DB-GOV revalidation
 
-`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/DB-BASELINE-001_GREENFIELD_TARGET_DATABASE_2026-08-28.md`
+The exact v1.0 Greenfield physical design and acceptance specification now exist in repository evidence. A mission-local DB-GOV decision file nominally approves coordinated disposable/Greenfield non-Production rehearsal, but repository chronology proves that decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`, before the exact v1.0 resubmission was committed in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
 
-## Greenfield DB-GOV re-review — COMPLETE
+Control Tower therefore independently revalidated the current repository package and recorded the controlling result in:
 
-Control Tower completed the required second independent DB-GOV review and recorded it in:
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+Result:
 
-Controlling result:
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
 
-`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
+### Evidence-bound dependency conflict
 
-Cleared as target-database prerequisites:
+The exact physical design orders:
 
-- legacy target-row/cardinality/backfill inventory;
-- legacy PasswordHash/verifier/rehash compatibility;
-- legacy audit/accounting row reconciliation;
-- safe-copy/backup of a pre-existing target database;
-- preservation of a pre-existing target database population.
+`DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`
 
-The existing ten committed migrations remain the bootstrap lineage. A future Greenfield rehearsal database must start empty and apply only those ten migrations before any separately authorized candidate migration.
+and makes DBP-006 depend on DBP-003B/C device/proof persistence.
 
-## Current DBP dispositions
+The earlier review decision orders:
 
-- `DBP-002 = REVISE BEFORE REHEARSAL` — exact physical membership/grant schema, tenant-consistent keys/FKs/checks/indexes, RLS/equivalent bootstrap and rollback/test specification remain required.
-- `DBP-003A = REVISE BEFORE REHEARSAL` — final DBP-004-compatible caller-owned audit/UoW boundary, exact candidate persistence mapping and new-system password hash/verify/lockout policy remain required.
-- `DBP-003B = DEFERRED — DEPENDS ON DBP-002/006`.
-- `DBP-003C = DEFERRED — DEPENDS ON DBP-002/006`; nonce/JTI uniqueness, proof-key persistence, retention/legal-hold/cleanup and recovery remain required.
-- `DBP-004 = REVISE BEFORE REHEARSAL` — exact V2 audit schema/canonicalizer/stream sequencing, append-only DB enforcement, transaction enlistment and failure-injection acceptance remain required.
-- `DBP-005 = REVISE BEFORE REHEARSAL` — exact Settlement/journal/source-link constraints, account-role/FX/rounding configuration contract, period/SoD and concurrency/reversal acceptance remain required.
-- `DBP-006 = REVISE BEFORE REHEARSAL` — exact typed queue/inbox/outbox/result/claim-lease schema, protocol/version/fingerprint constraints, retention/legal-hold and device/proof dependencies remain required.
+`DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`
 
-No DBP currently has:
+and conditions DBP-003B/C on a passed DBP-006 candidate baseline.
 
-`APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`.
+Both orders cannot govern the same exact physical package. No candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring or candidate migration application is authorized while this contradiction remains unresolved.
 
 ## Authorized next work
 
-MISSION-03 must continue automatically with non-destructive repository/governance work enabled by the re-review:
+MISSION-03 must continue automatically with non-destructive work and must **not** stop the analytical chain:
 
-1. Produce exact candidate physical specifications for DBP-002/003A/004/005/006 and explicitly order cross-proposal dependencies.
-2. Define and test-specify the new-system password hash/verify/lockout policy; do not request legacy compatibility evidence.
-3. Finalize the shared caller-owned transaction/audit boundary across session, audit, Settlement and Offline persistence.
-4. Define Greenfield PostgreSQL roles/RLS-equivalent bootstrap plus negative-test requirements.
-5. Define retention/legal-hold/cleanup/recovery for device proof, nonce/replay, Offline queue and audit records.
-6. Re-submit proposal packages for independent DB-GOV decision. Do not author or execute candidate migrations until the exact proposal receives bounded rehearsal authority.
-7. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
-8. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
-
-## v1.0 resubmission checkpoint
-
-MISSION-03 completed the authorized non-destructive design revision in:
-
-- `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md`;
-- `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`.
-
-DBP-002/003A/B/C/004/005/006 now have exact dependency order, tables, columns,
-keys, tenant FKs, checks, indexes, RLS-equivalent roles/policies, new-system
-password/lockout/reset policy, session rotation/family revoke, caller-owned
-Audit V2/Outbox UoW, Settlement atomicity, typed Offline claim/lease/result,
-device/PoP/nonce/replay, retention/legal hold and recovery acceptance.
-
-The bundle is `RESUBMITTED — AWAITING INDEPENDENT DB-GOV DECISION`. It does not
-self-grant rehearsal. Entity/DbContext/Migration/Schema/Seed/persistent-adapter/
-data authority remains `NONE`. Product head/tree remain unchanged.
-
-A blocked DBP must not stop unrelated satisfied packages.
+1. Resolve the DBP-003B/C ↔ DBP-006 physical dependency by either:
+   - retaining DBP-003B/C before DBP-006 and correcting the coordinated decision; or
+   - splitting DBP-006 into a physically independent pre-device core plus a later device/proof-bound extension.
+2. Bind the corrected order to the exact current design revision, execution parent SHA/tree, proposed candidate-unit identities, FK/index dependencies, and the Greenfield acceptance matrix.
+3. Submit the corrected package for a fresh independent DB-GOV review **after** the corrected repository package exists.
+4. Do not author Entity/DbContext/Migration/Schema/Seed/persistent adapters and do not apply candidate migrations until that post-resubmission review opens bounded rehearsal authority.
+5. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
+6. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
+7. The next worker checkpoint must issue a new manifest and detached SHA-256 set; `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is now historical because Control Tower governance changed after that checkpoint.
 
 ## Remaining non-DB / external gates
 
@@ -111,4 +83,4 @@ Do not change MISSION-04 to START until MISSION-03 is conclusively sealed and ha
 
 No merge to master, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit, Entity/DbContext/Migration/Schema/Seed/Data change or unauthorized database action.
 
-No `OWNER DECISION REQUIRED` is active from this re-review. The immediate next work is non-destructive design/governance work within delegated Control Tower/MISSION-03 authority.
+No `OWNER DECISION REQUIRED` is active. The current next action is delegated non-destructive DB-GOV correction/revalidation.
