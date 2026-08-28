@@ -2,14 +2,24 @@
 
 | Order | Mission | Team | Prerequisite | Required Output | State | Blocker |
 |---:|---|---|---|---|---|---|
-| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + actual team assignments | Independent reports + current architecture | SEALED | A/B remain sealed; C1 v1.1 accepted and hash-verified; C1 v1.0 preserved as superseded |
-| 2 | MISSION-01 | TEAM-D | Accepted C1 v1.1 plus A/B sealed inputs | Complete v1.1 reconciliation package satisfying every §34 field and new Sync evidence | SEALED | v1.1 accepted: 14 hashes OK, 64 complete Crosswalk rows, valid chronology/seal/handoff; v1.0 preserved and superseded |
-| 3 | MISSION-01 | TEAM-C2 | TEAM-D v1.1 SEALED | Corrected v1.1 target package with truthful chronology and full seal chain | SEALED | v1.1 accepted: 16 hashes OK, 27 target rows, valid chronology/seal/handoff; v1.0 preserved and superseded |
-| 4 | MISSION-01 | TEAM-E | Accepted C1/D/C2 v1.1 chain | Multidisciplinary advisory report + complete evidence/manifest/seal/handoff package | SEALED | v1.1 accepted: 16 hashes OK, 39/39 P0/P1 and 8/8 P2/P3 revalidated, stale states corrected; v1.0 preserved/rejected |
-| 5 | MISSION-01 | MASTER | TEAM-E v1.1 SEALED | Master report + gate | SEALED | Master and gate verified; formal gate `NOT READY — CRITICAL EVIDENCE GAPS REMAIN`; transition HOLD |
-| 6 | MISSION-02 | Planning Team | MISSION-01 gate `READY FOR REMEDIATION PLANNING` | Remediation plan | OWNER DECISION REQUIRED | Authoritative product ref/full SHA must be designated by owner/repository authority, then affected evidence and gate revalidated; MISSION-02 not started |
+| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + assignments | Independent reports + current architecture | SEALED | A/B sealed; C1 v1.1 accepted; historical versions preserved |
+| 2 | MISSION-01 | TEAM-D | A/B/C1 accepted | Complete reconciliation package | SEALED | D v1.1 accepted; historical v1.0 preserved |
+| 3 | MISSION-01 | TEAM-C2 | TEAM-D sealed | Target architecture proposal | SEALED | C2 v1.1 accepted |
+| 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
+| 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | REOPENED / IN PROGRESS | Authoritative line blocker RESOLVED. Revalidate remaining critical evidence gaps on `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`; preserve prior sealed gate. |
+| 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | WAITING | Await resealed revalidated gate; no owner-line decision remains outstanding |
 | 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | WAITING | |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | |
 
-Ordinary analytical disagreements move to the designated reconciliation/advisory stage. Non-urgent owner decisions are carried to final GROUP-01 delivery; immediate owner hold is reserved for an actual destructive, Production, irreversible, or explicitly owner-reserved action.
+## Governing line decision
+
+Authoritative current product line:
+
+`refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
+
+Decision record:
+
+`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/AUTHORITATIVE_PRODUCT_LINE_DECISION_2026-08-28.md`
+
+PR #69 at `601f2d1cad61d62e590a6714ad84e307eb84fe5f` remains `UNMERGED REMEDIATION / FINAL CANDIDATE`; no merge is authorized.
