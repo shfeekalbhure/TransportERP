@@ -1,0 +1,81 @@
+namespace TransportERP.Infrastructure.Persistence.Migrations;
+
+internal static class GreenfieldDbp002PhysicalSql
+{
+    internal const string Up = """
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='transporterp_schema_owner') THEN CREATE ROLE transporterp_schema_owner NOLOGIN NOBYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='transporterp_migrator') THEN CREATE ROLE transporterp_migrator NOLOGIN NOBYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='transporterp_app') THEN CREATE ROLE transporterp_app NOLOGIN NOBYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='transporterp_worker') THEN CREATE ROLE transporterp_worker NOLOGIN NOBYPASSRLS; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='transporterp_readonly') THEN CREATE ROLE transporterp_readonly NOLOGIN NOBYPASSRLS; END IF;
+END $roles$;
+GRANT transporterp_schema_owner TO transporterp_migrator;
+REVOKE CREATE ON SCHEMA transport_erp FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION transport_erp.current_user_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.user_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_membership_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.membership_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_company_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.company_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_branch_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.branch_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_session_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.session_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_device_id() RETURNS uuid LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.device_id',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::uuid; EXCEPTION WHEN invalid_text_representation THEN RETURN NULL; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.current_security_version() RETURNS bigint LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$DECLARE v text; BEGIN v:=current_setting('app.security_version',true); IF v IS NULL OR btrim(v)='' THEN RETURN NULL; END IF; RETURN v::bigint; EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN RETURN NULL; END$$;
+
+CREATE OR REPLACE FUNCTION transport_erp.enforce_grant_membership_scope() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$DECLARE b uuid; BEGIN SELECT "BranchId" INTO b FROM transport_erp.user_memberships WHERE "Id"=NEW."MembershipId" AND "UserId"=NEW."UserId" AND "CompanyId"=NEW."CompanyId"; IF NOT FOUND THEN RAISE EXCEPTION 'grant membership scope mismatch' USING ERRCODE='23514'; END IF; IF b IS DISTINCT FROM NEW."BranchId" THEN RAISE EXCEPTION 'grant branch must equal membership branch' USING ERRCODE='23514'; END IF; RETURN NEW; END$$;
+CREATE OR REPLACE FUNCTION transport_erp.enforce_role_company_scope() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$DECLARE c uuid; BEGIN SELECT "CompanyId" INTO c FROM transport_erp.roles WHERE "Id"=NEW."RoleId"; IF NOT FOUND THEN RETURN NEW; END IF; IF c IS NOT NULL AND c IS DISTINCT FROM NEW."CompanyId" THEN RAISE EXCEPTION 'role company must equal grant company' USING ERRCODE='23514'; END IF; RETURN NEW; END$$;
+CREATE CONSTRAINT TRIGGER "CT_user_permission_grants_membership_scope" AFTER INSERT OR UPDATE ON transport_erp.user_permission_grants DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_grant_membership_scope();
+CREATE CONSTRAINT TRIGGER "CT_user_role_grants_membership_scope" AFTER INSERT OR UPDATE ON transport_erp.user_role_grants DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_grant_membership_scope();
+CREATE CONSTRAINT TRIGGER "CT_user_role_grants_role_company_scope" AFTER INSERT OR UPDATE ON transport_erp.user_role_grants DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION transport_erp.enforce_role_company_scope();
+
+DO $rls$
+DECLARE r record; expr text;
+BEGIN
+  FOR r IN
+    SELECT c.relname,
+           EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attname='CompanyId' AND a.attnum>0 AND NOT a.attisdropped) AS has_company,
+           EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attname='BranchId' AND a.attnum>0 AND NOT a.attisdropped) AS has_branch
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='transport_erp' AND c.relkind='r'
+      AND c.relname NOT IN ('currencies','permissions','global_settings','journal_entry_lines','manifest_lines','trip_stops','waybill_items','waybill_parties','payment_plan_lines','waybill_financial_links')
+  LOOP
+    expr := CASE r.relname
+      WHEN 'companies' THEN '"Id" = transport_erp.current_company_id()'
+      WHEN 'branches' THEN '"CompanyId" = transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR "Id" = transport_erp.current_branch_id())'
+      WHEN 'users' THEN '"Id" = transport_erp.current_user_id()'
+      WHEN 'roles' THEN '("CompanyId" IS NULL OR "CompanyId" = transport_erp.current_company_id())'
+      WHEN 'role_permissions' THEN '("CompanyId" IS NULL OR "CompanyId" = transport_erp.current_company_id()) AND ("BranchId" IS NULL OR transport_erp.current_branch_id() IS NULL OR "BranchId" = transport_erp.current_branch_id())'
+      WHEN 'user_memberships' THEN '"CompanyId" = transport_erp.current_company_id() AND "UserId" = transport_erp.current_user_id() AND "Id" = transport_erp.current_membership_id() AND "SecurityVersion" = transport_erp.current_security_version() AND (transport_erp.current_branch_id() IS NULL OR "BranchId" = transport_erp.current_branch_id())'
+      WHEN 'user_role_grants' THEN '"CompanyId" = transport_erp.current_company_id() AND "UserId" = transport_erp.current_user_id() AND "MembershipId" = transport_erp.current_membership_id() AND (transport_erp.current_branch_id() IS NULL OR "BranchId" = transport_erp.current_branch_id())'
+      WHEN 'user_permission_grants' THEN '"CompanyId" = transport_erp.current_company_id() AND "UserId" = transport_erp.current_user_id() AND "MembershipId" = transport_erp.current_membership_id() AND (transport_erp.current_branch_id() IS NULL OR "BranchId" = transport_erp.current_branch_id())'
+      ELSE CASE WHEN r.has_company THEN '"CompanyId" = transport_erp.current_company_id()' || CASE WHEN r.has_branch THEN ' AND (transport_erp.current_branch_id() IS NULL OR "BranchId" = transport_erp.current_branch_id())' ELSE '' END ELSE 'false' END
+    END;
+    EXECUTE format('ALTER TABLE transport_erp.%I ENABLE ROW LEVEL SECURITY',r.relname);
+    EXECUTE format('ALTER TABLE transport_erp.%I FORCE ROW LEVEL SECURITY',r.relname);
+    EXECUTE format('CREATE POLICY tenant_scope ON transport_erp.%I USING (%s) WITH CHECK (%s)',r.relname,expr,expr);
+  END LOOP;
+END $rls$;
+
+ALTER TABLE transport_erp.journal_entry_lines ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.journal_entry_lines FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.journal_entry_lines USING (EXISTS(SELECT 1 FROM transport_erp.journal_entries p WHERE p."Id"="JournalEntryId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.journal_entries p WHERE p."Id"="JournalEntryId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.manifest_lines ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.manifest_lines FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.manifest_lines USING (EXISTS(SELECT 1 FROM transport_erp.manifests p WHERE p."Id"="ManifestId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.manifests p WHERE p."Id"="ManifestId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.trip_stops ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.trip_stops FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.trip_stops USING (EXISTS(SELECT 1 FROM transport_erp.trips p WHERE p."Id"="TripId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.trips p WHERE p."Id"="TripId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.waybill_items ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.waybill_items FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.waybill_items USING (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.waybill_parties ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.waybill_parties FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.waybill_parties USING (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.payment_plan_lines ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.payment_plan_lines FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.payment_plan_lines USING (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+ALTER TABLE transport_erp.waybill_financial_links ENABLE ROW LEVEL SECURITY; ALTER TABLE transport_erp.waybill_financial_links FORCE ROW LEVEL SECURITY; CREATE POLICY tenant_scope ON transport_erp.waybill_financial_links USING (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id()))) WITH CHECK (EXISTS(SELECT 1 FROM transport_erp.waybills p WHERE p."Id"="WaybillId" AND p."CompanyId"=transport_erp.current_company_id() AND (transport_erp.current_branch_id() IS NULL OR p."BranchId"=transport_erp.current_branch_id())));
+
+REVOKE ALL ON ALL TABLES IN SCHEMA transport_erp FROM PUBLIC; REVOKE ALL ON ALL SEQUENCES IN SCHEMA transport_erp FROM PUBLIC; REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA transport_erp FROM PUBLIC;
+GRANT USAGE ON SCHEMA transport_erp TO transporterp_app,transporterp_worker,transporterp_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA transport_erp TO transporterp_app,transporterp_worker,transporterp_readonly;
+GRANT INSERT,UPDATE,DELETE ON transport_erp.user_memberships,transport_erp.user_role_grants,transport_erp.user_permission_grants TO transporterp_app;
+GRANT EXECUTE ON FUNCTION transport_erp.current_user_id(),transport_erp.current_membership_id(),transport_erp.current_company_id(),transport_erp.current_branch_id(),transport_erp.current_session_id(),transport_erp.current_device_id(),transport_erp.current_security_version() TO transporterp_app,transporterp_worker,transporterp_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA transport_erp REVOKE ALL ON TABLES FROM PUBLIC; ALTER DEFAULT PRIVILEGES IN SCHEMA transport_erp REVOKE ALL ON SEQUENCES FROM PUBLIC; ALTER DEFAULT PRIVILEGES IN SCHEMA transport_erp REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+""";
+
+    internal const string Down = """
+DO $p$ DECLARE r record; BEGIN FOR r IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind='r' LOOP EXECUTE format('DROP POLICY IF EXISTS tenant_scope ON transport_erp.%I',r.relname); EXECUTE format('ALTER TABLE transport_erp.%I NO FORCE ROW LEVEL SECURITY',r.relname); EXECUTE format('ALTER TABLE transport_erp.%I DISABLE ROW LEVEL SECURITY',r.relname); END LOOP; END $p$;
+DROP TRIGGER IF EXISTS "CT_user_role_grants_role_company_scope" ON transport_erp.user_role_grants; DROP TRIGGER IF EXISTS "CT_user_role_grants_membership_scope" ON transport_erp.user_role_grants; DROP TRIGGER IF EXISTS "CT_user_permission_grants_membership_scope" ON transport_erp.user_permission_grants;
+DROP FUNCTION IF EXISTS transport_erp.enforce_role_company_scope(); DROP FUNCTION IF EXISTS transport_erp.enforce_grant_membership_scope(); DROP FUNCTION IF EXISTS transport_erp.current_security_version(); DROP FUNCTION IF EXISTS transport_erp.current_device_id(); DROP FUNCTION IF EXISTS transport_erp.current_session_id(); DROP FUNCTION IF EXISTS transport_erp.current_branch_id(); DROP FUNCTION IF EXISTS transport_erp.current_company_id(); DROP FUNCTION IF EXISTS transport_erp.current_membership_id(); DROP FUNCTION IF EXISTS transport_erp.current_user_id();
+REVOKE transporterp_schema_owner FROM transporterp_migrator; DROP OWNED BY transporterp_readonly; DROP OWNED BY transporterp_worker; DROP OWNED BY transporterp_app; DROP OWNED BY transporterp_migrator; DROP OWNED BY transporterp_schema_owner; DROP ROLE IF EXISTS transporterp_readonly; DROP ROLE IF EXISTS transporterp_worker; DROP ROLE IF EXISTS transporterp_app; DROP ROLE IF EXISTS transporterp_migrator; DROP ROLE IF EXISTS transporterp_schema_owner;
+""";
+}
