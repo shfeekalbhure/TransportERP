@@ -131,6 +131,22 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("UI_INPUT_FOCUS_FAILED", script, StringComparison.Ordinal);
         Assert.Contains("for attempt in range(5)", script, StringComparison.Ordinal);
+        Assert.Contains("def safe_focus_observation(self, automation_id: str)", script,
+            StringComparison.Ordinal);
+        foreach (var focusDiagnostic in new[]
+                 {
+                     "COUNT_UNKNOWN", "VISIBLE_UNKNOWN", "FOCUSABLE_UNKNOWN", "CLICKABLE_UNKNOWN",
+                     "OWNER_UNKNOWN", "ZONE_UNKNOWN", "IME_UNKNOWN", "FOCUS_OWNER_ALLOWLIST"
+                 })
+            Assert.Contains(focusDiagnostic, script, StringComparison.Ordinal);
+        var focusObservationStart = script.IndexOf(
+            "    def safe_focus_observation(self, automation_id: str)", StringComparison.Ordinal);
+        var focusObservationEnd = script.IndexOf(
+            "    def hide_keyboard(self)", focusObservationStart, StringComparison.Ordinal);
+        Assert.True(focusObservationStart >= 0 && focusObservationEnd > focusObservationStart);
+        var focusObservation = script[focusObservationStart..focusObservationEnd];
+        Assert.DoesNotContain("attrib.get(\"text\")", focusObservation, StringComparison.Ordinal);
+        Assert.DoesNotContain("completed.stdout", focusObservation, StringComparison.Ordinal);
         Assert.Contains("observed == value", script, StringComparison.Ordinal);
         Assert.Contains("else \"EMPTY\" if not observed else \"MISMATCH\"", script,
             StringComparison.Ordinal);
