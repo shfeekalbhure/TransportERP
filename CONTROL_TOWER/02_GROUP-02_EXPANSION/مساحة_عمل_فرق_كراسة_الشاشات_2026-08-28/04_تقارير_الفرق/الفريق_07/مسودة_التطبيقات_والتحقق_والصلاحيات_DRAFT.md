@@ -2,25 +2,40 @@
 
 **حالة التقرير:** `DRAFT — CORRECTED — NOT FOR HANDOFF`
 
-**قيد حاكم:** هذه جولة تصحيح محدودة لمسودة TEAM-07 السابقة وفق مراجعة Wave A. لا تعيد التحليل من البداية، ولا تنشئ تصميمًا بصريًا أو عقد API/DDL/Permission أو سياسة قانونية/خصوصية أو تصريح برمجة، ولا تفتح TEAM-03 أو TEAM-06 أو TEAM-08.
+**قيد حاكم:** هذه جولة `TEAM-07-PRESERVATION-CORRECTION` محدودة. الأصل المحفوظ في File Library هو Preservation baseline، والنسخة `cf39b3af708aade9eff764a557fc7f994255f266` هي Correction delta. النتيجة هنا = `ORIGINAL MATERIAL + VERIFIED CORRECTION DELTA`. لا تعيد التحليل من البداية، ولا تنشئ تصميمًا بصريًا أو عقد API/DDL/Permission أو سياسة قانونية/خصوصية أو تصريح برمجة، ولا تفتح TEAM-03 أو TEAM-06 أو TEAM-08.
 
 ## 1. بيانات الجولة والتتبع
 
 | الحقل | القيمة |
 |---|---|
 | الفريق | 07 — التطبيقات والتسجيل والتحقق والصلاحيات والثقة الرقمية |
-| الصفة | تصحيح قنوات الاستخدام والهوية والثقة والصلاحيات والأدلة وOffline فقط |
+| الصفة | Preservation Merge للمادة الأصلية مع تصحيحات Wave A المثبتة |
 | التاريخ | 2026-08-29 |
 | الفرع | `governance/control-tower-20260828-screens-workspace` |
-| HEAD عند بدء TEAM-07-CORRECTION | `e3fed20944753d4b33c06868eb66763a2160f4ee` |
+| Preservation baseline | `TEAM-07_مسودة_التطبيقات_والتحقق_والصلاحيات_DRAFT.md` — File Library ID `file_00000000585881f4acf926e46a6d5e96` |
+| Correction delta baseline | commit `cf39b3af708aade9eff764a557fc7f994255f266`؛ blob `4a6edab143a57675cfbdb5306f94ce79da1ce081` |
+| HEAD عند بدء TEAM-07-CORRECTION السابقة | `e3fed20944753d4b33c06868eb66763a2160f4ee` |
 | حدود الكتابة | هذا الملف فقط داخل مجلد الفريق 07 |
 | حالة البوابة | `DRAFT — CORRECTED — NOT FOR HANDOFF` |
 
 ### 1.1 استمرارية المسودة
 
-عند بدء التصحيح كان المسار الإلزامي لهذه المسودة غير موجود في HEAD الفرع، بينما كانت نسخة TEAM-07 التي راجعتها Wave A محفوظة ضمن ملفات المشروع. استُخدمت آخر نسخة TEAM-07 التي كانت محل مراجعة Wave A كأساس تصحيحي، وأعيدت إلى **المسار نفسه المحدد في أمر الفريق** دون إنشاء ملف تقرير نهائي أو Population موازية.
+عند بدء التصحيح السابق كان المسار الإلزامي لهذه المسودة غير موجود في HEAD الفرع، بينما كانت نسخة TEAM-07 التي راجعتها Wave A محفوظة ضمن ملفات المشروع. استُخدمت نسخة Wave A الأصلية كأساس provenance، ثم أضيفت Correction delta في `cf39...`. هذه الجولة تعالج فقط مانع Preservation: إعادة كل المادة الأصلية المادية التي اختصرتها نسخة `cf39...` مع إبقاء التصحيح المعتمد.
 
-هذا اكتشاف استمرارية مساحة عمل فقط، ولا يغير سلطة أي نتيجة سابقة ولا يفتح أي بوابة.
+### 1.2 بيانات الجولة الأصلية المحفوظة ماديًا
+
+| الحقل | القيمة الأصلية المحفوظة |
+|---|---|
+| الفريق | 07 — التطبيقات والتسجيل والتحقق والصلاحيات والثقة الرقمية |
+| الصفة الأصلية | تحليل قنوات الاستخدام والهوية والثقة والصلاحيات وحماية البيانات والمزامنة |
+| التاريخ الأصلي | 2026-08-28 |
+| الفرع الأصلي | `governance/control-tower-20260828-screens-workspace` |
+| HEAD عند بدء الجولة الأصلية | `23a6032320239c4ae75badab2db6c81d12bf4ce3` |
+| تحركات HEAD المرصودة | `8626603ed525448d2a71cf74e2af90cca1fc2e20` ثم `4f6124fa2396a459a27c37436e74ae0ed676d14a`؛ لم يتغير مرجع مشترك مستهلك وقتها |
+| HEAD عند آخر حفظ قبل commit الفريق 07 الأصلي | `6b25b60058cc8e77105a705c4e71c77c7784cd14` |
+| اسم الملف | `مسودة_التطبيقات_والتحقق_والصلاحيات_DRAFT.md` |
+| نوع الاسم | DRAFT فقط |
+| حدود الكتابة الأصلية | هذا الملف فقط داخل مجلد الفريق 07 |
 
 ## 2. المدخلات الحاكمة والمستهلكة
 
@@ -35,102 +50,323 @@
 | CLIENT-001 | commit `e8d443dc5cefb6a1ea131311cfb7b2ded569b8df`؛ blob `1fe32f285bedde7571046cc79f1165e2e4c7e980` | Desktop + Android Admin/Customer/Driver؛ iOS مؤجل |
 | ACC-001 | commit `e8d443dc5cefb6a1ea131311cfb7b2ded569b8df`؛ blob `7487cbdd1e442f695c65a0776404cd77e861c48a` | CollectionTransaction تشغيلي، Settlement حد محاسبي، SoD threshold=0، reversal permission منفصلة |
 
-**المدخلان المصححان المستهلكان صراحة في هذه الجولة:**
+**المدخلان المصححان المستهلكان صراحة:**
 
 `TEAM-04-CORRECTION @ 9afec06269cd618d281743f6424c3ead6354d3a0`
 
 `TEAM-05-CORRECTION @ e3fed20944753d4b33c06868eb66763a2160f4ee`
 
-## 3. الحدود التي لم تتغير عن المسودة السابقة
+### 2.1 سجل المدخلات الأصلي — محفوظ مع إحلال النسخ المصححة فقط عند التعارض
 
-تبقى الاستنتاجات التالية دون إعادة تحليل:
+| المرجع | المسار/Library file_id | حالة السلطة | SHA/Version الأصلي | كيف استُخدم |
+|---|---|---|---|---|
+| سياسة DRAFT MODE | `00_فريق_تهيئة_مساحة_العمل/08_سياسة_DRAFT_MODE_ONLY_وضبط_العمل_المتوازي.md` | حاكمة للجولة الأصلية | blob `ef9900ff46e5d2496aab576a8c3b9d115b9d3dc6` | ضبط حدود القراءة والكتابة والتوقف |
+| R-001 | `00_اقرأ_أولاً/قرار_المالك_ونطاق_المرحلة_الأولى.md` | حاكم للنطاق | blob `f926ce337911e1a512e4807091d64eb665b421bb` | حصر النطاق في النقل والحسابات المباشرة |
+| R-008 | `01_الكراسة_الرئيسية/كراسة_حصر_وتحليل_شاشات_النقل_والحسابات_المرتبطة_2026-08-28.md` | عقد تحليل عملي | blob `2f58e1e3f157ab5a229e9fc50b5d80896070396d` | المستخدمون، القنوات، التسجيل، الوثائق، GPS/POD |
+| فهرس المراجع | `02_المراجع/فهرس_المراجع_المطلوبة.md` | مجموعة مراجع مثبتة | blob `d15ef2a0adb17f81aa8a6ccfe9e165ada92b477d` | ضبط أولوية السلطة وهوية R-012/R-013 |
+| RACI | `03_أوامر_الفرق/02_مصفوفة_الملكية_والتسليم_RACI.md` | حاكم للملكية | blob `deb4426bf71df25e5d1a3712c5f4a1765c6bf130` | تثبيت ملكية الفريق 07 للأدلة والهوية والموقع والخصوصية |
+| مسودة TEAM-04 الأصلية | `04_تقارير_الفرق/الفريق_04/مسودة_النقل_والتشغيل_DRAFT.md` | مدخل DRAFT أصلي | commit `4f6124fa2396a459a27c37436e74ae0ed676d14a`؛ blob `8ad972b2ff6a87da983d90cf35c9a36c639ab68b` | تاريخيًا فقط؛ استُبدلت كمدخل حاكم بالنسخة المصححة `9afec...` |
+| أمر الفريق 07 | `03_أوامر_الفرق/الفريق_07_التطبيقات_والتسجيل_والتحقق_والصلاحيات.md` | حاكم للمهمة | blob `1a0b914e92979348505e287aab800f4a247dbdc0` | تعريف المخرجات والقيود |
+| القالب الموحد | `04_تقارير_الفرق/00_قالب_التقرير_الموحد.md` | حد أدنى للتقرير | blob `4649de7926da3734d46bf0539ec28ea22f4a3574` | بنية المسودة والتتبع والعدادات |
+| R-002 | `OWNER_DRAFTS/TRANSPORTERP_OWNER_DISCUSSION_DRAFT_2026-08-28_AR.md` | كلام مالك غير منقول إلى مواصفة نهائية | blob `8946a862eb0f8e5cd1c168d48a02bc20c0c9c5a5` | أنواع السائقين/الناقلين، الثقة، التطبيقات، GPS، التحقق |
+| R-003 | الكراسة التنفيذية الأساسية الرسمية | مرشح خط أساس رسمي ضمن سجل السلطة | `file_00000000a88081f4a753c0b9f06d9fa4`, version `72` | مصالحة القيود التاريخية وعقود التذاكر والبوليصة |
+| R-004 A11-LIVE | `A11-ALL_DRAFT_SCREEN_TABLE_GLOBAL_RECONCILIATION.xlsx` | سجل حي لهويات الحصر؛ لا يرقّيها للتنفيذ | `file_000000001a7c81fd87469fb8c0e9fdf4`, version `14` | مطابقة المرشحات مع Screen IDs القائمة |
+| R-012 OFFLINE-001 | Git object عند `e8d443dc5cefb6a1ea131311cfb7b2ded569b8df` | قرار مالك حاكم | blob `4064125c3d5ba8439b4f9c295177c0c09006ef50` | DEFAULT DENY، فئات Queue، envelope، إعادة التفويض |
+| R-013 CLIENT-001 | Git object عند الرأس نفسه | قرار مالك حاكم | blob `1fe32f285bedde7571046cc79f1165e2e4c7e980` | Desktop + Admin/Customer/Driver Android؛ iOS مؤجل |
+| AUTH-001 | `AUTH-001_PRODUCTION_AUTHORITY_MODE_2026-08-28.md` | قرار مالك أحدث مباشر | blob `cb60e2a434de275465fc33232983e177072b2885` | حسم سلطة token/session المحلية للتوجه الإنتاجي |
+| ADR-W2-002 | `MISSION-03_EXECUTION/IDENTITY_RBAC_SESSION_ADR.md` | دليل معماري مقيد ببوابات الحوكمة | blob `84c3e8c636433fa2a5d493ff25e3b3c1901fc7e0` | دورة الجلسة، RBAC، fail-closed، فجوات الواقع |
+| ADR-W2-003 | `MISSION-03_EXECUTION/DEVICE_LIFECYCLE_POP_ADR.md` | دليل معماري مقيد ببوابات DB | blob `8728338f6775c167654aa57a437e8cd60c819704` | دورة الجهاز، PoP، التجميد بعد revoke |
+| واقع المصدر | `TransportERP.Api/Program.cs` | دليل الموجود فقط | blob `69826838c61c116e7a37d08f06b3892f7c447c6c` | JWT وSync endpoint الحاليان |
+| واقع Sync | `SyncOperationService.cs` + `P1Entities.cs` | دليل الموجود فقط | blobs `263ab7e2722cba0918ee494bf0097669a05a331d` و`016d78fa0006479b7dcc3d60c898650e74f7cfa4` | idempotency، الحالات، provenance، التعارضات والفجوات |
+| واقع تطبيقات Mobile | مشاريع Admin/Customer/Driver | دليل الموجود فقط | blobs `9e47b002e4b1a6365a8c4fab58f39d5c7865c977`, `7faea833f8025d4a16f1197299496f111b057af4`, `0bfa8b25c48bd652ae06afaaefc088ef51221e24` | إثبات أنها مشاريع placeholder غير تنفيذية حاليًا |
 
-- `AUTH-001` اختار local application authority، لكنه لم يحسم MFA factors أو step-up triggers أو مدد الجلسات أو recovery policy.
-- `CLIENT-001` يثبت Desktop وثلاثة Android clients فقط: Admin/Customer/Driver. توزيع تطبيق السوق/الناقل/مالك المركبة داخل هذه القنوات غير محسوم.
-- مشروعات Mobile التي فُحصت في الجولة الأصلية لم تثبت runtime ميدانيًا مكتملًا لـGPS/POD/Offline client.
-- token لا يصبح tenant/permission/device authority؛ السلطة الفعلية تعاد من الخادم وفق الحالة الحالية.
-- الأدلة الحساسة، GPS الخلفي، صور الهوية، البصمة، retention/deletion والمشاركة تحتاج سياسة مثبتة ولا تُحسم بالتخمين.
-- الحدث التشغيلي تملكه TEAM-04؛ الأثر المالي تملكه TEAM-05؛ TEAM-07 يقتصر على الهوية والدليل والوصول والصلاحية وOffline/replay.
+### 2.2 A11 fingerprint — حفظ الواقعة الأصلية مع التصنيف المصحح
 
-## 4. القنوات والهوية والجلسة والجهاز
+النسخة الأصلية سجلت أن هوية A11 هي `file_000000001a7c81fd87469fb8c0e9fdf4` version `14` وأن البايتات المتاحة أعادت SHA-256 `0f6036b62901983f7ba72bbaf74559df513061e68bb530bacac22f711e9663d6` بينما الفهرس صنفها تاريخية. الواقعة محفوظة، لكن تصنيفها الحاكم بعد Wave A هو:
 
-| القناة | الحالة الحاكمة | ملاحظة TEAM-07 |
+`GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION`
+
+وليست قرار مالك، ولا ينشئ TEAM-07 fingerprint بديلًا.
+
+## 3. نطاق المراجعة وحدودها — المادة الأصلية محفوظة
+
+دخل في النطاق الأصلي:
+
+- التسجيل والدخول والتفعيل والاسترداد والحظر.
+- أنواع المستخدمين والخدمات ومستويات التحقق والثقة.
+- الأدوار والصلاحيات والنطاق وSoD.
+- تطبيق الزبون، تطبيق السائق، تطبيق الإدارة، ونموذج السوق/الناقل/مالك المركبة المقترح.
+- السائق الموظف والمنتسب والخارجي، والناقل ومالك المركبة.
+- الهوية والوثائق والملكية والضمانات والصور.
+- التوقيع وPOD والبصمة كموضوع قرار حساس غير محسوم.
+- GPS وحالات الإذن والتتبع الخلفي.
+- Offline Queue والمزامنة والانقطاع والتعارض وإعادة المحاولة وإعادة التحقق.
+- دورة الجهاز والجلسة والثقة الرقمية والتخزين الآمن وسحب الموافقة.
+
+استُبعد أصلًا وما يزال مستبعدًا:
+
+- التصميم البصري.
+- كتابة أو تعديل الكود أو الاختبارات أو المخطط أو الترحيلات.
+- اختيار خوارزمية تشفير/بصمة/عامل MFA نهائية.
+- اعتماد مدة احتفاظ أو حذف أو تتبع أو مهلة جلسة.
+- جمع بيانات أشخاص أو هويات أو مواقع حقيقية.
+- حسم قيمة مالية أو واقعة تشغيلية يملكها الفريقان 04 و05.
+
+## 4. الخلاصة التحليلية الأصلية — محفوظة مع Correction precedence
+
+1. `AUTH-001` حسم أن سلطة إصدار token/session المستهدفة محلية داخل TransportERP، لكنه لم يحسم MFA أو مدد الجلسات أو الاسترداد أو مفاتيح الإنتاج.
+2. قنوات الإصدار الحاكمة: Desktop وثلاثة تطبيقات Android: Admin/Customer/Driver. لا يوجد تطبيق رابع للسوق/الناقل في `CLIENT-001`.
+3. كلام المالك يطلب فصل تطبيق الزبون عن تطبيق السوق/مقدمي الخدمة؛ وهذا لا يطابق مباشرة نموذج العملاء الثلاثة، فيسجل `GOVERNANCE/OWNER CONTEXT CONFLICT` دون دمج صامت.
+4. المشاريع الثلاثة Mobile كانت موجودة اسميًا فقط في الجولة الأصلية: كل مشروع `.csproj` وحده، بلا شاشات أو نقطة تشغيل أو Secure Storage أو GPS أو Offline client مثبت.
+5. معرفات التطبيقات في `.csproj` كانت `com.companyname...` مقابل `com.altayer.transporterp.admin/customer/driver` في CLIENT-001؛ هذا `GOVERNANCE DELTA`.
+6. الـAPI الذي فُحص في الجولة الأصلية كان يتحقق من JWT لكنه لم يثبت تسجيلًا أو دخولًا أو إصدار token أو refresh أو logout/revoke أو recovery أو MFA كاملًا.
+7. RBAC كان موجودًا ككيانات User/Role/Permission/RolePermission/UserRole/Override، لكن الاعتماد على claims في نقاط حرجة لا يحل محل server-resolved authority.
+8. لم يكن Registry/Assignment/PoP/Session persistence فعلي للأجهزة مثبتًا؛ `device_registered=true` claim ليس إثباتًا من سجل خادمي.
+9. Sync الخادمي كان يملك `ClientOperationId`, payload hash, user/company/branch/device, base version وحالات أساسية، لكنه لم يثبت session provenance أو permission/action code داخل سجل العملية ولا حالة `FROZEN` كاملة.
+10. OFFLINE-001 يسمح فقط بأهلية فئات تشغيلية محدودة وبقبول خادمي نهائي؛ جميع إجراءات الهوية والصلاحيات والجهاز والموافقات والأمن Online-authoritative.
+11. صور الهوية والبصمة والتتبع الخلفي لا تعتمد بلا غرض محدد، أقل قدر من الجمع، موافقة، صلاحيات وصول، تشفير، retention/deletion وحكم قانوني.
+12. البصمة الحيوية ليست افتراضًا إلزاميًا؛ البدائل الأقل جمعًا مثل OTP أو توقيع أو رمز/مسح مرتبطة بنوع العملية وتحتاج سياسة قبل الاعتماد.
+
+## 5. واقع التطبيقات والهوية وOffline عند الجولة الأصلية
+
+| المجال | الموجود المثبت في الجولة الأصلية | الفجوة/الأثر |
 |---|---|---|
-| Desktop | Release target مثبت في CLIENT-001 | موظفو المكتب/الإدارة بحسب permission وscope الخادمي؛ اسم القناة لا يمنح Action |
-| Mobile Admin Android | Release target مثبت | مراجعة/إدارة بحسب permission وscope؛ لا تفويض عام |
-| Mobile Customer Android | Release target مثبت | العميل يرى/ينفذ ما يخصه وفق الخدمة والهوية والعقد |
-| Mobile Driver Android | Release target مثبت | السائق/المندوب الميداني بحسب التعيين والpermission والscope |
-| تطبيق السوق/الناقل/مالك المركبة | غير محسوم داخل CLIENT-001 | `NEEDS OWNER DECISION` بشأن التوزيع داخل القنوات الحالية أو قرار client إضافي |
-| iOS | مؤجل | خارج نطاق الإصدار الحالي |
+| Mobile Admin | `.csproj` فقط | لا executable entry point أو navigation أو auth/secure storage/runtime evidence |
+| Mobile Customer | `.csproj` فقط | لا تسجيل/دخول/طلبات/تتبع/دفع فعلي |
+| Mobile Driver | `.csproj` فقط | لا مهام/GPS/POD/Offline queue فعلي |
+| Application IDs | `com.companyname.transporterp.mobile.*` | تختلف عن الهويات الحاكمة في CLIENT-001 |
+| Platforms في csproj | Android، وإمكان iOS/macCatalyst/Windows مشروط عند وجود scaffold | CLIENT-001 يؤجل iOS؛ لا يتحول الشرط التقني إلى نطاق إصدار |
+| JWT validation | external authority أو issuer+signing key | AUTH-001 اختار local application authority، لكن issuance/session lifecycle لم يكن مثبتًا في الجولة الأصلية |
+| Login/recovery/MFA | لا endpoint/service مثبت وقت الجولة الأصلية | المرشحات تحليلية وليست واقعًا منفذًا مثبتًا |
+| RBAC | User/Role/Permission وروابطها | لا request-time DB effective-permission pipeline شامل مثبت وقت الجولة الأصلية |
+| Membership | User يحمل CompanyId/BranchId مباشرة | ADR يطلب membership/TenantContext صريحًا؛ لا يُخترع مخطط هنا |
+| Session | غير موجود ككيان/خدمة مثبت وقت الجولة الأصلية | refresh family/revoke/logout/session-device binding فجوات |
+| Device trust | claims نصية | لا registry أو assignment أو proof key أو nonce/replay authority مثبتة |
+| Sync intake | batch endpoint + SyncOperationService | دليل خادمي جزئي؛ ليس Offline client كاملًا |
+| Sync ownership | duplicate enqueue يفحص user/device؛ transitions/conflict resolution يثبتان tenant أساسًا | فجوة same-tenant different-user/device مذكورة في ADR-W2-003 |
+| Queue states | `QUEUED/SENDING/SUCCEEDED/FAILED/CONFLICT/REJECTED/RESOLVED` | لا تطابق كاملًا النموذج التحليلي؛ المعالجة = `NEEDS TEAM CORRECTION — QUEUE GOVERNANCE` |
+| GPS/POD | لا تنفيذ ميداني مثبت في المشاريع الثلاثة وقت الجولة الأصلية | يلزم عقد شاشة/صلاحية/خصوصية/Offline مستقل لاحقًا |
 
-قواعد الهوية والجلسة والجهاز الحاكمة:
+## 6. نموذج القنوات والتعارض الحاكم
 
-1. Authentication منفصل عن authorization.
-2. tenant/company/branch/effective permission/device/session authority تعاد من الخادم عند الطلب/replay.
-3. revoke/expiry يعامل fail-closed ويجمّد outbound المحمي إلى أن تتم إعادة المصادقة/المعالجة المسموحة.
-4. لا ينقل queue محمي بين مستخدم أو شركة أو فرع أو جهاز مختلف دون عقد صريح؛ لا يوجد عقد من هذا النوع مثبت هنا.
-5. MFA/step-up/session durations/recovery تبقى `NEEDS OWNER DECISION` عندما لا يوجد قرار مثبت.
+| القناة | مرجعها | المستخدمون المقصودون | الحكم |
+|---|---|---|---|
+| Desktop | CLIENT-001 | موظفو المكتب والإدارة والمحاسبة والتشغيل | ثابت كهدف إصدار؛ تفاصيل الشاشة خارج فريق 07 إلا الأمن والقناة |
+| Mobile Admin Android | CLIENT-001 | مدير/مشرف/موظف مخول | ثابت كقناة؛ لا يعني نقل كل وظائف Desktop |
+| Mobile Customer Android | CLIENT-001 + كلام المالك | عميل فرد/راكب/شحن/توصيل/تاجر مفوض | ثابت كقناة؛ الخدمات تظهر حسب التفعيل |
+| Mobile Driver Android | CLIENT-001 | السائق/المحصل/المندوب الميداني | ثابت كقناة، لكن نطاق الناقل/المالك غير محسوم |
+| تطبيق السوق/مقدمي الخدمة | مسودة المالك | سائق منتسب/خارجي، ناقل، مالك مركبة | `GOVERNANCE/OWNER CONTEXT CONFLICT`؛ لا يوجد client مستقل في CLIENT-001 |
+| iOS | CLIENT-001 | مؤجل | خارج نطاق الإصدار الحالي |
 
-## 5. الخصوصية وGPS وPOD — الحدود الحاكمة
+### 6.1 خيارات المصالحة الأصلية — لا قرار من الفريق
 
-### 5.1 GPS
+1. إبقاء تطبيقات CLIENT-001 الثلاثة، وجعل Mobile Driver قناة أدوار متعددة للسائق/الناقل/مالك المركبة مع وحدات بحسب الدور.
+2. إصدار قرار مالك لاحق يضيف تطبيق سوق/ناقل رابع وهوية تطبيق وتوقيع وتوزيع مستقلين.
+3. إبقاء التسجيل كسوق/بوابة ويب أو مسار داخل Mobile Driver، مع فصل تجربة الزبون فقط.
 
-المسودة لا تعتمد background tracking كافتراض عام. يلزم قرار حاكم يحدد على الأقل:
+كل خيار يؤثر على Application ID، التوقيع، secure storage، device enrollment، Offline data continuity وحجم التطبيق؛ لا يختاره TEAM-07.
 
-- الغرض من الجمع.
-- بدء/إيقاف التتبع.
-- المصدر: هاتف أم جهاز مركبة أم مصدر آخر.
-- freshness/delay المقبول.
-- accuracy إن كانت مطلوبة.
-- cadence.
-- من يرى الموقع الحي والتاريخ.
-- مشاركة العميل.
-- retention/deletion/legal hold.
-- أثر رفض أو سحب الإذن.
-- ضوابط التلاعب/المحاكاة/إعادة الإرسال.
+## 7. مصفوفة User × Service × Verification × Capability — مستعادة كاملة
 
-### 5.2 POD
+مصطلح «قدرة منطقية» وصف تحليلي وليس Permission Code أو عقد API.
 
-لا يعتمد نوع POD واحد لجميع الخدمات. الحد الأدنى المتناسب لكل خدمة/خطر/منطقة يبقى `NEEDS OWNER DECISION`، وقد يشمل عند ثبوت السياسة OTP أو توقيعًا أو صورة أو بيانات وقت/موقع أو خليطًا منها. البصمة الحيوية لا تعتمد دون ضرورة وقاعدة قانونية مثبتتين.
+| المستخدم/العلاقة | القناة المرشحة | الخدمات | بوابة التحقق | القدرات المنطقية الدنيا | القيود |
+|---|---|---|---|---|---|
+| مدير/مشرف داخلي | Desktop/Mobile Admin | رقابة واعتماد وتشغيل | هوية موظف + عضوية نشطة + جهاز/جلسة موثوقان حسب السياسة | مراجعة/اعتماد ضمن نطاقه | SoD وstep-up للأفعال الحساسة يحتاجان قرارًا |
+| موظف فرع | Desktop | حجز/بوليصة/استلام/تسليم | عضوية شركة وفرع نشطة | إنشاء/تعديل تشغيل ضمن الفرع | لا اعتماد ذاتي ولا توسيع نطاق |
+| وكيل/نقطة خدمة | قناة محدودة | حجز/استلام/تسليم حسب العقد | تحقق الجهة والمستخدم والنقطة | عمليات النقطة فقط | لا يرى شركات/فروعًا أخرى |
+| عميل فرد أساسي | Mobile Customer | استعلام/طلب منخفض المخاطر | هاتف متحقق وفق سياسة لاحقة | إنشاء draft ومتابعة ما يخصه | لا ائتمان أو خدمة عالية المخاطر تلقائيًا |
+| عميل موثق | Mobile Customer | ركاب/شحن/طرود/توصيل | هوية/بيانات إضافية حسب الخدمة | طلبات وخدمات مفعلة | مستوى التحقق لا يمنح صلاحية داخلية |
+| تاجر/شركة ومفوض | Mobile Customer/بوابة محتملة | خدمات متعددة | KYB/وثائق ومفوضون وفق قرار قانوني | طلبات المنشأة ضمن التفويض | حدود الائتمان/المستخدمين تحتاج قرارًا |
+| سائق موظف | Mobile Driver | رحلات/ركاب/شحن/تحصيل/POD | ملف موظف + رخصة + تعيين + جهاز | مهامه وعهدته فقط | لا تعديل سعر/دفع/تسوية صامتًا |
+| سائق منتسب | Mobile Driver أو قناة السوق | خدمات مفعلة وعقود | هوية + رخصة + مركبة/تفويض + اعتماد | قبول/تنفيذ المهام ضمن الخط والخدمة | لا وصول للنظام الداخلي |
+| سائق خارجي | قناة السوق/Driver محدودة | مهمة أو مهام محددة | تحقق أقوى وقرار ثقة وحدود تشغيل | المهمة المسندة فقط | تقييد مالي/تشغيلي حتى قرار الثقة |
+| ناقل/شركة نقل | قناة السوق/بوابة | نقل خفيف/متوسط/ثقيل | كيان/مفوض/مركبات/سائقون ووثائق | عروض/قبول/تنفيذ/أدلة ضمن العقد | لا يرى بيانات غير لازمة للمهمة |
+| مالك مركبة غير سائق | قناة السوق/بوابة | ملكية/تفويض/مستحقات | هوية وملكية وعلاقة التفويض | إدارة مركباته والتفويضات المسموحة | لا يكتسب صلاحيات السائق تلقائيًا |
 
-### 5.3 الأدلة الحساسة
+قاعدة مشتركة: اختيار الخدمة لا يساوي تفعيلها، ونوع العلاقة لا يساوي دورًا أمنيًا، واسم الدور لا يكفي وحده؛ التفويض يحسمه user + membership + company/branch + service + current verification + device/session + permission + state.
 
-- evidence capture لا يساوي final/legal acceptance.
-- attachment staging لا يساوي server acceptance.
-- الوصول إلى صور الهوية/POD/GPS/history يحتاج permission وscope مثبتين.
-- لا retention duration مخترعة في هذه المسودة.
+## 8. التسجيل والتحقق والثقة — مستعاد كاملًا
 
-## 6. وظائف A11 القائمة — دون تغيير Population
+### 8.1 المسار التحليلي المشترك
 
-تظل إحالات A11 الموجودة في المسودة السابقة مرجعًا فقط، ومنها:
+`إنشاء طلب تسجيل → تحقق وسيلة الاتصال → اختيار نوع الحساب/الخدمات → جمع الحد الأدنى → رفع الوثائق المطلوبة فقط → مراجعة → تفعيل محدود/كامل حسب القرار → مراجعة دورية أو تقييد/حظر`
 
-- `PLT-001..003` للدخول/MFA/TenantContext.
-- `SEC-001..020` للمستخدم/الدور/permission/scope/session/device/audit/privacy.
-- `MOB-001/002/006/010/014..037` للقنوات Mobile والعمليات الميدانية.
-- `PTY-006/009` للناقل/مقدم الخدمة والوثائق.
-- `FLT-002/003/007/008/012/018/019/029` للمركبة والسائق وGPS/share tracking.
-- `SHP-031/037` للتتبع/POD.
-- `LMD-013/017` للتتبع/POD في last-mile.
-- `INT-011/012` للمراقبة الإدارية، لا كإثبات client queue UI.
-- `TRV-035/039` للبيع/المعلومات الحية، مع خضوع أي Offline action لـOFFLINE-001.
+هذا تسلسل تحليلي، ولا يعتمد أسماء حالات نهائية أو شروط KYC/KYB.
 
-لا يثبت أي ID أعلاه وحده Permission أو موضع شاشة نهائي أو Action authority.
+### 8.2 طبقات البيانات
 
-## 7. إزالة Local Candidate IDs
+| الطبقة | العميل | السائق/الناقل | المركبة/المالك | الحكم |
+|---|---|---|---|---|
+| اتصال أساسي | اسم/هاتف | اسم/هاتف/منطقة | اسم المالك/اتصال | أقل قدر لازم |
+| تحقق هوية | بحسب مخاطر الخدمة | هوية ورخصة | هوية المالك عند الحاجة | يحتاج أساسًا قانونيًا وسياسة |
+| علاقة تشغيل | الخدمات المطلوبة | موظف/منتسب/خارجي، خطوط وخدمات | مكتب/منتسب/مؤجرة/خارجية | لا يتحول تلقائيًا إلى صلاحية |
+| ملكية/تفويض | غير منطبق غالبًا | علاقة بالمركبة | ملكية أو تفويض | مطلوب قبل إسناد مركبة خارجية وفق السياسة |
+| أدلة مرئية | عند الضرورة فقط | صورة شخصية/هوية وربط بالمركبة | صور المركبة/اللوحة/الملكية | `NEEDS SECURITY/OWNER DECISION` |
+| ضمانات | حسب خدمة/مخاطر | ضامن شخصي/تجاري مقترح | أصل/ملكية كدليل مقترح | ليست سياسة قانونية معتمدة |
+| سجل الثقة | تعاملات واعتراضات | مهام/مخالفات/شكاوى/نجاحات | حوادث/صلاحية/وثائق | يلزم حق الاعتراض والتصحيح |
 
-تم إلغاء صفة المعرف عن **العناصر السبعة** التي كانت مسجلة في المسودة السابقة كـLocal Candidate. لا يوجد لها بديل ID، ولا Population موازية، ولا توريث إلى TEAM-03/06/08.
+### 8.3 حالات Onboarding/Verification التحليلية
+
+- طلب جديد.
+- اتصال غير متحقق/متحقق.
+- ملف غير مكتمل.
+- تحت المراجعة.
+- مفعّل بحدود.
+- موثق للخدمات المعتمدة.
+- مقيد.
+- موقوف.
+- محظور.
+- تحقق منتهي/يحتاج تجديد.
+- طلب سحب موافقة أو إغلاق حساب قيد المعالجة.
+
+الأسماء والانتقالات وأسباب الحظر وآلية الاعتراض ومدة التجديد كلها: `NEEDS SECURITY/OWNER DECISION`.
+
+## 9. Session lifecycle وMFA وDevice lifecycle — مستعادة كاملة
+
+### 9.1 سلطة الجلسة
+
+`GOVERNANCE DELTA`: ADR-W2-002 أقدم ويحمل AUTH-001 مفتوحًا، لكن القرار الأحدث `AUTH-001` حسم `LOCAL APPLICATION AUTHORITY`. تبقى مفتوحة:
+
+- مدة access token.
+- مدة refresh family/absolute session/idle timeout.
+- عدد الجلسات المتزامنة.
+- سياسة remember device.
+- عوامل MFA واستردادها.
+- step-up triggers والمهلة بعد التحقق.
+
+### 9.2 دورة الجلسة
+
+| الحدث | السلوك المطلوب | Offline |
+|---|---|---|
+| Login | تحقق محلي خادمي من الهوية ثم membership/permission/device | Online-authoritative |
+| Issue access/refresh | access قصير العمر؛ refresh دوار أحادي الاستخدام وفق AUTH-001 | لا Queue |
+| Refresh | إعادة تحقق session/security/device version | Online-authoritative |
+| Step-up | تحد مستقل يعيد المستخدم للسياق بعد النجاح | Online-authoritative |
+| Expiry | منع التنقل المحمي وتجميد الإرسال حتى re-auth | محلي fail-closed |
+| Logout | محو credentials محليًا فورًا + revoke خادمي عند الاتصال | revoke لا يُعتمد Offline |
+| Revoke | إبطال session/family والجهاز عند الانطباق | يجمد queue ويحظر replay |
+| Refresh reuse | revoke family + تدقيق + إعادة مصادقة | لا Queue |
+| Recovery | مسار منفصل لا يستخدم جلسة قديمة أو جهازًا غير موثوق كسلطة | Online-authoritative |
+
+### 9.3 MFA وStep-up
+
+وجود `PLT-002` و`SEC-014` في A11 يثبت مرشحات، لا سياسة عوامل. الحالة:
+
+`NEEDS SECURITY/OWNER DECISION`
+
+مرشحات استخدام تحتاج اعتمادًا: إدارة الصلاحيات، استرداد الجهاز/الحساب، تغيير عوامل الدخول، اعتماد عالي الأثر، الوصول إلى صور الهوية/التصدير، وتغيير وسائل الدفع أو التسوية. لا يعتمد حد مبلغ أو عامل SMS/Authenticator/Passkey هنا.
+
+### 9.4 دورة الجهاز
+
+| الحالة/الإجراء | السلطة | أثر الجلسة/Offline |
+|---|---|---|
+| enroll request | مستخدم نشط؛ pending فقط | لا ثقة ولا إرسال محمي قبل القبول |
+| approve/activate | مدير مخول منفصل عن الطلب | يسمح فقط ضمن assignment صحيح |
+| assign | يربط الجهاز بعضوية user/company/branch | لا يوسع العضوية |
+| transfer | إزالة/إضافة محكومة وتدقيق | revoke للجلسات القديمة وتجميد queue |
+| suspend/revoke/lost | مدير؛ self-report طلب فقط | منع intake جديد وتجميد outbound |
+| proof-key rotation | جهاز معين مع إثبات حيازة وسياسة | key version قد يبطل session القديمة |
+| recovery | مسؤول استرداد مسمى + step-up/دليل خارجي | revoke للمفتاح والجلسات السابقة |
+
+Registry/assignment/session binding/PoP/nonce/replay تحتاج DB gates؛ المسودة لا تنشئ مخططًا.
+
+### 9.5 Secure Storage controls
+
+- access/refresh credentials في مخزن النظام الآمن فقط، لا نص صريح في ملفات التطبيق.
+- مفتاح حماية queue المحلية في keystore/platform secure storage، دون اعتماد خوارزمية هنا.
+- منع طباعة token/صور الهوية/POD أو محتوى queue في السجلات.
+- عند revoke: محو/عزل credentials، منع protected navigation، وتجميد outbound المحمي.
+- البيانات الحساسة المتزامنة تتبع deletion/retention policy؛ لا توجد مدة معتمدة.
+
+## 10. Consent / Privacy / Retention / Deletion — مستعاد كاملًا
+
+يلزم فصل موافقات مستقلة عند انطباقها على:
+
+- صور الهوية والملكية.
+- التتبع أثناء الاستخدام.
+- التتبع في الخلفية.
+- مشاركة التتبع مع العميل.
+- التوقيع الإلكتروني.
+- أي بصمة حيوية.
+
+سحب الموافقة يجب أن:
+
+1. يوقف الجمع المستقبلي غير اللازم فورًا بحسب نوع الموافقة.
+2. لا يمحو سجلًا خادميًا أو دليلًا قانونيًا صامتًا.
+3. يحدد أثره على الخدمة والمهام النشطة بوضوح.
+4. يوجه البيانات القائمة إلى retention/deletion/legal hold policy الحاكمة.
+5. يسجل actor/time/scope/reason/outcome.
+
+لا توجد مدة احتفاظ معتمدة للهوية أو GPS أو POD أو nonce/replay أو audit أو queue. جميعها: `NEEDS SECURITY/OWNER DECISION`.
+
+## 11. GPS permission/background tracking states — مستعادة كاملة
+
+| حالة الإذن | سلوك الواجهة/الخدمة | الحكم |
+|---|---|---|
+| Denied | شرح الغرض والبديل/الأثر؛ لا جمع صامت | لا إعادة طلب مزعجة؛ السياسة تحتاج قرارًا |
+| While in use | جمع فقط أثناء الشاشة/المهمة المسموحة | لا يساوي background consent |
+| Background allowed | مؤشر واضح ونطاق مهمة/وردية محدد | cadence/purpose/retention/stop rules مفتوحة |
+| Temporarily unavailable | حفظ حالة عدم التوفر والوقت؛ لا اختلاق إحداثي | retry وفق نوع الخطأ لا كقبول صامت |
+| Permission revoked أثناء المهمة | إيقاف الجمع وتحديث حالة المهمة/التنبيه | لا استمرار خفي |
+
+التتبع الخلفي لا يُفترض دائمًا. يلزم قرار يحدد: من يُتتبع، أثناء أي مهمة/وردية، متى يبدأ وينتهي، دقة الموقع، تكرار العينة، من يرى التاريخ، مشاركة العميل، الاحتفاظ، الاعتراض، وتأثير رفض الإذن.
+
+## 12. POD / signature / photos / biometric analysis — مستعاد كاملًا
+
+| الدليل | الاستخدام التحليلي | Offline | الخصوصية/القرار |
+|---|---|---|---|
+| رمز/OTP | إثبات حيازة قناة/مستلم وفق عقد لاحق | التحقق النهائي Online؛ Offline غير محسوم | سياسة إصدار/انتهاء/إعادة استخدام مطلوبة |
+| توقيع إلكتروني | دليل استلام عند ملاءمة الخدمة | staging فقط بعد سياسة مرفقات | retention/access/non-repudiation مطلوب |
+| صورة الطرد/الحمولة | حالة الاستلام/التسليم/التلف | staging بعد سياسة مرفقات | تقليل المحتوى والوجوه/الخلفية |
+| صورة هوية المستلم | فقط إذا ضرورة قانونية مثبتة | `UNRESOLVED` ويعامل كـDENY افتراضيًا | شديد الحساسية؛ بديل أقل جمعًا أولًا |
+| بصمة حيوية | لم تثبت الضرورة أو القانونية | `DENY` حتى قرار صريح | `NEEDS SECURITY/OWNER DECISION` |
+| موقع/وقت POD | سياق العملية | pending capture ممكن فقط عند اكتمال السياسة والعقد | لا يثبت التسليم وحده |
+
+لا يصبح التسليم نهائيًا لأن الجهاز عرضه كذلك؛ الحالة النهائية بعد upload/validation/server acknowledgement.
+
+## 13. الشاشات والوظائف المرشحة من A11 — الجدول الأصلي مستعاد
+
+جميع IDs التالية `A11 EXISTING`، لكن وجودها لا يرقّيها إلى Permission أو موضع نهائي أو Action authority.
+
+| IDs | الشاشات/الوظائف | الاستخدام | حالة القرار |
+|---|---|---|---|
+| `PLT-001` | تسجيل الدخول | نقطة دخول مشتركة | SUPPORTED AS A11 ID؛ تفاصيل العقد مفتوحة |
+| `PLT-002` | تحدي MFA | step-up/MFA | NEEDS SECURITY/OWNER DECISION |
+| `PLT-003` | اختيار الشركة/الفرع/الفترة | TenantContext بعد الدخول | SUPPORTED AS A11 ID؛ authority خادمية |
+| `SEC-001..004` | المستخدمون/الأدوار/الصلاحيات/المصفوفة | إدارة RBAC | Online-authoritative |
+| `SEC-005..012` | النطاقات/التفويض/طلبات ومراجعة الصلاحية/SoD | scope وgovernance | Online-authoritative |
+| `SEC-013..017` | كلمة المرور/MFA/الجلسات والأجهزة/قفل الحساب/محاولات الدخول | security lifecycle | Online-authoritative |
+| `SEC-018..020` | audit/config changes/retention & privacy | رقابة وسياسة | مدد/حذف تحتاج قرارًا |
+| `MOB-001/002` | Admin home/approvals | قناة الإدارة | approvals Online-authoritative |
+| `MOB-006` | Customer registration/login | onboarding عميل | لا يغطي recovery/consent تفصيليًا |
+| `MOB-010/030/032/033` | تتبع العميل/الرئيسية والخدمات/التذاكر/العناوين والمحفظة | تطبيق الزبون | بعضها Draft requires promotion |
+| `MOB-031` | Driver registration/activation | onboarding سائق | لا يثبت قناة ناقل/مالك مستقلة |
+| `MOB-014..027` | وردية/مهام/ملاحة/استلام/فحص/صور/GPS/POD/تحصيل/عهدة/تسوية/بلاغ/وثائق | تطبيق السائق الميداني | كل Action يخضع لمصفوفة Offline |
+| `MOB-034..037` | مانيفست/مسح تذاكر/بيع داخل الحافلة/رسائل | تطبيق السائق للركاب | البيع/المقاعد تحتاج سلطة دقيقة |
+| `PTY-006/009` | الناقلون/مقدمو الخدمة والهوية/التراخيص/الوثائق | ملف الطرف والتحقق | لا ينشئ trust policy |
+| `FLT-003/007/008/012` | مركبات/سائقون/وثائق/ربط السائق بالمركبة | ملف تشغيلي وثقة | لا يحسم الملكية أو التفويض القانوني |
+| `FLT-002/018/019/029` | خريطة حية/GPS history/geofence/share tracking | GPS والتتبع | privacy/consent/retention مفتوحة |
+| `SHP-031/037` | تتبع الرحلة/POD | الشحن | ownership التشغيلي مع 04؛ الدليل مع 07 |
+| `LMD-013/017` | تتبع العميل/إثبات التسليم | Last-mile | مرشحات مشتركة مع SHP/MOB |
+| `INT-011/012` | Offline monitor/device & mobile app status | مراقبة الإدارة | ليسا client queue UI بذاتهما |
+| `TRV-035/039` | بيع يدوي/Offline ومعلومات الركاب الحية | تذاكر/تتبع | TRV-035 لا يعلو على OFFLINE-001 |
+
+### 13.1 العناصر السبعة التي كانت Local Candidate — المفهوم محفوظ وصفة ID محذوفة
+
+لا تظهر السلسلة المحذوفة كمعرّف. لا ID بديل ولا Population.
 
 | الوصف الوظيفي فقط | الحالة | حد الاستخدام |
 |---|---|---|
 | استرداد الحساب/كلمة المرور | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | flow محتمل تحت login/security؛ ليس هوية شاشة |
-| تفعيل الحساب/الخدمة ومراجعة onboarding | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | يجب فصل طلب الخدمة عن اعتماد الصلاحية؛ ليس هوية شاشة |
-| تسجيل الناقل/مالك المركبة/مقدم الخدمة | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | قناة السوق نفسها غير محسومة؛ ليس هوية شاشة |
+| تفعيل الحساب/الخدمة ومراجعة onboarding | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | فصل طلب الخدمة عن اعتماد الصلاحية؛ ليس هوية شاشة |
+| تسجيل الناقل/مالك المركبة/مقدم الخدمة | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | قناة السوق غير محسومة؛ ليس هوية شاشة |
 | إدارة موافقة المستخدم وسحبها | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | privacy/consent function؛ ليس هوية شاشة |
 | enrollment/recovery/transfer للجهاز | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | device lifecycle function؛ ليس هوية شاشة |
-| حالة queue المحلية والتعارضات للمستخدم الميداني | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | client component محتمل؛ `INT-011` لا يثبته؛ ليس هوية شاشة |
+| حالة queue المحلية والتعارضات للمستخدم الميداني | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | client component محتمل؛ INT-011 لا يثبته |
 | تفسير إذن GPS وحالة التتبع الخلفي | `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | OS/application handoff؛ ليس هوية شاشة |
 
-## 8. نتائج ذرية مصححة من المسودة السابقة
+## 14. النتائج الذرية — التصحيح المعتمد محفوظ
 
 | ID موجود سابقًا | النوع | النتيجة بعد التصحيح | الحالة |
 |---|---|---|---|
@@ -139,7 +375,7 @@
 | `T07-F-003` | تعارض | نموذج السوق المقترح لا يطابق client scope مباشرة | `NEEDS OWNER DECISION` |
 | `T07-F-004` | فجوة | Mobile runtime لم يكن مثبتًا في الجولة الأصلية | فجوة تنفيذ؛ لا تعاد مراجعتها هنا |
 | `T07-F-005` | فجوة | login/session lifecycle الكامل غير مثبت في Source الجولة الأصلية | فجوة تنفيذ؛ لا قرار شاشة |
-| `T07-F-006` | فجوة | permission/device authority لا يجوز أن تعتمد claims عميل كحقيقة نهائية | ثابت من AUTH-001 |
+| `T07-F-006` | فجوة | permission/device authority لا تعتمد claims عميل كحقيقة نهائية | ثابت من AUTH-001 |
 | `T07-F-007` | فجوة | device/session/PoP persistence تخضع لبواباتها الحاكمة | ثابت كحد حوكمي |
 | `T07-F-008` | قاعدة | `ELIGIBLE CATEGORY DOES NOT MEAN ACTION AUTHORITY` | مصحح وفق Wave A/OFFLINE-001 |
 | `T07-F-009` | قاعدة | لا silent merge للحسابات/العهدة/الكميات/الموافقات/الأمن | ثابت |
@@ -147,97 +383,94 @@
 | `T07-F-011` | سؤال | MFA/step-up/session durations غير محسومة | `NEEDS OWNER DECISION` |
 | `T07-F-012` | سؤال | GPS background purpose/cadence/retention غير محسومة | `NEEDS OWNER DECISION` |
 | `T07-F-013` | سؤال | POD/هوية المستلم/البصمة تحتاج أقل جمع وسياسة | `NEEDS OWNER DECISION` |
-| `T07-F-014` | تعارض مرجع | A11 fingerprint reconciliation | `GOVERNANCE DELTA` — ليس قرار مالك وظيفيًا |
+| `T07-F-014` | تعارض مرجع | A11 fingerprint reconciliation | `GOVERNANCE DELTA` — ليس قرار مالك |
 | `T07-F-015` | فجوة | Application IDs التي كانت في scaffold لا تطابق CLIENT-001 | `GOVERNANCE DELTA`/تنفيذ لاحق |
 
-## 9. استهلاك Handoff المالي من TEAM-05 — مصفوفة الأفعال الحساسة
+## 15. Handoff المالي من TEAM-05 — 9 أفعال حساسة محفوظة
 
-قاعدة المصفوفة: لا يُنشأ Role أو Permission جديد. أي خانة لا تثبتها TEAM-05/ACC-001/AUTH-001/OFFLINE-001 تبقى `UNRESOLVED`. `Settlement` محاسبي يخضع دائمًا للحد الأدنى من SoD في ACC-001: `SoD threshold = 0`، collector لا يعتمد/يرحل تسويته الخاصة، وSettlement maker لا يكون final approver/poster.
+قاعدة المصفوفة: لا Role ولا Permission ولا Action ID جديد. كل غير مثبت = `UNRESOLVED`. `Settlement` محاسبي يخضع لـACC-001: `SoD threshold = 0`، collector لا يعتمد/يرحل تسويته الخاصة، وSettlement maker لا يكون final approver/poster.
 
 | Action | Actor | Company/Branch/Entity Scope | Permission | Maker | Checker | Approver/Poster | Channel | Offline/Replay | Audit | Decision Gap |
 |---|---|---|---|---|---|---|---|---|---|---|
-| التقاط التحصيل | Collector؛ قد يكون موظف فرع/سائق/مندوب/وكيل بحسب الواقعة، والهوية الدقيقة لكل قناة `UNRESOLVED` | CollectionTransaction مرتبط بالمصدر/البوليصة + amount/currency/party + company/branch/entity context | `UNRESOLVED` | المحصل/منشئ أمر الالتقاط | لا Checker محاسبي مثبت لمجرد الالتقاط؛ server validation إلزامي عند replay | لا posting عند الالتقاط؛ collector ممنوع من اعتماد/ترحيل تسويته الخاصة | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; replay يعيد tenant/permission/device/session/idempotency/amount/currency/state validation | ClientOperationId + immutable provenance + server outcome/audit مطلوب عند التعاقد | Action identity/permission/channel/envelope غير مثبتة |
-| تعديل السعر | `UNRESOLVED` — دور تسعير مخول غير مثبت بالاسم | Quote/Price Snapshot/Customer Charge ضمن company/branch/entity scope غير المثبت تفصيلًا | `UNRESOLVED` | طالب/صانع التعديل غير مثبت بالدور | `UNRESOLVED` | سلطة قبول override وحدودها `UNRESOLVED` | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | قبل/بعد + actor + reason + scope + correlation مطلوب عند التعاقد | OWNER: من يملك التعديل والحدود؛ TEAM-07 لا يخترع Permission |
-| إعداد Settlement | Settlement maker كوظيفة SoD؛ اسم الدور `UNRESOLVED` | accepted collections/custody/differences ضمن company/branch scope المصرح؛ تفاصيل scope `UNRESOLVED` | `UNRESOLVED` | Settlement maker | maker-checker separation إلزامي عند settlement accounting boundary | maker لا يكون final approver/poster | قناة مالية مخولة؛ الاسم/القناة `UNRESOLVED` | أي posting `ONLINE AUTHORITATIVE`; إعداد action نفسه غير مفوض Offline دون عقد | source rows + maker + version/state + correlation + immutable audit | role/scope/action identity/workflow states غير مثبتة |
-| مراجعة Settlement | Reviewer/Checker كوظيفة؛ اسم الدور `UNRESOLVED` | Settlement + source rows/attachments/differences ضمن scope مخول | `UNRESOLVED` | ليس maker في حالة تحقق الفصل | Checker منفصل عن maker | كون checker نفسه final approver/poster غير محسوم فوق حد ACC-001 | `UNRESOLVED` | `ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; لا اعتماد مالي Offline | reviewer identity + outcome + reason + correlation + immutable audit | هل يلزم فصل إضافي reviewer/poster غير مثبت |
-| اعتماد/ترحيل Settlement | Final approver/poster كوظيفة؛ اسم الدور `UNRESOLVED` | Settlement مكتمل ضمن company/branch/fiscal period المسموح | `UNRESOLVED` | لا يكون maker | maker-checker separation إلزامي | final approver/poster؛ collector لا يعتمد/يرحل تسويته الخاصة | `ONLINE AUTHORITATIVE` | `DENY/ONLINE AUTHORITATIVE` | poster identity + source bindings + voucher/journal refs + period + correlation + immutable audit | permission code/role/scope limits `UNRESOLVED` |
-| عكس Settlement/التصحيح المحاسبي | مستخدم مخول بالعكس؛ اسم الدور `UNRESOLVED` | الأصل + reason + allowed fiscal period + company/branch/source references | `UNRESOLVED — distinct reversal permission required by ACC-001` | منفذ العكس | مراجعة إضافية `UNRESOLVED` | approver إضافي إن وجد `UNRESOLVED`; الأصل لا يحذف | `ONLINE AUTHORITATIVE` | `DENY/ONLINE AUTHORITATIVE` | mandatory reason + original link + correlation + immutable audit | اسم permission وحدود scope/approval الإضافي غير مثبتة |
-| الاسترداد | Actor مالي مخول `UNRESOLVED` | original payment/collection + amount/part + channel + reason + company/entity context | `UNRESOLVED` | منشئ طلب الاسترداد `UNRESOLVED` | `UNRESOLVED` | اعتماد الاسترداد وحدوده `UNRESOLVED` | القناة/استثناءاتها `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; أي accounting posting/reversal Online authoritative | original reference + actor + reason + amount + approval/rejection + immutable audit | OWNER: policy/fees/limits/channel exceptions; actor/SoD/permission غير مثبتة |
-| اعتماد/تسوية العمولة | Actor عمولات/مالية `UNRESOLVED` | Commission entitlement by beneficiary/base/trigger/executed part; company/entity scope تفصيلي `UNRESOLVED` | `UNRESOLVED` | صانع الاحتساب/التسوية `UNRESOLVED` | مراجعة وظيفية مطلوبة كمرشح؛ checker permission `UNRESOLVED` | approver/poster `UNRESOLVED` | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; posting المالي Online authoritative | rule/version/basis/beneficiary/executed part + actor/review/approval + audit | OWNER: trigger/base/approval policy; TEAM-07 لا يخترع actor/permission |
-| تسوية عهدة السائق/المندوب | Actor مالي/عهدة `UNRESOLVED` | collections attributed + remittance + differences under FIN-034/035 context; scope تفصيلي `UNRESOLVED` | `UNRESOLVED` | maker تسوية العهدة كوظيفة؛ اسم الدور `UNRESOLVED` | maker-checker عند الحد المحاسبي | collector لا يعتمد/يرحل تسويته الخاصة | posting `ONLINE AUTHORITATIVE`; قناة الإعداد `UNRESOLVED` | الترحيل `DENY/ONLINE AUTHORITATIVE`; أي capture سابق يبقى غير مفوض دون عقد | source collections + custody/remittance/differences + actor/checker/poster + immutable audit | OWNER: shortage/overage policy; actor/scope/permission غير مثبتة |
+| التقاط التحصيل | Collector؛ الهوية الدقيقة لكل قناة `UNRESOLVED` | CollectionTransaction + source + amount/currency/party + scope | `UNRESOLVED` | المحصل/منشئ الالتقاط | لا Checker محاسبي لمجرد الالتقاط؛ server validation عند replay | لا posting؛ collector ممنوع من اعتماد/ترحيل تسويته | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | ClientOperationId + provenance + server outcome/audit | Action identity/permission/channel/envelope غير مثبتة |
+| تعديل السعر | actor مخول غير مثبت بالاسم | Quote/Price Snapshot/Customer Charge ضمن scope | `UNRESOLVED` | غير مثبت | `UNRESOLVED` | override authority/limits `UNRESOLVED` | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | before/after + actor + reason + scope + correlation | OWNER policy؛ TEAM-07 لا يخترع Permission |
+| إعداد Settlement | Settlement maker كوظيفة؛ اسم الدور `UNRESOLVED` | accepted collections/custody/differences ضمن scope | `UNRESOLVED` | Settlement maker | maker-checker separation إلزامي | maker لا يكون final approver/poster | قناة مالية مخولة `UNRESOLVED` | أي posting `ONLINE AUTHORITATIVE`; الإعداد غير مفوض Offline بلا عقد | source rows + maker + state/version + audit | role/scope/action identity/workflow states غير مثبتة |
+| مراجعة Settlement | Reviewer/Checker كوظيفة؛ الاسم `UNRESOLVED` | Settlement + source rows/attachments/differences | `UNRESOLVED` | ليس maker | Checker منفصل عن maker | الفصل الإضافي فوق ACC-001 `UNRESOLVED` | `UNRESOLVED` | `ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | reviewer + outcome + reason + correlation + audit | reviewer/poster separation الإضافية غير مثبتة |
+| اعتماد/ترحيل Settlement | Final approver/poster؛ الاسم `UNRESOLVED` | Settlement ضمن company/branch/fiscal period | `UNRESOLVED` | لا يكون maker | maker-checker separation | final approver/poster؛ collector لا يعتمد/يرحل تسويته | `ONLINE AUTHORITATIVE` | `DENY/ONLINE AUTHORITATIVE` | poster + source bindings + journal refs + period + audit | permission/role/scope limits `UNRESOLVED` |
+| عكس Settlement/التصحيح المحاسبي | مستخدم مخول بالعكس؛ الاسم `UNRESOLVED` | الأصل + reason + fiscal period + references | `UNRESOLVED — distinct reversal permission required by ACC-001` | منفذ العكس | `UNRESOLVED` | approver إضافي إن وجد `UNRESOLVED`; الأصل لا يحذف | `ONLINE AUTHORITATIVE` | `DENY/ONLINE AUTHORITATIVE` | mandatory reason + original link + correlation + immutable audit | اسم permission وحدوده غير مثبتة |
+| الاسترداد | actor مالي مخول `UNRESOLVED` | original payment/collection + amount/part + channel + reason + scope | `UNRESOLVED` | `UNRESOLVED` | `UNRESOLVED` | refund approval/limits `UNRESOLVED` | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; accounting posting/reversal Online authoritative | original ref + actor + reason + amount + outcome + audit | OWNER policy؛ actor/SoD/permission غير مثبتة |
+| اعتماد/تسوية العمولة | actor عمولات/مالية `UNRESOLVED` | entitlement by beneficiary/base/trigger/executed part + scope | `UNRESOLVED` | `UNRESOLVED` | reviewer permission `UNRESOLVED` | approver/poster `UNRESOLVED` | `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; posting Online authoritative | rule/version/basis/beneficiary/executed part + audit | OWNER trigger/base/approval policy |
+| تسوية عهدة السائق/المندوب | actor مالي/عهدة `UNRESOLVED` | attributed collections + remittance + differences + scope | `UNRESOLVED` | maker كوظيفة؛ الاسم `UNRESOLVED` | maker-checker عند الحد المحاسبي | collector لا يعتمد/يرحل تسويته | posting `ONLINE AUTHORITATIVE`; قناة الإعداد `UNRESOLVED` | الترحيل `DENY/ONLINE AUTHORITATIVE`; capture سابق غير مفوض بلا عقد | source collections + custody/remittance/differences + audit | OWNER shortage/overage policy؛ actor/scope/permission غير مثبتة |
 
-**الحصيلة:** تمت مطابقة الأفعال المالية الحساسة التسعة فقط، دون إنشاء Role أو Permission أو Action ID جديد.
+**الحصيلة:** `9` أفعال مالية حساسة فقط، بلا Role/Permission/Action ID جديد.
 
-## 10. P04-16 — حكم قوة المدخل فقط
-
-`P04-16` في TEAM-05 بقي `STILL UNRESOLVED` للوقائع التالية: الكيلومترات، وقت/موقع الحدث، الوقود، ورسوم الطريق كوقائع تشغيلية. هذا القسم لا يقرر سعرًا أو بدلًا أو خصمًا أو أثرًا ماليًا.
-
-### 10.1 فحص TEAM-07 للدليل
+## 16. P04-16 — حكم قوة الدليل فقط
 
 | البند | ما هو مثبت | الفجوة المؤثرة في قوة المدخل |
 |---|---|---|
-| مصدر GPS/الموقع | TEAM-04 يحدد GPS/المركبة/الرحلة كمصدر تشغيلي محتمل | لا يوجد contract مثبت يميز هاتفًا من جهاز مركبة لكل sample، ولا runtime ميداني مثبت في الجولة الأصلية |
-| هوية الجهاز/المستخدم | AUTH-001/OFFLINE-001 يفرضان server-resolved user/company/branch/device/session provenance | device registry/assignment/PoP التنفيذية لم تثبتها الجولة الأصلية؛ لا يجوز اعتبار claim عميل سلطة |
-| Timestamp | OFFLINE-001 يفرض client occurred-at + server received-at | لا يوجد policy مثبت لحدود clock skew أو freshness المقبولة لـP04-16 |
-| حداثة الموقع | غير مثبتة | لا freshness threshold أو max-age معتمد |
-| دقة الموقع | غير مثبتة | لا accuracy requirement أو measured accuracy evidence |
-| الهاتف مقابل جهاز المركبة | غير محسوم | لا source precedence أو source-binding معتمد |
-| قوة/سلامة الدليل | envelope/hash/provenance/replay requirements مثبتة كحد حاكم | لا attestation/anti-spoof/tamper evidence ميداني مثبت للموقع/الوقود/رسوم الطريق |
-| احتمالات التلاعب | يجب fail-closed وعدم قبول client-authoritative trust | لا سياسة مثبتة لكشف mock location أو gallery substitution أو sensor/device mismatch |
-| صلاحية الوصول | permission/scope يجب أن تكون server-resolved | من يرى/يعدل/يعتمد كل عنصر من P04-16 غير مثبت تفصيليًا |
-| Offline capture/replay | eligible category قد تكون ممكنة لبعض append-only events إذا اكتمل العقد | لا Action identity/permission/envelope/version/conflict rule خاص بـP04-16؛ يبقى DENY/UNRESOLVED |
-| Audit | immutable provenance/correlation/replay outcome مطلوبة | field-level audit policy لوقود/رسوم/odometer/GPS source غير مثبتة |
-
-### 10.2 الحكم
+| مصدر GPS/الموقع | TEAM-04 يحدد GPS/المركبة/الرحلة كمصدر تشغيلي محتمل | لا contract مثبت يميز هاتفًا من جهاز مركبة لكل sample، ولا runtime ميداني مثبت في الجولة الأصلية |
+| هوية الجهاز/المستخدم | AUTH-001/OFFLINE-001 يفرضان server-resolved provenance | registry/assignment/PoP التنفيذية لم تثبتها الجولة الأصلية؛ claim العميل ليس سلطة |
+| Timestamp | OFFLINE-001 يفرض client occurred-at + server received-at | لا policy مثبت لحدود clock skew/freshness |
+| حداثة الموقع | غير مثبتة | لا freshness threshold/max-age معتمد |
+| دقة الموقع | غير مثبتة | لا accuracy requirement/measured evidence |
+| الهاتف مقابل جهاز المركبة | غير محسوم | لا source precedence/source-binding معتمد |
+| قوة/سلامة الدليل | envelope/hash/provenance/replay حدود حاكمة | لا attestation/anti-spoof/tamper evidence ميداني مثبت |
+| احتمالات التلاعب | fail-closed وعدم client-authoritative trust | لا سياسة مثبتة لـmock location/gallery substitution/device mismatch |
+| صلاحية الوصول | permission/scope server-resolved | من يرى/يعدل/يعتمد كل عنصر غير مثبت تفصيليًا |
+| Offline capture/replay | فئة eligible ممكنة نظريًا لبعض append-only events | لا Action identity/permission/envelope/version/conflict rule خاص؛ يبقى DENY/UNRESOLVED |
+| Audit | provenance/correlation/replay outcome مطلوبة | field-level audit policy غير مثبتة |
 
 `P04-16 INPUT STRENGTH = INSUFFICIENT EVIDENCE`
 
-السبب: توجد **حدود تحكم حاكمة** جيدة للهوية/replay/audit، لكن الدليل المتاح لا يثبت بعد مصدرًا ميدانيًا متعاقدًا، source binding، freshness، accuracy، anti-tamper أو access/action authority كافية لجعل وقائع P04-16 مدخلًا قويًا. لا ينتج عن هذا الحكم أي قرار مالي.
+هذا حكم على قوة المدخل فقط، ولا ينتج أي أثر مالي.
 
-## 11. Crosswalk محدود لأحداث TEAM-04
+## 17. TEAM-04 Event Crosswalk — 10 أحداث محفوظة
 
-TEAM-04 هو مرجع الواقعة التشغيلية. الجدول التالي لا يعيد تعريف event/state machine؛ يربط فقط الهوية والدليل والوصول والاعتماد وOffline.
+TEAM-04 هو مرجع الواقعة التشغيلية. الجدول يربط فقط الهوية والدليل والوصول والاعتماد وOffline.
 
 | Event | Actor | Evidence | Identity Requirement | GPS | Who Can View | Who Can Act | Who Can Approve | Offline State | Owner Decision Gap |
 |---|---|---|---|---|---|---|---|---|---|
-| انتقال العهدة | الحامل الحالي + المستلم التشغيلي بحسب TEAM-04؛ role/security mapping تفصيلي `UNRESOLVED` | unit/manifest/custody references + طرفان + وقت + نتيجة handover؛ أي صورة/توقيع حسب policy | user/company/branch + current membership/permission + device/session provenance عند القناة الميدانية | سياق فقط ما لم تفرض خدمة/سياسة غير مثبتة | `UNRESOLVED` حسب permission/scope | الأطراف المعينة تشغيليًا فقط بعد permission؛ mapping `UNRESOLVED` | `UNRESOLVED` | append-only custody category قد تكون eligible، لكن `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | هل يلزم POD/توقيع/OTP/موقع لكل نوع انتقال |
-| قبول/رفض العهدة | المستلم التشغيلي المعين؛ identity mapping `UNRESOLVED` | accept/reject + reason + unit/manifest refs + time + الطرفين | current user/membership/scope + device/session provenance | `UNRESOLVED` كمتطلب | `UNRESOLVED` | المستلم المعين إذا ثبت permission | approval إضافي `UNRESOLVED` | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | الدليل الأدنى عند الرفض/الاستلام الخارجي |
-| التسليم الجزئي | منفذ التسليم + سياق المستلم؛ security roles تفصيلًا `UNRESOLVED` | الوحدات المقبولة/المرفوضة + reason + attempt/time + POD وفق policy | منفذ مخول + source task/company/branch/entity + device/session | location context مفيد لكن إلزامه/دقته `NEEDS OWNER DECISION` | منفذ/مراجعون/عميل وفق data minimization؛ permissions `UNRESOLVED` | منفذ المهمة إذا ثبت permission | final/legal close authority `UNRESOLVED` | capture قد يكون eligible category؛ final close لا يفوض Offline | الحد الأدنى لـPOD وهوية المستلم حسب الخدمة/الخطر/المنطقة |
-| تعذر التسليم | منفذ المهمة | reason + attempt time + address/contact context + available evidence | current task assignment + user/device/session provenance | location/time قد يدعمان الواقعة؛ requirement/freshness `UNRESOLVED` | `UNRESOLVED` | منفذ المهمة إذا ثبت permission | إعادة محاولة/RTO approval إن وجد `UNRESOLVED` | append-only exception capture category فقط؛ action authority غير متعاقد | عدد المحاولات وسياسة الموقع/POD والخصوصية |
-| رفض المستلم | منفذ التسليم + recipient context؛ recipient identity level `UNRESOLVED` | refusal reason + affected units + time + POD/evidence حسب policy | actor authenticated؛ recipient verification level `NEEDS OWNER DECISION` | context فقط؛ إلزامه غير مثبت | `UNRESOLVED` | منفذ المهمة إذا ثبت permission | next-step/RTO approval `UNRESOLVED` | capture category فقط؛ `ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | إثبات الرفض الأدنى وهوية المستلم/التوقيع/OTP |
-| RTO | actor تشغيلي يملكه TEAM-04؛ security mapping `UNRESOLVED` | source shipment + failed/refused delivery refs + reason + custody transition + time | authenticated actor + company/branch/entity scope + current assignment | `UNRESOLVED` كمتطلب | `UNRESOLVED` | `UNRESOLVED` حتى permission/action contract | `UNRESOLVED` | event capture قد يكون eligible category؛ final state/authority تخضع server validation | متى يبدأ RTO ومن يحمل العهدة بعده وما دليل الانتقال الأدنى |
-| المطالبة/التلف/النقص/الفقد | reporter + custodians/inspectors according to TEAM-04; security roles `UNRESOLVED` | event type + affected units/quantity + first discovery + custody chain + reason + photos/docs only if policy permits | authenticated actor + scope + device/session for field capture | location may support discovery/custody; requirement `UNRESOLVED` | least-privilege; sensitive evidence access `UNRESOLVED` | report/capture permission `UNRESOLVED` | claim liability/financial approval خارج 07؛ evidence acceptance `UNRESOLVED` | incident capture category only; attachments staging depends on policy | evidence minimum, sensitive-media policy, legal/privacy, claim responsibility outside 07 |
-| التحصيل | Collector كما تثبته الواقعة؛ channel identity mapping `UNRESOLVED` | CollectionTransaction source + amount/currency/party + time/location context + ClientOperationId/provenance عند Offline contract | user/company/branch/device/session + current permission + source entity scope | location operational context؛ إلزامه/دقته غير مثبتة | collector + authorized finance/operations according to permission; mapping `UNRESOLVED` | collector may capture only if action contracted | collector cannot approve/post own settlement; posting authority Online | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; server re-authorizes on replay; no accounting posting | actor×channel×scope/permission + financial policies from TEAM-05 |
-| GPS | assigned field actor/device/vehicle relationship `UNRESOLVED` | sample source + coordinates + timestamps + task/trip ref + accuracy if captured + provenance | current user/task + device/session; vehicle-device binding if applicable | هو الحدث نفسه؛ source/freshness/accuracy/precedence غير مثبتة | `NEEDS OWNER DECISION` للموقع الحي/history/share tracking | capture فقط إذا consent/purpose/permission/action contract مكتمل | لا approval وظيفي مثبت؛ acceptance server-side وفق contract | `UNRESOLVED`; لا queue authority حتى consent/purpose/cadence/retention/action contract | background tracking, source precedence, cadence, accuracy, retention, sharing, anti-tamper |
-| POD | منفذ التسليم + recipient context | service-specific POD set: OTP/signature/photo/time/location بحسب قرار لاحق؛ server ack منفصل | actor authenticated + task/scope/device/session; recipient proof level بحسب policy | location may be one signal, not proof alone | least-privilege; customer view only required subset; permissions `UNRESOLVED` | field capture إذا action contracted | final/legal delivery acceptance authority `UNRESOLVED` | metadata capture may be eligible category; sensitive attachments `UNRESOLVED`; final authority not granted Offline | POD minimum by service/risk/region, identity/photo/biometric legality and retention |
+| انتقال العهدة | الحامل الحالي + المستلم التشغيلي؛ security mapping `UNRESOLVED` | unit/manifest/custody refs + طرفان + وقت + outcome | user/company/branch + membership/permission + device/session provenance | سياق فقط ما لم تفرض سياسة | `UNRESOLVED` | الأطراف المعينة فقط بعد permission | `UNRESOLVED` | eligible category فقط؛ `ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | POD/توقيع/OTP/موقع لكل نوع انتقال |
+| قبول/رفض العهدة | المستلم التشغيلي المعين؛ mapping `UNRESOLVED` | accept/reject + reason + refs + time + طرفان | current user/membership/scope + device/session | `UNRESOLVED` | `UNRESOLVED` | المستلم إذا ثبت permission | `UNRESOLVED` | eligible category فقط؛ action authority غير متعاقدة | الدليل الأدنى عند الرفض/الاستلام الخارجي |
+| التسليم الجزئي | منفذ التسليم + recipient context | accepted/rejected units + reason + attempt/time + POD | actor + task/company/branch/entity + device/session | context؛ إلزامه/دقته `NEEDS OWNER DECISION` | حسب minimization والpermission | منفذ المهمة إذا ثبت permission | final/legal close `UNRESOLVED` | capture eligible category؛ final close غير مفوض Offline | POD/هوية المستلم حسب الخدمة/الخطر/المنطقة |
+| تعذر التسليم | منفذ المهمة | reason + attempt time + address/contact + evidence | current assignment + user/device/session | time/location يدعمان الواقعة؛ requirement/freshness `UNRESOLVED` | `UNRESOLVED` | منفذ المهمة إذا ثبت permission | retry/RTO approval `UNRESOLVED` | append-only exception category فقط | عدد المحاولات وسياسة الموقع/POD/الخصوصية |
+| رفض المستلم | منفذ التسليم + recipient context | refusal reason + units + time + POD/evidence | actor authenticated؛ recipient level `NEEDS OWNER DECISION` | context فقط | `UNRESOLVED` | منفذ المهمة إذا ثبت permission | next-step/RTO `UNRESOLVED` | capture category فقط؛ `ACTION DENY/UNRESOLVED UNTIL CONTRACTED` | إثبات الرفض الأدنى |
+| RTO | actor تشغيلي من TEAM-04؛ mapping `UNRESOLVED` | shipment + failed/refused refs + reason + custody transition + time | actor + scope + current assignment | `UNRESOLVED` | `UNRESOLVED` | `UNRESOLVED` حتى contract | `UNRESOLVED` | event capture eligible category؛ final authority server-validated | متى يبدأ RTO ومن يحمل العهدة ودليل الانتقال |
+| المطالبة/التلف/النقص/الفقد | reporter + custodians/inspectors؛ roles `UNRESOLVED` | type + units/quantity + discovery + custody chain + reason + permitted evidence | actor + scope + device/session | قد يدعم discovery؛ requirement `UNRESOLVED` | least-privilege | report/capture permission `UNRESOLVED` | claim financial approval خارج 07 | incident capture category فقط؛ attachments policy-dependent | evidence minimum/privacy/claim responsibility |
+| التحصيل | Collector حسب الواقعة؛ mapping `UNRESOLVED` | source + amount/currency/party + time/location + ClientOperationId/provenance | user/company/branch/device/session + current permission + source scope | context؛ إلزامه/دقته غير مثبتة | collector + authorized finance/operations | capture فقط إذا action contracted | collector لا يعتمد/post تسويته | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; لا accounting posting | actor×channel×scope/permission + financial policies |
+| GPS | assigned field actor/device/vehicle relationship `UNRESOLVED` | source + coordinates + timestamps + task/trip + accuracy if captured + provenance | current user/task + device/session + vehicle binding if applicable | الحدث نفسه؛ source/freshness/accuracy/precedence غير مثبتة | `NEEDS OWNER DECISION` | capture فقط إذا اكتمل consent/purpose/permission/action contract | لا approval وظيفي مثبت | `UNRESOLVED`; لا queue authority قبل اكتمال العقد | background/source/cadence/accuracy/retention/sharing/anti-tamper |
+| POD | منفذ التسليم + recipient context | service-specific set: OTP/signature/photo/time/location؛ server ack منفصل | actor + task/scope/device/session؛ recipient level حسب policy | signal لا proof وحيد | least-privilege | field capture إذا action contracted | final/legal acceptance `UNRESOLVED` | metadata may be eligible category؛ sensitive attachments unresolved؛ final authority غير ممنوحة Offline | POD minimum + identity/photo/biometric legality/retention |
 
-**الحصيلة:** تم Crosswalk لـ`10` أحداث TEAM-04 فقط.
+**الحصيلة:** `10` أحداث TEAM-04 فقط.
 
-## 12. Offline — القاعدة المصححة الحاكمة
-
-تثبت هذه المسودة العبارتين دون استثناء لغوي:
+## 18. Offline — القاعدة المصححة الحاكمة وتفاصيل Queue الأصلية
 
 `ELIGIBLE CATEGORY DOES NOT MEAN ACTION AUTHORITY`
 
 `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`
 
-أهلية فئة عامة وفق OFFLINE-001 **لا** تمنح Action authority. لا يصبح أي فعل مسموحًا للتنفيذ/الإرسال بصفته Action حتى يثبت له جميع الآتي:
+إذا ظهر لفظ `ALLOW` في مادة أصلية تاريخية، فمعناه الوحيد هنا: **CATEGORY ELIGIBILITY ONLY**. لا يعني `ACTION AUTHORITY`. كل Action بلا عقد كامل يبقى `DENY/UNRESOLVED`.
 
-1. Action identity.
-2. Permission.
-3. Envelope.
-4. Protocol/version.
-5. Entity base/expected version عند الحاجة.
-6. Conflict handling + deterministic conflict owner.
-7. Replay rule/idempotency.
-8. Server-side re-authorization على current authority.
-9. Immutable audit/provenance.
+`ACCOUNTING POSTING / REVERSAL = ONLINE AUTHORITATIVE`
 
-كل نقص في واحد من هذه العناصر يبقي الفعل `DENY/UNRESOLVED`.
+### 18.1 Queue envelope الأصلي محفوظ
 
-### 12.1 مصفوفة Offline السابقة — تصحيح الدلالة دون إنشاء Actions جديدة
+كل Mutation قد يصبح eligible category مستقبلًا يجب أن يربط:
 
-الـIDs التالية كانت موجودة في المسودة السابقة؛ لم تُنشأ في هذه الجولة. التصنيف هنا يصحح فقط دلالة الفئة مقابل سلطة الفعل.
+- `ClientOperationId` ثابتًا للعملية المنطقية.
+- protocol version.
+- entity/action identity وpayload hash.
+- expected/base version عند aggregate قابل للتغيير.
+- user/company/branch/device/session provenance.
+- client occurred-at وserver received-at.
+- permission/action code دون claims عميل حاكمة.
+- bounded retention metadata وdeterministic conflict owner.
+- server replay re-authorization على authority الحالية.
+- local protection at rest.
+
+إعادة الإرسال لنفس `ClientOperationId` وبنفس hash تعيد النتيجة السابقة؛ نفس ID مع hash مختلف = conflict/reject، لا عملية ثانية. لا silent merge للحسابات أو العهدة أو الكميات أو الموافقات أو الأمن.
+
+### 18.2 مصفوفة Offline actions الأصلية — 33 فعلًا مع الدلالة المصححة
 
 | ID موجود سابقًا | Action تحليلي | الحالة المصححة |
 |---|---|---|
@@ -248,7 +481,7 @@ TEAM-04 هو مرجع الواقعة التشغيلية. الجدول التال
 | `OF-005` | Role/permission/scope/delegation/block | `DENY/ONLINE AUTHORITATIVE` |
 | `OF-006` | Device enroll approve/assign/transfer/revoke/recover | `DENY/ONLINE AUTHORITATIVE` |
 | `OF-007` | Server logout/revoke command | `DENY/ONLINE AUTHORITATIVE`؛ local credential clearing فوري ليس server acceptance |
-| `OF-008` | Consent withdrawal | server effect `DENY/ONLINE AUTHORITATIVE`; إيقاف الجمع محليًا عند السحب لا يعني قبول الخادم |
+| `OF-008` | Consent withdrawal | server effect `DENY/ONLINE AUTHORITATIVE`; إيقاف الجمع محليًا لا يعني قبول الخادم |
 | `OF-009` | draft طلب خدمة | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` |
 | `OF-010` | draft بوليصة | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` |
 | `OF-011` | Submit/approve/finalize/official numbering | `DENY/ONLINE AUTHORITATIVE` |
@@ -267,119 +500,128 @@ TEAM-04 هو مرجع الواقعة التشغيلية. الجدول التال
 | `OF-024` | Cached read للخرائط/المهام/الحالة | read-only حسب classification؛ يظهر as-of/last-sync ولا يمثل authority حالية |
 | `OF-025` | Collection capture كـPENDING command | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; لا posting |
 | `OF-026` | Settlement/posting/unpost/reversal/period change | `DENY/ONLINE AUTHORITATIVE` |
-| `OF-027` | Vehicle inspection/fuel/odometer metadata | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; الصور منفصلة عن metadata |
+| `OF-027` | Vehicle inspection/fuel/odometer metadata | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; الصور منفصلة |
 | `OF-028` | Incident/damage/shortage/exception report | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` |
 | `OF-029` | driver/vehicle/ownership/guarantee master-data change | `DENY/ONLINE AUTHORITATIVE` |
 | `OF-030` | Notification/task acknowledgement | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED` |
 | `OF-031` | destructive delete/history rewrite | `DENY` |
 | `OF-032` | conflict resolution/override | `DENY/ONLINE AUTHORITATIVE` |
-| `OF-033` | reapply after conflict | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; عملية جديدة فقط بعد server state review |
+| `OF-033` | reapply after conflict | `ELIGIBLE CATEGORY ONLY — ACTION DENY/UNRESOLVED UNTIL CONTRACTED`; عملية جديدة بعد server-state review |
 
-### 12.2 Queue envelope
+### 18.3 Queue states الأصلية مستعادة
 
-أي Action يُتعاقد لاحقًا ضمن فئة eligible يجب أن يربط:
+`pending → sending → accepted / rejected / conflict / retry / frozen`
 
-- stable ClientOperationId.
-- protocol version.
-- entity/action identity.
-- payload hash.
-- expected/base version عندما يلزم.
-- user/company/branch/device/session provenance.
-- client occurred-at + server received-at.
-- server permission/action code.
-- bounded retention metadata.
-- deterministic conflict owner.
-- replay rule/idempotency.
-- server-side re-authorization.
-- local protection at rest.
+- `pending`: محفوظ محليًا ومشفّرًا، غير مقبول خادميًا.
+- `sending`: محاولة جارية مع correlation.
+- `accepted`: ack خادمي ثابت؛ يعاد عند idempotent replay.
+- `rejected`: رفض نهائي معلوم السبب.
+- `conflict`: version/state/quantity/custody conflict؛ لا silent merge.
+- `retry`: فشل تقني مصنف قابلًا للمحاولة مع backoff غير مخترع هنا.
+- `frozen`: revoke/expiry/device/session/permission/unknown policy؛ لا إرسال حتى re-auth/recovery.
 
-لا silent merge للحسابات أو العهدة أو الكميات أو الموافقات أو الأمن.
+### 18.4 reconnect/re-auth/replay — مستعاد كاملًا
 
-## 13. Queue وA11 — إعادة التصنيف الحوكمي
+1. عند رجوع الاتصال لا تُرسل العمليات الحساسة تلقائيًا قبل فحص session/device.
+2. إذا انتهت الجلسة أو سُحبت الثقة: queue = frozen، ويطلب re-auth.
+3. بعد re-auth يراجع العميل provenance ويمنع نقل queue إلى مستخدم أو شركة أو فرع أو جهاز آخر.
+4. الخادم يعيد permission/scope/state/version/idempotency في intake والتنفيذ.
+5. revoked user/membership/session/device = fail-closed؛ لا إعادة كتابة claims من العميل.
+6. backoff/max attempts/retention ليست قرارات هذه المسودة؛ defaults المصدرية لا تصبح سياسة.
 
-### 13.1 Queue vocabulary
+### 18.5 Queue vocabulary — التصنيف الحاكم
 
-المصدر الحالي الذي راجعته المسودة الأصلية كان يستخدم vocabulary مختلفًا عن النموذج التحليلي `pending/sending/accepted/rejected/conflict/frozen/retry`.
-
-الحالة بعد التصحيح:
+المصدر الأصلي استخدم `QUEUED/SENDING/SUCCEEDED/FAILED/CONFLICT/REJECTED/RESOLVED` بينما النموذج التحليلي يميز `accepted/retry/frozen`.
 
 `NEEDS TEAM CORRECTION — QUEUE GOVERNANCE`
 
-هذه ليست سياسة وظيفية للمالك. يجب أن تُصالح vocabulary مع contract/implementation الحاكم في مسار الفريق/الحوكمة عند فتح بوابته، مع الحفاظ على الأدلة القديمة وعدم اختراع state transition هنا.
+لا تتحول هذه المسألة إلى قرار مالك.
 
-### 13.2 A11 fingerprint reconciliation
+## 19. التعارضات والفجوات والمخاطر — المادة الأصلية والتصنيف المصحح
 
-الحالة بعد التصحيح:
+| ID موجود سابقًا | التصنيف/البيان الأصلي | الأثر الأصلي | الحالة بعد التصحيح |
+|---|---|---|---|
+| `T07-C-001` | CLIENT-001 = ثلاثة Android؛ نموذج السوق قد يطلب قناة مستقلة | عدد التطبيقات/الهوية/التوقيع/Offline data | `NEEDS OWNER DECISION` |
+| `T07-C-002` | App IDs scaffold تختلف عن CLIENT-001 | upgrade/signing/secure storage continuity | `GOVERNANCE DELTA`/تنفيذ لاحق |
+| `T07-C-003` | csproj يحتفظ بشروط iOS مستقبلية بينما iOS مؤجل | خطر قراءة config كنطاق إصدار | `GOVERNANCE DELTA`; CLIENT-001 يحكم |
+| `T07-C-004` | ADR-W2-002 أقدم من AUTH-001 | إعادة ربط السلطة لاحقًا | `GOVERNANCE DELTA`; AUTH-001 الأحدث يحكم |
+| `T07-C-005` | عقود Offline أقدم من OFFLINE-001 | خطر اعتماد توسيع سابق | `GOVERNANCE DELTA`; OFFLINE-001 يحكم |
+| `T07-C-006` | A11 live identity/fingerprint conflict | fingerprint غير صالح للتسليم حتى المصالحة | `GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION` |
+| `T07-C-007` | Mobile x3 placeholders وقت الجولة الأصلية | لا برهان runtime/session/secure storage/GPS/Offline | فجوة تنفيذ؛ لا يعاد فحصها هنا |
+| `T07-C-008` | permission/device trust من claims في المسار الأصلي | token قد يسبق revoke/DB authority | فجوة أمن/تنفيذ؛ AUTH-001 يفرض server authority |
+| `T07-C-009` | لا registry/assignment/PoP/nonce/replay persistence مثبت | لا ثقة جهاز فعلية | فجوة تنفيذ/DB-GOV |
+| `T07-C-010` | Sync provenance/action contract غير كامل | envelope غير مكتمل | `NEEDS TEAM CORRECTION`/تنفيذ لاحق |
+| `T07-C-011` | جمع الهوية/الموقع/البصمة بلا سياسة كاملة | امتثال وثقة وتسريب بيانات | `NEEDS OWNER/LEGAL/SECURITY DECISION` |
+| `T07-C-012` | عرض accepted/paid/delivered محليًا قبل ack | تضليل عهدة/مال/عميل | خطر؛ server acceptance authoritative |
+
+## 20. أسئلة المالك/الأمن/القانوني الأصلية — محفوظة دون تحويل Queue/A11 لمالك
+
+1. هل Mobile Driver هو أيضًا تطبيق السوق/الناقل/مالك المركبة، أم يلزم client رابع؟
+2. ما الخدمات التي تتفعل فوريًا للعميل، وما الذي يحتاج مراجعة؟
+3. ما مستويات التحقق المطلوبة لكل خدمة وقيمة/مخاطر دون اختراع حدود مبلغ؟
+4. ما عوامل MFA المعتمدة، ومن يجب أن يستخدمها؟
+5. ما أحداث step-up، وما مدة صلاحية التحدي؟
+6. ما مدد access/refresh/idle/absolute session وعدد الجلسات المتزامنة؟
+7. ما سياسة recovery إذا فُقد الهاتف أو الجهاز وعوامل MFA؟
+8. هل يسمح self-service device registration request، ومن يعتمد/ينقل/يسترد الجهاز؟
+9. ما الغرض والبدء/الإيقاف والدقة والتواتر والاحتفاظ للتتبع الخلفي؟
+10. هل رفض background GPS يمنع المهمة أم يوفر بديلًا تشغيليًا؟
+11. من يرى موقع السائق الحي والتاريخ، ومتى يشارك مع العميل؟
+12. ما أدلة POD الدنيا لكل خدمة: OTP أم توقيع أم صورة أم خليط؟
+13. هل توجد ضرورة قانونية للبصمة الحيوية؟ إن لم تثبت، هل تُمنع بالكامل؟
+14. متى يجوز تصوير هوية المستلم، وما البديل الأقل جمعًا؟
+15. ما مدد الاحتفاظ والحذف/legal hold لصور الهوية والملكية والمركبات وPOD وGPS وqueue وaudit وnonce/replay؟
+16. ما صلاحيات الاطلاع والتنزيل والتصدير على الأدلة الحساسة؟
+17. ما مسار الاعتراض على الحظر والتقييم والمخالفات وتصحيح السجل؟
+18. ما أنواع الضمانات المقبولة قانونيًا، ومن يراجعها، ومتى تنتهي؟
+19. من هو conflict owner لكل Action eligible category، وما الأفعال التي لا تقبل resolution إلا بإعادة الأمر Online؟
+
+السؤال الأصلي الخاص بمصالحة قاموس Queue **محفوظ كمادة** لكن تصنيفه المصحح ليس Owner Decision:
+
+`NEEDS TEAM CORRECTION — QUEUE GOVERNANCE`
+
+ومسألة A11 تبقى:
 
 `GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION`
 
-هذه ليست `OWNER DECISION`. يجب أن تُعالج كسجل حوكمي مركزي/مرجعي لاحقًا؛ TEAM-07 لا يخلق fingerprint بديلًا ولا يرفعها كقرار وظيفي للمالك.
+## 21. التكرار والتشابه / similarity-reuse — مستعاد كاملًا
 
-## 14. التعارضات والفجوات والمخاطر — الحالة المصححة
+- `PLT-002` و`SEC-014`: الأول challenge للمستخدم، والثاني إدارة سياسة/عوامل؛ لا يدمجان تلقائيًا.
+- `SEC-015` و`INT-012`: الأول سلطة جلسة/جهاز، والثاني مراقبة حالة التطبيقات؛ لا يختلط trust مع observability.
+- `SHP-037` و`LMD-017` و`MOB-021`: POD عمل واحد عبر شاشة مكتبية/مجال/قناة ميدانية؛ يلزم نواة مشتركة وسياق، لا ثلاثة تعريفات متعارضة.
+- `SHP-031` و`FLT-018/029` و`MOB-010` و`TRV-039`: موقع مصدر واحد بأذونات وعروض مختلفة؛ مشاركة العميل read model وليست سلطة GPS جديدة.
+- `MOB-031` مع `PTY-006/009` و`FLT-003/007/008/012`: onboarding قد يكون flow واحدًا متعدد التبويبات، لا شاشة مستقلة لكل وثيقة.
+- `INT-011` لا يغني عن مكوّن queue محلي داخل التطبيقات؛ الأخير قد يكون status panel لا شاشة مستقلة.
 
-| ID موجود سابقًا | التصنيف | الحالة بعد التصحيح |
-|---|---|---|
-| `T07-C-001` | CLIENT-001 مقابل نموذج تطبيق السوق | `NEEDS OWNER DECISION` |
-| `T07-C-002` | App IDs scaffold مقابل CLIENT-001 | `GOVERNANCE DELTA`/تنفيذ لاحق |
-| `T07-C-003` | iOS config مقابل scope المؤجل | `GOVERNANCE DELTA`؛ CLIENT-001 يحكم النطاق |
-| `T07-C-004` | ADR قديم مقابل AUTH-001 | `GOVERNANCE DELTA`؛ AUTH-001 الأحدث يحكم |
-| `T07-C-005` | Offline contracts أقدم مقابل OFFLINE-001 | `GOVERNANCE DELTA`؛ OFFLINE-001 يحكم |
-| `T07-C-006` | A11 fingerprint | `GOVERNANCE DELTA`؛ ليس قرار مالك |
-| `T07-C-007` | Mobile runtime غير مثبت في الجولة الأصلية | فجوة تنفيذ؛ لا يعاد فحصها هنا |
-| `T07-C-008` | permission/device authority من claims | فجوة أمن/تنفيذ؛ AUTH-001 يفرض server authority |
-| `T07-C-009` | device registry/assignment/PoP غير مثبتة | فجوة تنفيذ/DB-GOV |
-| `T07-C-010` | Sync provenance/action contract غير مكتمل | `NEEDS TEAM CORRECTION`/تنفيذ لاحق |
-| `T07-C-011` | privacy للهوية/GPS/biometric | `NEEDS OWNER/LEGAL/SECURITY DECISION` |
-| `T07-C-012` | local UI يعرض حالة نهائية قبل ack | خطر؛ server acceptance authoritative |
+## 22. Handoff لاحق — مقفول الآن
 
-## 15. القرارات الحقيقية للمالك فقط
+هذه المسودة لا تبدأ TEAM-03 ولا TEAM-06 ولا TEAM-08 ولا Population.
 
-لا تحسم هذه الجولة ما يلي:
-
-1. توزيع تطبيق السوق/الناقل/مالك المركبة ضمن قنوات CLIENT-001، أو إصدار قرار client إضافي.
-2. الحد الأدنى المتناسب لـPOD/هوية المستلم/OTP/توقيع/صورة لكل خدمة/خطر/منطقة.
-3. GPS background tracking: الغرض، المصدر/الأولوية، البدء/الإيقاف، cadence، accuracy/freshness، retention، من يرى، مشاركة العميل، أثر رفض/سحب الإذن.
-4. MFA factors، step-up triggers، session durations/concurrency، recovery إذا لم تغطها سلطة مثبتة لاحقًا.
-5. الضمانات ومستويات الثقة والاعتراض والتصحيح.
-6. أي قرار قانوني/خصوصية بشأن صور الهوية، biometric، tracking، consent، retention/deletion/legal hold.
-7. سياسات TEAM-05 التي بقيت `NEEDS OWNER DECISION`، ومنها على سبيل الحصر دون حسم: أولوية مصادر السعر، سلطة/حدود تعديل السعر، binding/repricing policy، الوزن القابل للتحصيل، الضرائب/الجمارك/الرسوم وملكية المبلغ، revenue recognition، Commission/Driver Pay/Carrier Cost triggers/bases، تخصيص الاستحقاق بين الرحلات/الناقلين، نقص/زيادة العهدة والمقاصة، refund policy/fees/channel exceptions، claim liability/compensation، Settlement workflow authorities فوق الحد الأدنى لـACC-001، branch/agent uncleared remittance policy، وأي dynamic pricing policy.
-
-ليست قرارات مالك في هذه المسودة:
-
-- موضع شاشة/تبويب/مكون.
-- إنشاء IDs أو Population.
-- قاموس Queue.
-- A11 fingerprint reconciliation.
-- SHA/citation/crosswalk corrections.
-
-## 16. ملخص التصحيحات المنفذة
-
-| البند | النتيجة |
-|---|---|
-| Local Candidate identifiers | أزيلت صفة ID من العناصر السبعة؛ أصبحت أوصافًا `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` فقط |
-| TEAM-05 financial handoff | تمت مطابقة `9` أفعال حساسة في مصفوفة Actor/Scope/Permission/SoD/Channel/Offline/Audit |
-| P04-16 | `INSUFFICIENT EVIDENCE` لقوة المدخل فقط؛ لا أثر مالي حُسم |
-| TEAM-04 event crosswalk | `10` أحداث |
-| Offline | `CORRECTED — ELIGIBLE CATEGORY DOES NOT MEAN ACTION AUTHORITY`؛ كل Action غير متعاقد `DENY/UNRESOLVED` |
-| Accounting posting/reversal | `ONLINE AUTHORITATIVE` وفق ACC-001/OFFLINE-001 |
-| Queue vocabulary | `NEEDS TEAM CORRECTION — QUEUE GOVERNANCE` |
-| A11 fingerprint | `GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION` |
-| TEAM-03/06/08 | لم تُفتح أي بوابة ولم يُطلب توريث identifiers محلية |
-
-## 17. Handoff لاحق — مقفول الآن
-
-هذه المسودة **لا** تبدأ TEAM-03 ولا TEAM-06 ولا TEAM-08، ولا تطلب من أي فريق توريث التسميات المحلية السابقة.
-
-عند صدور أمر منفصل لاحقًا لفريق التصنيف/المراجعة، يجب أن يستهلك فقط:
+عند صدور أمر لاحق مستقل فقط، يجب الحفاظ على:
 
 - A11 IDs القائمة كما هي.
-- الأوصاف السبعة `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` كوظائف بلا هوية شاشة.
-- TEAM-04 كمرجع الواقعة التشغيلية.
-- TEAM-05 كمرجع السياسة/الفجوات المالية.
+- العناصر السبعة كأوصاف `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` بلا Local Candidate IDs.
+- TEAM-04-CORRECTION كمرجع الواقعة التشغيلية.
+- TEAM-05-CORRECTION كمرجع السياسة/الفجوات المالية.
 - AUTH-001/OFFLINE-001/CLIENT-001/ACC-001 كقرارات حاكمة ضمن حدودها.
-- Queue/A11 fingerprint كتصحيحات حوكمة، لا كقرارات مالك.
+- `NEEDS TEAM CORRECTION — QUEUE GOVERNANCE`.
+- `GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION`.
+- الفصل بين capture pending وserver acceptance، وبين evidence capture وlegal/final state.
 
-## 18. الحفظ والتوقف
+## 23. العدادات والحفظ
+
+| المؤشر | العدد/الحالة |
+|---|---:|
+| المراجع/مجموعات الأدلة الأصلية المحفوظة | 19 |
+| A11 Screen IDs المشار إليها في المادة الأصلية | 67 |
+| الوظائف السبعة بلا A11 match دقيق | 7 أوصاف فقط؛ بلا IDs محلية |
+| النتائج الذرية | 15 |
+| Offline actions المصنفة | 33 |
+| التعارضات/الفجوات/المخاطر | 12 |
+| أسئلة المالك/الأمن/القانوني الفعلية | 19 بعد نقل Queue إلى TEAM CORRECTION |
+| الأفعال المالية الحساسة | 9 |
+| TEAM-04 Event Crosswalk | 10 |
+| Preservation material groups restored | 17 major original sections/material groups |
 
 - مسار المسودة: `CONTROL_TOWER/02_GROUP-02_EXPANSION/مساحة_عمل_فرق_كراسة_الشاشات_2026-08-28/04_تقارير_الفرق/الفريق_07/مسودة_التطبيقات_والتحقق_والصلاحيات_DRAFT.md`
 - الحالة: `DRAFT — CORRECTED — NOT FOR HANDOFF`
@@ -387,4 +629,38 @@ TEAM-04 هو مرجع الواقعة التشغيلية. الجدول التال
 - Commit SHA: يسجل بعد commit محصور بهذا الملف فقط.
 - لا تصميم بصري، لا Source/Tests/Database/Migrations، لا TEAM-03/06/08.
 
-**NEW FINDING DURING CORRECTION:** مسار مسودة TEAM-07 كان غائبًا من HEAD الفرع عند بدء التصحيح رغم وجود النسخة التي راجعتها Wave A ضمن ملفات المشروع؛ أُعيدت النسخة إلى المسار الإلزامي نفسه وصُححت، دون تعديل أي ملف TEAM-04 أو TEAM-05 أو ملف مشترك.
+## 24. جدول التحقق الداخلي — Preservation Merge
+
+| Original Section / Material | Preserved | Correction Applied | Omitted | Reason |
+|---|---|---|---|---|
+| بيانات الجولة والتتبع الأصلية | YES | أضيف lineage للـPreservation baseline وCorrection delta | NO | — |
+| سجل المدخلات الأصلي و19 مجموعة أدلة | YES | TEAM-04/05 المصححتان هما المدخلان الحاكمان عند التعارض | NO | — |
+| A11 reference-version conflict material | YES | أعيد تصنيفه `GOVERNANCE DELTA — A11 FINGERPRINT RECONCILIATION` | NO | — |
+| نطاق المراجعة وحدودها | YES | لا تغيير نطاق | NO | — |
+| الخلاصة التحليلية الأصلية | YES | AUTH/OFFLINE/CLIENT correction precedence | NO | — |
+| واقع التطبيقات والهوية وOffline | YES | Queue = TEAM CORRECTION | NO | — |
+| نموذج القنوات وخيارات المصالحة | YES | لا client جديد | NO | — |
+| User × Service × Verification × Capability | YES | لا Permission/Role جديد | NO | — |
+| مسار التسجيل والتحقق والثقة | YES | لا حالات نهائية جديدة | NO | — |
+| طبقات بيانات العميل/السائق-الناقل/المركبة-المالك والتحقق والعلاقة والملكية والأدلة والضمانات والثقة | YES | privacy/authority boundaries محفوظة | NO | — |
+| Onboarding/Verification states | YES | تبقى تحليلية غير نهائية | NO | — |
+| Session lifecycle/MFA/Step-up/Refresh/Logout-Revoke/Recovery | YES | AUTH-001 precedence وOnline-authoritative محفوظان | NO | — |
+| Device lifecycle كامل | YES | لا schema/permission جديد | NO | — |
+| Secure Storage controls | YES | fail-closed/revoke preserved | NO | — |
+| Consent/Privacy/Retention/Deletion | YES | لا retention مخترع | NO | — |
+| GPS permission/background states | YES | consent/purpose/cadence/retention غير محسومة | NO | — |
+| POD/signature/photos/biometric | YES | biometric DENY حتى قرار؛ final acceptance server-side | NO | — |
+| A11 detailed screen/function material | YES | لا Population جديد | NO | — |
+| العناصر السبعة التي كانت Local Candidate | YES — concept/content only | صفة ID أزيلت، وكل عنصر `UNRESOLVED FUNCTION — NEEDS A11 CROSSWALK` | YES — identifier attribute only | Wave A Finding أمر بإزالة صفة Local Candidate ID |
+| 15 نتائج ذرية | YES | Queue/A11/Offline classifications corrected | NO | — |
+| 9 أفعال مالية حساسة | YES | لا Role/Permission/Action ID جديد | NO | — |
+| P04-16 evidence analysis | YES | `INPUT STRENGTH = INSUFFICIENT EVIDENCE` فقط؛ بلا أثر مالي | NO | — |
+| TEAM-04 Event Crosswalk | YES | العدد ثابت = 10 | NO | — |
+| Offline envelope + 33 actions | YES | `ALLOW = CATEGORY ELIGIBILITY ONLY`; غير المتعاقد DENY/UNRESOLVED | NO | — |
+| Queue states/reconnect/re-auth/replay | YES | `NEEDS TEAM CORRECTION — QUEUE GOVERNANCE` | NO | — |
+| التعارضات/الفجوات/المخاطر | YES | corrected classifications preserved | NO | — |
+| أسئلة المالك/الأمن/القانوني | YES | Queue removed from Owner Decision; A11 Governance Delta | NO | — |
+| التكرار والتشابه / similarity-reuse | YES | لا تغيير جوهري | NO | — |
+| Handoff boundaries | YES | لا TEAM-03/06/08 ولا Population | NO | — |
+
+**Preservation result:** `ALL MATERIAL ORIGINAL TEAM-07 CONTENT RESTORED — VERIFIED CORRECTION DELTA PRESERVED`.
