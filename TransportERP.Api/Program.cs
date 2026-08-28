@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Api.Security;
 using TransportERP.Api.Waybills;
 using TransportERP.Infrastructure.Persistence;
 
@@ -16,6 +17,7 @@ var connectionString = builder.Configuration.GetConnectionString("TransportErp")
 builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
 builder.Services.AddScoped<IEffectivePermissionResolver, PersistentPermissionResolver>();
+builder.Services.AddScoped<ICurrentRequestSecurityResolver, CurrentRequestSecurityResolver>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),

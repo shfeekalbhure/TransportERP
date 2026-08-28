@@ -5,10 +5,12 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Api.Security;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
@@ -252,7 +254,9 @@ public sealed class P2C01CShippingApiContractTests
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IShippingExecutionStore>();
+                services.RemoveAll<ICurrentRequestSecurityResolver>();
                 services.AddSingleton(store);
+                services.AddSingleton<ICurrentRequestSecurityResolver, ContractRequestSecurityResolver>();
             });
         });
 
@@ -289,6 +293,36 @@ public sealed class P2C01CShippingApiContractTests
         Func<HttpRequestMessage> CreateRequest);
 
     private sealed record ApiError(string ErrorCode, Guid CorrelationId);
+
+    private sealed class ContractRequestSecurityResolver : ICurrentRequestSecurityResolver
+    {
+        public Task<RequestSecurityResolution> ResolveAsync(
+            HttpContext http,
+            string permissionCode,
+            CancellationToken cancellationToken = default)
+        {
+            if (http.User.Identity?.IsAuthenticated != true)
+                return Task.FromResult(new RequestSecurityResolution(null, Results.Unauthorized()));
+
+            if (!Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? http.User.FindFirst("sub")?.Value, out var userId) ||
+                !Guid.TryParse(http.User.FindFirst("company_id")?.Value, out var companyId) ||
+                !Guid.TryParse(http.User.FindFirst("branch_id")?.Value, out var branchId))
+                return Task.FromResult(new RequestSecurityResolution(null, Results.Unauthorized()));
+
+            var correlationId = Guid.TryParse(
+                http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var parsed)
+                    ? parsed
+                    : Guid.NewGuid();
+            var context = new OperationContext(userId, companyId, branchId, correlationId);
+            var allowed = http.User.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role &&
+                string.Equals(x.Value, permissionCode, StringComparison.OrdinalIgnoreCase));
+            return Task.FromResult(allowed
+                ? new RequestSecurityResolution(context, null)
+                : new RequestSecurityResolution(null, Results.Json(
+                    new { ErrorCode = "SCOPE_DENIED", correlationId },
+                    statusCode: StatusCodes.Status403Forbidden)));
+        }
+    }
 
     private sealed class RecordingShippingExecutionStore : IShippingExecutionStore
     {

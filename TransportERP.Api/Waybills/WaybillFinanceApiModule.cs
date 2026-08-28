@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using TransportERP.Api.Security;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
@@ -25,12 +25,13 @@ public static class WaybillFinanceApiModule
             Guid waybillId,
             SetPaymentPlanRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillFinanceApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillFinancePermissionCodes.PaymentPlan))
-                return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillFinancePermissionCodes.PaymentPlan, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.SetPaymentPlanAsync(context, waybillId, request, ct));
         });
 
@@ -39,12 +40,13 @@ public static class WaybillFinanceApiModule
             Guid waybillId,
             RecordCollectionRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillFinanceApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillFinancePermissionCodes.CollectionCreate))
-                return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillFinancePermissionCodes.CollectionCreate, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.RecordCollectionAsync(context, waybillId, request, ct));
         });
 
@@ -53,12 +55,13 @@ public static class WaybillFinanceApiModule
             Guid collectionId,
             ReverseCollectionRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillFinanceApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillFinancePermissionCodes.CollectionReverse))
-                return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillFinancePermissionCodes.CollectionReverse, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.ReverseCollectionAsync(context, collectionId, request, ct));
         });
 
@@ -102,35 +105,4 @@ public static class WaybillFinanceApiModule
     private static IResult Forbidden(Guid correlationId)
         => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
 
-    private static bool TryContext(HttpContext http, out OperationContext context, out IResult? failure)
-    {
-        context = default!;
-        failure = null;
-        if (http.User.Identity?.IsAuthenticated != true)
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        if (!TryGuid(http.User, ClaimTypes.NameIdentifier, "sub", out var userId) ||
-            !TryGuid(http.User, "company_id", null, out var companyId) ||
-            !TryGuid(http.User, "branch_id", null, out var branchId))
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        var correlationId = Guid.TryParse(http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var parsed)
-            ? parsed : Guid.NewGuid();
-        context = new OperationContext(userId, companyId, branchId, correlationId);
-        return true;
-    }
-
-    private static bool TryGuid(ClaimsPrincipal principal, string first, string? second, out Guid value)
-    {
-        var raw = principal.FindFirstValue(first) ?? (second is null ? null : principal.FindFirstValue(second));
-        return Guid.TryParse(raw, out value);
-    }
-
-    private static bool HasPermission(ClaimsPrincipal principal, string permission)
-        => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role &&
-            string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
 }

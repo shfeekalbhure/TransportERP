@@ -1,5 +1,4 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Http.HttpResults;
+using TransportERP.Api.Security;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Numbering;
@@ -29,11 +28,13 @@ public static class WaybillApiModule
         group.MapPost("/waybills/drafts", async Task<IResult> (
             CreateWaybillDraftRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Create)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Create, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.CreateDraftAsync(context, request, ct));
         });
 
@@ -41,11 +42,13 @@ public static class WaybillApiModule
             Guid waybillId,
             UpdateWaybillDraftRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Edit)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Edit, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.UpdateDraftAsync(context, waybillId, request, ct));
         });
 
@@ -54,11 +57,13 @@ public static class WaybillApiModule
             int? skip,
             int? take,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.PartyView)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.PartyView, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.SearchPartiesAsync(context,
                 new OperationalPartySearchRequest(query, skip ?? 0, take ?? 50), ct));
         });
@@ -66,11 +71,13 @@ public static class WaybillApiModule
         group.MapPost("/operational-parties", async Task<IResult> (
             OperationalPartyCreateRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.PartyCreate)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.PartyCreate, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.CreatePartyAsync(context, request, ct));
         });
 
@@ -78,11 +85,13 @@ public static class WaybillApiModule
             Guid waybillId,
             ValidateWaybillRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Validate)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Validate, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.ValidateAsync(context, waybillId, request, ct));
         });
 
@@ -90,11 +99,13 @@ public static class WaybillApiModule
             Guid waybillId,
             SubmitWaybillRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Submit)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Submit, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.SubmitAsync(context, waybillId, request, ct));
         });
 
@@ -102,11 +113,13 @@ public static class WaybillApiModule
             Guid waybillId,
             ApproveWaybillRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Approve)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Approve, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.ApproveAsync(context, waybillId, request, ct));
         });
 
@@ -114,11 +127,13 @@ public static class WaybillApiModule
             Guid waybillId,
             ReturnWaybillRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Return)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Return, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.ReturnForCorrectionAsync(context, waybillId, request, ct));
         });
 
@@ -126,11 +141,13 @@ public static class WaybillApiModule
             Guid waybillId,
             CancelWaybillRequest request,
             HttpContext http,
+            ICurrentRequestSecurityResolver securityResolver,
             WaybillApplicationService service,
             CancellationToken ct) =>
         {
-            if (!TryContext(http, out var context, out var failure)) return failure!;
-            if (!HasPermission(http.User, WaybillPermissionCodes.Cancel)) return Forbidden(context.CorrelationId);
+            var security = await securityResolver.ResolveAsync(http, WaybillPermissionCodes.Cancel, ct);
+            if (!security.Succeeded) return security.Failure!;
+            var context = security.Context!;
             return await Execute(context, () => service.CancelAsync(context, waybillId, request, ct));
         });
 
@@ -180,35 +197,4 @@ public static class WaybillApiModule
     private static IResult Forbidden(Guid correlationId)
         => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
 
-    private static bool TryContext(HttpContext http, out OperationContext context, out IResult? failure)
-    {
-        context = default!;
-        failure = null;
-        if (http.User.Identity?.IsAuthenticated != true)
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        if (!TryGuid(http.User, ClaimTypes.NameIdentifier, "sub", out var userId) ||
-            !TryGuid(http.User, "company_id", null, out var companyId) ||
-            !TryGuid(http.User, "branch_id", null, out var branchId))
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        var correlationId = Guid.TryParse(http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var parsed)
-            ? parsed : Guid.NewGuid();
-        context = new OperationContext(userId, companyId, branchId, correlationId);
-        return true;
-    }
-
-    private static bool TryGuid(ClaimsPrincipal principal, string first, string? second, out Guid value)
-    {
-        var raw = principal.FindFirstValue(first) ?? (second is null ? null : principal.FindFirstValue(second));
-        return Guid.TryParse(raw, out value);
-    }
-
-    private static bool HasPermission(ClaimsPrincipal principal, string permission)
-        => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role &&
-            string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
 }

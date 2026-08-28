@@ -261,7 +261,12 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         await EnsureMigratedAsync(connection);
         FinanceScope scope;
         await using (var seedDb = CreateP2Db(connection))
+        {
             scope = await SeedApprovedWaybillAsync(seedDb, "BHTTP");
+            await PersistentRbacTestSeeder.GrantBranchPermissionAsync(
+                seedDb, scope.UserId, scope.CompanyId, scope.BranchId,
+                WaybillFinancePermissionCodes.PaymentPlan);
+        }
 
         using var factory = CreateFactory(connection);
         using var client = factory.CreateClient();
@@ -285,7 +290,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         {
             ClientOperationId = $"http-wrong-{Guid.NewGuid():N}"
         });
-        Assert.Equal(HttpStatusCode.NotFound, scoped.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, scoped.StatusCode);
     }
 
     private static RecordCollectionRequest NewCollection(

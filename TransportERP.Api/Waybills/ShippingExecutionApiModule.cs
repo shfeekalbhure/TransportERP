@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using TransportERP.Api.Security;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
@@ -22,62 +22,71 @@ public static class ShippingExecutionApiModule
 
         group.MapPost("/waybills/{waybillId:guid}/items/{itemId:guid}/releases", async Task<IResult> (
             Guid waybillId, Guid itemId, ReleaseItemRequest request, HttpContext http,
-            ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.Release,
+            ICurrentRequestSecurityResolver securityResolver, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.Release, ct,
                 context => service.ReleaseItemAsync(context, waybillId, itemId, request, ct)));
 
         group.MapPost("/trips", async Task<IResult> (
-            CreateTripRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.TripCreate,
+            CreateTripRequest request, HttpContext http, ICurrentRequestSecurityResolver securityResolver,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.TripCreate, ct,
                 context => service.CreateTripAsync(context, request, ct)));
 
         group.MapPost("/trips/{tripId:guid}/allocations", async Task<IResult> (
-            Guid tripId, AllocateItemRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.Allocate,
+            Guid tripId, AllocateItemRequest request, HttpContext http, ICurrentRequestSecurityResolver securityResolver,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.Allocate, ct,
                 context => service.AllocateAsync(context, tripId, request, ct)));
 
         group.MapPost("/allocations/{allocationId:guid}:reverse", async Task<IResult> (
-            Guid allocationId, UnallocateRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.Unallocate,
+            Guid allocationId, UnallocateRequest request, HttpContext http, ICurrentRequestSecurityResolver securityResolver,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.Unallocate, ct,
                 context => service.UnallocateAsync(context, allocationId, request, ct)));
 
         group.MapPost("/trips/{tripId:guid}/manifests", async Task<IResult> (
-            Guid tripId, GenerateManifestRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.ManifestCreate,
+            Guid tripId, GenerateManifestRequest request, HttpContext http, ICurrentRequestSecurityResolver securityResolver,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.ManifestCreate, ct,
                 context => service.GenerateManifestAsync(context, tripId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}/lines/{lineId:guid}:load", async Task<IResult> (
             Guid manifestId, Guid lineId, LoadManifestLineRequest request, HttpContext http,
-            ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.ManifestLoad,
+            ICurrentRequestSecurityResolver securityResolver, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.ManifestLoad, ct,
                 context => service.LoadManifestLineAsync(context, manifestId, lineId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}:finalize", async Task<IResult> (
             Guid manifestId, FinalizeManifestRequest request, HttpContext http,
-            ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.ManifestFinalize,
+            ICurrentRequestSecurityResolver securityResolver, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.ManifestFinalize, ct,
                 context => service.FinalizeManifestAsync(context, manifestId, request, ct)));
 
         group.MapPost("/manifests/{manifestId:guid}:handover", async Task<IResult> (
             Guid manifestId, HandoverManifestRequest request, HttpContext http,
-            ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.ManifestHandover,
+            ICurrentRequestSecurityResolver securityResolver, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.ManifestHandover, ct,
                 context => service.HandoverManifestAsync(context, manifestId, request, ct)));
 
         group.MapPost("/trips/{tripId:guid}:start", async Task<IResult> (
             Guid tripId, StartTripRequest request, HttpContext http,
-            ShippingExecutionApplicationService service, CancellationToken ct) =>
-            await Authorized(http, ShippingExecutionPermissionCodes.TripStart,
+            ICurrentRequestSecurityResolver securityResolver, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, securityResolver, ShippingExecutionPermissionCodes.TripStart, ct,
                 context => service.StartTripAsync(context, tripId, request, ct)));
 
         return app;
     }
 
     private static async Task<IResult> Authorized<T>(
-        HttpContext http, string permission, Func<OperationContext, Task<T>> action)
+        HttpContext http,
+        ICurrentRequestSecurityResolver securityResolver,
+        string permission,
+        CancellationToken cancellationToken,
+        Func<OperationContext, Task<T>> action)
     {
-        if (!TryContext(http, out var context, out var failure)) return failure!;
-        if (!HasPermission(http.User, permission)) return Forbidden(context.CorrelationId);
+        var security = await securityResolver.ResolveAsync(http, permission, cancellationToken);
+        if (!security.Succeeded) return security.Failure!;
+        var context = security.Context!;
         return await Execute(context, () => action(context));
     }
 
@@ -117,38 +126,6 @@ public static class ShippingExecutionApiModule
             Results.Json(new { ErrorCode = code, CorrelationId = correlationId }, statusCode: StatusCodes.Status409Conflict),
         _ => Results.BadRequest(new { ErrorCode = code, CorrelationId = correlationId })
     };
-
-    private static bool TryContext(HttpContext http, out OperationContext context, out IResult? failure)
-    {
-        context = default!;
-        failure = null;
-        if (http.User.Identity?.IsAuthenticated != true)
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        if (!TryGuid(http.User, ClaimTypes.NameIdentifier, "sub", out var userId) ||
-            !TryGuid(http.User, "company_id", null, out var companyId) ||
-            !TryGuid(http.User, "branch_id", null, out var branchId))
-        {
-            failure = Results.Unauthorized();
-            return false;
-        }
-        var correlationId = Guid.TryParse(http.Request.Headers["X-Correlation-Id"].FirstOrDefault(), out var parsed)
-            ? parsed : Guid.NewGuid();
-        context = new OperationContext(userId, companyId, branchId, correlationId);
-        return true;
-    }
-
-    private static bool TryGuid(ClaimsPrincipal principal, string first, string? second, out Guid value)
-    {
-        var raw = principal.FindFirstValue(first) ?? (second is null ? null : principal.FindFirstValue(second));
-        return Guid.TryParse(raw, out value);
-    }
-
-    private static bool HasPermission(ClaimsPrincipal principal, string permission)
-        => principal.Claims.Any(x => x.Type is "permission" or ClaimTypes.Role &&
-            string.Equals(x.Value, permission, StringComparison.OrdinalIgnoreCase));
 
     private static IResult Forbidden(Guid correlationId)
         => Results.Json(new { ErrorCode = "SCOPE_DENIED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);

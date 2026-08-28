@@ -192,7 +192,15 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         await EnsureMigratedAsync(connection);
         TestScope scope;
         await using (var seedDb = CreateP2Db(connection))
+        {
             scope = await SeedScopeAsync(seedDb, "P2HTTP", withSequence: false);
+            await PersistentRbacTestSeeder.GrantBranchPermissionAsync(
+                seedDb, scope.UserId, scope.CompanyId, scope.BranchId, WaybillPermissionCodes.Create);
+        }
+
+        TestScope ungrantedScope;
+        await using (var seedDb = CreateP2Db(connection))
+            ungrantedScope = await SeedScopeAsync(seedDb, "P2HTTP-NO-GRANT", withSequence: false);
 
         using var factory = CreateFactory(connection);
         using var client = factory.CreateClient();
@@ -201,6 +209,11 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
             CreateToken(scope.UserId, scope.CompanyId, scope.BranchId, "audit.events.read"));
         var denied = await client.PostAsJsonAsync("/api/v1/waybills/drafts", NewCreateRequest(scope));
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            CreateToken(ungrantedScope.UserId, ungrantedScope.CompanyId, ungrantedScope.BranchId, WaybillPermissionCodes.Create));
+        var claimOnly = await client.PostAsJsonAsync("/api/v1/waybills/drafts", NewCreateRequest(ungrantedScope));
+        Assert.Equal(HttpStatusCode.Forbidden, claimOnly.StatusCode);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
             CreateToken(scope.UserId, scope.CompanyId, scope.BranchId, WaybillPermissionCodes.Create));

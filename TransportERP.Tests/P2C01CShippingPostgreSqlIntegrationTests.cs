@@ -194,7 +194,12 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         await EnsureMigratedAsync(connection);
         ShippingScope scope;
         await using (var seedDb = CreateP2Db(connection))
+        {
             scope = await SeedApprovedWaybillAsync(seedDb, "CHTTP", quantity: 3m);
+            await PersistentRbacTestSeeder.GrantBranchPermissionAsync(
+                seedDb, scope.UserId, scope.CompanyId, scope.BranchId,
+                ShippingExecutionPermissionCodes.Release);
+        }
 
         using var factory = CreateFactory(connection);
         using var client = factory.CreateClient();
@@ -214,7 +219,7 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
             CreateToken(scope.UserId, scope.CompanyId, Guid.NewGuid(), ShippingExecutionPermissionCodes.Release));
         var scoped = await client.PostAsJsonAsync($"/api/v1/waybills/{scope.WaybillId}/items/{scope.ItemId}/releases",
             body with { ClientOperationId = $"wrong-branch-{Guid.NewGuid():N}" });
-        Assert.Equal(HttpStatusCode.NotFound, scoped.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, scoped.StatusCode);
     }
 
     private static ShippingExecutionApplicationService CreateService(TransportErpDbContext db)
