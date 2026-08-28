@@ -350,6 +350,7 @@ class Driver:
         automation_id: str,
         up_movements: list[str],
         down_movements: list[str],
+        top_anchor_seen: bool,
     ) -> str:
         if automation_id not in FIND_EXHAUSTION_DIAGNOSTIC_TARGETS:
             return "OBSERVATION_UNAVAILABLE"
@@ -359,9 +360,10 @@ class Driver:
         down = down_movements[-1] if down_movements and down_movements[-1] in {
             "MOVED", "UNCHANGED", "UNKNOWN"
         } else "UNKNOWN"
+        top_anchor = "TRUE" if top_anchor_seen is True else "FALSE"
         unavailable = (
             "COUNT_UNKNOWN:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:"
-            f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+            f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}:TOP_ANCHOR_SEEN_{top_anchor}"
         )
         try:
             hierarchy = self.dump()
@@ -372,7 +374,8 @@ class Driver:
             if len(targets) != 1:
                 return (
                     f"COUNT_{count}:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:"
-                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}:"
+                    f"TOP_ANCHOR_SEEN_{top_anchor}"
                 )
             target = targets[0]
             visible = self._safe_boolean(target.attrib.get("visible-to-user"))
@@ -383,7 +386,8 @@ class Driver:
             if len(roots) != 1:
                 return (
                     f"COUNT_ONE:VISIBLE_{visible}:ENABLED_{enabled}:"
-                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}:"
+                    f"TOP_ANCHOR_SEEN_{top_anchor}"
                 )
             target_left, target_top, target_right, target_bottom = self._rectangle(target)
             root_left, root_top, root_right, root_bottom = self._rectangle(roots[0])
@@ -395,7 +399,8 @@ class Driver:
             )
             return (
                 f"COUNT_ONE:VISIBLE_{visible}:ENABLED_{enabled}:"
-                f"X_{x_relation}:Y_{y_relation}:UP_{up}:DOWN_{down}"
+                f"X_{x_relation}:Y_{y_relation}:UP_{up}:DOWN_{down}:"
+                f"TOP_ANCHOR_SEEN_{top_anchor}"
             )
         except (UiE2EFailure, ValueError, TypeError):
             return unavailable
@@ -405,11 +410,16 @@ class Driver:
         if found:
             return found[0]
         up_movements: list[str] = []
+        top_anchor_seen = False
         for _ in range(6):
             up_movements.append(self._scroll(toward_bottom=False))
             found = self.nodes(automation_id, self._last_scroll_hierarchy)
             if found:
                 return found[0]
+            if automation_id == "driver_sign_out" and self.nodes(
+                "driver_sign_in", self._last_scroll_hierarchy
+            ):
+                top_anchor_seen = True
         down_movements: list[str] = []
         for _ in range(14):
             down_movements.append(self._scroll(toward_bottom=True))
@@ -418,7 +428,7 @@ class Driver:
                 return found[0]
         movement = self._aggregate_scroll_movement(up_movements + down_movements)
         observation = self.safe_find_exhaustion_observation(
-            automation_id, up_movements, down_movements
+            automation_id, up_movements, down_movements, top_anchor_seen
         )
         suffix = "" if observation == "OBSERVATION_UNAVAILABLE" else f":{observation}"
         raise UiE2EFailure(f"UI_AUTOMATION_ID_NOT_FOUND:SCROLL_{movement}{suffix}")

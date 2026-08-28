@@ -219,6 +219,11 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}", script,
             StringComparison.Ordinal);
+        Assert.Contains("TOP_ANCHOR_SEEN_{top_anchor}", script, StringComparison.Ordinal);
+        Assert.Contains("automation_id == \"driver_sign_out\" and self.nodes(", script,
+            StringComparison.Ordinal);
+        Assert.Contains("\"driver_sign_in\", self._last_scroll_hierarchy", script,
+            StringComparison.Ordinal);
         Assert.Contains("suffix = \"\" if observation == \"OBSERVATION_UNAVAILABLE\"",
             script, StringComparison.Ordinal);
         var findObservationStart = script.IndexOf(

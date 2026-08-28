@@ -45,11 +45,11 @@ class FindExhaustionObservationTests(unittest.TestCase):
         )
         driver.dump = lambda: hierarchy
         actual = driver.safe_find_exhaustion_observation(
-            "driver_sign_out", ["MOVED"], ["UNCHANGED"]
+            "driver_sign_out", ["MOVED"], ["UNCHANGED"], True
         )
         self.assertEqual(
             "COUNT_ONE:VISIBLE_FALSE:ENABLED_TRUE:X_INSIDE:Y_ABOVE:"
-            "UP_MOVED:DOWN_UNCHANGED",
+            "UP_MOVED:DOWN_UNCHANGED:TOP_ANCHOR_SEEN_TRUE",
             actual,
         )
         self.assertNotIn("secret", actual)
@@ -63,11 +63,11 @@ class FindExhaustionObservationTests(unittest.TestCase):
         )
         driver.dump = lambda: hierarchy
         actual = driver.safe_find_exhaustion_observation(
-            "driver_sign_out", ["MOVED"], ["MOVED"]
+            "driver_sign_out", ["MOVED"], ["MOVED"], False
         )
         self.assertEqual(
             "COUNT_MULTIPLE:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:X_UNKNOWN:Y_UNKNOWN:"
-            "UP_MOVED:DOWN_MOVED",
+            "UP_MOVED:DOWN_MOVED:TOP_ANCHOR_SEEN_FALSE",
             actual,
         )
         self.assertNotIn("secret", actual)
@@ -77,17 +77,23 @@ class FindExhaustionObservationTests(unittest.TestCase):
         driver.dump = mock.Mock(side_effect=AssertionError("must not inspect hierarchy"))
         self.assertEqual(
             "OBSERVATION_UNAVAILABLE",
-            driver.safe_find_exhaustion_observation("secret-target", [], []),
+            driver.safe_find_exhaustion_observation("secret-target", [], [], False),
         )
         driver.dump.assert_not_called()
 
     def test_find_appends_only_allowlisted_exhaustion_observation(self) -> None:
         driver = HARNESS.Driver("adb", "pkg", 30)
-        driver.nodes = lambda *_: []
-        driver._scroll = lambda toward_bottom: "MOVED"
+        driver.nodes = lambda automation_id, root=None: (
+            [object()] if automation_id == "driver_sign_in" and root is not None else []
+        )
+        def scroll(toward_bottom: bool) -> str:
+            driver._last_scroll_hierarchy = object()
+            return "MOVED"
+
+        driver._scroll = scroll
         observation = (
             "COUNT_ZERO:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:X_UNKNOWN:Y_UNKNOWN:"
-            "UP_MOVED:DOWN_MOVED"
+            "UP_MOVED:DOWN_MOVED:TOP_ANCHOR_SEEN_TRUE"
         )
         driver.safe_find_exhaustion_observation = mock.Mock(return_value=observation)
         with self.assertRaisesRegex(
@@ -96,6 +102,7 @@ class FindExhaustionObservationTests(unittest.TestCase):
         ) as raised:
             driver.find("driver_sign_out")
         self.assertNotIn("driver_sign_out", str(raised.exception))
+        self.assertTrue(driver.safe_find_exhaustion_observation.call_args.args[3])
 
 
 class ConditionalImeDismissalTests(unittest.TestCase):
