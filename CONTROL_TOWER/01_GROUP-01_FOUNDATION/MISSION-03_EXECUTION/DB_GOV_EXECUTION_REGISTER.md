@@ -9,13 +9,13 @@ Control Tower independently revalidated and adopted the authority-neutral code-o
 | Proposal | Relevant REM | Historical / current gate | Current controlling result |
 |---|---|---|---|
 | `DBP-001` | `REM-100` | code-only mapper path implemented; existing ten-migration disposable verification passed | `CODE-ONLY IMPLEMENTED; GREENFIELD TARGET HAS NO LEGACY POPULATION TO REPAIR` |
-| `DBP-002` | `REM-210` | exact Greenfield physical design resubmitted | `HOLD AT COORDINATED REHEARSAL ENTRY — POST-RESUBMISSION ORDER REVALIDATION REQUIRED` |
-| `DBP-003A` | `REM-200` | exact session/security/password design resubmitted | `HOLD AT COORDINATED REHEARSAL ENTRY; LOGIN ACTIVATION ALSO REQUIRES PASSWORD/LOCKOUT TEST` |
-| `DBP-003B` | `REM-220` | exact device registry/assignment design resubmitted | `ORDER CONFLICT WITH DBP-006 — HOLD` |
-| `DBP-003C` | `REM-220` | exact PoP/nonce/replay design resubmitted | `ORDER CONFLICT WITH DBP-006 — HOLD` |
-| `DBP-004` | `REM-320` | exact Audit V2/UoW design resubmitted | `HOLD AS PART OF COORDINATED BUNDLE` |
-| `DBP-005` | `REM-310` | exact Settlement/accounting design resubmitted | `HOLD AS PART OF COORDINATED BUNDLE` |
-| `DBP-006` | `REM-400` | exact typed Offline design resubmitted | `ORDER CONFLICT WITH DBP-003B/C — HOLD` |
+| `DBP-002` | `REM-210` | exact Greenfield design + v1.1 dependency correction | `CORRECTED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED BEFORE REHEARSAL AUTHORING` |
+| `DBP-003A` | `REM-200` | session/security/password design; now physically after DBP-003B/C so device FK target exists | `CORRECTED PACKAGE READY; LOGIN ACTIVATION ALSO REQUIRES PASSWORD/LOCKOUT TEST` |
+| `DBP-003B` | `REM-220` | device registry/assignment design now physically after DBP-002/004 and before DBP-003A/006 | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
+| `DBP-003C` | `REM-220` | PoP/nonce/replay design now physically after DBP-002/004 and before DBP-003A/006 | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
+| `DBP-004` | `REM-320` | exact Audit V2/UoW design | `CORRECTED COORDINATED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED` |
+| `DBP-005` | `REM-310` | exact Settlement/accounting design | `CORRECTED COORDINATED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED` |
+| `DBP-006` | `REM-400` | typed Offline design now after both session and device/proof persistence | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
 | `DBP-007` | `REM-600` | canonical scope absent | `BLOCKED` |
 | `DBP-008` | `REM-610` | canonical Ticketing requirements absent | `BLOCKED` |
 | `DBP-009` | reporting | requirements absent | `BLOCKED` |
@@ -52,35 +52,57 @@ Those files remain historical evidence. `DB-BASELINE-001` later superseded only 
 
 - `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0`;
 - `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`;
-- `EXECUTION_OUTPUT_SHA256_v1.1.txt`.
+- historical `EXECUTION_OUTPUT_SHA256_v1.1.txt`.
 
 The exact design covers membership/grant/RLS, new-system PBKDF2 password and lockout/reset, security/session rotation, device/PoP/replay, Audit V2 caller-UoW, Settlement, Offline inbox/queue/result/lease, retention/hold and recovery gates.
 
 A mission-local file `DBP-002_003_004_005_006_GREENFIELD_DB_GOV_REVIEW_DECISION.md` records nominal coordinated disposable/Greenfield rehearsal approval. Repository chronology shows that decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`, before the exact physical resubmission was committed later in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
 
-## Current controlling post-resubmission revalidation
+## Post-resubmission revalidation and correction
 
-Control Tower independently re-read the exact current package and recorded:
+Control Tower independently recorded:
 
 `CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
 
-Result:
+with result:
 
-`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`.
 
-The controlling evidence-bound conflict is:
+That revalidation identified the DBP-003B/C ↔ DBP-006 sequencing contradiction. During exact FK binding MISSION-03 also identified a second physical ordering issue: DBP-003A `auth_sessions.RegisteredDeviceId` cannot create its composite FK before DBP-003B/C creates `registered_devices`.
 
-- exact physical design order: `DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`;
-- earlier review decision order: `DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`;
-- exact physical design makes DBP-006 depend on durable device/proof objects introduced by DBP-003B/C.
+The corrected package is now recorded in:
 
-Until one corrected post-resubmission dependency disposition is recorded and independently reviewed **after** the corrected repository package exists:
+`DBP-003BC_003A_006_PHYSICAL_DEPENDENCY_CORRECTION_v1.1.md`
 
-- design/governance correction: `ALLOWED`;
+Correction commit:
+
+`20608494998e671892ee35abd415158e399c9036`
+
+The sole corrected candidate-unit order submitted for review is:
+
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`.
+
+Dependency/activation constraints:
+
+- DBP-003B/C physical objects depend on DBP-002/004, not on the existence of `auth_sessions`.
+- Device commands that require session-family revocation remain disabled until DBP-003A passes.
+- Device commands that require Offline quarantine remain disabled until DBP-006 passes.
+- DBP-003A creates its device FK after the registered-device target and tenant key exist.
+- DBP-006 is created only after membership, Audit V2, device/proof and session durable dependencies exist.
+
+`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` is rebound to this corrected order.
+
+## Current controlling authority
+
+The sequencing defect is corrected at design level, but the rehearsal entry HOLD is **not** lifted by MISSION-03 itself. A fresh independent DB-GOV decision must be recorded after the correction package exists.
+
+Until that review is recorded:
+
+- design/governance correction and review preparation: `ALLOWED`;
 - candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring: `HOLD`;
 - candidate migration application on disposable PostgreSQL: `HOLD`;
 - Production database/data/configuration/credentials: `PROHIBITED`.
 
-This is not an `OWNER DECISION REQUIRED` condition. It is delegated DB-GOV correction/revalidation work.
+This is not an `OWNER DECISION REQUIRED` condition. It is the current independent DB-GOV gate.
 
-`MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is now an open historical checkpoint because Control Tower governance/directive files changed after that hash set. A new manifest and detached SHA-256 set are required at the next worker checkpoint before any later acceptance or seal claim.
+The historical `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` hash set must not be represented as current after these corrections. A new manifest/checkpoint and detached SHA-256 set are required after the corrected package is stabilized.
