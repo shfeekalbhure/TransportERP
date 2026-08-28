@@ -33,10 +33,11 @@ Target database authority:
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — POST-CORRECTION DB-GOV PASS RECORDED; BOUNDED GREENFIELD AUTHORING/REHEARSAL AUTHORIZED; KEEP MISSION-03 OPEN`.
+- `CURRENT DIRECTIVE`: `CONTINUE — DBP-002 WORKER EXECUTION EVIDENCED; EXACT-HEAD REHEARSAL/REGRESSION GATES FAILING; FIX AND RERUN; DO NOT ADVANCE TO DBP-004`.
 - MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`.
 - Product authority remains `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
-- Reviewed execution baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
+- Reviewed pre-authoring execution baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
+- Current evidenced worker head: `codex/mission-03-execution-20260828@4cb8a388d65f9bf621feec4fde8ba3ec06bebea1`, tree `948726dfdd61e541a3b36c6e4039d48f23da4cfe`, parent `8e4d6e81104172bab86bb1eb3666c44da20d4ded`.
 - PR #69 remains comparative unmerged evidence only; no merge is authorized.
 
 ### Binding owner decisions
@@ -47,71 +48,40 @@ Target database authority:
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
 - `DB-BASELINE-001 = RESOLVED — GREENFIELD / NEW / EMPTY TARGET DATABASE`.
 
-### Fresh post-correction DB-GOV decision
+### Governing DB-GOV decision
 
-Correction:
-
-`20608494998e671892ee35abd415158e399c9036`
-
-Formal record:
-
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_CORRECTION_PASS_DECISION_2026-08-29.md`
-
-Verdict:
-
-`DB-GOV VERDICT = PASS`
-
-`DEPENDENCY CORRECTION ACCEPTED — NO REMAINING PHYSICAL ORDER BLOCKER IDENTIFIED`
-
-The prior rehearsal-entry/formal-recording hold is closed.
-
-### Only approved coordinated physical order
+The fresh post-correction decision remains `DB-GOV VERDICT = PASS` and authorizes bounded non-Production authoring/rehearsal in this single order only:
 
 `DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-Candidate units:
+The PASS authorizes work; it does not pre-accept any generated candidate.
 
-1. `GreenfieldTenantMembershipIsolation`.
-2. `GreenfieldAuditV2AndAtomicOutbox`.
-3. `GreenfieldDeviceRegistryAndProof`.
-4. `GreenfieldLocalAuthSessions`.
-5. `GreenfieldTypedOfflineProtocol`.
-6. `GreenfieldGovernedSettlement`.
+### DBP-002 current exact-head result
 
-No alternate order is authorized.
+Worker execution is now proven. The current head contains candidate `GreenfieldTenantMembershipIsolation`, an additive Migration 11, model-snapshot/physical-SQL changes, permission-resolver wiring and regression tests. Evidence on exact head `4cb8a388...` proves the original ten migration source/designer files remain unchanged, PostgreSQL 18.6 is used, build succeeds, no pending model changes are reported, and an empty baseline can receive exactly the existing ten migrations.
 
-### Bounded authority now opened
+DBP-002 is **not accepted** because mandatory exact-head gates fail:
 
-MISSION-03 may perform candidate Entity/DbContext/persistent-adapter authoring, additive forward-only candidate migrations, generated SQL/model-snapshot changes, and candidate application/testing only on its isolated branch and disposable/Greenfield non-Production PostgreSQL 18.6.
-
-For every candidate checkpoint it must bind exact SHA/tree/parent, changed files, migration/hash/generated SQL, apply the existing ten migrations unchanged to an empty baseline, prove baseline backup/restore, apply only the authorized next candidate, run proposal-specific negatives/concurrency/failure injection plus full regression/model-drift checks, then prove candidate backup/restore/catalog reconciliation and retain artifact digests.
-
-### Dependency and activation gates
-
-- Failure of DBP-003B/C stops DBP-003A and DBP-006.
-- Failure of DBP-003A stops DBP-006.
-- DBP-005 materially depends on DBP-002/004 but remains ordered last in the coordinated run.
-- Device behavior requiring session-family revoke remains disabled until DBP-003A passes.
-- Device behavior requiring Offline quarantine remains disabled until DBP-006 passes.
-- `LOGIN ACTIVATION` remains blocked until new-system password hash/verify/lockout tests pass.
-- OFFLINE remains default-deny under OFFLINE-001.
-- Settlement remains governed by ACC-001, configuration-driven account roles, FX/rounding, SoD and fiscal-period controls.
+1. Full Rehearsal v2 run `33219905514` fails at baseline backup/restore catalog reconciliation before candidate application. The observed differences are textual PostgreSQL canonicalization of semantically equivalent CHECK expressions after `pg_dump/pg_restore`; later candidate/RLS/regression/restore steps are therefore skipped.
+2. W0 exact-head run `33219905526` successfully applies all 11 migrations but full regression is `149 passed / 5 failed / 154 total`. Four SyncOperation persistence tests fail with `PERMISSION_DENIED: sync.operations.execute`; the API sync test expects `QUEUED` but receives `REJECTED`. The worker must prove whether this is an intended membership-authority fixture transition or a product integration regression and restore the required regression gate without weakening authorization.
+3. Harness-fix run `33219905547` creates a local workflow-only correction commit but cannot push it because the GitHub App lacks permission to update `.github/workflows/*`. This is an execution-mechanism blocker, not owner-reserved authority. Do not broaden permissions or ask for merge/Production authority; land any harness-only correction through an already-authorized worker path and rerun exact-head gates.
 
 ### Required continuation
 
-MISSION-03 must now continue automatically through all enabled work. Do not return after each DBP or Wave.
-
-After every candidate package and the coordinated bundle, submit exact-head rehearsal evidence for independent post-rehearsal DB-GOV. Fix and rerun failed gates before continuing dependent units.
-
-Continue unrelated W5/W6/W7 work in parallel where its own gates permit. Keep W8 last and do not perform destructive/global cleanup before the preservation gate is satisfied.
-
-Remaining non-DB gates include canonical post-DEPART Shipping/Ticketing/screen authority, real Windows/Android executable runtime and secure-store proof, protected signing custody, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and complete worktree/stash/local-only preservation inventory before W8 cleanup.
+- Keep DBP-002 `IN PROGRESS — NOT ACCEPTED`.
+- Fix the catalog reconciliation harness so backup/restore comparison is semantic/deterministic without masking real schema drift.
+- Reconcile the five W0 authorization regressions under the accepted DBP-002 membership model without weakening deny/fail-closed behavior.
+- Rerun exact-head Full Rehearsal and W0/full regression on a fresh disposable PostgreSQL 18.6 environment.
+- Require all mandatory DBP-002 steps to complete, retain exact artifacts/digests, and submit the resulting exact-head package for independent post-rehearsal DB-GOV.
+- `DBP-004 = HOLD — DEPENDS ON DBP-002 ACCEPTANCE`; no later DBP may be advanced by reordering.
+- Continue unrelated W5/W6/W7 work only where its own gates remain independent.
+- W8 stays last; no destructive/global cleanup before preservation gates.
 
 ### Prohibitions
 
-No Production database/data/configuration/credentials. No Production secrets. Do not edit/delete/squash the existing ten migrations. No destructive migration/down-migration reliance. No merge to master, rebase, cherry-pick, force-push or history rewrite.
+No Production database/data/configuration/credentials. No Production secrets. Do not edit/delete/squash the existing ten migrations. No destructive migration/down-migration reliance. No merge to master, PR #69 merge, rebase, cherry-pick, force-push or history rewrite.
 
-No `OWNER DECISION REQUIRED` is active for the DB-GOV dependency package.
+No `OWNER DECISION REQUIRED` is active for this exact-head failure set; the next permitted actions are ordinary isolated-branch harness/test/candidate correction and rerun.
 
 ## MISSION-04
 
