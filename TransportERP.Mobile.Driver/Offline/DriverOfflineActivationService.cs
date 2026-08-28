@@ -247,7 +247,20 @@ public sealed class DriverOfflineActivationService(
         }
     }
 
-    public async Task DeactivateAsync(CancellationToken cancellationToken = default)
+    public Task DeactivateAsync(CancellationToken cancellationToken = default) =>
+        DeactivateCoreAsync(null, cancellationToken);
+
+    internal Task DeactivateWithBestEffortRemoteRevocationAsync(
+        Func<Task> remoteRevocation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteRevocation);
+        return DeactivateCoreAsync(remoteRevocation, cancellationToken);
+    }
+
+    private async Task DeactivateCoreAsync(
+        Func<Task>? remoteRevocation,
+        CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -255,6 +268,12 @@ public sealed class DriverOfflineActivationService(
             Volatile.Write(ref _active, null);
             NotifyStateChanged();
             _supervisorCancellation?.Cancel();
+            volatileSession.Clear();
+            if (remoteRevocation is not null)
+            {
+                try { await remoteRevocation(); }
+                catch { /* Remote revocation is best effort after mandatory local closure. */ }
+            }
             if (_supervisorTask is not null)
             {
                 try
@@ -274,7 +293,6 @@ public sealed class DriverOfflineActivationService(
             _supervisorTask = null;
             _supervisorCancellation?.Dispose();
             _supervisorCancellation = null;
-            volatileSession.Clear();
         }
         finally
         {

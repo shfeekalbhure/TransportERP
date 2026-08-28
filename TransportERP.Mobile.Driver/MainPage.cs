@@ -289,6 +289,7 @@ public sealed class MainPage : ContentPage
     {
         if (_busy) return;
         _busy = true;
+        _signOut.IsEnabled = false;
         try
         {
             var active = _activation.Active;
@@ -299,7 +300,6 @@ public sealed class MainPage : ContentPage
             }
 
             var runtime = active.Runtime;
-            _signOut.IsEnabled = true;
             _signIn.IsEnabled = false;
             _mode.Text = $"Offline runtime: {runtime.Status.Mode.ToString().ToUpperInvariant()}";
             _reason.Text = $"Reason: {SanitizeCode(runtime.Status.ReasonCode)}";
@@ -323,6 +323,7 @@ public sealed class MainPage : ContentPage
         finally
         {
             _busy = false;
+            _signOut.IsEnabled = _activation.Active is not null;
         }
     }
 
@@ -450,8 +451,15 @@ public sealed class MainPage : ContentPage
 
     private async Task SignOutAsync()
     {
-        if (_busy) return;
+        if (_busy)
+        {
+            _actionResult.Text = "Result: SIGN_OUT_BUSY";
+            return;
+        }
         _busy = true;
+        _signOut.IsEnabled = false;
+        DisableActions();
+        _actionResult.Text = "Result: SIGN_OUT_IN_PROGRESS";
         try
         {
             await _authenticatedActivation.SignOutAsync();

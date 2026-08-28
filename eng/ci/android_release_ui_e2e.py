@@ -81,6 +81,10 @@ SAFE_SIGN_IN_RESULT_CODES = frozenset(
         "SESSION_TOKEN_UNAVAILABLE",
     }
 )
+SAFE_SIGN_OUT_ACKNOWLEDGEMENT_CODES = frozenset(
+    {"SIGN_OUT_IN_PROGRESS", "SIGNED_OUT"}
+)
+SIGN_OUT_ACKNOWLEDGEMENT_TIMEOUT_SECONDS = 10
 IME_DISMISS_TIMEOUT_SECONDS = 5
 IME_DISMISS_POLL_SECONDS = 0.25
 FOCUS_OWNER_ALLOWLIST = (
@@ -620,6 +624,20 @@ class Driver:
             time.sleep(0.5)
         raise UiE2EFailure("UI_WAIT_TIMEOUT")
 
+    def wait_enabled(self, automation_id: str, timeout_seconds: int | None = None) -> None:
+        deadline = time.monotonic() + (timeout_seconds or self.timeout_seconds)
+        while time.monotonic() < deadline:
+            try:
+                node = self.find(automation_id)
+            except UiE2EFailure as error:
+                if not str(error).startswith("UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"):
+                    raise
+            else:
+                if node.attrib.get("enabled") == "true":
+                    return
+            time.sleep(0.5)
+        raise UiE2EFailure("UI_WAIT_TIMEOUT")
+
     def wait_result_code(self, automation_id: str, expected_code: str) -> None:
         if expected_code not in SAFE_SIGN_IN_RESULT_CODES:
             raise UiE2EFailure("EXPECTED_RESULT_CODE_INVALID")
@@ -643,6 +661,25 @@ class Driver:
                     )
             time.sleep(0.5)
         raise UiE2EFailure("UI_WAIT_TIMEOUT")
+
+    def wait_sign_out_acknowledgement(self, automation_id: str) -> None:
+        deadline = time.monotonic() + SIGN_OUT_ACKNOWLEDGEMENT_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            try:
+                node = self.find(automation_id)
+            except UiE2EFailure as error:
+                if not str(error).startswith("UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"):
+                    raise
+            else:
+                match = SAFE_RESULT.fullmatch(node.attrib.get("text", ""))
+                if match is not None:
+                    code = match.group(1)
+                    if code in SAFE_SIGN_OUT_ACKNOWLEDGEMENT_CODES:
+                        return
+                    if code == "SIGN_OUT_BUSY":
+                        raise UiE2EFailure("SIGN_OUT_BUSY")
+            time.sleep(0.5)
+        raise UiE2EFailure("SIGN_OUT_ACTION_NOT_ACCEPTED")
 
     def operation_summaries(self) -> list[str]:
         self.find("driver_operation_list")
@@ -880,7 +917,10 @@ def main() -> int:
         evidence["persistedAfterReleaseRestart"] = True
 
         phase = "SIGN_OUT_ACTION"
+        driver.wait_enabled("driver_sign_out")
         driver.click("driver_sign_out")
+        phase = "SIGN_OUT_ACKNOWLEDGEMENT"
+        driver.wait_sign_out_acknowledgement("driver_action_result")
         phase = "SIGN_OUT_CLOSED_MODE"
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
         phase = "SIGN_OUT_WRITE_CONTROL"

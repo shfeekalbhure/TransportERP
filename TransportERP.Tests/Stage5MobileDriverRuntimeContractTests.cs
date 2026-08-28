@@ -89,9 +89,60 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/sessions/{session.SessionId:D}:revoke", authenticated,
             StringComparison.Ordinal);
+        var coordinatorDeactivateStart = authenticated.IndexOf(
+            "    private async Task DeactivateCoreAsync(", StringComparison.Ordinal);
+        var coordinatorDeactivateEnd = authenticated.IndexOf(
+            "    private void ArmExpiry(", coordinatorDeactivateStart, StringComparison.Ordinal);
+        Assert.True(coordinatorDeactivateStart >= 0 &&
+            coordinatorDeactivateEnd > coordinatorDeactivateStart);
+        var coordinatorDeactivate = authenticated[
+            coordinatorDeactivateStart..coordinatorDeactivateEnd];
+        Assert.Contains("await activation.DeactivateWithBestEffortRemoteRevocationAsync(async () =>",
+            coordinatorDeactivate, StringComparison.Ordinal);
+        Assert.Contains("}, CancellationToken.None);", coordinatorDeactivate,
+            StringComparison.Ordinal);
+        Assert.Contains("session.Bearer", coordinatorDeactivate, StringComparison.Ordinal);
+        Assert.Contains("AuthorizedRequest", coordinatorDeactivate, StringComparison.Ordinal);
+        Assert.Contains("SendAsync", coordinatorDeactivate, StringComparison.Ordinal);
+        Assert.Contains("HttpCompletionOption.ResponseHeadersRead, cancellationToken",
+            coordinatorDeactivate, StringComparison.Ordinal);
+        Assert.True(
+            coordinatorDeactivate.IndexOf("AuthorizedRequest", StringComparison.Ordinal) <
+            coordinatorDeactivate.IndexOf("SendAsync", StringComparison.Ordinal));
         Assert.Contains("RunSyncSupervisorAsync", activation, StringComparison.Ordinal);
         Assert.Contains("_supervisorCancellation?.Cancel()", activation, StringComparison.Ordinal);
         Assert.Contains("volatileSession.Clear()", activation, StringComparison.Ordinal);
+        var deactivateStart = activation.IndexOf("    private async Task DeactivateCoreAsync(",
+            StringComparison.Ordinal);
+        var supervisorStart = activation.IndexOf("    private static async Task RunSupervisorAsync(",
+            deactivateStart, StringComparison.Ordinal);
+        Assert.True(deactivateStart >= 0 && supervisorStart > deactivateStart);
+        var deactivate = activation[deactivateStart..supervisorStart];
+        Assert.Contains("Volatile.Write(ref _active, null);", deactivate,
+            StringComparison.Ordinal);
+        Assert.Contains("NotifyStateChanged();", deactivate, StringComparison.Ordinal);
+        Assert.Contains("_supervisorCancellation?.Cancel();", deactivate,
+            StringComparison.Ordinal);
+        Assert.Contains("volatileSession.Clear();", deactivate, StringComparison.Ordinal);
+        Assert.Contains("await remoteRevocation();", deactivate, StringComparison.Ordinal);
+        Assert.Contains("await _supervisorTask.WaitAsync(cancellationToken);", deactivate,
+            StringComparison.Ordinal);
+        Assert.True(
+            deactivate.IndexOf("Volatile.Write(ref _active, null);", StringComparison.Ordinal) <
+            deactivate.IndexOf("NotifyStateChanged();", StringComparison.Ordinal));
+        Assert.True(
+            deactivate.IndexOf("NotifyStateChanged();", StringComparison.Ordinal) <
+            deactivate.IndexOf("_supervisorCancellation?.Cancel();", StringComparison.Ordinal));
+        Assert.True(
+            deactivate.IndexOf("_supervisorCancellation?.Cancel();", StringComparison.Ordinal) <
+            deactivate.IndexOf("volatileSession.Clear();", StringComparison.Ordinal));
+        Assert.True(
+            deactivate.IndexOf("volatileSession.Clear();", StringComparison.Ordinal) <
+            deactivate.IndexOf("await remoteRevocation();", StringComparison.Ordinal));
+        Assert.True(
+            deactivate.IndexOf("await remoteRevocation();", StringComparison.Ordinal) <
+            deactivate.IndexOf("await _supervisorTask.WaitAsync(cancellationToken);",
+                StringComparison.Ordinal));
         Assert.Contains("public sealed class DriverOfflineActivationRequest", activation, StringComparison.Ordinal);
         Assert.DoesNotContain("record DriverOfflineActivationRequest", activation, StringComparison.Ordinal);
     }
@@ -150,7 +201,7 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "QUEUE_PARTY_RESULT", "NEW_OPERATION_VISIBLE", "INITIAL_OPERATION_SUCCESS",
                      "RESTART_FORCE_STOP", "RESTART_LAUNCH", "RESTART_CLOSED_MODE",
                      "RESTART_SIGN_IN", "PERSISTED_OPERATION_SUCCESS", "SIGN_OUT_ACTION",
-                     "SIGN_OUT_CLOSED_MODE", "SIGN_OUT_WRITE_CONTROL"
+                     "SIGN_OUT_ACKNOWLEDGEMENT", "SIGN_OUT_CLOSED_MODE", "SIGN_OUT_WRITE_CONTROL"
                  })
             Assert.Contains($"phase = \"{phase}\"", script, StringComparison.Ordinal);
         Assert.Contains("raise UiE2EFailure(f\"{phase}:{error}\") from error", script,
@@ -362,6 +413,69 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("RefreshAsync(preserveActionResult: true)", page[signOutStart..resolveStart],
             StringComparison.Ordinal);
+        var refreshStart = page.IndexOf("    private async Task RefreshAsync(",
+            StringComparison.Ordinal);
+        var refreshEnd = page.IndexOf("    private void RenderClosed(", refreshStart,
+            StringComparison.Ordinal);
+        Assert.True(refreshStart >= 0 && refreshEnd > refreshStart);
+        var refresh = page[refreshStart..refreshEnd];
+        Assert.Contains("_busy = true;", refresh, StringComparison.Ordinal);
+        Assert.Contains("_signOut.IsEnabled = false;", refresh, StringComparison.Ordinal);
+        Assert.True(
+            refresh.IndexOf("_busy = true;", StringComparison.Ordinal) <
+            refresh.IndexOf("_signOut.IsEnabled = false;", StringComparison.Ordinal));
+        Assert.DoesNotContain("_signOut.IsEnabled = true;", refresh, StringComparison.Ordinal);
+        Assert.Contains("_signOut.IsEnabled = _activation.Active is not null;", refresh,
+            StringComparison.Ordinal);
+        var signOut = page[signOutStart..resolveStart];
+        Assert.Contains("Result: SIGN_OUT_BUSY", signOut, StringComparison.Ordinal);
+        Assert.Contains("Result: SIGN_OUT_IN_PROGRESS", signOut, StringComparison.Ordinal);
+        Assert.Contains("_signOut.IsEnabled = false;", signOut, StringComparison.Ordinal);
+        Assert.Contains("DisableActions();", signOut, StringComparison.Ordinal);
+        Assert.Contains("await _authenticatedActivation.SignOutAsync()", signOut,
+            StringComparison.Ordinal);
+        Assert.True(
+            signOut.IndexOf("Result: SIGN_OUT_IN_PROGRESS", StringComparison.Ordinal) <
+            signOut.IndexOf("await _authenticatedActivation.SignOutAsync()", StringComparison.Ordinal));
+        Assert.True(
+            signOut.IndexOf("_signOut.IsEnabled = false;", StringComparison.Ordinal) <
+            signOut.IndexOf("await _authenticatedActivation.SignOutAsync()", StringComparison.Ordinal));
+        Assert.True(
+            signOut.IndexOf("DisableActions();", StringComparison.Ordinal) <
+            signOut.IndexOf("await _authenticatedActivation.SignOutAsync()", StringComparison.Ordinal));
+        Assert.Contains("wait_sign_out_acknowledgement", script, StringComparison.Ordinal);
+        Assert.Contains("driver.wait_enabled(\"driver_sign_out\")", script,
+            StringComparison.Ordinal);
+        Assert.Contains("SIGN_OUT_ACTION_NOT_ACCEPTED", script, StringComparison.Ordinal);
+        Assert.Contains("SIGN_OUT_BUSY", script, StringComparison.Ordinal);
+        var signOutFlowStart = script.IndexOf("        phase = \"SIGN_OUT_ACTION\"",
+            StringComparison.Ordinal);
+        var signOutFlowEnd = script.IndexOf("        evidence[\"signedOutClosed\"] = True",
+            signOutFlowStart, StringComparison.Ordinal);
+        Assert.True(signOutFlowStart >= 0 && signOutFlowEnd > signOutFlowStart);
+        var signOutFlow = script[signOutFlowStart..signOutFlowEnd];
+        foreach (var step in new[]
+                 {
+                     "driver.wait_enabled(\"driver_sign_out\")",
+                     "driver.click(\"driver_sign_out\")",
+                     "phase = \"SIGN_OUT_ACKNOWLEDGEMENT\"",
+                     "driver.wait_sign_out_acknowledgement(\"driver_action_result\")",
+                     "phase = \"SIGN_OUT_CLOSED_MODE\"",
+                     "driver.wait_text(\"driver_mode\", \"Offline runtime: CLOSED\")",
+                     "phase = \"SIGN_OUT_WRITE_CONTROL\""
+                 })
+            Assert.Contains(step, signOutFlow, StringComparison.Ordinal);
+        Assert.Equal(1, signOutFlow.Split("driver.click(\"driver_sign_out\")",
+            StringSplitOptions.None).Length - 1);
+        Assert.True(
+            signOutFlow.IndexOf("driver.wait_enabled", StringComparison.Ordinal) <
+            signOutFlow.IndexOf("driver.click", StringComparison.Ordinal));
+        Assert.True(
+            signOutFlow.IndexOf("driver.click", StringComparison.Ordinal) <
+            signOutFlow.IndexOf("driver.wait_sign_out_acknowledgement", StringComparison.Ordinal));
+        Assert.True(
+            signOutFlow.IndexOf("driver.wait_sign_out_acknowledgement", StringComparison.Ordinal) <
+            signOutFlow.IndexOf("Offline runtime: CLOSED", StringComparison.Ordinal));
     }
 
     [Fact]

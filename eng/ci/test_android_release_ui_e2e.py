@@ -491,5 +491,80 @@ class SafeActionResultTests(unittest.TestCase):
         )
 
 
+class SignOutAcknowledgementTests(unittest.TestCase):
+    @staticmethod
+    def node(text: str) -> object:
+        return mock.Mock(attrib={"text": text})
+
+    def test_started_and_fast_completed_sign_out_are_accepted(self) -> None:
+        for code in ("SIGN_OUT_IN_PROGRESS", "SIGNED_OUT"):
+            with self.subTest(code=code):
+                driver = HARNESS.Driver("adb", "pkg", 30)
+                driver.find = mock.Mock(return_value=self.node(f"Result: {code}"))
+                driver.wait_sign_out_acknowledgement("driver_action_result")
+                driver.find.assert_called_once_with("driver_action_result")
+
+    def test_sign_out_waits_for_the_enabled_readiness_contract(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        nodes = iter((self.node("",), self.node("",)))
+        first = next(nodes)
+        second = next(nodes)
+        first.attrib["enabled"] = "false"
+        second.attrib["enabled"] = "true"
+        driver.find = mock.Mock(side_effect=(first, second))
+        with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 2)):
+            with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                driver.wait_enabled("driver_sign_out")
+        self.assertEqual(2, driver.find.call_count)
+
+    def test_sign_out_enabled_wait_fails_closed_without_retrying_the_action(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        disabled = self.node("")
+        disabled.attrib["enabled"] = "false"
+        driver.find = mock.Mock(return_value=disabled)
+        driver.click = mock.Mock(side_effect=AssertionError("must not click"))
+        with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 31)):
+            with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_WAIT_TIMEOUT$"):
+                    driver.wait_enabled("driver_sign_out")
+        driver.click.assert_not_called()
+
+    def test_busy_sign_out_fails_early_with_fixed_code(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = mock.Mock(return_value=self.node("Result: SIGN_OUT_BUSY"))
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^SIGN_OUT_BUSY$"):
+            driver.wait_sign_out_acknowledgement("driver_action_result")
+
+    def test_missing_acknowledgement_fails_closed_without_value_disclosure(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = mock.Mock(return_value=self.node("secret-bearing unexpected text"))
+        with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 11)):
+            with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                with self.assertRaisesRegex(
+                    HARNESS.UiE2EFailure,
+                    "^SIGN_OUT_ACTION_NOT_ACCEPTED$",
+                ) as raised:
+                    driver.wait_sign_out_acknowledgement("driver_action_result")
+        self.assertNotIn("secret", str(raised.exception))
+
+    def test_missing_element_retries_but_non_scroll_failure_stops(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = mock.Mock(
+            side_effect=HARNESS.UiE2EFailure(
+                "UI_AUTOMATION_ID_NOT_FOUND:SCROLL_UNCHANGED"
+            )
+        )
+        with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 11)):
+            with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                with self.assertRaisesRegex(
+                    HARNESS.UiE2EFailure,
+                    "^SIGN_OUT_ACTION_NOT_ACCEPTED$",
+                ):
+                    driver.wait_sign_out_acknowledgement("driver_action_result")
+        driver.find = mock.Mock(side_effect=HARNESS.UiE2EFailure("UI_HIERARCHY_INVALID"))
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_HIERARCHY_INVALID$"):
+            driver.wait_sign_out_acknowledgement("driver_action_result")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

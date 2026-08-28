@@ -409,9 +409,9 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         featureGate.Clear();
         bindingVerifier.Clear();
         var session = Interlocked.Exchange(ref _authenticatedSession, null);
-        if (session is not null)
+        await activation.DeactivateWithBestEffortRemoteRevocationAsync(async () =>
         {
-            try
+            if (session is not null)
             {
                 using var revoke = AuthorizedRequest(HttpMethod.Post,
                     Endpoint($"/api/v1/auth/sessions/{session.SessionId:D}:revoke"),
@@ -420,9 +420,7 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                 using var _ = await network.SyncHttpClient.SendAsync(
                     revoke, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             }
-            catch { /* Local teardown remains mandatory when revocation is unavailable. */ }
-        }
-        await activation.DeactivateAsync(CancellationToken.None);
+        }, CancellationToken.None);
     }
 
     private void ArmExpiry(DateTimeOffset expiresAt)
