@@ -27,6 +27,8 @@ AUTOMATION_ROOT = "driver_main_scroll"
 SAFE_INPUT = re.compile(r"^[A-Za-z0-9@._+/:=%-]+$")
 BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 OPERATION_ID = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \|")
+IME_DISMISS_TIMEOUT_SECONDS = 5
+IME_DISMISS_POLL_SECONDS = 0.25
 FOCUS_OWNER_ALLOWLIST = (
     ("driver_user_name", "USER_NAME"),
     ("driver_password", "PASSWORD"),
@@ -231,6 +233,7 @@ class Driver:
     def set_text(self, automation_id: str, value: str, verify_plaintext: bool = True) -> None:
         if not value or not SAFE_INPUT.fullmatch(value):
             raise UiE2EFailure("INPUT_CHARACTER_SET_UNSUPPORTED")
+        self.dismiss_ime_if_shown()
         self.focus_input(automation_id)
         # CI credentials are generated from hexadecimal/base64 alphabets. Reject rather than guess
         # when an input cannot be typed deterministically by Android's standard input command.
@@ -336,9 +339,12 @@ class Driver:
 
     def safe_ime_state(self) -> str:
         try:
-            payload = self.run("shell", "dumpsys", "input_method")
+            return self._read_ime_state()
         except UiE2EFailure:
             return "UNKNOWN"
+
+    def _read_ime_state(self) -> str:
+        payload = self.run("shell", "dumpsys", "input_method")
         return self._parse_ime_state(payload)
 
     @staticmethod
@@ -353,9 +359,22 @@ class Driver:
             return "UNKNOWN"
         return "SHOWN" if matches[0] == "true" else "HIDDEN"
 
-    def hide_keyboard(self) -> None:
+    def dismiss_ime_if_shown(self) -> None:
+        if self._read_ime_state() != "SHOWN":
+            return
         self.run("shell", "input", "keyevent", "KEYCODE_BACK")
-        time.sleep(0.25)
+        deadline = time.monotonic() + IME_DISMISS_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            if self._read_ime_state() == "HIDDEN":
+                roots = self.nodes(AUTOMATION_ROOT)
+                if len(roots) != 1:
+                    raise UiE2EFailure("UI_IME_DISMISS_ROOT_INVALID")
+                return
+            time.sleep(IME_DISMISS_POLL_SECONDS)
+        raise UiE2EFailure("UI_IME_DISMISS_TIMEOUT")
+
+    def hide_keyboard(self) -> None:
+        self.dismiss_ime_if_shown()
 
     def text(self, automation_id: str) -> str:
         return self.find(automation_id).attrib.get("text", "")
