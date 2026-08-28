@@ -98,12 +98,13 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         foreach (var phase in new[]
                  {
                      "INITIAL_LAUNCH", "INITIAL_CLOSED_MODE", "INITIAL_CLOSED_REASON",
+                     "INITIAL_CLOSED_WRITE_CONTROL",
                      "INITIAL_SIGN_IN", "INITIAL_OPERATION_LIST", "QUEUE_PARTY_NAME",
                      "QUEUE_PARTY_MOBILE", "QUEUE_PARTY_ADDRESS", "QUEUE_PARTY_ACTION",
                      "QUEUE_PARTY_RESULT", "NEW_OPERATION_VISIBLE", "INITIAL_OPERATION_SUCCESS",
                      "RESTART_FORCE_STOP", "RESTART_LAUNCH", "RESTART_CLOSED_MODE",
                      "RESTART_SIGN_IN", "PERSISTED_OPERATION_SUCCESS", "SIGN_OUT_ACTION",
-                     "SIGN_OUT_CLOSED_MODE"
+                     "SIGN_OUT_CLOSED_MODE", "SIGN_OUT_WRITE_CONTROL"
                  })
             Assert.Contains($"phase = \"{phase}\"", script, StringComparison.Ordinal);
         Assert.Contains("raise UiE2EFailure(f\"{phase}:{error}\") from error", script,
@@ -131,22 +132,29 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("UI_INPUT_FOCUS_FAILED", script, StringComparison.Ordinal);
         Assert.Contains("for attempt in range(5)", script, StringComparison.Ordinal);
-        Assert.Contains("def safe_focus_observation(self, automation_id: str)", script,
-            StringComparison.Ordinal);
+        Assert.Contains(
+            "def safe_focus_observation(self, automation_id: str, scroll_movement: str)",
+            script, StringComparison.Ordinal);
         foreach (var focusDiagnostic in new[]
                  {
                      "COUNT_UNKNOWN", "VISIBLE_UNKNOWN", "FOCUSABLE_UNKNOWN", "CLICKABLE_UNKNOWN",
-                     "OWNER_UNKNOWN", "ZONE_UNKNOWN", "IME_UNKNOWN", "FOCUS_OWNER_ALLOWLIST"
+                     "OWNER_UNKNOWN", "ZONE_UNKNOWN", "SCROLL_", "IME_", "FOCUS_OWNER_ALLOWLIST",
+                     "SCROLL_OBSERVATION_IDS", "def safe_ime_state(self)",
+                     "def _parse_ime_state(payload: str)", "mInputShown=(true|false)",
+                     "UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"
                  })
             Assert.Contains(focusDiagnostic, script, StringComparison.Ordinal);
         var focusObservationStart = script.IndexOf(
-            "    def safe_focus_observation(self, automation_id: str)", StringComparison.Ordinal);
+            "    def safe_focus_observation(self, automation_id: str, scroll_movement: str)",
+            StringComparison.Ordinal);
         var focusObservationEnd = script.IndexOf(
             "    def hide_keyboard(self)", focusObservationStart, StringComparison.Ordinal);
         Assert.True(focusObservationStart >= 0 && focusObservationEnd > focusObservationStart);
         var focusObservation = script[focusObservationStart..focusObservationEnd];
         Assert.DoesNotContain("attrib.get(\"text\")", focusObservation, StringComparison.Ordinal);
         Assert.DoesNotContain("completed.stdout", focusObservation, StringComparison.Ordinal);
+        Assert.DoesNotContain("{payload}", focusObservation, StringComparison.Ordinal);
+        Assert.DoesNotContain("return payload", focusObservation, StringComparison.Ordinal);
         Assert.Contains("observed == value", script, StringComparison.Ordinal);
         Assert.Contains("else \"EMPTY\" if not observed else \"MISMATCH\"", script,
             StringComparison.Ordinal);
