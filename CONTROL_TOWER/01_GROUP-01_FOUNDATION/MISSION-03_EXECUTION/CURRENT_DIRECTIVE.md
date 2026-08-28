@@ -1,6 +1,6 @@
 # CURRENT DIRECTIVE — MISSION-03
 
-`CONTINUE — GREENFIELD TARGET DATABASE CONFIRMED; RE-ROUTE DB-GOV; KEEP MISSION-03 OPEN`
+`CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS; KEEP MISSION-03 OPEN`
 
 ## Current execution basis
 
@@ -19,69 +19,79 @@
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
 - `DB-BASELINE-001 = RESOLVED — TARGET DATABASE IS GREENFIELD / NEW / EMPTY / NO LEGACY TABLES OR DATA`.
 
-Decision file:
+Greenfield decision file:
 
 `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/DB-BASELINE-001_GREENFIELD_TARGET_DATABASE_2026-08-28.md`
 
-## Greenfield consequences
+## Greenfield DB-GOV re-review — COMPLETE
 
-The target database does not contain legacy users, password hashes, accounting rows, audit rows, business rows or schema requiring migration/preservation.
+Control Tower completed the required second independent DB-GOV review and recorded it in:
 
-Therefore:
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
 
-- `LEGACY DATABASE PRESERVATION = NOT APPLICABLE`.
-- `LEGACY PASSWORD HASH INVENTORY / LEGACY VERIFIER / LEGACY REHASH COMPATIBILITY = NOT APPLICABLE`.
-- `LEGACY ACCOUNTING/AUDIT ROW RECONCILIATION = NOT APPLICABLE` as a target-database prerequisite.
-- A copy of an existing target database is not required for rehearsal because no prior target population exists.
+Controlling result:
 
-The existing ten committed migrations remain the initial schema lineage. A new non-Production rehearsal database must start empty, apply those ten migrations, then apply only candidate migrations separately authorized by DB-GOV.
+`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
 
-A new password-hashing and lockout policy is still required before login activation, but it is a **new-system security design/test requirement**, not a legacy evidence gate.
+Cleared as target-database prerequisites:
 
-## DB-GOV direction
+- legacy target-row/cardinality/backfill inventory;
+- legacy PasswordHash/verifier/rehash compatibility;
+- legacy audit/accounting row reconciliation;
+- safe-copy/backup of a pre-existing target database;
+- preservation of a pre-existing target database population.
 
-Owner decisions do not override `DB-GOV-001`.
+The existing ten committed migrations remain the bootstrap lineage. A future Greenfield rehearsal database must start empty and apply only those ten migrations before any separately authorized candidate migration.
 
-Control Tower / DB-GOV must now independently re-review:
+## Current DBP dispositions
 
-- `DBP-002` — tenant-consistent physical keys/FKs/indexes/RLS-equivalent;
-- `DBP-003A/B/C` — session/security version/device/PoP/nonce/replay persistence;
-- `DBP-004` — audit integrity;
-- `DBP-005` — accounting integrity / governed Settlement persistence;
-- `DBP-006` — Offline queue/inbox/outbox protocol persistence.
+- `DBP-002 = REVISE BEFORE REHEARSAL` — exact physical membership/grant schema, tenant-consistent keys/FKs/checks/indexes, RLS/equivalent bootstrap and rollback/test specification remain required.
+- `DBP-003A = REVISE BEFORE REHEARSAL` — final DBP-004-compatible caller-owned audit/UoW boundary, exact candidate persistence mapping and new-system password hash/verify/lockout policy remain required.
+- `DBP-003B = DEFERRED — DEPENDS ON DBP-002/006`.
+- `DBP-003C = DEFERRED — DEPENDS ON DBP-002/006`; nonce/JTI uniqueness, proof-key persistence, retention/legal-hold/cleanup and recovery remain required.
+- `DBP-004 = REVISE BEFORE REHEARSAL` — exact V2 audit schema/canonicalizer/stream sequencing, append-only DB enforcement, transaction enlistment and failure-injection acceptance remain required.
+- `DBP-005 = REVISE BEFORE REHEARSAL` — exact Settlement/journal/source-link constraints, account-role/FX/rounding configuration contract, period/SoD and concurrency/reversal acceptance remain required.
+- `DBP-006 = REVISE BEFORE REHEARSAL` — exact typed queue/inbox/outbox/result/claim-lease schema, protocol/version/fingerprint constraints, retention/legal-hold and device/proof dependencies remain required.
 
-The review must remove blockers that depended only on unknown legacy/live target rows, legacy password formats, legacy accounting/audit populations or a prior target database.
+No DBP currently has:
 
-Where proposal-specific design/tests are complete, DB-GOV may issue only a bounded next-stage authority such as:
+`APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`.
 
-`APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`
+## Authorized next work
 
-before any separate Production authorization.
+MISSION-03 must continue automatically with non-destructive repository/governance work enabled by the re-review:
 
-No Entity, DbContext, Migration, Schema, Seed, Data or Production mutation is authorized by DB-BASELINE-001 alone.
+1. Produce exact candidate physical specifications for DBP-002/003A/004/005/006 and explicitly order cross-proposal dependencies.
+2. Define and test-specify the new-system password hash/verify/lockout policy; do not request legacy compatibility evidence.
+3. Finalize the shared caller-owned transaction/audit boundary across session, audit, Settlement and Offline persistence.
+4. Define Greenfield PostgreSQL roles/RLS-equivalent bootstrap plus negative-test requirements.
+5. Define retention/legal-hold/cleanup/recovery for device proof, nonce/replay, Offline queue and audit records.
+6. Re-submit proposal packages for independent DB-GOV decision. Do not author or execute candidate migrations until the exact proposal receives bounded rehearsal authority.
+7. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
+8. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
 
-## Remaining external/non-Greenfield gates
+A blocked DBP must not stop unrelated satisfied packages.
 
-The following are **not** removed by the Greenfield decision:
+## Remaining non-DB / external gates
 
-- new-system password hash/lockout security policy and tests;
-- PostgreSQL role/RLS/equivalent design and DB-GOV proof;
-- canonical programming authority for post-DEPART Shipping, Ticketing and screen routes;
-- executable Windows/Android runtime, secure-store integration and protected signing custody;
+The Greenfield decision does not remove:
+
+- canonical programming authority for post-DEPART Shipping, Ticketing and governed screen routes;
+- real Windows/Android executable runtime and secure-store proof;
+- protected Production signing custody;
 - Production recovery/RPO/RTO, privacy/retention, KMS/key custody and dependency/license/provenance approvals;
-- complete Git worktree/stash/local-only preservation inventory before W8 cleanup.
+- complete Git worktree/stash/local-only preservation inventory before any W8 destructive/global cleanup.
 
-## Execution routing
+## Mission transition boundary
 
-1. Do not ask the owner again for legacy database/password evidence; it is not applicable.
-2. Route DBP-002/003/004/005/006 immediately to second independent DB-GOV review using the Greenfield basis.
-3. Continue any non-destructive work enabled by that review; do not cross a DB-GOV gate.
-4. Preserve execution head `5d1352b...` until a newly authorized Product package is opened.
-5. W8 remains last and may not start before W7/preservation gates are satisfied.
-6. Do not start MISSION-04 before `MISSION-03 = SEALED — DELIVERED TO CONTROL TOWER`.
+MISSION-03 is not sealed. No final exact-head acceptance package/seal/handoff exists. MISSION-04 remains:
+
+`WAIT — NOT STARTED`
+
+Do not change MISSION-04 to START until MISSION-03 is conclusively sealed and handed off with exact SHAs, evidence, manifest, detached SHA-256, seal, preservation/rollback and DB-GOV compliance verified.
 
 ## Prohibitions
 
-No merge to master, rebase, cherry-pick, force-push, history rewrite, Production mutation, secret commit or unauthorized database/data change.
+No merge to master, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit, Entity/DbContext/Migration/Schema/Seed/Data change or unauthorized database action.
 
-This directive supersedes the v1.0 exhaustion directive only where that directive assumed a pre-existing legacy target database/data population. Historical evidence remains preserved in Git.
+No `OWNER DECISION REQUIRED` is active from this re-review. The immediate next work is non-destructive design/governance work within delegated Control Tower/MISSION-03 authority.
