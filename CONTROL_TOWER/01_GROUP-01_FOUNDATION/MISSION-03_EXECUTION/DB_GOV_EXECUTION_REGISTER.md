@@ -1,108 +1,117 @@
 # DB-GOV Execution Register
 
-`DB-GOV-001` is binding. No database, schema, entity, migration, field, relationship, index, constraint, type, seed, precision or numbering change was executed. Applying the already-committed migration lineage to an empty disposable PostgreSQL database was verification only.
+`DB-GOV-001` is binding. Production database/schema/entity/migration/data authority remains separate from bounded Greenfield rehearsal authority.
 
-The central proposal register contains DBP-001..009. AUTH-001, ACC-001, OFFLINE-001, CLIENT-001 and DB-BASELINE-001 resolve bounded design/target questions but do not themselves grant Production schema/data execution authority.
+The central proposal register contains DBP-001..009. AUTH-001, ACC-001, OFFLINE-001, CLIENT-001 and DB-BASELINE-001 remain binding owner decisions.
 
-Control Tower independently revalidated and adopted the authority-neutral code-only W2 controls and the B2B code-only head `cc67ad2...`. The current execution head remains `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / tree `00512125311306a43474638195d2cad97b76118e` with no candidate persistence delta.
+Reviewed MISSION-03 execution baseline:
 
-| Proposal | Relevant REM | Historical / current gate | Current controlling result |
-|---|---|---|---|
-| `DBP-001` | `REM-100` | code-only mapper path implemented; existing ten-migration disposable verification passed | `CODE-ONLY IMPLEMENTED; GREENFIELD TARGET HAS NO LEGACY POPULATION TO REPAIR` |
-| `DBP-002` | `REM-210` | exact Greenfield design + v1.1 dependency correction | `CORRECTED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED BEFORE REHEARSAL AUTHORING` |
-| `DBP-003A` | `REM-200` | session/security/password design; now physically after DBP-003B/C so device FK target exists | `CORRECTED PACKAGE READY; LOGIN ACTIVATION ALSO REQUIRES PASSWORD/LOCKOUT TEST` |
-| `DBP-003B` | `REM-220` | device registry/assignment design now physically after DBP-002/004 and before DBP-003A/006 | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
-| `DBP-003C` | `REM-220` | PoP/nonce/replay design now physically after DBP-002/004 and before DBP-003A/006 | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
-| `DBP-004` | `REM-320` | exact Audit V2/UoW design | `CORRECTED COORDINATED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED` |
-| `DBP-005` | `REM-310` | exact Settlement/accounting design | `CORRECTED COORDINATED PACKAGE READY; FRESH INDEPENDENT DB-GOV REQUIRED` |
-| `DBP-006` | `REM-400` | typed Offline design now after both session and device/proof persistence | `ORDER CONFLICT CORRECTED; FRESH INDEPENDENT DB-GOV REQUIRED` |
-| `DBP-007` | `REM-600` | canonical scope absent | `BLOCKED` |
-| `DBP-008` | `REM-610` | canonical Ticketing requirements absent | `BLOCKED` |
-| `DBP-009` | reporting | requirements absent | `BLOCKED` |
+`codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
 
-No Entity, DbContext, Migration, Seed, Schema, Product data or Production credential has been changed by Control Tower supervision.
+Tree:
 
-## v0.9 historical preparation
+`00512125311306a43474638195d2cad97b76118e`
 
-`DBP-003A_REHEARSAL_RESUBMISSION.md` addressed the then-known repository-resolvable design findings: proposed keys/checks/indexes, failure/lockout state, tenant boundary, serializable family locking and re-read, one-successor invariants, atomic caller-owned audit, SQLSTATE/constraint retry, ambiguous-commit recovery and failure injection. Historical read-only inventory/reconciliation SQL and a safe-copy/backup/restore runbook were prepared under the older non-Greenfield assumptions.
+## Current DB-GOV state
 
-Those files remain historical evidence. `DB-BASELINE-001` later superseded only the legacy-target assumptions; it did not self-authorize persistence execution.
-
-## Owner-decision rebind review package
-
-`DBP-002_004_005_006_REVIEW_PREPARATION.md` records current-model inventory, additive designs, preservation, compatible-reader, rollback/recovery, reconciliation and negative/concurrency gates. The DBP-003A design specifies successor-side `PredecessorSessionId`, one-successor lineage semantics, conflict classification and role/grant inventory. These are proposal/design evidence only.
-
-## DBP-003 code-only review boundary
-
-- Reviewed code-only head/tree: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / `ea940e592cb11f5fff736e68055ebf77d2eece88`.
-- Exact diff: three new code/contracts/test files, 992 insertions; migration/model/project/Production configuration counts unchanged.
-- Raw CI: PostgreSQL 18.6, ten existing migrations, no model drift, 146/146, HTTP 401 and all four client build jobs succeeded. Client probes remain Library/build evidence, not executable-runtime proof.
-- `NO NEW PERSISTENCE CHANGE` in Git; disposable test database mutation occurred only as part of validation.
-
-## v1.0 execution reconciliation
-
-- Product head `5d1352b...` changes no Entity, DbContext model, Migration, Schema, Seed, persistent adapter or Product data.
-- DBP-003A code contracts require atomic mutation+audit and exercise one-successor/failure-injection semantics in a test-only store. This is not a PostgreSQL adapter.
-- Runs `33201720878` and `33201720896` use PostgreSQL 18.6, apply only the ten existing migrations to disposable databases, report no model drift, and prove disposable backup/restore with source/restored migration counts `10/10`.
-- The recovery probe is historical verification only and does not authorize a candidate migration.
-
-## v1.1 Greenfield exact physical-design resubmission
-
-`DB-BASELINE-001` establishes the target as Greenfield/new/empty. MISSION-03 supplied:
-
-- `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0`;
-- `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`;
-- historical `EXECUTION_OUTPUT_SHA256_v1.1.txt`.
-
-The exact design covers membership/grant/RLS, new-system PBKDF2 password and lockout/reset, security/session rotation, device/PoP/replay, Audit V2 caller-UoW, Settlement, Offline inbox/queue/result/lease, retention/hold and recovery gates.
-
-A mission-local file `DBP-002_003_004_005_006_GREENFIELD_DB_GOV_REVIEW_DECISION.md` records nominal coordinated disposable/Greenfield rehearsal approval. Repository chronology shows that decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`, before the exact physical resubmission was committed later in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
-
-## Post-resubmission revalidation and correction
-
-Control Tower independently recorded:
-
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
-
-with result:
-
-`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`.
-
-That revalidation identified the DBP-003B/C ↔ DBP-006 sequencing contradiction. During exact FK binding MISSION-03 also identified a second physical ordering issue: DBP-003A `auth_sessions.RegisteredDeviceId` cannot create its composite FK before DBP-003B/C creates `registered_devices`.
-
-The corrected package is now recorded in:
-
-`DBP-003BC_003A_006_PHYSICAL_DEPENDENCY_CORRECTION_v1.1.md`
-
-Correction commit:
+Physical dependency correction:
 
 `20608494998e671892ee35abd415158e399c9036`
 
-The sole corrected candidate-unit order submitted for review is:
+Fresh independent post-correction verdict:
 
-`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`.
+`DB-GOV VERDICT = PASS`
 
-Dependency/activation constraints:
+`DEPENDENCY CORRECTION ACCEPTED — NO REMAINING PHYSICAL ORDER BLOCKER IDENTIFIED`
 
-- DBP-003B/C physical objects depend on DBP-002/004, not on the existence of `auth_sessions`.
-- Device commands that require session-family revocation remain disabled until DBP-003A passes.
-- Device commands that require Offline quarantine remain disabled until DBP-006 passes.
-- DBP-003A creates its device FK after the registered-device target and tenant key exist.
-- DBP-006 is created only after membership, Audit V2, device/proof and session durable dependencies exist.
+Formal record:
 
-`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` is rebound to this corrected order.
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_CORRECTION_PASS_DECISION_2026-08-29.md`
 
-## Current controlling authority
+The previous state `FRESH INDEPENDENT DB-GOV REQUIRED BEFORE REHEARSAL AUTHORING` is closed.
 
-The sequencing defect is corrected at design level, but the rehearsal entry HOLD is **not** lifted by MISSION-03 itself. A fresh independent DB-GOV decision must be recorded after the correction package exists.
+## Current proposal gates
 
-Until that review is recorded:
+| Proposal | Relevant REM | Current controlling result |
+|---|---|---|
+| `DBP-001` | `REM-100` | `CODE-ONLY IMPLEMENTED; GREENFIELD TARGET HAS NO LEGACY POPULATION TO REPAIR` |
+| `DBP-002` | `REM-210` | `PASS — CANDIDATE AUTHORING + DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL AUTHORIZED` |
+| `DBP-004` | `REM-320` | `PASS — AUTHORIZED AFTER DBP-002` |
+| `DBP-003B/C` | `REM-220` | `PASS — AUTHORIZED AFTER DBP-002/004; BEHAVIORAL ACTIVATION STILL DEPENDENCY-GATED` |
+| `DBP-003A` | `REM-200` | `PASS — AUTHORIZED AFTER DBP-003B/C; LOGIN ACTIVATION STILL PASSWORD/LOCKOUT TEST-GATED` |
+| `DBP-006` | `REM-400` | `PASS — AUTHORIZED AFTER DBP-003A + DBP-003B/C + DBP-002/004` |
+| `DBP-005` | `REM-310` | `PASS — AUTHORIZED AFTER DBP-002/004; ORDERED LAST` |
+| `DBP-007` | `REM-600` | `BLOCKED — CANONICAL SCOPE REQUIRED` |
+| `DBP-008` | `REM-610` | `BLOCKED — CANONICAL TICKETING REQUIREMENTS REQUIRED` |
+| `DBP-009` | reporting | `BLOCKED — REPORTING REQUIREMENTS REQUIRED` |
 
-- design/governance correction and review preparation: `ALLOWED`;
-- candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring: `HOLD`;
-- candidate migration application on disposable PostgreSQL: `HOLD`;
-- Production database/data/configuration/credentials: `PROHIBITED`.
+## Only approved coordinated physical order
 
-This is not an `OWNER DECISION REQUIRED` condition. It is the current independent DB-GOV gate.
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-The historical `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` hash set must not be represented as current after these corrections. A new manifest/checkpoint and detached SHA-256 set are required after the corrected package is stabilized.
+Reserved candidate units:
+
+1. `GreenfieldTenantMembershipIsolation`.
+2. `GreenfieldAuditV2AndAtomicOutbox`.
+3. `GreenfieldDeviceRegistryAndProof`.
+4. `GreenfieldLocalAuthSessions`.
+5. `GreenfieldTypedOfflineProtocol`.
+6. `GreenfieldGovernedSettlement`.
+
+No alternate ordering is authorized.
+
+## Bounded authoring authority
+
+MISSION-03 may now author proposal-scoped Entity/DbContext mappings, additive forward-only candidate migrations, persistent adapters, generated SQL/model snapshot deltas, and test/rehearsal controls on its isolated execution branch.
+
+This authority does not allow Product work on master or any Production database/data/configuration/credential.
+
+## Disposable Greenfield rehearsal authority
+
+Candidate application is authorized only to isolated PostgreSQL 18.6 rehearsal databases that start empty.
+
+Required baseline:
+
+1. apply the existing ten migrations unchanged;
+2. record migration/catalog/FK/index/RLS-equivalent state;
+3. create and hash baseline backup;
+4. restore it successfully to a fresh disposable database;
+5. apply only the next candidate unit in the approved order.
+
+Every candidate must then pass proposal-specific negatives/concurrency/failure injection, full regression, model-drift check, candidate-state backup/restore and catalog/migration reconciliation.
+
+Exact candidate SHA/tree/parent, changed files, migration identity/hash, generated SQL, model snapshot diff, logs and artifact digests are mandatory evidence.
+
+## Dependency failure gates
+
+- Failure of unit 13 / DBP-003B/C stops DBP-003A and DBP-006.
+- Failure of unit 14 / DBP-003A stops DBP-006.
+- DBP-005 materially depends on DBP-002/004 but remains ordered last.
+- A failed unit does not authorize reordering.
+
+## Runtime activation boundary
+
+- Device actions needing session-family revoke remain disabled until DBP-003A passes.
+- Device actions needing Offline quarantine remain disabled until DBP-006 passes.
+- `LOGIN ACTIVATION` remains separately blocked until new-system password hash/verify/lockout tests pass.
+- OFFLINE-001 default-deny remains binding.
+- ACC-001 Settlement/accounting rules remain binding.
+
+## Prior exact-head evidence retained
+
+- W2-B2B code-only: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`; raw CI `146/146 PASS`, ten existing migrations/no drift.
+- Current reviewed execution baseline: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / `00512125311306a43474638195d2cad97b76118e`.
+- Run `33201720896 = 153/153 PASS`; PostgreSQL 18.6; ten existing migrations; no model drift.
+- Run `33201720878 = PASS`; disposable backup/restore and migration reconciliation `10/10`.
+
+These prior runs prove the baseline only; they do not substitute for candidate-head rehearsal evidence.
+
+## Post-rehearsal gate
+
+Every candidate checkpoint and the coordinated bundle require independent post-rehearsal DB-GOV acceptance before any Production/bootstrap release authority can be considered.
+
+## Prohibitions
+
+No Production database/data/configuration/credentials. No secrets. Do not edit/delete/squash the existing ten migrations. No destructive/down-migration recovery reliance. No merge to master, rebase, cherry-pick, force-push or history rewrite.
+
+MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`; MISSION-04 remains `WAIT — NOT STARTED`.
