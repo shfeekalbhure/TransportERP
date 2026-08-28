@@ -2321,58 +2321,13 @@ jobs:
           [[ "$certificate_alias" =~ ^[0-9a-f]{8}\.[0-9]{1,2}$ ]]
           expected_root_sha=$(cat "$RUNNER_TEMP/android-e2e-tls/root-ca-sha256.txt")
           [[ "$expected_root_sha" =~ ^[0-9a-f]{64}$ ]]
-          conscrypt_certificate_path="/apex/com.android.conscrypt/cacerts/${certificate_alias}"
-          mapfile -t release_launcher_candidates < <(
-            adb shell cmd package resolve-activity --components \
-              -a android.intent.action.MAIN \
-              -c android.intent.category.LAUNCHER \
-              "$ANDROID_TEST_PACKAGE" | tr -d '\r'
-          )
-          test "${#release_launcher_candidates[@]}" -eq 1
-          release_launcher_component="${release_launcher_candidates[0]}"
-          [[ "$release_launcher_component" =~ ^com\.transporterp\.mobile\.driver/[A-Za-z0-9._$]+$ ]]
-          release_launch_result=$(adb shell am start -W -n "$release_launcher_component" | tr -d '\r')
-          grep -Fx 'Status: ok' <<< "$release_launch_result" >/dev/null
-          release_process_pid=''
-          for attempt in $(seq 1 30); do
-            release_process_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r' | xargs)
-            if [[ "$release_process_pid" =~ ^[0-9]+$ ]]; then
-              break
-            fi
-            release_process_pid=''
-            sleep 1
-          done
-          test -n "$release_process_pid"
-          release_process_conscrypt_state=MATCH
-          if ! adb shell nsenter -t "$release_process_pid" -m -- \
-              test -r "$conscrypt_certificate_path"; then
-            release_process_conscrypt_state=ABSENT
-          elif release_process_root_sha=$(adb exec-out nsenter -t "$release_process_pid" -m -- \
-              cat "$conscrypt_certificate_path" \
-              | openssl x509 -outform der 2>/dev/null \
-              | sha256sum | awk '{print $1}'); then
-            if [[ ! "$release_process_root_sha" =~ ^[0-9a-f]{64}$ ]]; then
-              release_process_conscrypt_state=INVALID
-            elif [ "$release_process_root_sha" != "$expected_root_sha" ]; then
-              release_process_conscrypt_state=MISMATCH
-            fi
-          else
-            release_process_conscrypt_state=INVALID
-          fi
-          case "$release_process_conscrypt_state" in
-            MATCH|ABSENT|MISMATCH|INVALID) ;;
-            *) exit 1 ;;
-          esac
-          echo "tls_release_process_conscrypt=$release_process_conscrypt_state" \
-            >> ci-evidence/android-runtime/tls-trust-evidence.txt
-          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
-          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
-          test "$release_process_conscrypt_state" = MATCH
           python3 eng/ci/android_release_ui_e2e.py \
             --input "$release_input" \
             --evidence "$evidence" \
             --package "$ANDROID_TEST_PACKAGE" \
-            --timeout-seconds 300
+            --timeout-seconds 300 \
+            --conscrypt-alias "$certificate_alias" \
+            --conscrypt-root-sha256 "$expected_root_sha"
           python3 - "$evidence" <<'PY'
           import json, sys
           result = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -2386,10 +2341,15 @@ jobs:
               "businessOperationSucceeded": True,
               "persistedAfterReleaseRestart": True,
               "signedOutClosed": True,
+              "conscryptTrustProcessLaunchCount": 2,
           }
           if result != expected:
               raise SystemExit("Android Release UI evidence is incomplete or unexpected.")
           PY
+          {
+            echo 'tls_release_process_conscrypt=MATCH'
+            echo 'tls_release_process_launch_count=2'
+          } >> ci-evidence/android-runtime/tls-trust-evidence.txt
           installed_path_after=$(adb shell pm path "$ANDROID_TEST_PACKAGE" | tr -d '\r' | sed -n 's/^package://p')
           test "$installed_path_after" = "$installed_path"
           test "$(adb exec-out cat "$installed_path_after" | sha256sum | awk '{print $1}')" = "$expected_sha"

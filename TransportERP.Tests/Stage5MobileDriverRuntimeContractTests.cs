@@ -269,6 +269,24 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("driver.wait_for_operation_success(operation_id)", script,
             StringComparison.Ordinal);
+        Assert.Contains("def bind_conscrypt_trust_for_current_process(self)", script,
+            StringComparison.Ordinal);
+        Assert.Contains("self.bind_conscrypt_trust_for_current_process()", script,
+            StringComparison.Ordinal);
+        Assert.Contains("RELEASE_CONSCRYPT_BIND_FAILED", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_CONSCRYPT_ROOT_UNAVAILABLE", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_CONSCRYPT_ROOT_INVALID", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_CONSCRYPT_ROOT_MISMATCH", script, StringComparison.Ordinal);
+        Assert.Contains("conscryptTrustProcessLaunchCount", script, StringComparison.Ordinal);
+        foreach (var processTrustTest in new[]
+                 {
+                     "test_exact_root_is_bound_and_verified_for_each_process_launch",
+                     "test_bind_failure_stops_before_certificate_read",
+                     "test_unavailable_invalid_and_mismatched_roots_fail_with_fixed_codes",
+                     "test_invalid_configuration_and_process_identity_fail_closed",
+                     "test_launcher_binds_before_any_ui_observation_on_initial_and_restart_launches"
+                 })
+            Assert.Contains(processTrustTest, stateMachineTests, StringComparison.Ordinal);
         Assert.Contains("signedOutClosed", script, StringComparison.Ordinal);
         Assert.DoesNotContain("DriverDeviceTestActivity", script, StringComparison.Ordinal);
         Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", script,
@@ -450,15 +468,17 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("test \"$conscrypt_certificate_state\" = MATCH", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("tls_release_process_conscrypt=$release_process_conscrypt_state", workflow,
+        Assert.Contains("--conscrypt-alias \"$certificate_alias\"", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("test \"$release_process_conscrypt_state\" = MATCH", workflow,
+        Assert.Contains("--conscrypt-root-sha256 \"$expected_root_sha\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("tls_release_process_conscrypt=MATCH", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("tls_release_process_launch_count=2", workflow,
             StringComparison.Ordinal);
         Assert.Contains("tls_conscrypt_certificate_state=$conscrypt_certificate_state", workflow,
             StringComparison.Ordinal);
         Assert.Contains("[[ ! \"$namespace_root_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
-            StringComparison.Ordinal);
-        Assert.Contains("[[ ! \"$release_process_root_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
             StringComparison.Ordinal);
         Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", workflow,
             StringComparison.Ordinal);

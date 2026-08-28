@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import unittest
 from pathlib import Path
@@ -117,6 +118,151 @@ class ConditionalImeDismissalTests(unittest.TestCase):
         with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_HIERARCHY_INVALID$"):
             driver.set_text("driver_company_id", "SAFE", verify_plaintext=False)
         self.assertEqual(["READ_IME", "BACK", "READ_IME", "ROOT"], events)
+
+
+class ProcessConscryptTrustTests(unittest.TestCase):
+    certificate_der = b"fixed-test-root-der"
+    root_sha256 = hashlib.sha256(certificate_der).hexdigest()
+
+    def driver(self) -> object:
+        return HARNESS.Driver("adb", "pkg", 30, "abcdef12.0", self.root_sha256)
+
+    def test_exact_root_is_bound_and_verified_for_each_process_launch(self) -> None:
+        driver = self.driver()
+        events: list[str] = []
+        commands: list[tuple[str, ...]] = []
+
+        def run(*arguments: str, **_: object) -> str:
+            commands.append(arguments)
+            if arguments[:3] == ("shell", "pidof", "pkg"):
+                events.append("PID")
+                return "321\n"
+            if "mount" in arguments:
+                events.append("BIND")
+                return ""
+            raise AssertionError(arguments)
+
+        def run_binary(*_: str, **__: object) -> bytes:
+            commands.append(_)
+            events.append("READ")
+            return HARNESS.ssl.DER_cert_to_PEM_cert(self.certificate_der).encode("ascii")
+
+        driver.run = run
+        driver.run_binary = run_binary
+        driver.bind_conscrypt_trust_for_current_process()
+        driver.bind_conscrypt_trust_for_current_process()
+        self.assertEqual(["PID", "BIND", "READ", "PID", "BIND", "READ"], events)
+        self.assertEqual(2, driver.conscrypt_process_bind_count)
+        self.assertEqual(
+            2,
+            commands.count(
+                (
+                    "shell", "nsenter", "-t", "321", "-m", "--", "mount", "--bind",
+                    "/system/etc/security/cacerts", "/apex/com.android.conscrypt/cacerts",
+                )
+            ),
+        )
+        self.assertEqual(
+            2,
+            commands.count(
+                (
+                    "exec-out", "nsenter", "-t", "321", "-m", "--", "cat",
+                    "/apex/com.android.conscrypt/cacerts/abcdef12.0",
+                )
+            ),
+        )
+
+    def test_bind_failure_stops_before_certificate_read(self) -> None:
+        driver = self.driver()
+        driver.run = mock.Mock(
+            side_effect=("321\n", HARNESS.UiE2EFailure("secret-bearing adb failure"))
+        )
+        driver.run_binary = mock.Mock(side_effect=AssertionError("must not read"))
+        with self.assertRaisesRegex(
+            HARNESS.UiE2EFailure,
+            "^RELEASE_CONSCRYPT_BIND_FAILED$",
+        ) as raised:
+            driver.bind_conscrypt_trust_for_current_process()
+        self.assertNotIn("321", str(raised.exception))
+        self.assertNotIn("secret", str(raised.exception))
+        driver.run_binary.assert_not_called()
+
+    def test_unavailable_invalid_and_mismatched_roots_fail_with_fixed_codes(self) -> None:
+        cases = (
+            (
+                HARNESS.UiE2EFailure("secret-bearing certificate read"),
+                None,
+                "RELEASE_CONSCRYPT_ROOT_UNAVAILABLE",
+            ),
+            (b"not-a-certificate", ValueError("secret-bearing parse"), "RELEASE_CONSCRYPT_ROOT_INVALID"),
+            (b"other-certificate", b"different-der", "RELEASE_CONSCRYPT_ROOT_MISMATCH"),
+        )
+        for certificate, parsed, expected in cases:
+            with self.subTest(expected=expected):
+                driver = self.driver()
+                driver.run = mock.Mock(side_effect=("321\n", ""))
+                if isinstance(certificate, BaseException):
+                    driver.run_binary = mock.Mock(side_effect=certificate)
+                else:
+                    driver.run_binary = mock.Mock(return_value=certificate)
+                parse = (
+                    mock.patch.object(HARNESS.ssl, "PEM_cert_to_DER_cert", side_effect=parsed)
+                    if isinstance(parsed, BaseException)
+                    else mock.patch.object(HARNESS.ssl, "PEM_cert_to_DER_cert", return_value=parsed)
+                )
+                with parse:
+                    with self.assertRaisesRegex(HARNESS.UiE2EFailure, f"^{expected}$") as raised:
+                        driver.bind_conscrypt_trust_for_current_process()
+                self.assertNotIn("secret", str(raised.exception))
+                self.assertEqual(0, driver.conscrypt_process_bind_count)
+
+    def test_invalid_configuration_and_process_identity_fail_closed(self) -> None:
+        invalid = HARNESS.Driver("adb", "pkg", 30, "unsafe-alias", "not-a-sha")
+        invalid.run = mock.Mock(side_effect=AssertionError("must not call adb"))
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^RELEASE_CONSCRYPT_INPUT_INVALID$"):
+            invalid.bind_conscrypt_trust_for_current_process()
+        invalid.run.assert_not_called()
+
+        driver = self.driver()
+        driver.run = mock.Mock(return_value="321 654\n")
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^RELEASE_PROCESS_PID_INVALID$"):
+            driver.bind_conscrypt_trust_for_current_process()
+
+        unavailable = self.driver()
+        unavailable.run = mock.Mock(
+            side_effect=HARNESS.UiE2EFailure("secret-bearing pid lookup")
+        )
+        with self.assertRaisesRegex(
+            HARNESS.UiE2EFailure,
+            "^RELEASE_PROCESS_PID_UNAVAILABLE$",
+        ) as raised:
+            unavailable.bind_conscrypt_trust_for_current_process()
+        self.assertNotIn("secret", str(raised.exception))
+
+    def test_launcher_binds_before_any_ui_observation_on_initial_and_restart_launches(self) -> None:
+        driver = self.driver()
+        events: list[str] = []
+
+        def run(*arguments: str, **_: object) -> str:
+            if arguments[:3] == ("shell", "dumpsys", "package"):
+                return "pkgFlags=[ HAS_CODE ]\n"
+            if "resolve-activity" in arguments:
+                return "pkg/MainActivity\n"
+            if arguments[:3] == ("shell", "am", "start"):
+                events.append("START")
+            return ""
+
+        def bind() -> None:
+            events.append("BIND")
+            driver.conscrypt_process_bind_count += 1
+
+        driver.run = run
+        driver.bind_conscrypt_trust_for_current_process = bind
+        driver.wait_for = lambda _: events.append("UI")
+        driver.launch_ordinary_activity()
+        driver.launch_ordinary_activity()
+        self.assertEqual(["START", "BIND", "UI", "START", "BIND", "UI"], events)
+        self.assertEqual(2, driver.conscrypt_process_bind_count)
 
 
 class SafeActionResultTests(unittest.TestCase):

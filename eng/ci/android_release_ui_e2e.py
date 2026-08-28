@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """Drive the ordinary TransportERP Driver launcher activity through stable AutomationIds.
 
-The script intentionally has no test-activity, HTTP, certificate-validation, database, or
-application-internal hook. Its input file contains secrets and must be owner-readable only. Output
-evidence contains fixed phase/result codes only.
+The script intentionally has no test activity, HTTP shortcut, application certificate-validation
+callback, database hook, or application-internal hook. It binds the ephemeral CI root only inside
+each launched emulator process mount namespace before UI/network actions. Its input file contains
+secrets and must be owner-readable only. Output evidence contains fixed phase/result codes only.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import re
+import ssl
 import stat
 import subprocess
 import sys
@@ -25,6 +29,8 @@ from typing import Callable, Iterable
 DEFAULT_PACKAGE = "com.transporterp.mobile.driver"
 AUTOMATION_ROOT = "driver_main_scroll"
 SAFE_INPUT = re.compile(r"^[A-Za-z0-9@._+/:=%-]+$")
+CONSCRYPT_ALIAS = re.compile(r"^[0-9a-f]{8}\.[0-9]{1,2}$")
+LOWER_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 OPERATION_ID = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \|")
 SAFE_RESULT = re.compile(r"Result: ([A-Z0-9_]{1,64})")
@@ -104,10 +110,20 @@ class UiE2EFailure(RuntimeError):
 
 
 class Driver:
-    def __init__(self, adb: str, package: str, timeout_seconds: int) -> None:
+    def __init__(
+        self,
+        adb: str,
+        package: str,
+        timeout_seconds: int,
+        conscrypt_alias: str | None = None,
+        conscrypt_root_sha256: str | None = None,
+    ) -> None:
         self.adb = adb
         self.package = package
         self.timeout_seconds = timeout_seconds
+        self.conscrypt_alias = conscrypt_alias
+        self.conscrypt_root_sha256 = conscrypt_root_sha256
+        self.conscrypt_process_bind_count = 0
         self._last_scroll_hierarchy: ET.Element | None = None
 
     def run(self, *arguments: str, timeout: int = 30) -> str:
@@ -124,6 +140,74 @@ class Driver:
         if completed.returncode != 0:
             raise UiE2EFailure("ADB_COMMAND_FAILED")
         return completed.stdout.replace("\r", "")
+
+    def run_binary(self, *arguments: str, timeout: int = 30) -> bytes:
+        try:
+            completed = subprocess.run(
+                [self.adb, *arguments],
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise UiE2EFailure("ADB_UNAVAILABLE") from error
+        if completed.returncode != 0:
+            raise UiE2EFailure("ADB_COMMAND_FAILED")
+        return completed.stdout
+
+    def bind_conscrypt_trust_for_current_process(self) -> None:
+        if (
+            self.conscrypt_alias is None
+            or CONSCRYPT_ALIAS.fullmatch(self.conscrypt_alias) is None
+            or self.conscrypt_root_sha256 is None
+            or LOWER_SHA256.fullmatch(self.conscrypt_root_sha256) is None
+        ):
+            raise UiE2EFailure("RELEASE_CONSCRYPT_INPUT_INVALID")
+        try:
+            process_pid = self.run("shell", "pidof", self.package).strip()
+        except UiE2EFailure as error:
+            raise UiE2EFailure("RELEASE_PROCESS_PID_UNAVAILABLE") from error
+        if re.fullmatch(r"[0-9]+", process_pid) is None:
+            raise UiE2EFailure("RELEASE_PROCESS_PID_INVALID")
+        system_directory = "/system/etc/security/cacerts"
+        conscrypt_directory = "/apex/com.android.conscrypt/cacerts"
+        certificate_path = f"{conscrypt_directory}/{self.conscrypt_alias}"
+        try:
+            self.run(
+                "shell",
+                "nsenter",
+                "-t",
+                process_pid,
+                "-m",
+                "--",
+                "mount",
+                "--bind",
+                system_directory,
+                conscrypt_directory,
+            )
+        except UiE2EFailure as error:
+            raise UiE2EFailure("RELEASE_CONSCRYPT_BIND_FAILED") from error
+        try:
+            certificate = self.run_binary(
+                "exec-out",
+                "nsenter",
+                "-t",
+                process_pid,
+                "-m",
+                "--",
+                "cat",
+                certificate_path,
+            )
+        except UiE2EFailure as error:
+            raise UiE2EFailure("RELEASE_CONSCRYPT_ROOT_UNAVAILABLE") from error
+        try:
+            certificate_der = ssl.PEM_cert_to_DER_cert(certificate.decode("ascii"))
+        except (UnicodeDecodeError, ValueError) as error:
+            raise UiE2EFailure("RELEASE_CONSCRYPT_ROOT_INVALID") from error
+        actual_sha256 = hashlib.sha256(certificate_der).hexdigest()
+        if not hmac.compare_digest(actual_sha256, self.conscrypt_root_sha256):
+            raise UiE2EFailure("RELEASE_CONSCRYPT_ROOT_MISMATCH")
+        self.conscrypt_process_bind_count += 1
 
     def launch_ordinary_activity(self) -> None:
         package_dump = self.run("shell", "dumpsys", "package", self.package)
@@ -148,6 +232,7 @@ class Driver:
         if len(component) != 1 or not component[0].startswith(self.package + "/"):
             raise UiE2EFailure("ORDINARY_LAUNCHER_ACTIVITY_NOT_RESOLVED")
         self.run("shell", "am", "start", "-W", "-n", component[0])
+        self.bind_conscrypt_trust_for_current_process()
         self.wait_for(AUTOMATION_ROOT)
 
     def dump(self) -> ET.Element:
@@ -619,12 +704,20 @@ def main() -> int:
     parser.add_argument("--adb", default=os.environ.get("ADB", "adb"))
     parser.add_argument("--package", default=DEFAULT_PACKAGE)
     parser.add_argument("--timeout-seconds", type=int, default=180)
+    parser.add_argument("--conscrypt-alias", required=True)
+    parser.add_argument("--conscrypt-root-sha256", required=True)
     arguments = parser.parse_args()
     if arguments.timeout_seconds < 30 or arguments.timeout_seconds > 900:
         raise UiE2EFailure("TIMEOUT_INVALID")
 
     secret_input = read_input(arguments.input)
-    driver = Driver(arguments.adb, arguments.package, arguments.timeout_seconds)
+    driver = Driver(
+        arguments.adb,
+        arguments.package,
+        arguments.timeout_seconds,
+        arguments.conscrypt_alias,
+        arguments.conscrypt_root_sha256,
+    )
     evidence = {
         "schemaVersion": 1,
         "activity": "ordinary-launcher",
@@ -635,6 +728,7 @@ def main() -> int:
         "businessOperationSucceeded": False,
         "persistedAfterReleaseRestart": False,
         "signedOutClosed": False,
+        "conscryptTrustProcessLaunchCount": 0,
     }
     phase = "INITIAL_LAUNCH"
     try:
@@ -698,6 +792,9 @@ def main() -> int:
         if driver.find("driver_queue_party").attrib.get("enabled") != "false":
             raise UiE2EFailure("SIGNED_OUT_WRITE_ENABLED")
         evidence["signedOutClosed"] = True
+        if driver.conscrypt_process_bind_count != 2:
+            raise UiE2EFailure("RELEASE_CONSCRYPT_LAUNCH_COUNT_INVALID")
+        evidence["conscryptTrustProcessLaunchCount"] = driver.conscrypt_process_bind_count
         arguments.evidence.parent.mkdir(parents=True, exist_ok=True)
         arguments.evidence.write_text(
             json.dumps(evidence, sort_keys=True, separators=(",", ":")) + "\n",
