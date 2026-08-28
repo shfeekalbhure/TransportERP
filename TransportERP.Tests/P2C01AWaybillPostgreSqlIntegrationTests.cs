@@ -216,6 +216,11 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         Assert.Equal(HttpStatusCode.Forbidden, claimOnly.StatusCode);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            CreateToken(scope.UserId, ungrantedScope.CompanyId, ungrantedScope.BranchId, WaybillPermissionCodes.Create));
+        var crossCompany = await client.PostAsJsonAsync("/api/v1/waybills/drafts", NewCreateRequest(ungrantedScope));
+        Assert.Equal(HttpStatusCode.Forbidden, crossCompany.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
             CreateToken(scope.UserId, scope.CompanyId, scope.BranchId, WaybillPermissionCodes.Create));
         var allowed = await client.PostAsJsonAsync("/api/v1/waybills/drafts", NewCreateRequest(scope));
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
