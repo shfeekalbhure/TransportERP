@@ -1,0 +1,10 @@
+Authoritative commit: 2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5
+Authoritative tree: 516247dd320cfc0ef71607cd3d8e7946fe9375ab
+Tracked files: 378
+Projects: 10
+Solutions: 1
+Migration implementations: 10
+Snapshots: 1
+C# test files: 22
+Static Fact/Theory attributes: 103
+Workflows: 7
