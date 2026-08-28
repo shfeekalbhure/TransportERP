@@ -31,7 +31,7 @@ mkdir -p "${EVIDENCE_DIR}"
 evidence_abs="$(cd "${EVIDENCE_DIR}" && pwd)"
 
 pg18() {
-  docker run --rm --network host \
+  docker run --rm -i --network host \
     -e PGPASSWORD="${PGPASSWORD}" \
     -v "${evidence_abs}:/evidence" \
     postgres:18.6-bookworm "$@"
