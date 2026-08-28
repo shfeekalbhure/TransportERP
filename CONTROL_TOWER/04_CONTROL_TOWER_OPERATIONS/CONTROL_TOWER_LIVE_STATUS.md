@@ -1,9 +1,9 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T21:16:36Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-29T00:16:36+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T22:05:02Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-29T01:05:02+03:00`
 - `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
-- `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
+- `MONITORING STATE`: `ACTIVE — CONTINUOUS MISSION DISPATCH`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - MISSION-03 execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
@@ -11,53 +11,48 @@
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | IN PROGRESS | exact post-resubmission DB-GOV chronology/design/order independently reverified | coordinated Greenfield rehearsal entry held pending corrected dependency decision | N/A |
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | fresh post-correction DB-GOV PASS recorded after physical dependency correction | bounded Greenfield candidate authoring/rehearsal is authorized; Production block remains | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; v1.1 Greenfield DBP resubmission exists; no candidate DB implementation evidenced | `CONTINUE — DB REHEARSAL ENTRY HOLD; RESOLVE DBP-003B/C ↔ DBP-006 ORDER CONFLICT` | NOT SEALED; no final handoff |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged after authorization; no post-authorization candidate/rehearsal worker output evidenced | `CONTINUE — DB-GOV PASS; AUTHORING/REHEARSAL START AUTHORIZED — WAITING FOR WORKER SESSION` | NOT SEALED; no final handoff |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
 ## Material transition this check
 
-Control Tower re-read the exact v1.0 Greenfield physical design, its acceptance specification, the detached v1.1 SHA-256 list, the mission-local coordinated DB-GOV decision, the current manifest, DB-GOV registers, and the execution branch head.
+Control Tower reconciled central status against the current mission-local directive, DB-GOV proposal register and the formal post-correction independent decision:
 
-A new governing record was created:
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_CORRECTION_PASS_DECISION_2026-08-29.md`
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
+Current controlling result:
 
-Current result:
+`DB-GOV VERDICT = PASS`
 
-`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+`PASS RECORDED — BOUNDED GREENFIELD AUTHORING/REHEARSAL AUTHORIZED`
 
-### Why the hold is required
+The prior `HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY` is closed. The accepted physical dependency order is:
 
-1. The mission-local coordinated review decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`.
-2. The exact v1.0 physical resubmission did not exist at that ref and was committed later in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
-3. The latest detached v1.1 SHA list contains both files, but the manifest still describes the package as awaiting independent DB-GOV and does not list that review decision as a manifest output.
-4. More importantly, the exact physical design and the earlier review decision impose incompatible candidate order:
-   - physical design: `DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`;
-   - earlier decision: `DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`.
-5. The physical design makes DBP-006 depend on device/proof persistence introduced by DBP-003B/C, so the earlier decision order cannot be activated against that exact package without correction.
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-## Current DB-GOV package states
+The correction was reviewed after repository correction `20608494998e671892ee35abd415158e399c9036`. The execution baseline remains `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
 
-| Package | Current state | Immediate boundary |
-|---|---|---|
-| DBP-002 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | may be revised; no coordinated candidate persistence authoring yet |
-| DBP-003A | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | password/verify/lockout test remains required before login activation |
-| DBP-003B/C | `ORDER CONFLICT — HOLD` | exact design places before DBP-006; earlier decision places after DBP-006 |
-| DBP-004 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | coordinated bundle held pending corrected post-resubmission decision |
-| DBP-005 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | coordinated bundle held pending corrected post-resubmission decision |
-| DBP-006 | `ORDER CONFLICT — HOLD` | exact design depends on DBP-003B/C while earlier decision requires DBP-006 first |
+## Current DB-GOV execution posture
 
-No candidate Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data or candidate migration application is authorized while this bounded DB-GOV hold is active. Existing ten-migration disposable validation remains historical evidence only.
+MISSION-03 may now author proposal-scoped candidate Entities, DbContext mappings, additive forward-only migrations, persistent adapters, generated SQL/model snapshot changes and synthetic non-Production rehearsal fixtures on its isolated execution branch, and may apply/test them only against disposable/Greenfield PostgreSQL 18.6 environments under the approved order.
 
-## Required next action
+Before candidate migration application, the worker must bind and retain exact candidate SHA/tree/parent, changed-file inventory, migration identity/hash, model snapshot diff, generated SQL, pending-model evidence, empty PostgreSQL 18.6 baseline/catalog proof, backup/restore proof and proposal-specific test/recovery evidence. Each candidate checkpoint and the coordinated bundle still require independent post-rehearsal DB-GOV review.
 
-MISSION-03 must continue non-destructively. It must reconcile the DBP-003B/C ↔ DBP-006 dependency by either correcting the review order to match the physical dependency, or splitting DBP-006 into a physically independent pre-device core plus a later device/proof-bound extension. The corrected package must then receive a fresh independent DB-GOV review after the corrected repository evidence exists.
+No repository evidence currently shows a post-authorization candidate/rehearsal worker output; therefore this workstream is recorded as:
 
-The next MISSION-03 worker checkpoint must issue a new manifest and detached SHA-256 set. `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is now a historical open checkpoint after Control Tower changed governance files.
+`START AUTHORIZED — WAITING FOR WORKER SESSION`
+
+and is not treated as completed or independently accepted.
+
+## Production and mission boundaries
+
+The PASS does not authorize Production database/data/configuration/credentials, real business data, Production secrets/signing material, destructive/down-migration reliance, edits/deletes/squashes of the existing ten migrations, master merge, PR #69 merge, rebase, cherry-pick, force-push or history rewrite.
+
+MISSION-03 remains `OPEN — NOT SEALED`. MISSION-04 remains `WAIT — NOT STARTED` because no final MISSION-03 report + evidence + manifest + detached SHA-256 + seal + handoff has been verified.
 
 ## Remaining non-DB gates
 
@@ -67,4 +62,4 @@ The next MISSION-03 worker checkpoint must issue a new manifest and detached SHA
 - Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals;
 - complete Git worktree/stash/local-only preservation inventory before W8 destructive/global cleanup.
 
-There is no active `OWNER DECISION REQUIRED`. MISSION-04 remains WAIT because MISSION-03 is not sealed and has no final valid handoff.
+There is no active `OWNER DECISION REQUIRED` for the immediate authorized work.
