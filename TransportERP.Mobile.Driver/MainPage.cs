@@ -210,7 +210,7 @@ public sealed class MainPage : ContentPage
                 _branchId,
                 _deviceId,
                 _deviceCredential,
-                new HorizontalStackLayout { Spacing = 8, Children = { _signIn, _signOut } },
+                new VerticalStackLayout { Spacing = 8, Children = { _signIn, _signOut } },
                 new Label { Text = "Offline business action — CreateOperationalParty" },
                 _partyName,
                 _partyMobile,

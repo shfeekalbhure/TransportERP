@@ -106,6 +106,12 @@ public sealed class Stage5MobileDriverRuntimeContractTests
 
         Assert.Contains("Content = new ScrollView", page, StringComparison.Ordinal);
         Assert.Contains("AutomationId = \"driver_main_scroll\"", page, StringComparison.Ordinal);
+        Assert.Contains(
+            "new VerticalStackLayout { Spacing = 8, Children = { _signIn, _signOut } }",
+            page, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "new HorizontalStackLayout { Spacing = 8, Children = { _signIn, _signOut } }",
+            page, StringComparison.Ordinal);
         foreach (var automationId in new[]
                  {
                      "driver_mode", "driver_reason", "driver_user_name", "driver_password",
