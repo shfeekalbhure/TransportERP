@@ -1,7 +1,8 @@
 # CLIENT-001 — Delivery and Signing Scope
 
 Decision date: 2026-08-28
-Owner decision: `RESOLVED`
+Owner decision: `APPROVED — RESOLVED`
+Owner approval record: `EXPLICIT OWNER APPROVAL — 2026-08-28 — "اعتمد"`
 
 ## Decision
 
