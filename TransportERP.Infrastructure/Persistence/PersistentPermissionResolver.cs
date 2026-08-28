@@ -13,9 +13,9 @@ public interface IEffectivePermissionResolver
 }
 
 /// <summary>
-/// Resolves the existing persistent RBAC model at request time. Token permission
-/// claims can narrow an API request, but cannot replace this decision or widen it.
-/// Malformed or tenant-inconsistent scope rows fail closed.
+/// Resolves only the authoritative Greenfield membership-scoped grants. Legacy
+/// user_roles and user_permission_overrides remain physically preserved but are
+/// intentionally not request-time authorization sources.
 /// </summary>
 public sealed class PersistentPermissionResolver(TransportErpDbContext db) : IEffectivePermissionResolver
 {
@@ -26,103 +26,63 @@ public sealed class PersistentPermissionResolver(TransportErpDbContext db) : IEf
         string permissionCode,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(permissionCode)) return false;
+        if (userId == Guid.Empty || companyId == Guid.Empty || string.IsNullOrWhiteSpace(permissionCode))
+            return false;
 
+        var now = DateTimeOffset.UtcNow;
         var permission = await db.Permissions.AsNoTracking()
             .Where(x => x.Code == permissionCode && x.Status == "ACTIVE")
             .Select(x => new { x.Id, x.ScopeType })
             .SingleOrDefaultAsync(cancellationToken);
         if (permission is null || !IsKnownScope(permission.ScopeType)) return false;
 
-        var overrides = await db.UserPermissionOverrides.AsNoTracking()
-            .Where(x => x.UserId == userId && x.PermissionId == permission.Id)
-            .Select(x => new ScopedDecision(x.CompanyId, x.BranchId, x.IsAllowed))
-            .ToListAsync(cancellationToken);
-        if (!await ScopeRowsAreValidAsync(overrides, cancellationToken)) return false;
-
-        var applicableOverrides = overrides
-            .Where(x => AppliesToContext(x.CompanyId, x.BranchId, companyId, branchId))
-            .ToArray();
-        if (applicableOverrides.Any(x => !x.IsAllowed)) return false;
-        if (applicableOverrides.Any(x => x.IsAllowed &&
-                ScopeType(x.CompanyId, x.BranchId) == permission.ScopeType))
-            return true;
-
-        var grants = await (
-            from userRole in db.UserRoles.AsNoTracking()
-            join role in db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
-            join rolePermission in db.RolePermissions.AsNoTracking() on role.Id equals rolePermission.RoleId
-            where userRole.UserId == userId && role.Status == "ACTIVE" &&
-                  rolePermission.PermissionId == permission.Id
-            select new PermissionGrant(
-                userRole.CompanyId,
-                userRole.BranchId,
-                role.CompanyId,
-                rolePermission.ScopeType,
-                rolePermission.CompanyId,
-                rolePermission.BranchId))
+        // The current API contract has no client-authoritative membership id. Fail
+        // closed by selecting only an exact persistent scope row; W2 may expose an
+        // explicit server-validated membership selector without widening this rule.
+        var memberships = await db.Set<UserMembership>().AsNoTracking()
+            .Where(x => x.UserId == userId && x.CompanyId == companyId &&
+                        x.Status == "ACTIVE" && x.ValidFrom <= now &&
+                        (x.ValidTo == null || x.ValidTo >= now) &&
+                        x.BranchId == branchId)
+            .Select(x => new { x.Id, x.ScopeType, x.SecurityVersion, x.BranchId })
+            .Take(2)
             .ToListAsync(cancellationToken);
 
-        if (!await ScopeRowsAreValidAsync(
-                grants.Select(x => new ScopedDecision(x.UserCompanyId, x.UserBranchId, true)),
-                cancellationToken) ||
-            !await ScopeRowsAreValidAsync(
-                grants.Select(x => new ScopedDecision(x.GrantCompanyId, x.GrantBranchId, true)),
-                cancellationToken))
+        if (memberships.Count != 1) return false;
+        var membership = memberships[0];
+        if (membership.SecurityVersion < 1 ||
+            (membership.ScopeType == "COMPANY") != (membership.BranchId is null) ||
+            (membership.ScopeType == "BRANCH") != (membership.BranchId is not null))
             return false;
 
-        return grants.Any(x =>
-            x.GrantScopeType == permission.ScopeType &&
-            ScopeType(x.GrantCompanyId, x.GrantBranchId) == x.GrantScopeType &&
-            AppliesToContext(x.UserCompanyId, x.UserBranchId, companyId, branchId) &&
-            (!x.RoleCompanyId.HasValue || x.RoleCompanyId == companyId) &&
-            AppliesToContext(x.GrantCompanyId, x.GrantBranchId, companyId, branchId));
+        var direct = await db.Set<UserPermissionGrant>().AsNoTracking()
+            .Where(x => x.MembershipId == membership.Id && x.UserId == userId &&
+                        x.CompanyId == companyId && x.BranchId == branchId &&
+                        x.PermissionId == permission.Id && x.Status == "ACTIVE" &&
+                        x.ValidFrom <= now && (x.ValidTo == null || x.ValidTo >= now))
+            .Select(x => x.Effect)
+            .ToListAsync(cancellationToken);
+
+        if (direct.Any(x => x == "DENY")) return false;
+        if (direct.Any(x => x == "ALLOW")) return true;
+        if (direct.Any(x => x is not ("ALLOW" or "DENY"))) return false;
+
+        return await (
+            from grant in db.Set<UserRoleGrant>().AsNoTracking()
+            join role in db.Roles.AsNoTracking() on grant.RoleId equals role.Id
+            join rolePermission in db.RolePermissions.AsNoTracking() on role.Id equals rolePermission.RoleId
+            where grant.MembershipId == membership.Id && grant.UserId == userId &&
+                  grant.CompanyId == companyId && grant.BranchId == branchId &&
+                  grant.Status == "ACTIVE" && grant.ValidFrom <= now &&
+                  (grant.ValidTo == null || grant.ValidTo >= now) &&
+                  role.Status == "ACTIVE" &&
+                  (!role.CompanyId.HasValue || role.CompanyId == companyId) &&
+                  rolePermission.PermissionId == permission.Id &&
+                  rolePermission.ScopeType == permission.ScopeType
+            select grant.Id)
+            .AnyAsync(cancellationToken);
     }
-
-    private async Task<bool> ScopeRowsAreValidAsync(
-        IEnumerable<ScopedDecision> rows,
-        CancellationToken cancellationToken)
-    {
-        var materialized = rows.ToArray();
-        if (materialized.Any(x => x.BranchId.HasValue && !x.CompanyId.HasValue)) return false;
-
-        foreach (var scope in materialized
-                     .Where(x => x.BranchId.HasValue)
-                     .Select(x => new { CompanyId = x.CompanyId!.Value, BranchId = x.BranchId!.Value })
-                     .Distinct())
-        {
-            if (!await db.Branches.AsNoTracking().AnyAsync(
-                    x => x.Id == scope.BranchId && x.CompanyId == scope.CompanyId,
-                    cancellationToken))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static bool AppliesToContext(
-        Guid? scopedCompanyId,
-        Guid? scopedBranchId,
-        Guid companyId,
-        Guid? branchId)
-        => (!scopedCompanyId.HasValue || scopedCompanyId == companyId) &&
-           (!scopedBranchId.HasValue || scopedBranchId == branchId);
 
     private static bool IsKnownScope(string scopeType)
         => scopeType is "PLATFORM" or "COMPANY" or "BRANCH";
-
-    private static string? ScopeType(Guid? companyId, Guid? branchId)
-        => branchId.HasValue
-            ? companyId.HasValue ? "BRANCH" : null
-            : companyId.HasValue ? "COMPANY" : "PLATFORM";
-
-    private sealed record ScopedDecision(Guid? CompanyId, Guid? BranchId, bool IsAllowed);
-
-    private sealed record PermissionGrant(
-        Guid? UserCompanyId,
-        Guid? UserBranchId,
-        Guid? RoleCompanyId,
-        string GrantScopeType,
-        Guid? GrantCompanyId,
-        Guid? GrantBranchId);
 }

@@ -38,6 +38,28 @@ internal static class PersistentRbacTestSeeder
                 $"Test permission {permissionCode} has incompatible persistent scope/status.");
         }
 
+        var membership = await db.Set<UserMembership>()
+            .SingleOrDefaultAsync(x => x.UserId == userId && x.CompanyId == companyId && x.BranchId == branchId);
+        if (membership is null)
+        {
+            membership = new UserMembership
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                CompanyId = companyId,
+                BranchId = branchId,
+                ScopeType = "BRANCH",
+                Status = "ACTIVE",
+                SecurityVersion = 1,
+                ValidFrom = now,
+                CreatedAt = now,
+                UpdatedAt = now,
+                CreatedBy = userId,
+                ConcurrencyVersion = 1
+            };
+            db.Set<UserMembership>().Add(membership);
+        }
+
         var role = new Role
         {
             Id = Guid.NewGuid(),
@@ -51,16 +73,6 @@ internal static class PersistentRbacTestSeeder
             RowVersion = Guid.NewGuid().ToByteArray()
         };
         db.Roles.Add(role);
-        db.UserRoles.Add(new UserRole
-        {
-            UserId = userId,
-            RoleId = role.Id,
-            CompanyId = companyId,
-            BranchId = branchId,
-            CreatedAt = now,
-            UpdatedAt = now,
-            RowVersion = Guid.NewGuid().ToByteArray()
-        });
         db.RolePermissions.Add(new RolePermission
         {
             RoleId = role.Id,
@@ -71,6 +83,21 @@ internal static class PersistentRbacTestSeeder
             CreatedAt = now,
             UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        db.Set<UserRoleGrant>().Add(new UserRoleGrant
+        {
+            Id = Guid.NewGuid(),
+            MembershipId = membership.Id,
+            UserId = userId,
+            CompanyId = companyId,
+            BranchId = branchId,
+            RoleId = role.Id,
+            Status = "ACTIVE",
+            ValidFrom = now,
+            GrantedBy = userId,
+            CreatedAt = now,
+            UpdatedAt = now,
+            ConcurrencyVersion = 1
         });
         await db.SaveChangesAsync();
     }

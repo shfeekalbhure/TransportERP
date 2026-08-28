@@ -1,0 +1,50 @@
+name: MISSION-03 DBP-002 Candidate Generator
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+
+permissions:
+  contents: read
+
+jobs:
+  generate-db-p002:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore migration project
+        run: dotnet restore TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+      - name: Generate candidate migration 11
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mission-03-dbp002-generator
+          if find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_GreenfieldTenantMembershipIsolation.cs' | grep -q .; then
+            echo 'candidate already present in branch' | tee mission-03-dbp002-generator/status.txt
+            exit 0
+          fi
+          dotnet ef migrations add GreenfieldTenantMembershipIsolation \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --output-dir Persistence/Migrations \
+            | tee mission-03-dbp002-generator/ef-add.txt
+          git status --short | tee mission-03-dbp002-generator/status.txt
+          git diff -- TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs > mission-03-dbp002-generator/snapshot.diff
+          cp TransportERP.Infrastructure/Persistence/Migrations/*GreenfieldTenantMembershipIsolation*.cs mission-03-dbp002-generator/
+          cp TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs mission-03-dbp002-generator/
+      - name: Upload generated candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mission-03-dbp002-generator-${{ github.sha }}
+          path: mission-03-dbp002-generator
+          if-no-files-found: error
