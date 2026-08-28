@@ -30,19 +30,22 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `CONTINUE`
+- `CURRENT DIRECTIVE`: `STOP`
 - Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
 - Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
 - Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
-- Recorded disposition: `IN PROGRESS — TEAM-D SESSION STARTED 2026-08-28T01:52:48Z`.
-- Next permitted action: Continue TEAM-D reconciliation inside `04_TEAM-D/` only and produce the full report/register/manifest/seal/handoff package.
+- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`; 13 detached hashes and the 62-record Crosswalk verified by Control Tower.
+- Next permitted action: None unless Control Tower records `REOPEN`.
 
 ## TEAM-C2
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `WAIT`
+- `CURRENT DIRECTIVE`: `CONTINUE`
 - Prerequisite: TEAM-D must be sealed and handed off.
-- Next permitted action: Wait for a Control Tower `START` directive.
+- Required scope: Build the target architecture proposal from the sealed TEAM-D reconciliation and predecessor packages without treating proposals as implemented state.
+- Governing limitations: `AUTHORITATIVE CURRENT LINE` remains `UNKNOWN`; confirmed P0 risks and `DB-GOV-001` must be preserved as design constraints, not silently remediated.
+- Recorded disposition: `IN PROGRESS — TEAM-C2 SESSION STARTED 2026-08-28T02:02:53Z`.
+- Next permitted action: Continue TEAM-C2 target-architecture work inside `05_TEAM-C2/` only and produce the complete report/register/manifest/seal/handoff package.
 
 ## TEAM-E
 
