@@ -1,7 +1,7 @@
 # CURRENT DIRECTIVE — MISSION-01 MASTER
 
-`WAIT`
+`START`
 
-Prerequisite: TEAM-E advisory package must be `SEALED — DELIVERED TO CONTROL TOWER — STOP`, and any required reconciliation-reopen cycle must be closed.
+Prerequisite satisfied: TEAM-E v1.1 is `SEALED — DELIVERED TO CONTROL TOWER — STOP`, and the reconciliation-reopen cycle is closed.
 
-Do not issue the master report or reconciliation gate until Control Tower changes this directive to `START`.
+Read all accepted sealed packages and issue the required Master Deep Audit Report plus Audit Reconciliation Gate. Preserve `AUTHORITATIVE CURRENT LINE = UNKNOWN`, both P0s, `BLK-B-001` provenance/mitigation, `E-BLK-013`, DB-GOV-001, and all inaccessible evidence. Do not issue `READY FOR REMEDIATION PLANNING` unless every governing gate condition is actually satisfied. Do not implement or modify product files.

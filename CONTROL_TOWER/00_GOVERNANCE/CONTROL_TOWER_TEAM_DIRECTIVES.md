@@ -51,18 +51,18 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-E
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `RETURN FOR REWORK`
+- `CURRENT DIRECTIVE`: `STOP`
 - Prerequisite: TEAM-C2 must be sealed and handed off.
 - Required scope: Multidisciplinary advisory review of sealed TEAM-D reconciliation and TEAM-C2 target proposal; review every P0/P1 and a justified P2/P3 sample; preserve assurance and authority limitations.
-- Recorded disposition: `v1.0 PRESERVED — CENTRAL ACCEPTANCE REJECTED`; hashes are valid, but two final P0/P1 matrix rows retain stale `REOPEN REQUIRED` wording after the governed D/C2 reopen chain was resolved.
-- Next permitted action: Preserve v1.0 unchanged and issue complete TEAM-E v1.1 under `06_TEAM-E/v1.1/` with reconciled dispositions and a new seal chain.
+- Recorded disposition: `v1.1 SEALED — DELIVERED TO CONTROL TOWER — STOP`; v1.0 is preserved and rejected for downstream use.
+- Next permitted action: None unless new evidence causes `REOPEN REQUIRED`.
 
 ## MASTER REPORT + RECONCILIATION GATE
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `WAIT`
+- `CURRENT DIRECTIVE`: `START`
 - Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed.
-- Next permitted action: Wait for a Control Tower `START` directive.
+- Next permitted action: Produce the Master report and reconciliation gate from sealed accepted inputs only. Do not claim a final current line or `READY FOR REMEDIATION PLANNING` while authoritative-line and other critical gate evidence remain unresolved.
 
 ## MISSION-02
 
