@@ -1,54 +1,63 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T20:03:19Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T23:03:19+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T21:16:36Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-29T00:16:36+03:00`
 - `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
 - `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - MISSION-03 execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
+- PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f — OPEN / DRAFT / UNMERGED`
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | IN PROGRESS | Greenfield owner decision and DB-GOV proposal evidence independently re-read | second Greenfield DB-GOV review completed; central records rebound | N/A |
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | exact post-resubmission DB-GOV chronology/design/order independently reverified | coordinated Greenfield rehearsal entry held pending corrected dependency decision | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; exact v1.0 DBP physical bundle resubmitted | `CONTINUE — INDEPENDENT DB-GOV DECISION REQUIRED; NO REHEARSAL AUTHORITY` | NOT SEALED; no final handoff |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; v1.1 Greenfield DBP resubmission exists; no candidate DB implementation evidenced | `CONTINUE — DB REHEARSAL ENTRY HOLD; RESOLVE DBP-003B/C ↔ DBP-006 ORDER CONFLICT` | NOT SEALED; no final handoff |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
 ## Material transition this check
 
-Owner decision `DB-BASELINE-001` was applied to the central DB-GOV register through an independent second review:
+Control Tower re-read the exact v1.0 Greenfield physical design, its acceptance specification, the detached v1.1 SHA-256 list, the mission-local coordinated DB-GOV decision, the current manifest, DB-GOV registers, and the execution branch head.
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+A new governing record was created:
 
-Result:
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
 
-`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
+Current result:
 
-The following are no longer target-database prerequisites: legacy target-row/backfill evidence, legacy PasswordHash/verifier/rehash compatibility, legacy accounting/audit row reconciliation, and a safe-copy of a pre-existing target database.
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+
+### Why the hold is required
+
+1. The mission-local coordinated review decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`.
+2. The exact v1.0 physical resubmission did not exist at that ref and was committed later in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
+3. The latest detached v1.1 SHA list contains both files, but the manifest still describes the package as awaiting independent DB-GOV and does not list that review decision as a manifest output.
+4. More importantly, the exact physical design and the earlier review decision impose incompatible candidate order:
+   - physical design: `DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`;
+   - earlier decision: `DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`.
+5. The physical design makes DBP-006 depend on device/proof persistence introduced by DBP-003B/C, so the earlier decision order cannot be activated against that exact package without correction.
 
 ## Current DB-GOV package states
 
-| Package | Decision | Remaining boundary |
+| Package | Current state | Immediate boundary |
 |---|---|---|
-| DBP-002 | `REVISE BEFORE REHEARSAL` | exact membership/grant physical schema, tenant-consistent keys/FKs/checks/indexes, RLS/equivalent bootstrap and recovery tests |
-| DBP-003A | `REVISE BEFORE REHEARSAL` | final caller-owned audit/UoW, exact persistence mapping, new-system password hash/verify/lockout policy |
-| DBP-003B/C | `DEFERRED — DEPENDS ON DBP-002/006` | membership-bound device registry/assignment and proof/nonce/replay/retention design |
-| DBP-004 | `REVISE BEFORE REHEARSAL` | exact V2 audit schema/canonicalizer/stream/append-only/UoW acceptance |
-| DBP-005 | `REVISE BEFORE REHEARSAL` | exact Settlement/journal/source-link constraints, mapping/FX/rounding/period/SoD/concurrency/reversal contract |
-| DBP-006 | `REVISE BEFORE REHEARSAL` | exact typed Offline persistence, version/fingerprint, claim/lease, retention/legal-hold and device dependencies |
+| DBP-002 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | may be revised; no coordinated candidate persistence authoring yet |
+| DBP-003A | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | password/verify/lockout test remains required before login activation |
+| DBP-003B/C | `ORDER CONFLICT — HOLD` | exact design places before DBP-006; earlier decision places after DBP-006 |
+| DBP-004 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | coordinated bundle held pending corrected post-resubmission decision |
+| DBP-005 | `DESIGN COMPLETE — REHEARSAL ENTRY HOLD` | coordinated bundle held pending corrected post-resubmission decision |
+| DBP-006 | `ORDER CONFLICT — HOLD` | exact design depends on DBP-003B/C while earlier decision requires DBP-006 first |
 
-No proposal currently has disposable/Greenfield rehearsal authority. No Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data or Production database change is authorized.
+No candidate Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data or candidate migration application is authorized while this bounded DB-GOV hold is active. Existing ten-migration disposable validation remains historical evidence only.
 
-## New MISSION-03 evidence received
+## Required next action
 
-The exact physical-design and acceptance gaps listed above are addressed in
-`DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0` and
-`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`. Proposal states are now
-`RESUBMITTED — AWAITING INDEPENDENT DB-GOV DECISION`. This live-status update
-does not self-approve them; material Product/database work remains prohibited.
+MISSION-03 must continue non-destructively. It must reconcile the DBP-003B/C ↔ DBP-006 dependency by either correcting the review order to match the physical dependency, or splitting DBP-006 into a physically independent pre-device core plus a later device/proof-bound extension. The corrected package must then receive a fresh independent DB-GOV review after the corrected repository evidence exists.
+
+The next MISSION-03 worker checkpoint must issue a new manifest and detached SHA-256 set. `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is now a historical open checkpoint after Control Tower changed governance files.
 
 ## Remaining non-DB gates
 
@@ -58,4 +67,4 @@ does not self-approve them; material Product/database work remains prohibited.
 - Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals;
 - complete Git worktree/stash/local-only preservation inventory before W8 destructive/global cleanup.
 
-There is no active `OWNER DECISION REQUIRED` for the immediate next work. It is non-destructive proposal/design refinement. MISSION-04 remains WAIT because MISSION-03 has no final valid seal/handoff.
+There is no active `OWNER DECISION REQUIRED`. MISSION-04 remains WAIT because MISSION-03 is not sealed and has no final valid handoff.
