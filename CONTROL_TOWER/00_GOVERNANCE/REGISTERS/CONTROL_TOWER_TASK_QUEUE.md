@@ -8,7 +8,7 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED | Execution remains `5d1352b...` / `00512125...`. Exact v1.0 physical designs and Greenfield rehearsal acceptance for DBP-002/003A/B/C/004/005/006 are complete and resubmitted; no DBP has rehearsal authority until independent review. Remaining non-DB gates are canonical Shipping/Ticketing/screen programming promotion, executable Windows/Android + secure-store/signing proof, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and Git worktree/stash/local-only preservation inventory before W8. |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED | Execution remains `5d1352b...` / `00512125...`. Post-resubmission Control Tower revalidation found a DB-GOV sequencing conflict: the exact physical design requires DBP-003B/C before DBP-006, while the earlier review decision requires DBP-006 before DBP-003B/C. Coordinated candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring and candidate migration application are on HOLD until a corrected post-resubmission dependency decision is recorded. Unrelated non-destructive M03 work may continue. Remaining non-DB gates are canonical Shipping/Ticketing/screen programming promotion, executable Windows/Android + secure-store/signing proof, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and Git worktree/stash/local-only preservation inventory before W8. |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 remains open/not sealed; no final exact-head acceptance package/seal/handoff exists |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
@@ -20,7 +20,7 @@ Authoritative current product line:
 
 MISSION-03 execution branch:
 
-`codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9` — isolated remediation branch, tree `00512125311306a43474638195d2cad97b76118e`. This does not authorize a master merge or any DB/schema/data action.
+`codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9` — isolated remediation branch, tree `00512125311306a43474638195d2cad97b76118e`. This does not authorize a master merge or any Production DB/schema/data action.
 
 MISSION-02 accepted package:
 
@@ -30,13 +30,16 @@ PR #69 at `601f2d1cad61d62e590a6714ad84e307eb84fe5f` remains `UNMERGED REMEDIATI
 
 ## Current MISSION-03 priority
 
-Apply the Greenfield DB-GOV re-review decision:
+Controlling DB-GOV revalidation:
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
 
-The non-destructive proposal refinement is complete in the v1.0 exact physical
-bundle and acceptance specification. Required next action is independent DB-GOV
-disposition. Material execution remains prohibited until that action explicitly
-opens a bounded Greenfield rehearsal.
+Current result:
 
-No `OWNER DECISION REQUIRED` is active for that immediate work.
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+
+Required immediate work is non-destructive: reconcile the DBP-003B/C ↔ DBP-006 physical order, bind the corrected package to the exact current execution SHA/tree and acceptance matrix, then obtain a fresh independent DB-GOV decision after that corrected repository package exists. Do not author or apply candidate database persistence changes before that gate reopens.
+
+`MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is an open historical checkpoint after this Control Tower transition. The next worker checkpoint must regenerate its manifest and detached SHA-256 set.
+
+No `OWNER DECISION REQUIRED` is active for the immediate work.
