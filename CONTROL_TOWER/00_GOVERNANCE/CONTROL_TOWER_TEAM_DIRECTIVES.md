@@ -22,21 +22,21 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-C1
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `REOPEN`
-- Recorded disposition: `REOPENED — LIMITED v1.1 CORRECTION REQUIRED`.
+- `CURRENT DIRECTIVE`: `STOP`
+- Recorded disposition: `v1.1 SEALED — DELIVERED TO CONTROL TOWER — STOP`; v1.0 is preserved and superseded for downstream use.
 - Reason: TEAM-E proved v1.0 incorrectly describes a source-coded design-time connection fallback; source fails closed when `TRANSPORTERP_DESIGN_CONNSTR` is absent. Preserve v1.0.
-- Next permitted action: Issue complete corrected v1.1 under `03_TEAM-C1/v1.1/` with truthful source claim and complete required registers/seal chain.
+- Next permitted action: None unless new evidence causes `REOPEN REQUIRED`.
 
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `REOPEN`
+- `CURRENT DIRECTIVE`: `CONTINUE`
 - Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
 - Required scope: Create the complete Finding-by-Finding Crosswalk; independently reverify agreements, conflicts, and single-team findings; preserve all original IDs and temporal classifications.
 - Governing limitation: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` remains `UNKNOWN — REQUIRES VERIFICATION`. TEAM-D may reconcile evidence and classified refs, but must not infer or designate the authoritative current line or issue a final CURRENT-state/gate judgment.
-- Recorded disposition: `REOPENED — v1.1 REQUIRED AFTER TEAM-C1 v1.1`; v1.0 remains preserved.
+- Recorded disposition: `REOPENED — v1.1 IN PROGRESS`; corrected TEAM-C1 v1.1 input accepted at `2026-08-28T02:31:30Z`.
 - Reopen basis: Seal chronology defect; §34 Crosswalk field omissions; newly observed Sync lifecycle user/device ownership scope; mandatory-register contract recheck.
-- Next permitted action: After C1 v1.1 handoff, issue complete D v1.1 under `04_TEAM-D/v1.1/`.
+- Next permitted action: Issue complete D v1.1 under `04_TEAM-D/v1.1/` with corrected chronology, full §34 Crosswalk fields, new Sync ownership determination, conforming registers, hashes, seal, and handoff.
 
 ## TEAM-C2
 
