@@ -1,0 +1,7 @@
+# AUDIT REPORT SEAL REGISTER — MISSION-01
+
+| Team / Stage | Start UTC | Close UTC | Audit Baseline | Audit Subject / Authoritative Line | Refs / Full SHAs | Report path | Report SHA-256 | Register versions | Finding / Evidence / Unknown counts | Reviewer roles | Independence declaration | State | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TEAM-B / Independent audit | `2026-08-28T00:09Z approximately, per TEAM-B baseline` | `2026-08-28T00:44:51Z` | `02_TEAM-B/AUDIT_BASELINE.md` | TEAM-B assessed governance branch with product ancestor `master`; central authoritative line remains UNKNOWN | Governance `8a36f88b56a43cd5b47277b645ba2030ed3da4f1`; product assessed `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`; PR #69 delta `939f49fa9c2ae57fa532ad55f67461c5f3f256f3` | `02_TEAM-B/TEAM-B_INDEPENDENT_DEEP_AUDIT_REPORT.md` | `51b924968bbb685c3767eb624fcb1a2603bcffaed89a6ff2b5e8b2cb58dd39ec` | Exact hashes in `02_TEAM-B/AUDIT_OUTPUT_MANIFEST.md` and detached checksum list | `21 / 25 / 12` | Single Codex session using multiple review lenses; no separate multi-reviewer signatures | `CONFIRMED — TEAM-A CONTENT NOT READ` | `SEALED — RECEIVED BY CONTROL TOWER` | Verdict `NO-GO FOR RELEASE`; P0=0 confirmed, P1=15, P2=3, P3=1, INFO=2; `BLK-B-001` retained; no automatic reopen |
+
+TEAM-B is sealed and received. TEAM-A and TEAM-C1 are not sealed. TEAM-D remains waiting. No state for another team may be inferred from TEAM-B's delivery.

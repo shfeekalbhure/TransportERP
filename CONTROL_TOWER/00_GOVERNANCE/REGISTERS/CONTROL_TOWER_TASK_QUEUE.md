@@ -2,8 +2,8 @@
 
 | Order | Mission | Team | Prerequisite | Required Output | State | Blocker |
 |---:|---|---|---|---|---|---|
-| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline | Independent reports + current architecture | READY | |
-| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED | Reconciliation report | WAITING | |
+| 1 | MISSION-01 | TEAM-A/TEAM-B/TEAM-C1 | Audit baseline + authoritative current line + actual team assignments | Independent reports + current architecture | HOLD | TEAM-B sealed and received; TEAM-A and TEAM-C1 sealed packages observed in separate workspaces but not formally received/registered by Control Tower; authoritative current product line remains `UNKNOWN — REQUIRES OWNER/REPOSITORY VERIFICATION` |
+| 2 | MISSION-01 | TEAM-D | A/B/C1 SEALED and centrally received/verified | Reconciliation report | WAITING | `WAITING FOR SEALED TEAM-A + TEAM-B + TEAM-C1 OUTPUTS`; central intake is complete only for TEAM-B |
 | 3 | MISSION-01 | TEAM-C2 | TEAM-D SEALED | Target architecture proposal | WAITING | |
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 SEALED | Advisory review | WAITING | |
 | 5 | MISSION-01 | MASTER | TEAM-E SEALED | Master report + gate | WAITING | |
