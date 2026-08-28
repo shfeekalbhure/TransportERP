@@ -1,0 +1,50 @@
+name: MISSION-03 DBP-002 Semantic Reconcile Fix
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+    paths:
+      - .github/workflows/mission-03-dbp002-semantic-reconcile-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-semantic-reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Replace physical attnum comparisons with semantic column names
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/mission-03-dbp002-rehearsal-v3.sh')
+          s = p.read_text()
+          replacements = {
+          '''  psqlq "$db" "SELECT table_name,ordinal_position,column_name,data_type,udt_schema,udt_name,is_nullable,is_identity,COALESCE(identity_generation,''),(column_default IS NOT NULL) FROM information_schema.columns WHERE table_schema='transport_erp' ORDER BY table_name,ordinal_position;" > "evidence/${p}-columns.struct"''':
+          '''  psqlq "$db" "SELECT table_name,column_name,data_type,udt_schema,udt_name,is_nullable,is_identity,COALESCE(identity_generation,''),(column_default IS NOT NULL) FROM information_schema.columns WHERE table_schema='transport_erp' ORDER BY table_name,column_name;" > "evidence/${p}-columns.struct"''',
+          '''  psqlq "$db" "SELECT c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,con.convalidated,COALESCE(nr.nspname,''),COALESCE(cr.relname,''),COALESCE(con.conkey::text,''),COALESCE(con.confkey::text,''),con.confupdtype,con.confdeltype,con.confmatchtype FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_class cr ON cr.oid=con.confrelid LEFT JOIN pg_namespace nr ON nr.oid=cr.relnamespace WHERE n.nspname='transport_erp' ORDER BY c.relname,con.conname;" > "evidence/${p}-constraints.struct"''':
+          '''  psqlq "$db" "SELECT c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,con.convalidated,COALESCE(nr.nspname,''),COALESCE(cr.relname,''),COALESCE((SELECT string_agg(a.attname,',' ORDER BY k.ord) FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum,ord) JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=k.attnum),''),COALESCE((SELECT string_agg(a.attname,',' ORDER BY k.ord) FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum,ord) JOIN pg_attribute a ON a.attrelid=con.confrelid AND a.attnum=k.attnum),''),con.confupdtype,con.confdeltype,con.confmatchtype FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_class cr ON cr.oid=con.confrelid LEFT JOIN pg_namespace nr ON nr.oid=cr.relnamespace WHERE n.nspname='transport_erp' ORDER BY c.relname,con.conname;" > "evidence/${p}-constraints.struct"''',
+          '''  psqlq "$db" "SELECT t.relname,i.relname,x.indisunique,x.indisprimary,x.indisvalid,x.indisready,x.indisclustered,x.indisreplident,x.indnkeyatts,x.indnatts,x.indkey::text,(x.indpred IS NOT NULL),(x.indexprs IS NOT NULL) FROM pg_index x JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_class t ON t.oid=x.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='transport_erp' ORDER BY t.relname,i.relname;" > "evidence/${p}-indexes.struct"''':
+          '''  psqlq "$db" "SELECT t.relname,i.relname,x.indisunique,x.indisprimary,x.indisvalid,x.indisready,x.indisclustered,x.indisreplident,x.indnkeyatts,x.indnatts,COALESCE((SELECT string_agg(CASE WHEN k.attnum=0 THEN '<expression>' ELSE a.attname END,',' ORDER BY k.ord) FROM unnest(x.indkey) WITH ORDINALITY AS k(attnum,ord) LEFT JOIN pg_attribute a ON a.attrelid=x.indrelid AND a.attnum=k.attnum),''),(x.indpred IS NOT NULL),(x.indexprs IS NOT NULL) FROM pg_index x JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_class t ON t.oid=x.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='transport_erp' ORDER BY t.relname,i.relname;" > "evidence/${p}-indexes.struct"'''
+          }
+          changed = 0
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Expected semantic reconciliation source not found: {old[:120]}')
+              s = s.replace(old, new)
+              changed += 1
+          p.write_text(s)
+          print(f'Applied {changed} semantic reconciliation replacements.')
+          PY
+          git diff --check
+          git add scripts/mission-03-dbp002-rehearsal-v3.sh
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'MISSION-03 DBP-002: compare catalog keys by semantic column names'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
