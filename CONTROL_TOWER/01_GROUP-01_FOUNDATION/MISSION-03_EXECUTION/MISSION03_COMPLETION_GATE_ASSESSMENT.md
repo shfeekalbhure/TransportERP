@@ -2,101 +2,99 @@
 
 - Assessment baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
 - Tree: `00512125311306a43474638195d2cad97b76118e`
-- Owner decisions update: `ACC-001 / OFFLINE-001 / CLIENT-001 = RESOLVED`
-- Assessment: `MISSION-03 REMAINS OPEN — OWNER DECISION GATE CLEARED; AUTHORIZED EXTERNAL EVIDENCE + DB-GOV GATES REMAIN`
+- Owner decisions: `AUTH-001 / ACC-001 / OFFLINE-001 / CLIENT-001 / DB-BASELINE-001 = RESOLVED`
+- Target database: `GREENFIELD — NEW — EMPTY — NO LEGACY TABLES / NO LEGACY DATA`
+- Assessment: `MISSION-03 REMAINS OPEN — GREENFIELD LEGACY GATES CLEARED; DB-GOV + NON-DB EXTERNAL GATES REMAIN`
 - Product/DB/Production mutation in this assessment: `NONE`
 
-## Exhaustion result
+## Greenfield correction to v1.0 exhaustion state
 
-The complete sealed MISSION-02 package, current MISSION-03 registers/ADRs, superseding Control Tower and DB-GOV decisions, current Product source, reachable Git history and PR #69 were re-read. Repository-only design and preparation were continued across W2–W8 without crossing a dependency or DB-GOV gate.
+The prior exhaustion checkpoint treated the target database as potentially containing unknown legacy/live users, password hashes, accounting/audit rows, roles/RLS state and data shape. The owner has now explicitly resolved that assumption:
 
-| Wave | Current executable result | Completion blocker after owner decisions |
+`DB-BASELINE-001 = TARGET DATABASE IS GREENFIELD / NEW / EMPTY`
+
+There is no legacy target database or data population to preserve or reconcile.
+
+Accordingly:
+
+- legacy target database safe-copy requirement = `NOT APPLICABLE`;
+- legacy PasswordHash inventory/verifier/rehash compatibility = `NOT APPLICABLE`;
+- legacy target accounting/audit row reconciliation = `NOT APPLICABLE`;
+- legacy target row-count/data-shape preservation = `NOT APPLICABLE`.
+
+The existing ten committed migrations remain the governed schema bootstrap lineage. A new Greenfield rehearsal target must start empty, apply the ten current migrations, then apply only proposal-specific candidate migrations explicitly opened by DB-GOV.
+
+## Wave impact
+
+| Wave | Current state after Greenfield decision | Remaining blocker |
 |---:|---|---|
-| W0 | closed for bounded isolated execution | external workspace inventory prevents destructive/global preservation PASS |
-| W1 | REM-100 implemented and exact-head verified | historical data assessment/repair remains DBP-001 external/data-gated |
-| W2 | adopted code-only tenant/RBAC/owner/session lifecycle | PasswordHash, safe copy/live roles, DBP-002/003/006 and device/PoP persistence |
-| W3 | UoW/audit design prepared | `ACC-001 RESOLVED`; legacy audit/accounting sample, DBP-004/005 and safe-copy evidence remain |
-| W4 | Offline/Sync design prepared | `OFFLINE-001 RESOLVED`; exact action matrix must now be materialized under the approved default-deny/bounded-queue policy; W2/W3 and DBP-006 remain |
-| W5 | client truth inventory/test/packaging design prepared | `CLIENT-001 RESOLVED`; executable Windows + Android targets, external signing material/custody and runtime environments remain |
-| W6 | Shipping/Ticketing/screen authority reconciliation prepared | external canonical Kurrasa, Ticketing package, post-departure authority and DBP-007/008 |
-| W7 | CI/supply/recovery/privacy preparation sequenced | immutable prior waves, topology/signing/license/privacy/KMS policies and recovery evidence |
-| W8 | not entered; no cleanup authorized | W7 stable baseline and complete preservation inventory absent |
+| W0 | closed for bounded isolated execution | external Git workspace inventory still required only for destructive/global preservation actions |
+| W1 | REM-100 implemented and exact-head verified | legacy target-data repair assessment no longer applies to the new target; no Product data repair is required for a nonexistent legacy population |
+| W2 | code-only tenant/RBAC/session/device controls exhausted | DBP-002/003/006 physical persistence and new-system password/security policy; DB-GOV re-review required |
+| W3 | ACC-001 bound; direct posting fails closed | DBP-004/005 physical Settlement/audit design and rehearsal; legacy accounting/audit population is no longer a prerequisite |
+| W4 | OFFLINE-001 matrix/design completed | DBP-006 runtime persistence and replay implementation after DB-GOV |
+| W5 | CLIENT-001 package identities bound | real Windows/Android executable runtime, secure-store and signing/runtime evidence |
+| W6 | authority reconciliation prepared | canonical post-DEPART Shipping/Ticketing/screen programming authority remains external/non-DB |
+| W7 | disposable backup/restore passed | Production recovery/RPO-RTO/signing/privacy/KMS/dependency policies remain external |
+| W8 | not entered | W7 stable exit plus complete Git worktree/stash/local-only preservation inventory |
 
-## Owner decisions — RESOLVED
+## Password security interpretation
 
-### ACC-001
+No legacy users/password rows exist in the target database. Therefore the old blocker:
 
-Decision file:
+`PASSWORD-HASH BASELINE = UNKNOWN — LEGACY INVENTORY REQUIRED`
 
-`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/ACC-001_ACCOUNTING_POSTING_AUTHORITY_2026-08-28.md`
+is superseded for the Greenfield target.
 
-Decision:
+The required gate is now:
 
-`ACC-001 = RESOLVED — OPERATIONAL COLLECTION; GOVERNED SETTLEMENT POSTS THE LEDGER`
+`NEW-SYSTEM PASSWORD HASH / VERIFY / LOCKOUT POLICY = REQUIRED BEFORE LOGIN ACTIVATION`
 
-Collection remains operational and may be accepted without a pre-posted voucher. A later governed Settlement is the accounting boundary and must create/post the voucher+journal atomically, link the source collections, preserve reversals, use configured Cash/Bank/Clearing/Driver-Agent custody/Waybill-Customer receivable account roles, apply captured FX with explicit gain/loss/rounding treatment, enforce maker-checker for every settlement (`SoD threshold = 0`) and prohibit automatic hard-period reopen.
+MISSION-03/security implementation must define and test the new policy without any obligation to support an unknown historical hash format that is not present in the target database.
 
-### OFFLINE-001
+## DB-GOV re-review required now
 
-Decision file:
+Control Tower / DB-GOV must independently re-review:
 
-`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/OFFLINE-001_PER_ACTION_AUTHORITY_2026-08-28.md`
+- `DBP-002` tenant-consistent physical isolation;
+- `DBP-003A/B/C` sessions/security-version/device/PoP/nonce/replay persistence;
+- `DBP-004` audit integrity;
+- `DBP-005` accounting/Settlement integrity;
+- `DBP-006` Offline queue/inbox/outbox protocol persistence.
 
-Decision:
+The re-review must distinguish proposal-specific design risks from blockers that existed only because a legacy/live target population was assumed.
 
-`OFFLINE-001 = RESOLVED — DEFAULT DENY; EXPLICIT QUEUE FOR BOUNDED OPERATIONAL CAPTURE`
+For a proposal whose physical design, tests, rollback/recovery and isolation gates are complete, DB-GOV may grant a bounded next step such as:
 
-Draft operational edits, replay-safe append-only operational events and operational collection capture may be queued only when the full idempotency/version/tenant/user/device/session/payload-hash envelope exists. Security/admin, accounting posting/settlement/reversal/period, destructive and authority-changing actions remain online-authoritative. Any unclassified action remains DENY. MISSION-03 is authorized to materialize the exact per-action matrix from canonical action registers/code without another owner round-trip.
+`APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`
 
-### CLIENT-001
+This assessment does not self-approve any migration.
 
-Decision file:
+## External evidence still genuinely required
 
-`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/CLIENT-001_DELIVERY_SIGNING_SCOPE_2026-08-28.md`
+1. canonical programming authority for post-DEPART Shipping, Ticketing and governed screen routes;
+2. Windows/Android executable runtime environments, secure-store integration and protected Production signing custody;
+3. Production recovery topology, RPO/RTO, privacy/retention, KMS/key custody and dependency/license/provenance policies;
+4. complete Git worktree/stash/local-only ownership inventory before W8 cleanup.
 
-Decision:
+These remain external because the Greenfield database decision does not provide them.
 
-`CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS IS DEFERRED`
+## Evidence already available internally
 
-Targets: Windows x64 Desktop plus Android Mobile Admin, Customer and Driver. Current libraries/scaffolds are not release PASS; W5 must produce executable/runtime proof. Canonical mobile application IDs are `com.altayer.transporterp.admin`, `com.altayer.transporterp.customer`, `com.altayer.transporterp.driver`; Desktop identity is `TransportERP.Desktop`. Signing authority is project/company-owned and private keys remain outside source control in protected custody. Public app-store publication is not required for MISSION-03 exit.
-
-## Authorized external evidence still required
-
-1. PasswordHash: sanitized format/count inventory, authoritative verifier/source, controlled fixtures and approved legacy reset/rehash/lockout policy.
-2. Named non-Production safe copy: PostgreSQL version, applied history, roles/extensions/RLS, sanitized data shape, backup digest, restore proof and reconciliation for DBP-002/003/004/005/006 and later DBPs.
-3. Sanitized legacy audit vectors and accounting/posting reconciliation population.
-4. Latest canonical Kurrasa/screen supersession package; exact Ticketing Library artifacts and canonical contracts; accepted post-departure Shipping scope.
-5. Production non-secret deploy/recovery topology, RPO/RTO, actual signing certificate/key custody evidence, approved dependency/license/provenance policy, privacy/legal retention and KMS/key-custody evidence.
-6. Complete external workspace/stash/local-only ownership inventory before any W8 move/delete/cleanup.
-
-## Why repository/CI cannot replace the remaining inputs
-
-- Empty disposable PostgreSQL proves migration lineage and tests, not live/safe-copy row shape, roles, RLS, password formats or restore viability.
-- PR #69 is unmerged evidence and cannot establish current password/safe-copy/accounting populations or Production custody.
-- Library builds are not executable clients; CLIENT-001 resolves scope, not runtime proof.
-- Historical design/CSV/Kurrasa references cannot replace the latest authorized external package where supersession is unknown.
-- MISSION-03 cannot independently approve its own DB-GOV rehearsal.
+- `33201720896 = PASS`: 153/153, PostgreSQL 18.6, ten current migrations, no model drift, API HTTP 401, client build probes only.
+- `33201720878 = PASS`: disposable backup/restore and `10/10` migration-history reconciliation.
+- Product head remains `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` until a newly authorized package is opened.
 
 ## Disposition
 
-The bounded owner-decision gate is closed. MISSION-03 must resume automatically and consume ACC-001/OFFLINE-001/CLIENT-001 without asking for those decisions again. It must complete every repository-resolvable package enabled by them and continue to prepare/re-submit DB-GOV packages.
+The prior statement `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED` is no longer controlling for the database-legacy assumptions. New internal/governance work is now available: second DB-GOV review of DBP-002/003/004/005/006 on a Greenfield basis.
 
-A final regression or seal still cannot be issued until the remaining external evidence and DB-GOV gates necessary for W2–W7 exits are actually satisfied. W8 remains last and cannot begin before a stable W7/preservation baseline. MISSION-04 remains waiting.
+MISSION-03 remains:
 
-This remains an evidence-backed completion blocker only for the explicitly listed external/DB-GOV inputs, not for owner decisions.
+`IN PROGRESS — OPEN — NOT SEALED`
 
-## v1.0 internal-exhaustion proof
+MISSION-04 remains:
 
-Since the prior assessment, the execution team implemented every additionally
-independent repository-resolvable control: design-tool fail-closed evidence,
-server-side default-deny device trust, atomic session mutation/audit contracts,
-the ACC-001 direct-posting denial, approved Android package identities, and a
-guarded disposable PostgreSQL backup/restore drill. W4's action classification,
-W6's named external locators and DBP-002/004/005/006 review packages are fully
-recorded. No lawful internal step remains that can satisfy the material exits
-without inventing external truth, self-approving DB-GOV, or falsely treating a
-Library/scaffold build as runtime proof.
+`WAITING — NOT STARTED`
 
-Therefore the controlling outcome is:
-
-`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED`
+No MISSION-03 seal or MISSION-04 start is authorized by this assessment.
