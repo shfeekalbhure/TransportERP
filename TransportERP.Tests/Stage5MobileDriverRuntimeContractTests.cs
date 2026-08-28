@@ -417,12 +417,56 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.Contains("- name: Start API 35 emulator\n        shell: bash\n        run: |\n          set -euo pipefail",
             workflow.ReplaceLineEndings("\n"), StringComparison.Ordinal);
-        Assert.Contains("/apex/com.android.conscrypt/cacerts/${certificate_hash}.0", workflow,
+        Assert.Contains("basicConstraints=critical,CA:TRUE,pathlen:0", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("keyUsage=critical,keyCertSign,cRLSign", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("basicConstraints=critical,CA:FALSE", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("extendedKeyUsage=serverAuth", workflow, StringComparison.Ordinal);
+        Assert.Contains("subjectAltName=IP:10.0.2.2,DNS:localhost,IP:127.0.0.1", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("-certfile \"$tls_dir/root-ca.crt\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("openssl verify -purpose sslserver", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("root-ca-sha256.txt", workflow, StringComparison.Ordinal);
+        Assert.Contains("TransportERPDeviceTestServerCertificateSha256=\"$certificate_sha\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("--cacert \"$tls_dir/root-ca.crt\"", workflow,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("--cacert \"$tls_dir/server.crt\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("/apex/com.android.conscrypt/cacerts/${certificate_alias}", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("cp -a \"${conscrypt_certificate_directory}/.\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("pidof zygote64", workflow, StringComparison.Ordinal);
+        Assert.Contains("readlink \"/proc/${process_pid}/ns/mnt\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("nsenter -t \"$namespace_pid\" -m --", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("mount --bind \"$system_certificate_directory\"", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("test \"$conscrypt_certificate_state\" = MATCH", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("tls_release_process_conscrypt=$release_process_conscrypt_state", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("test \"$release_process_conscrypt_state\" = MATCH", workflow,
             StringComparison.Ordinal);
         Assert.Contains("tls_conscrypt_certificate_state=$conscrypt_certificate_state", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("[[ ! \"$actual_certificate_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
+        Assert.Contains("[[ ! \"$namespace_root_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
             StringComparison.Ordinal);
+        Assert.Contains("[[ ! \"$release_process_root_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("DangerousAcceptAnyServerCertificateValidator", workflow,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerCertificateCustomValidationCallback", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("application_certificate_bypass=false", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("rm -rf -- \"$tls_dir\"", workflow, StringComparison.Ordinal);
         Assert.Contains("Capture sanitized Android PostgreSQL diagnostics", workflow,
             StringComparison.Ordinal);
         Assert.Contains("if: ${{ always() }}", workflow, StringComparison.Ordinal);

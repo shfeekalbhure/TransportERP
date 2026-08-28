@@ -1378,19 +1378,51 @@ jobs:
           set -euo pipefail
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
           mkdir -p "$tls_dir"
-          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+          openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+            -subj "/CN=TransportERP Android E2E Root ${GITHUB_RUN_ID}" \
+            -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' \
+            -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+            -addext 'subjectKeyIdentifier=hash' \
+            -keyout "$tls_dir/root-ca.key" \
+            -out "$tls_dir/root-ca.crt" >/dev/null 2>&1
+          openssl req -new -newkey rsa:2048 -sha256 -nodes \
             -subj '/CN=10.0.2.2' \
+            -addext 'basicConstraints=critical,CA:FALSE' \
+            -addext 'keyUsage=critical,digitalSignature,keyEncipherment' \
+            -addext 'extendedKeyUsage=serverAuth' \
             -addext 'subjectAltName=IP:10.0.2.2,DNS:localhost,IP:127.0.0.1' \
             -keyout "$tls_dir/server.key" \
+            -out "$tls_dir/server.csr" >/dev/null 2>&1
+          openssl x509 -req -in "$tls_dir/server.csr" \
+            -CA "$tls_dir/root-ca.crt" \
+            -CAkey "$tls_dir/root-ca.key" \
+            -CAcreateserial -days 1 -sha256 -copy_extensions copy \
             -out "$tls_dir/server.crt" >/dev/null 2>&1
+          openssl verify -purpose sslserver \
+            -CAfile "$tls_dir/root-ca.crt" "$tls_dir/server.crt" >/dev/null
+          openssl x509 -in "$tls_dir/root-ca.crt" -noout -text | grep -F 'CA:TRUE'
+          openssl x509 -in "$tls_dir/server.crt" -noout -text | grep -F 'CA:FALSE'
+          openssl x509 -in "$tls_dir/server.crt" -noout -text | grep -F 'TLS Web Server Authentication'
+          openssl x509 -in "$tls_dir/server.crt" -noout -ext subjectAltName \
+            | grep -F 'IP Address:10.0.2.2'
+          openssl x509 -in "$tls_dir/server.crt" -noout -ext subjectAltName \
+            | grep -F 'DNS:localhost'
+          openssl x509 -in "$tls_dir/server.crt" -noout -ext subjectAltName \
+            | grep -F 'IP Address:127.0.0.1'
           openssl pkcs12 -export \
             -inkey "$tls_dir/server.key" \
             -in "$tls_dir/server.crt" \
+            -certfile "$tls_dir/root-ca.crt" \
             -out "$tls_dir/server.pfx" \
             -passout pass:android-ci-tls-password
           openssl x509 -in "$tls_dir/server.crt" -outform der \
             | sha256sum | awk '{print $1}' > "$tls_dir/server-cert-sha256.txt"
+          openssl x509 -in "$tls_dir/root-ca.crt" -outform der \
+            | sha256sum | awk '{print $1}' > "$tls_dir/root-ca-sha256.txt"
           test "$(wc -c < "$tls_dir/server-cert-sha256.txt")" -eq 65
+          test "$(wc -c < "$tls_dir/root-ca-sha256.txt")" -eq 65
+          test "$(cat "$tls_dir/server-cert-sha256.txt")" \
+            != "$(cat "$tls_dir/root-ca-sha256.txt")"
 
       - name: Build compile-gated Android device-test APK
         shell: bash
@@ -1610,7 +1642,7 @@ jobs:
           ready=false
           for attempt in $(seq 1 90); do
             status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              --cacert "$tls_dir/server.crt" \
+              --cacert "$tls_dir/root-ca.crt" \
               https://localhost:8443/api/v1/sync/activation || true)
             if [ "$status" = 401 ]; then ready=true; break; fi
             sleep 1
@@ -1637,7 +1669,7 @@ jobs:
           }, sys.stdout)
           PY
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H 'Content-Type: application/json' \
             --data-binary "@$RUNNER_TEMP/android-bootstrap-login.json" \
             https://localhost:8443/api/v1/auth/sessions \
@@ -1664,7 +1696,7 @@ jobs:
           }, sys.stdout)
           PY
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -H 'Content-Type: application/json' \
             --data-binary "@$RUNNER_TEMP/android-device-registration.json" \
@@ -1674,7 +1706,7 @@ jobs:
             "$RUNNER_TEMP/android-device-registration-response.json")
           test -n "$registered_device_id"
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -X POST \
             "https://localhost:8443/api/v1/devices/$registered_device_id:approve" \
@@ -1684,7 +1716,7 @@ jobs:
           json.dump({"userId": sys.argv[1], "branchId": sys.argv[2]}, sys.stdout)
           PY
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -H 'Content-Type: application/json' \
             --data-binary "@$RUNNER_TEMP/android-device-assignment.json" \
@@ -1705,7 +1737,7 @@ jobs:
           }, sys.stdout)
           PY
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -H 'Content-Type: application/json' \
             --data-binary "@$RUNNER_TEMP/android-release-device-registration.json" \
@@ -1715,13 +1747,13 @@ jobs:
             "$RUNNER_TEMP/android-release-device-registration-response.json")
           test -n "$release_registered_device_id"
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -X POST \
             "https://localhost:8443/api/v1/devices/$release_registered_device_id:approve" \
             > /dev/null
           curl --silent --show-error --fail-with-body \
-            --cacert "$tls_dir/server.crt" \
+            --cacert "$tls_dir/root-ca.crt" \
             -H "@$authorization_header" \
             -H 'Content-Type: application/json' \
             --data-binary "@$RUNNER_TEMP/android-device-assignment.json" \
@@ -1786,7 +1818,7 @@ jobs:
           ready=false
           for attempt in $(seq 1 90); do
             status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              --cacert "$tls_dir/server.crt" \
+              --cacert "$tls_dir/root-ca.crt" \
               https://localhost:8443/api/v1/sync/activation || true)
             if [ "$status" = 401 ]; then ready=true; break; fi
             sleep 1
@@ -1879,8 +1911,18 @@ jobs:
           test "$booted" = true
 
           tls_dir="$RUNNER_TEMP/android-e2e-tls"
-          certificate_hash=$(openssl x509 -in "$tls_dir/server.crt" -subject_hash_old -noout | head -n 1)
+          system_certificate_directory=/system/etc/security/cacerts
+          conscrypt_certificate_directory=/apex/com.android.conscrypt/cacerts
+          expected_root_sha=$(cat "$tls_dir/root-ca-sha256.txt")
+          [[ "$expected_root_sha" =~ ^[0-9a-f]{64}$ ]]
+          certificate_hash=$(openssl x509 -in "$tls_dir/root-ca.crt" -subject_hash_old -noout | head -n 1)
           [[ "$certificate_hash" =~ ^[0-9a-f]{8}$ ]]
+          device_certificate_sha() {
+            local device_path="$1"
+            adb exec-out cat "$device_path" \
+              | openssl x509 -outform der 2>/dev/null \
+              | sha256sum | awk '{print $1}'
+          }
           adb_root_bounded
           adb remount
           adb reboot
@@ -1897,10 +1939,47 @@ jobs:
           test "$booted" = true
           adb_root_bounded
           adb remount
-          adb shell 'touch /system/etc/security/cacerts/.transporterp-write-probe'
-          adb shell 'rm /system/etc/security/cacerts/.transporterp-write-probe'
-          adb push "$tls_dir/server.crt" "/system/etc/security/cacerts/${certificate_hash}.0"
-          adb shell chmod 644 "/system/etc/security/cacerts/${certificate_hash}.0"
+          adb shell "touch $system_certificate_directory/.transporterp-write-probe"
+          adb shell "rm $system_certificate_directory/.transporterp-write-probe"
+          certificate_alias=''
+          free_certificate_alias=''
+          for suffix in $(seq 0 99); do
+            candidate_alias="${certificate_hash}.${suffix}"
+            candidate_has_file=false
+            candidate_matches=true
+            for certificate_directory in \
+                "$system_certificate_directory" "$conscrypt_certificate_directory"; do
+              candidate_path="${certificate_directory}/${candidate_alias}"
+              if adb shell test -e "$candidate_path"; then
+                candidate_has_file=true
+                if candidate_sha=$(device_certificate_sha "$candidate_path") \
+                    && [[ "$candidate_sha" =~ ^[0-9a-f]{64}$ ]] \
+                    && [ "$candidate_sha" = "$expected_root_sha" ]; then
+                  :
+                else
+                  candidate_matches=false
+                fi
+              fi
+            done
+            if [ "$candidate_has_file" = true ] && [ "$candidate_matches" = true ]; then
+              certificate_alias="$candidate_alias"
+              break
+            fi
+            if [ "$candidate_has_file" = false ] && [ -z "$free_certificate_alias" ]; then
+              free_certificate_alias="$candidate_alias"
+            fi
+          done
+          if [ -z "$certificate_alias" ]; then
+            certificate_alias="$free_certificate_alias"
+          fi
+          [[ "$certificate_alias" =~ ^[0-9a-f]{8}\.[0-9]{1,2}$ ]]
+          printf '%s\n' "$certificate_alias" > "$RUNNER_TEMP/android-conscrypt-alias.txt"
+          system_certificate_path="${system_certificate_directory}/${certificate_alias}"
+          conscrypt_certificate_path="${conscrypt_certificate_directory}/${certificate_alias}"
+          adb push "$tls_dir/root-ca.crt" "$system_certificate_path"
+          adb shell chown root:root "$system_certificate_path"
+          adb shell chmod 644 "$system_certificate_path"
+          adb shell restorecon -F "$system_certificate_path"
           adb reboot
           timeout 30s adb wait-for-disconnect
           adb wait-for-device
@@ -1913,28 +1992,75 @@ jobs:
             sleep 2
           done
           test "$booted" = true
-          system_certificate_path="/system/etc/security/cacerts/${certificate_hash}.0"
-          conscrypt_certificate_path="/apex/com.android.conscrypt/cacerts/${certificate_hash}.0"
+          adb_root_bounded
+          adb remount
+          test "$(adb shell id -u | tr -d '\r')" = '0'
+          adb shell test -d "$conscrypt_certificate_directory"
+          for required_command in cp mount nsenter readlink restorecon; do
+            adb shell command -v "$required_command" >/dev/null
+          done
+          adb shell cp -a "${conscrypt_certificate_directory}/." "$system_certificate_directory/"
+          adb push "$tls_dir/root-ca.crt" "$system_certificate_path"
+          adb shell chown root:root "$system_certificate_directory" "$system_certificate_path"
+          adb shell chmod 755 "$system_certificate_directory"
+          adb shell chmod 644 "$system_certificate_path"
+          adb shell restorecon -RF "$system_certificate_directory"
           adb shell test -r "$system_certificate_path"
-          conscrypt_certificate_state=ABSENT
-          if ! adb shell test -d /apex/com.android.conscrypt/cacerts; then
-            conscrypt_certificate_state=STORE_UNAVAILABLE
-          elif adb shell test -r "$conscrypt_certificate_path"; then
-            expected_certificate_sha=$(cat "$tls_dir/server-cert-sha256.txt")
-            if actual_certificate_sha=$(adb exec-out cat "$conscrypt_certificate_path" \
+          system_root_sha=$(device_certificate_sha "$system_certificate_path")
+          [[ "$system_root_sha" =~ ^[0-9a-f]{64}$ ]]
+          test "$system_root_sha" = "$expected_root_sha"
+
+          zygote_pids=$(
+            {
+              adb shell pidof zygote 2>/dev/null || true
+              adb shell pidof zygote64 2>/dev/null || true
+            } | tr '\r\n' ' ' | xargs
+          )
+          test -n "$zygote_pids"
+          [[ "$zygote_pids" =~ ^[0-9]+([[:space:]][0-9]+)*$ ]]
+          declare -A observed_mount_namespaces=()
+          namespace_representatives="$RUNNER_TEMP/android-conscrypt-namespace-pids.txt"
+          : > "$namespace_representatives"
+          for process_pid in 1 $zygote_pids; do
+            namespace_identity=$(adb shell readlink "/proc/${process_pid}/ns/mnt" | tr -d '\r')
+            [[ "$namespace_identity" =~ ^mnt:\[[0-9]+\]$ ]]
+            if [ -n "${observed_mount_namespaces[$namespace_identity]+present}" ]; then
+              continue
+            fi
+            observed_mount_namespaces["$namespace_identity"]=1
+            printf '%s\n' "$process_pid" >> "$namespace_representatives"
+          done
+          namespace_count=${#observed_mount_namespaces[@]}
+          test "$namespace_count" -ge 1
+
+          conscrypt_certificate_state=MATCH
+          while IFS= read -r namespace_pid; do
+            if ! adb shell nsenter -t "$namespace_pid" -m -- \
+                mount --bind "$system_certificate_directory" "$conscrypt_certificate_directory"; then
+              conscrypt_certificate_state=STORE_UNAVAILABLE
+              break
+            fi
+            if ! adb shell nsenter -t "$namespace_pid" -m -- \
+                test -r "$conscrypt_certificate_path"; then
+              conscrypt_certificate_state=ABSENT
+              break
+            fi
+            if namespace_root_sha=$(adb exec-out nsenter -t "$namespace_pid" -m -- \
+                cat "$conscrypt_certificate_path" \
                 | openssl x509 -outform der 2>/dev/null \
                 | sha256sum | awk '{print $1}'); then
-              if [[ ! "$actual_certificate_sha" =~ ^[0-9a-f]{64}$ ]]; then
+              if [[ ! "$namespace_root_sha" =~ ^[0-9a-f]{64}$ ]]; then
                 conscrypt_certificate_state=INVALID
-              elif [ "$actual_certificate_sha" = "$expected_certificate_sha" ]; then
-                conscrypt_certificate_state=MATCH
-              else
+                break
+              elif [ "$namespace_root_sha" != "$expected_root_sha" ]; then
                 conscrypt_certificate_state=MISMATCH
+                break
               fi
             else
               conscrypt_certificate_state=INVALID
+              break
             fi
-          fi
+          done < "$namespace_representatives"
           case "$conscrypt_certificate_state" in
             MATCH|ABSENT|MISMATCH|INVALID|STORE_UNAVAILABLE) ;;
             *) exit 1 ;;
@@ -1944,12 +2070,17 @@ jobs:
           adb shell settings put global animator_duration_scale 0
           adb shell getprop ro.build.version.sdk | tr -d '\r' | grep -Fx '35'
           {
-            echo 'tls_validation=android-system-trust-store'
-            echo "tls_certificate_sha256=$(cat "$tls_dir/server-cert-sha256.txt")"
-            echo "tls_system_alias=${certificate_hash}.0"
+            echo 'tls_validation=android-api35-conscrypt-mount-namespaces'
+            echo "tls_leaf_sha256=$(cat "$tls_dir/server-cert-sha256.txt")"
+            echo "tls_root_sha256=$expected_root_sha"
+            echo "tls_system_alias=$certificate_alias"
+            echo "tls_mount_namespace_count=$namespace_count"
+            echo 'tls_stock_conscrypt_roots_preserved=true'
+            echo "tls_conscrypt_prepare=$conscrypt_certificate_state"
             echo "tls_conscrypt_certificate_state=$conscrypt_certificate_state"
             echo 'application_certificate_bypass=false'
           } > ci-evidence/android-runtime/tls-trust-evidence.txt
+          test "$conscrypt_certificate_state" = MATCH
 
       - name: Run closed startup and native security restart proof
         timeout-minutes: 12
@@ -2162,7 +2293,7 @@ jobs:
           ready=false
           for attempt in $(seq 1 90); do
             status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              --cacert "$tls_dir/server.crt" \
+              --cacert "$tls_dir/root-ca.crt" \
               https://localhost:8443/api/v1/sync/activation || true)
             if [ "$status" = 401 ]; then ready=true; break; fi
             sleep 1
@@ -2186,6 +2317,57 @@ jobs:
           test -n "$installed_path"
           installed_sha=$(adb exec-out cat "$installed_path" | sha256sum | awk '{print $1}')
           test "$installed_sha" = "$expected_sha"
+          certificate_alias=$(cat "$RUNNER_TEMP/android-conscrypt-alias.txt")
+          [[ "$certificate_alias" =~ ^[0-9a-f]{8}\.[0-9]{1,2}$ ]]
+          expected_root_sha=$(cat "$RUNNER_TEMP/android-e2e-tls/root-ca-sha256.txt")
+          [[ "$expected_root_sha" =~ ^[0-9a-f]{64}$ ]]
+          conscrypt_certificate_path="/apex/com.android.conscrypt/cacerts/${certificate_alias}"
+          mapfile -t release_launcher_candidates < <(
+            adb shell cmd package resolve-activity --components \
+              -a android.intent.action.MAIN \
+              -c android.intent.category.LAUNCHER \
+              "$ANDROID_TEST_PACKAGE" | tr -d '\r'
+          )
+          test "${#release_launcher_candidates[@]}" -eq 1
+          release_launcher_component="${release_launcher_candidates[0]}"
+          [[ "$release_launcher_component" =~ ^com\.transporterp\.mobile\.driver/[A-Za-z0-9._$]+$ ]]
+          release_launch_result=$(adb shell am start -W -n "$release_launcher_component" | tr -d '\r')
+          grep -Fx 'Status: ok' <<< "$release_launch_result" >/dev/null
+          release_process_pid=''
+          for attempt in $(seq 1 30); do
+            release_process_pid=$(adb shell pidof "$ANDROID_TEST_PACKAGE" 2>/dev/null | tr -d '\r' | xargs)
+            if [[ "$release_process_pid" =~ ^[0-9]+$ ]]; then
+              break
+            fi
+            release_process_pid=''
+            sleep 1
+          done
+          test -n "$release_process_pid"
+          release_process_conscrypt_state=MATCH
+          if ! adb shell nsenter -t "$release_process_pid" -m -- \
+              test -r "$conscrypt_certificate_path"; then
+            release_process_conscrypt_state=ABSENT
+          elif release_process_root_sha=$(adb exec-out nsenter -t "$release_process_pid" -m -- \
+              cat "$conscrypt_certificate_path" \
+              | openssl x509 -outform der 2>/dev/null \
+              | sha256sum | awk '{print $1}'); then
+            if [[ ! "$release_process_root_sha" =~ ^[0-9a-f]{64}$ ]]; then
+              release_process_conscrypt_state=INVALID
+            elif [ "$release_process_root_sha" != "$expected_root_sha" ]; then
+              release_process_conscrypt_state=MISMATCH
+            fi
+          else
+            release_process_conscrypt_state=INVALID
+          fi
+          case "$release_process_conscrypt_state" in
+            MATCH|ABSENT|MISMATCH|INVALID) ;;
+            *) exit 1 ;;
+          esac
+          echo "tls_release_process_conscrypt=$release_process_conscrypt_state" \
+            >> ci-evidence/android-runtime/tls-trust-evidence.txt
+          adb shell am force-stop "$ANDROID_TEST_PACKAGE"
+          adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null
+          test "$release_process_conscrypt_state" = MATCH
           python3 eng/ci/android_release_ui_e2e.py \
             --input "$release_input" \
             --evidence "$evidence" \
@@ -2465,6 +2647,20 @@ jobs:
             "$RUNNER_TEMP/android-release-signer-sha256.txt"
           adb shell am force-stop "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
           adb shell pm clear "$ANDROID_TEST_PACKAGE" >/dev/null 2>&1 || true
+          namespace_representatives="$RUNNER_TEMP/android-conscrypt-namespace-pids.txt"
+          if [ -f "$namespace_representatives" ] \
+              && adb get-state >/dev/null 2>&1; then
+            while IFS= read -r namespace_pid; do
+              adb shell nsenter -t "$namespace_pid" -m -- \
+                umount /apex/com.android.conscrypt/cacerts >/dev/null 2>&1 || true
+            done < "$namespace_representatives"
+          fi
+          rm -f "$RUNNER_TEMP/android-conscrypt-alias.txt" \
+            "$namespace_representatives"
+          tls_dir="$RUNNER_TEMP/android-e2e-tls"
+          if [ -d "$tls_dir" ]; then
+            rm -rf -- "$tls_dir"
+          fi
 
       - name: Stop Android emulator
         if: ${{ always() }}
