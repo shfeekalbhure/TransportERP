@@ -27,6 +27,14 @@ AUTOMATION_ROOT = "driver_main_scroll"
 SAFE_INPUT = re.compile(r"^[A-Za-z0-9@._+/:=%-]+$")
 BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 OPERATION_ID = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \|")
+FOCUS_OWNER_ALLOWLIST = (
+    ("driver_user_name", "USER_NAME"),
+    ("driver_password", "PASSWORD"),
+    ("driver_company_id", "COMPANY_ID"),
+    ("driver_branch_id", "BRANCH_ID"),
+    ("driver_device_id", "DEVICE_ID"),
+    ("driver_device_credential", "DEVICE_CREDENTIAL"),
+)
 
 
 class UiE2EFailure(RuntimeError):
@@ -207,9 +215,70 @@ class Driver:
                 if str(error) != "UI_WAIT_TIMEOUT":
                     raise
                 if attempt == 4:
-                    raise UiE2EFailure("UI_INPUT_FOCUS_FAILED") from error
+                    observation = self.safe_focus_observation(automation_id)
+                    raise UiE2EFailure(f"UI_INPUT_FOCUS_FAILED:{observation}") from error
                 self._scroll(toward_bottom=True)
         raise UiE2EFailure("UI_INPUT_FOCUS_FAILED")
+
+    def safe_focus_observation(self, automation_id: str) -> str:
+        unavailable = (
+            "COUNT_UNKNOWN:VISIBLE_UNKNOWN:FOCUSABLE_UNKNOWN:CLICKABLE_UNKNOWN:"
+            "OWNER_UNKNOWN:ZONE_UNKNOWN:IME_UNKNOWN"
+        )
+        try:
+            hierarchy = self.dump()
+            targets = [node for node in hierarchy.iter("node") if self._matches(node, automation_id)]
+            count = "ZERO" if not targets else "ONE" if len(targets) == 1 else "MULTIPLE"
+            if len(targets) != 1:
+                return (
+                    f"COUNT_{count}:VISIBLE_UNKNOWN:FOCUSABLE_UNKNOWN:CLICKABLE_UNKNOWN:"
+                    f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_UNKNOWN:IME_UNKNOWN"
+                )
+            target = targets[0]
+            visible = self._safe_boolean(target.attrib.get("visible-to-user"))
+            focusable = self._safe_boolean(target.attrib.get("focusable"))
+            clickable = self._safe_boolean(target.attrib.get("clickable"))
+            zone = self._safe_vertical_zone(hierarchy, target)
+            return (
+                f"COUNT_ONE:VISIBLE_{visible}:FOCUSABLE_{focusable}:CLICKABLE_{clickable}:"
+                f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_{zone}:IME_UNKNOWN"
+            )
+        except (UiE2EFailure, ValueError, TypeError):
+            return unavailable
+
+    @staticmethod
+    def _safe_boolean(value: str | None) -> str:
+        return "TRUE" if value == "true" else "FALSE" if value == "false" else "UNKNOWN"
+
+    def _safe_focus_owner(self, hierarchy: ET.Element) -> str:
+        focused = [node for node in hierarchy.iter("node") if node.attrib.get("focused") == "true"]
+        if not focused:
+            return "NONE"
+        if len(focused) != 1:
+            return "MULTIPLE"
+        matches = [
+            label
+            for candidate, label in FOCUS_OWNER_ALLOWLIST
+            if self._matches(focused[0], candidate)
+        ]
+        return matches[0] if len(matches) == 1 else "OTHER"
+
+    def _safe_vertical_zone(self, hierarchy: ET.Element, target: ET.Element) -> str:
+        roots = [node for node in hierarchy.iter("node") if self._matches(node, AUTOMATION_ROOT)]
+        if len(roots) != 1:
+            return "UNKNOWN"
+        _, target_top, _, target_bottom = self._rectangle(target)
+        _, root_top, _, root_bottom = self._rectangle(roots[0])
+        target_center = (target_top + target_bottom) // 2
+        if target_center < root_top or target_center > root_bottom:
+            return "OUTSIDE"
+        relative = target_center - root_top
+        height = root_bottom - root_top
+        if relative * 3 < height:
+            return "UPPER"
+        if relative * 3 < height * 2:
+            return "MIDDLE"
+        return "LOWER"
 
     def hide_keyboard(self) -> None:
         self.run("shell", "input", "keyevent", "KEYCODE_BACK")
