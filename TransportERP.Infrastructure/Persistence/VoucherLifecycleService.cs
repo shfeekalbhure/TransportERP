@@ -108,7 +108,7 @@ public sealed class VoucherLifecycleService(TransportErpDbContext db)
         TransitionAsync(db.ReceiptVouchers, companyId, voucherId, "DRAFT", "APPROVED", cancellationToken);
 
     public Task<ReceiptVoucher> PostReceiptAsync(Guid companyId, Guid voucherId, Guid actorId, CancellationToken cancellationToken = default) =>
-        TransitionAsync(db.ReceiptVouchers, companyId, voucherId, "APPROVED", "POSTED", cancellationToken);
+        Task.FromException<ReceiptVoucher>(new InvalidOperationException("GOVERNED_SETTLEMENT_REQUIRED"));
 
     public Task<ReceiptVoucher> CancelReceiptAsync(Guid companyId, Guid voucherId, string reason, Guid actorId, CancellationToken cancellationToken = default) =>
         CancelAsync(db.ReceiptVouchers, companyId, voucherId, reason, cancellationToken);
@@ -117,7 +117,7 @@ public sealed class VoucherLifecycleService(TransportErpDbContext db)
         TransitionAsync(db.PaymentVouchers, companyId, voucherId, "DRAFT", "APPROVED", cancellationToken);
 
     public Task<PaymentVoucher> PostPaymentAsync(Guid companyId, Guid voucherId, Guid actorId, CancellationToken cancellationToken = default) =>
-        TransitionAsync(db.PaymentVouchers, companyId, voucherId, "APPROVED", "POSTED", cancellationToken);
+        Task.FromException<PaymentVoucher>(new InvalidOperationException("GOVERNED_SETTLEMENT_REQUIRED"));
 
     public Task<PaymentVoucher> CancelPaymentAsync(Guid companyId, Guid voucherId, string reason, Guid actorId, CancellationToken cancellationToken = default) =>
         CancelAsync(db.PaymentVouchers, companyId, voucherId, reason, cancellationToken);

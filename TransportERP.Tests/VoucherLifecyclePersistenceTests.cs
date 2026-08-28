@@ -21,20 +21,54 @@ public sealed class VoucherLifecyclePersistenceTests
     }
 
     [Fact]
-    public async Task Receipt_lifecycle_requires_order_and_blocks_posted_cancellation()
+    public async Task Receipt_posting_requires_governed_settlement_and_has_no_partial_effects()
     {
         await using var db = CreateDb();
         var service = new VoucherLifecycleService(db);
         var receipt = await service.CreateReceiptAsync(ReceiptCommand("EXT-RECEIPT-002"));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.PostReceiptAsync(receipt.CompanyId, receipt.Id, Guid.NewGuid()));
         await service.ApproveReceiptAsync(receipt.CompanyId, receipt.Id, Guid.NewGuid());
-        await service.PostReceiptAsync(receipt.CompanyId, receipt.Id, Guid.NewGuid());
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PostReceiptAsync(receipt.CompanyId, receipt.Id, Guid.NewGuid()));
         var persisted = await db.ReceiptVouchers.SingleAsync(x => x.Id == receipt.Id);
-        Assert.Equal("POSTED", persisted.Status);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CancelReceiptAsync(receipt.CompanyId, receipt.Id, "اختبار منع الإلغاء", Guid.NewGuid()));
+        Assert.Equal("GOVERNED_SETTLEMENT_REQUIRED", exception.Message);
+        Assert.Equal("APPROVED", persisted.Status);
+        Assert.Empty(await db.JournalEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Payment_posting_requires_governed_settlement_and_has_no_partial_effects()
+    {
+        await using var db = CreateDb();
+        var service = new VoucherLifecycleService(db);
+        var payment = await service.CreatePaymentAsync(PaymentCommand("EXT-PAYMENT-POST-001"));
+        await service.ApprovePaymentAsync(payment.CompanyId, payment.Id, Guid.NewGuid());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PostPaymentAsync(payment.CompanyId, payment.Id, Guid.NewGuid()));
+        var persisted = await db.PaymentVouchers.SingleAsync(x => x.Id == payment.Id);
+
+        Assert.Equal("GOVERNED_SETTLEMENT_REQUIRED", exception.Message);
+        Assert.Equal("APPROVED", persisted.Status);
+        Assert.Empty(await db.JournalEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Existing_posted_voucher_still_cannot_be_cancelled()
+    {
+        await using var db = CreateDb();
+        var service = new VoucherLifecycleService(db);
+        var receipt = await service.CreateReceiptAsync(ReceiptCommand("EXT-RECEIPT-POSTED-001"));
+        receipt.Status = "POSTED";
+        await db.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CancelReceiptAsync(
+                receipt.CompanyId, receipt.Id, "اختبار منع الإلغاء", Guid.NewGuid()));
+
+        Assert.Equal("A posted voucher cannot be cancelled.", exception.Message);
+        Assert.Equal("POSTED", (await db.ReceiptVouchers.SingleAsync(x => x.Id == receipt.Id)).Status);
     }
 
     [Fact]
