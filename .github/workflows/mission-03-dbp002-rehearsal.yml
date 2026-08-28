@@ -1,0 +1,327 @@
+name: MISSION-03 DBP-002 Full Rehearsal
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+
+permissions:
+  contents: read
+
+jobs:
+  dbp002-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      BASE_SHA: 5d1352b4fb6d56261dff8b8a622bacb2786f56d9
+      BASELINE_MIGRATION: 20260821191039_P2C01CWaybillVolumeContract
+      CANDIDATE_MIGRATION: 20260828224241_GreenfieldTenantMembershipIsolation
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Establish immutable evidence directory and PostgreSQL 18.6 identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mission-03-dbp002-evidence
+          PGCID="$(docker ps --filter ancestor=postgres:18.6-bookworm --format '{{.ID}}' | head -n1)"
+          test -n "$PGCID"
+          echo "PGCID=$PGCID" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=${GITHUB_SHA}" | tee mission-03-dbp002-evidence/head.txt
+          git rev-parse HEAD^{tree} | tee mission-03-dbp002-evidence/tree.txt
+          git rev-parse HEAD^ | tee mission-03-dbp002-evidence/parent.txt
+          docker exec "$PGCID" psql -U postgres -d postgres -Atc "SHOW server_version;" | tee mission-03-dbp002-evidence/postgresql-server-version.txt
+          grep -q '^18\.6' mission-03-dbp002-evidence/postgresql-server-version.txt
+
+      - name: Prove original ten migration source files are byte-identical
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > mission-03-dbp002-evidence/original-migration-preservation.txt
+          while IFS= read -r p; do
+            base_blob="$(git rev-parse "${BASE_SHA}:${p}")"
+            head_blob="$(git rev-parse "HEAD:${p}")"
+            printf '%s|%s|%s\n' "$p" "$base_blob" "$head_blob" | tee -a mission-03-dbp002-evidence/original-migration-preservation.txt
+            test "$base_blob" = "$head_blob"
+          done < <(git ls-tree -r --name-only "$BASE_SHA" TransportERP.Infrastructure/Persistence/Migrations | grep -E '/202608(19|20|21)[0-9_].*\.cs$' | sort)
+          test "$(wc -l < mission-03-dbp002-evidence/original-migration-preservation.txt)" -eq 19
+          git diff "$BASE_SHA" -- TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs > mission-03-dbp002-evidence/model-snapshot.diff
+          sha256sum TransportERP.Infrastructure/Persistence/Migrations/20260828224241_GreenfieldTenantMembershipIsolation.cs \
+                    TransportERP.Infrastructure/Persistence/Migrations/20260828224241_GreenfieldTenantMembershipIsolation.Designer.cs \
+                    TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs \
+                    TransportERP.Infrastructure/Persistence/Migrations/GreenfieldDbp002PhysicalSql.cs \
+            | tee mission-03-dbp002-evidence/candidate-source-sha256.txt
+
+      - name: Restore build and install EF CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore TransportERP.Infrastructure/TransportERP.Infrastructure.csproj | tee mission-03-dbp002-evidence/restore-infra.log
+          dotnet restore TransportERP.Tests/TransportERP.Tests.csproj | tee mission-03-dbp002-evidence/restore-tests.log
+          dotnet build TransportERP.Tests/TransportERP.Tests.csproj -c Release --no-restore | tee mission-03-dbp002-evidence/build-tests.log
+          dotnet tool install --global dotnet-ef --version 10.0.0
+          dotnet ef --version | tee mission-03-dbp002-evidence/dotnet-ef-version.txt
+
+      - name: No model drift and generated SQL
+        shell: bash
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres;Include Error Detail=true
+        run: |
+          set -euo pipefail
+          dotnet ef migrations has-pending-model-changes \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-dbp002-evidence/no-model-drift.log
+          dotnet ef migrations script "$BASELINE_MIGRATION" "$CANDIDATE_MIGRATION" \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --output mission-03-dbp002-evidence/migration11-generated.sql
+          test -s mission-03-dbp002-evidence/migration11-generated.sql
+          grep -q 'user_memberships' mission-03-dbp002-evidence/migration11-generated.sql
+          grep -q 'ENABLE ROW LEVEL SECURITY' mission-03-dbp002-evidence/migration11-generated.sql
+          grep -q 'FORCE ROW LEVEL SECURITY' mission-03-dbp002-evidence/migration11-generated.sql
+          sha256sum mission-03-dbp002-evidence/migration11-generated.sql | tee mission-03-dbp002-evidence/migration11-generated.sql.sha256
+
+      - name: Apply original ten migrations to fresh baseline and prove history
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec "$PGCID" createdb -U postgres mission03_baseline
+          export TRANSPORTERP_DESIGN_CONNSTR='Host=127.0.0.1;Port=5432;Database=mission03_baseline;Username=postgres;Password=postgres;Include Error Detail=true'
+          dotnet ef database update "$BASELINE_MIGRATION" \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-dbp002-evidence/baseline-10-migrations.log
+          docker exec "$PGCID" psql -U postgres -d mission03_baseline -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' \
+            | tee mission-03-dbp002-evidence/baseline-history.txt
+          test "$(wc -l < mission-03-dbp002-evidence/baseline-history.txt)" -eq 10
+          test "$(tail -n1 mission-03-dbp002-evidence/baseline-history.txt)" = "$BASELINE_MIGRATION"
+          ! grep -q "$CANDIDATE_MIGRATION" mission-03-dbp002-evidence/baseline-history.txt
+
+      - name: Capture baseline catalog and baseline backup restore reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          capture_schema() {
+            local db="$1" prefix="$2"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,c.relkind,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind IN ('r','p') ORDER BY 1,2;" > "mission-03-dbp002-evidence/${prefix}-tables.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT table_schema,table_name,column_name,data_type,is_nullable,coalesce(column_default,'') FROM information_schema.columns WHERE table_schema='transport_erp' ORDER BY table_name,ordinal_position;" > "mission-03-dbp002-evidence/${prefix}-columns.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,pg_get_constraintdef(con.oid,true) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' ORDER BY c.relname,con.conname;" > "mission-03-dbp002-evidence/${prefix}-constraints.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='transport_erp' ORDER BY tablename,indexname;" > "mission-03-dbp002-evidence/${prefix}-indexes.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,policyname,cmd,qual,with_check FROM pg_policies WHERE schemaname='transport_erp' ORDER BY tablename,policyname;" > "mission-03-dbp002-evidence/${prefix}-policies.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT event_object_table,trigger_name,action_timing,event_manipulation FROM information_schema.triggers WHERE trigger_schema='transport_erp' ORDER BY event_object_table,trigger_name,event_manipulation;" > "mission-03-dbp002-evidence/${prefix}-triggers.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' > "mission-03-dbp002-evidence/${prefix}-history.txt"
+          }
+          capture_schema mission03_baseline baseline
+          docker exec "$PGCID" pg_dump -U postgres -Fc mission03_baseline > mission-03-dbp002-evidence/baseline.dump
+          docker exec "$PGCID" createdb -U postgres mission03_baseline_restore
+          cat mission-03-dbp002-evidence/baseline.dump | docker exec -i "$PGCID" pg_restore -U postgres -d mission03_baseline_restore
+          capture_schema mission03_baseline_restore baseline-restore
+          for f in tables columns constraints indexes policies triggers history; do diff -u "mission-03-dbp002-evidence/baseline-${f}.txt" "mission-03-dbp002-evidence/baseline-restore-${f}.txt"; done
+          sha256sum mission-03-dbp002-evidence/baseline.dump | tee mission-03-dbp002-evidence/baseline.dump.sha256
+
+      - name: Apply exact generated SQL to restored ten-migration baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec "$PGCID" createdb -U postgres mission03_sql_candidate
+          cat mission-03-dbp002-evidence/baseline.dump | docker exec -i "$PGCID" pg_restore -U postgres -d mission03_sql_candidate
+          cat mission-03-dbp002-evidence/migration11-generated.sql | docker exec -i "$PGCID" psql -v ON_ERROR_STOP=1 -U postgres -d mission03_sql_candidate \
+            | tee mission-03-dbp002-evidence/generated-sql-execution.log
+          docker exec "$PGCID" psql -U postgres -d mission03_sql_candidate -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' \
+            | tee mission-03-dbp002-evidence/sql-candidate-history.txt
+          test "$(wc -l < mission-03-dbp002-evidence/sql-candidate-history.txt)" -eq 11
+          test "$(tail -n1 mission-03-dbp002-evidence/sql-candidate-history.txt)" = "$CANDIDATE_MIGRATION"
+
+      - name: Apply original ten then Migration 11 to a second fresh empty PostgreSQL database
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec "$PGCID" createdb -U postgres mission03_candidate
+          export TRANSPORTERP_DESIGN_CONNSTR='Host=127.0.0.1;Port=5432;Database=mission03_candidate;Username=postgres;Password=postgres;Include Error Detail=true'
+          dotnet ef database update "$BASELINE_MIGRATION" \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-dbp002-evidence/candidate-first-ten.log
+          docker exec "$PGCID" psql -U postgres -d mission03_candidate -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' > mission-03-dbp002-evidence/candidate-before-11-history.txt
+          test "$(wc -l < mission-03-dbp002-evidence/candidate-before-11-history.txt)" -eq 10
+          dotnet ef database update "$CANDIDATE_MIGRATION" \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-dbp002-evidence/candidate-migration11.log
+          docker exec "$PGCID" psql -U postgres -d mission03_candidate -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' \
+            | tee mission-03-dbp002-evidence/candidate-history.txt
+          test "$(wc -l < mission-03-dbp002-evidence/candidate-history.txt)" -eq 11
+          test "$(tail -n1 mission-03-dbp002-evidence/candidate-history.txt)" = "$CANDIDATE_MIGRATION"
+
+      - name: RLS FK index role function catalog acceptance checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          psqlq() { docker exec "$PGCID" psql -v ON_ERROR_STOP=1 -U postgres -d mission03_candidate -At -c "$1"; }
+          test "$(psqlq "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind='r' AND c.relname NOT IN ('currencies','permissions','global_settings') AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity);")" = "0"
+          test "$(psqlq "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('currencies','permissions','global_settings') AND c.relrowsecurity;")" = "0"
+          test "$(psqlq "SELECT count(*) FROM pg_policies WHERE schemaname='transport_erp' AND policyname='tenant_scope';")" -ge 1
+          test "$(psqlq "SELECT count(*) FROM pg_roles WHERE rolname IN ('transporterp_schema_owner','transporterp_migrator','transporterp_app','transporterp_worker','transporterp_readonly') AND NOT rolcanlogin AND NOT rolbypassrls;")" = "5"
+          test "$(psqlq "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='transport_erp' AND p.proname LIKE 'current_%' AND NOT p.prosecdef AND array_to_string(p.proconfig,',') LIKE '%search_path=%';")" = "7"
+          test "$(psqlq "SELECT has_schema_privilege('public','transport_erp','CREATE');")" = "f"
+          test "$(psqlq "SELECT has_table_privilege('transporterp_app','transport_erp.user_roles','INSERT') OR has_table_privilege('transporterp_app','transport_erp.user_permission_overrides','INSERT');")" = "f"
+          test "$(psqlq "SELECT count(*) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('user_memberships','user_role_grants','user_permission_grants') AND con.contype='f';")" -ge 10
+          test "$(psqlq "SELECT count(*) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('user_role_grants','user_permission_grants') AND con.contype='t' AND con.condeferrable AND con.condeferred;")" = "3"
+          test "$(psqlq "SELECT count(*) FROM pg_indexes WHERE schemaname='transport_erp' AND indexname='IX_user_memberships_UserId_CompanyId_BranchId' AND indexdef ILIKE '%NULLS NOT DISTINCT%';")" = "1"
+          test "$(psqlq "SELECT count(*) FROM pg_indexes WHERE schemaname='transport_erp' AND indexname IN ('IX_user_permission_grants_MembershipId_PermissionId','IX_user_role_grants_MembershipId_RoleId') AND indexdef LIKE '%WHERE (\"Status\" = ''ACTIVE''::text)%';")" = "2" || \
+            test "$(psqlq "SELECT count(*) FROM pg_indexes WHERE schemaname='transport_erp' AND indexname IN ('IX_user_permission_grants_MembershipId_PermissionId','IX_user_role_grants_MembershipId_RoleId') AND indexdef ILIKE '%Status%ACTIVE%';")" = "2"
+          psqlq "SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind='r' ORDER BY c.relname;" | tee mission-03-dbp002-evidence/rls-catalog.txt
+          psqlq "SELECT con.conname,con.contype,con.condeferrable,con.condeferred,pg_get_constraintdef(con.oid,true) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('user_memberships','user_role_grants','user_permission_grants') ORDER BY con.conname;" | tee mission-03-dbp002-evidence/dbp002-fk-check-catalog.txt
+          psqlq "SELECT indexname,indexdef FROM pg_indexes WHERE schemaname='transport_erp' AND tablename IN ('user_memberships','user_role_grants','user_permission_grants') ORDER BY indexname;" | tee mission-03-dbp002-evidence/dbp002-index-catalog.txt
+          psqlq "SELECT rolname,rolcanlogin,rolbypassrls FROM pg_roles WHERE rolname LIKE 'transporterp_%' ORDER BY rolname;" | tee mission-03-dbp002-evidence/runtime-roles.txt
+
+      - name: Seed two tenants for raw SQL RLS tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/dbp002-seed.sql <<'SQL'
+          INSERT INTO transport_erp.currencies ("Id","Code","NameAr","NameEn","MinorUnit","IsBase","Status","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('00000000-0000-0000-0000-000000000001','YER','YER',NULL,2,true,'ACTIVE',now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.companies ("Id","Code","LegalNameAr","LegalNameEn","TaxIdentifier","BaseCurrencyId","DefaultCalendarId","Status","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('10000000-0000-0000-0000-000000000001','A','Tenant A',NULL,NULL,'00000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000001','ACTIVE',now(),now(),'\\x'::bytea),
+            ('20000000-0000-0000-0000-000000000001','B','Tenant B',NULL,NULL,'00000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000002','ACTIVE',now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.branches ("Id","CompanyId","Code","NameAr","NameEn","BranchType","Address","Timezone","Status","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('11000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','A1','A Branch',NULL,NULL,NULL,'UTC','ACTIVE',now(),now(),'\\x'::bytea),
+            ('22000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','B1','B Branch',NULL,NULL,NULL,'UTC','ACTIVE',now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.users ("Id","UserName","NormalizedUserName","DisplayName","Email","Phone","PasswordHash","Status","CompanyId","BranchId","LastLoginAt","DeletedAt","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('11100000-0000-0000-0000-000000000001','usera','USERA','User A',NULL,NULL,'x','ACTIVE','10000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001',NULL,NULL,now(),now(),'\\x'::bytea),
+            ('22200000-0000-0000-0000-000000000001','userb','USERB','User B',NULL,NULL,'x','ACTIVE','20000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001',NULL,NULL,now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.permissions ("Id","Code","NameAr","Resource","Action","ScopeType","IsSystem","Status","DeletedAt","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('30000000-0000-0000-0000-000000000001','TEST.READ','Read','TEST','READ','BRANCH',true,'ACTIVE',NULL,now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.roles ("Id","Code","NameAr","NameEn","Description","IsSystem","CompanyId","Status","DeletedAt","CreatedAt","UpdatedAt","RowVersion") VALUES
+            ('31000000-0000-0000-0000-000000000001','ROLE.A','Role A',NULL,NULL,false,'10000000-0000-0000-0000-000000000001','ACTIVE',NULL,now(),now(),'\\x'::bytea),
+            ('32000000-0000-0000-0000-000000000001','ROLE.B','Role B',NULL,NULL,false,'20000000-0000-0000-0000-000000000001','ACTIVE',NULL,now(),now(),'\\x'::bytea);
+          INSERT INTO transport_erp.user_memberships ("Id","UserId","CompanyId","BranchId","ScopeType","Status","SecurityVersion","ValidFrom","ValidTo","CreatedAt","UpdatedAt","CreatedBy","RevokedBy","RevokeReason","ConcurrencyVersion") VALUES
+            ('11110000-0000-0000-0000-000000000001','11100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','BRANCH','ACTIVE',1,now(),NULL,now(),now(),'11100000-0000-0000-0000-000000000001',NULL,NULL,1),
+            ('22220000-0000-0000-0000-000000000001','22200000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','BRANCH','ACTIVE',1,now(),NULL,now(),now(),'22200000-0000-0000-0000-000000000001',NULL,NULL,1);
+          INSERT INTO transport_erp.user_permission_grants ("Id","MembershipId","UserId","CompanyId","BranchId","PermissionId","Effect","Status","ValidFrom","ValidTo","GrantedBy","RevokedBy","Reason","CreatedAt","UpdatedAt","ConcurrencyVersion") VALUES
+            ('41000000-0000-0000-0000-000000000001','11110000-0000-0000-0000-000000000001','11100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','ALLOW','ACTIVE',now(),NULL,'11100000-0000-0000-0000-000000000001',NULL,NULL,now(),now(),1),
+            ('42000000-0000-0000-0000-000000000001','22220000-0000-0000-0000-000000000001','22200000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','ALLOW','ACTIVE',now(),NULL,'22200000-0000-0000-0000-000000000001',NULL,NULL,now(),now(),1);
+          DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='mission03_rls_probe') THEN CREATE ROLE mission03_rls_probe LOGIN NOBYPASSRLS; END IF; END $$;
+          GRANT transporterp_app TO mission03_rls_probe;
+          SQL
+          docker exec -i "$PGCID" psql -v ON_ERROR_STOP=1 -U postgres -d mission03_candidate < /tmp/dbp002-seed.sql | tee mission-03-dbp002-evidence/seed.log
+          docker exec "$PGCID" psql -U postgres -d mission03_candidate -At -c 'SELECT "CompanyId",count(*) FROM transport_erp.user_memberships GROUP BY "CompanyId" ORDER BY "CompanyId";' | tee mission-03-dbp002-evidence/seed-membership-counts.txt
+
+      - name: Tenant A to B and B to A raw SQL isolation negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctx_a="SET ROLE mission03_rls_probe; SELECT set_config('app.user_id','11100000-0000-0000-0000-000000000001',false); SELECT set_config('app.membership_id','11110000-0000-0000-0000-000000000001',false); SELECT set_config('app.company_id','10000000-0000-0000-0000-000000000001',false); SELECT set_config('app.branch_id','11000000-0000-0000-0000-000000000001',false); SELECT set_config('app.security_version','1',false);"
+          ctx_b="SET ROLE mission03_rls_probe; SELECT set_config('app.user_id','22200000-0000-0000-0000-000000000001',false); SELECT set_config('app.membership_id','22220000-0000-0000-0000-000000000001',false); SELECT set_config('app.company_id','20000000-0000-0000-0000-000000000001',false); SELECT set_config('app.branch_id','22000000-0000-0000-0000-000000000001',false); SELECT set_config('app.security_version','1',false);"
+          runq() { docker exec "$PGCID" psql -v ON_ERROR_STOP=1 -U postgres -d mission03_candidate -At -c "$1"; }
+          test "$(runq "$ctx_a SELECT count(*) FROM transport_erp.user_memberships;")" = "1"
+          test "$(runq "$ctx_a SELECT count(*) FROM transport_erp.user_memberships WHERE \"CompanyId\"='20000000-0000-0000-0000-000000000001';")" = "0"
+          test "$(runq "$ctx_b SELECT count(*) FROM transport_erp.user_memberships;")" = "1"
+          test "$(runq "$ctx_b SELECT count(*) FROM transport_erp.user_memberships WHERE \"CompanyId\"='10000000-0000-0000-0000-000000000001';")" = "0"
+          test "$(runq "$ctx_a SELECT count(*) FROM transport_erp.companies;")" = "1"
+          test "$(runq "$ctx_b SELECT count(*) FROM transport_erp.companies;")" = "1"
+          if runq "$ctx_a INSERT INTO transport_erp.user_memberships (\"Id\",\"UserId\",\"CompanyId\",\"BranchId\",\"ScopeType\",\"Status\",\"SecurityVersion\",\"ValidFrom\",\"CreatedAt\",\"UpdatedAt\",\"CreatedBy\",\"ConcurrencyVersion\") VALUES ('99990000-0000-0000-0000-000000000001','22200000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','22000000-0000-0000-0000-000000000001','BRANCH','ACTIVE',1,now(),now(),now(),'22200000-0000-0000-0000-000000000001',1);" > mission-03-dbp002-evidence/cross-tenant-insert-unexpected.log 2>&1; then
+            echo 'Cross-tenant insert unexpectedly succeeded' >&2; exit 1
+          else
+            echo 'PASS expected RLS rejection A->B insert' | tee mission-03-dbp002-evidence/cross-tenant-insert-negative.txt
+          fi
+          test "$(runq "$ctx_a UPDATE transport_erp.user_memberships SET \"UpdatedAt\"=now() WHERE \"CompanyId\"='20000000-0000-0000-0000-000000000001'; SELECT count(*) FROM transport_erp.user_memberships WHERE \"CompanyId\"='20000000-0000-0000-0000-000000000001';")" = "0"
+          test "$(runq "$ctx_b UPDATE transport_erp.user_memberships SET \"UpdatedAt\"=now() WHERE \"CompanyId\"='10000000-0000-0000-0000-000000000001'; SELECT count(*) FROM transport_erp.user_memberships WHERE \"CompanyId\"='10000000-0000-0000-0000-000000000001';")" = "0"
+          printf 'PASS A->B and B->A SELECT/INSERT/UPDATE isolation\n' | tee mission-03-dbp002-evidence/cross-tenant-summary.txt
+
+      - name: Missing malformed stale context and scope-trigger negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          runq() { docker exec "$PGCID" psql -v ON_ERROR_STOP=1 -U postgres -d mission03_candidate -At -c "$1"; }
+          test "$(runq "SET ROLE mission03_rls_probe; RESET app.user_id; RESET app.membership_id; RESET app.company_id; RESET app.branch_id; RESET app.security_version; SELECT count(*) FROM transport_erp.user_memberships;")" = "0"
+          test "$(runq "SET ROLE mission03_rls_probe; SELECT set_config('app.user_id','not-a-uuid',false); SELECT set_config('app.membership_id','not-a-uuid',false); SELECT set_config('app.company_id','not-a-uuid',false); SELECT set_config('app.branch_id','not-a-uuid',false); SELECT set_config('app.security_version','not-a-number',false); SELECT count(*) FROM transport_erp.user_memberships;")" = "0"
+          test "$(runq "SET ROLE mission03_rls_probe; SELECT set_config('app.user_id','11100000-0000-0000-0000-000000000001',false); SELECT set_config('app.membership_id','11110000-0000-0000-0000-000000000001',false); SELECT set_config('app.company_id','10000000-0000-0000-0000-000000000001',false); SELECT set_config('app.branch_id','11000000-0000-0000-0000-000000000001',false); SELECT set_config('app.security_version','2',false); SELECT count(*) FROM transport_erp.user_memberships;")" = "0"
+          if runq "BEGIN; INSERT INTO transport_erp.user_permission_grants (\"Id\",\"MembershipId\",\"UserId\",\"CompanyId\",\"BranchId\",\"PermissionId\",\"Effect\",\"Status\",\"ValidFrom\",\"GrantedBy\",\"CreatedAt\",\"UpdatedAt\",\"ConcurrencyVersion\") VALUES ('43000000-0000-0000-0000-000000000001','11110000-0000-0000-0000-000000000001','11100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',NULL,'30000000-0000-0000-0000-000000000001','DENY','ACTIVE',now(),'11100000-0000-0000-0000-000000000001',now(),now(),1); SET CONSTRAINTS ALL IMMEDIATE; COMMIT;" > /tmp/branch-mismatch.out 2>&1; then echo 'Branch mismatch unexpectedly succeeded' >&2; exit 1; else cat /tmp/branch-mismatch.out > mission-03-dbp002-evidence/branch-mismatch-negative.txt; fi
+          if runq "BEGIN; INSERT INTO transport_erp.user_role_grants (\"Id\",\"MembershipId\",\"UserId\",\"CompanyId\",\"BranchId\",\"RoleId\",\"Status\",\"ValidFrom\",\"GrantedBy\",\"CreatedAt\",\"UpdatedAt\",\"ConcurrencyVersion\") VALUES ('44000000-0000-0000-0000-000000000001','11110000-0000-0000-0000-000000000001','11100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','32000000-0000-0000-0000-000000000001','ACTIVE',now(),'11100000-0000-0000-0000-000000000001',now(),now(),1); SET CONSTRAINTS ALL IMMEDIATE; COMMIT;" > /tmp/role-mismatch.out 2>&1; then echo 'Role/company mismatch unexpectedly succeeded' >&2; exit 1; else cat /tmp/role-mismatch.out > mission-03-dbp002-evidence/role-company-mismatch-negative.txt; fi
+          echo 'PASS missing/malformed/stale context and physical scope negatives' | tee mission-03-dbp002-evidence/fail-closed-summary.txt
+
+      - name: Compare generated-SQL and EF-update physical schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          capture_schema() {
+            local db="$1" prefix="$2"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,c.relkind,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind IN ('r','p') ORDER BY 1,2;" > "mission-03-dbp002-evidence/${prefix}-tables.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT table_schema,table_name,column_name,data_type,is_nullable,coalesce(column_default,'') FROM information_schema.columns WHERE table_schema='transport_erp' ORDER BY table_name,ordinal_position;" > "mission-03-dbp002-evidence/${prefix}-columns.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,pg_get_constraintdef(con.oid,true) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' ORDER BY c.relname,con.conname;" > "mission-03-dbp002-evidence/${prefix}-constraints.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='transport_erp' ORDER BY tablename,indexname;" > "mission-03-dbp002-evidence/${prefix}-indexes.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,policyname,cmd,qual,with_check FROM pg_policies WHERE schemaname='transport_erp' ORDER BY tablename,policyname;" > "mission-03-dbp002-evidence/${prefix}-policies.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' > "mission-03-dbp002-evidence/${prefix}-history.txt"
+          }
+          capture_schema mission03_candidate candidate
+          capture_schema mission03_sql_candidate sql-candidate
+          for f in tables columns constraints indexes policies history; do diff -u "mission-03-dbp002-evidence/candidate-${f}.txt" "mission-03-dbp002-evidence/sql-candidate-${f}.txt"; done
+
+      - name: Full regression on independent fresh PostgreSQL 18.6 database
+        shell: bash
+        env:
+          TRANSPORTERP_TEST_POSTGRESQL: Host=127.0.0.1;Port=5432;Database=mission03_regression;Username=postgres;Password=postgres;Include Error Detail=true
+        run: |
+          set -euo pipefail
+          docker exec "$PGCID" createdb -U postgres mission03_regression
+          dotnet test TransportERP.Tests/TransportERP.Tests.csproj -c Release --no-restore --logger "trx;LogFileName=dbp002-full-regression.trx" \
+            | tee mission-03-dbp002-evidence/full-regression.log
+          cp TransportERP.Tests/TestResults/dbp002-full-regression.trx mission-03-dbp002-evidence/ 2>/dev/null || find TransportERP.Tests -name dbp002-full-regression.trx -exec cp {} mission-03-dbp002-evidence/ \;
+          grep -Eq 'Passed!|Passed:' mission-03-dbp002-evidence/full-regression.log
+
+      - name: Candidate backup restore and final reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec "$PGCID" pg_dump -U postgres -Fc mission03_candidate > mission-03-dbp002-evidence/candidate.dump
+          docker exec "$PGCID" createdb -U postgres mission03_candidate_restore
+          cat mission-03-dbp002-evidence/candidate.dump | docker exec -i "$PGCID" pg_restore -U postgres -d mission03_candidate_restore
+          capture_schema() {
+            local db="$1" prefix="$2"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,c.relkind,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind IN ('r','p') ORDER BY 1,2;" > "mission-03-dbp002-evidence/${prefix}-tables.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT table_schema,table_name,column_name,data_type,is_nullable,coalesce(column_default,'') FROM information_schema.columns WHERE table_schema='transport_erp' ORDER BY table_name,ordinal_position;" > "mission-03-dbp002-evidence/${prefix}-columns.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT n.nspname,c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,pg_get_constraintdef(con.oid,true) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' ORDER BY c.relname,con.conname;" > "mission-03-dbp002-evidence/${prefix}-constraints.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='transport_erp' ORDER BY tablename,indexname;" > "mission-03-dbp002-evidence/${prefix}-indexes.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT schemaname,tablename,policyname,cmd,qual,with_check FROM pg_policies WHERE schemaname='transport_erp' ORDER BY tablename,policyname;" > "mission-03-dbp002-evidence/${prefix}-policies.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' > "mission-03-dbp002-evidence/${prefix}-history.txt"
+            docker exec "$PGCID" psql -U postgres -d "$db" -At -F '|' -c "SELECT \"CompanyId\",count(*) FROM transport_erp.user_memberships GROUP BY \"CompanyId\" ORDER BY \"CompanyId\";" > "mission-03-dbp002-evidence/${prefix}-membership-counts.txt"
+          }
+          capture_schema mission03_candidate final-candidate
+          capture_schema mission03_candidate_restore final-restore
+          for f in tables columns constraints indexes policies history membership-counts; do diff -u "mission-03-dbp002-evidence/final-candidate-${f}.txt" "mission-03-dbp002-evidence/final-restore-${f}.txt"; done
+          sha256sum mission-03-dbp002-evidence/candidate.dump | tee mission-03-dbp002-evidence/candidate.dump.sha256
+          find mission-03-dbp002-evidence -type f -print0 | sort -z | xargs -0 sha256sum > mission-03-dbp002-evidence/EVIDENCE_SHA256.txt
+          printf 'DBP-002 REHEARSAL PASS\nHEAD=%s\nTREE=%s\nPARENT=%s\n' "$GITHUB_SHA" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)" | tee mission-03-dbp002-evidence/DBP002_PASS.txt
+
+      - name: Upload DBP-002 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mission-03-dbp002-rehearsal-${{ github.sha }}
+          path: mission-03-dbp002-evidence
+          if-no-files-found: error
