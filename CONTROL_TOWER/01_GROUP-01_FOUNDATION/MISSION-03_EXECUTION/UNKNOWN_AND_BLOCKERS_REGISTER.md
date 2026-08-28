@@ -14,21 +14,27 @@
 | `M03-BLK-W2-003` | device owner/lifecycle/PoP policy | ADR-W2-003; W2-C1 exact tests | owner binding | `RESOLVED FOR IMPLEMENTATION`; registry/PoP persistence remains DBP-003/006 blocked |
 | `M03-BLK-W2-004` | Production external authority vs local session issuer | owner decision at governance `6b2d238...` selects local application authority | none for code-only lifecycle | `RESOLVED — AUTH-001 LOCAL APPLICATION AUTHORITY`; persistence remains DBP-003 |
 | `M03-BLK-W2-005` | live tenant rows/applied history/roles/RLS and full DBP-002 impact/backfill/recovery | no authorized live DB evidence | W2-D DB mutation and W2 exit | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` |
-| `M03-BLK-W2-006` | registry/session/device persistence migration, retention and recovery evidence | DBP-003 proposal now covers logical design/rehearsal/recovery; live/sanitized baseline, custody/retention and execution authority remain absent | durable B2B adapter, W2-C2/E and full PoP/revoke matrix | `READY FOR DB-GOV REVIEW; EXECUTION BLOCKED — ENTRY GATE NOT SATISFIED` |
+| `M03-BLK-W2-006` | registry/session/device persistence migration, retention and recovery evidence | independent DB-GOV review `DBP-003_DB_GOV_REVIEW_DECISION.md` | durable B2B adapter, W2-C2/E and full PoP/revoke matrix | `DBP-003 HOLD AT REHEARSAL ENTRY — 003A REVISE; 003B/C DEFERRED` |
 | `M03-BLK-W2-007` | emergency non-owner override authority | no owner/security-approved permission/reason/audit contract | override only | default deny implemented; `OWNER DECISION REQUIRED — BOUNDED ITEM` before any override |
 | `M03-BLK-W2-008` | Control Tower issued a superseding W2 STOP/REPLAN directive at c274f9a after the worker's prior fetched base | current directive, exact diff/source, ADRs, run 33185419917, artifact digests and revalidation decision | none for adopted A1/A2/B1/B2A/C1/F1; historical deviation remains evidence | `RESOLVED BY CONTROL TOWER REVALIDATION — SIX BOUNDED PACKAGES ADOPTED` |
 | `M03-BLK-EXT-001` | live DB/schema/applied history/backups unavailable | no authorized DB connection/evidence | DB impacts and release | safe-copy/read-only inventory and restore drill |
 | `M03-BLK-EXT-002` | IdP/tenant/cardinality/accounting/offline/Kurrasa authority unavailable | M02 blockers retained | W2–W6 affected packages | provide approved ADRs/authority records |
 | `M03-BLK-EXT-003` | signing/release/privacy/Production topology unavailable | M02 blockers retained | W5/W7 | approved non-secret topology and drills |
+| `DBP003-BLK-001` | no executable PostgreSQL refresh-family lock/single-successor/atomic-audit transaction design; tests use process-local lock only | exact source and `LocalSessionLifecycleTests` at `cc67ad2...` | DBP-003A rehearsal authoring | revise constraints/transaction/audit UoW/retry/failure-injection specification; resubmit DB-GOV |
+| `DBP003-BLK-002` | password algorithm/format/salt/legacy/rehash/failure/lockout reality unknown | source exposes only `PasswordHash varchar(500)` and test-only literals | login persistence activation | authorized sanitized inventory plus approved verifier/upgrade/lockout policy |
+| `DBP003-BLK-003` | no bound safe-copy schema/data snapshot, backup digest, restore proof or reconciliation package | empty disposable CI only | DBP-003A rehearsal entry | prepare named non-Production safe copy and pre/post/restore evidence |
+| `DBP003-BLK-004` | User Company/Branch are independent FKs and no User composite alternate key exists | exact `P1Entities.cs` / `TransportErpDbContext.cs` | tenant-consistent session/user and device assignment FKs | split dependency and obtain DBP-002 physical-key decision |
+| `DBP003-BLK-005` | device/PoP/nonce store and retention not established | DBP-006, MDM/attestation and retention evidence absent | DBP-003B/C | keep deferred; settle DBP-006 lifecycle/storage/retention |
+| `DBP003-BLK-006` | Production signing/encryption/pepper custody/rotation/recovery unproved | no approved operational evidence | Production activation only | provide secret-store ownership and rotation/recovery drill; non-blocking for proposal revision |
 
-No blocker is converted into a guessed implementation. W2 A1/A2/B1/B2A/C1/F1 were independently revalidated and adopted; B2B code-only is implemented and exact-head verified. Durable B2B, C2, D/E and the persistence/device/client portions of F2 remain individually blocked. No destructive, Production, merge, data-repair or irreversible step was attempted.
+No blocker is converted into a guessed implementation. W2 A1/A2/B1/B2A/C1/F1 and B2B code-only were independently revalidated and adopted at bounded head `cc67ad2...`. Durable B2B, C2, D/E and the persistence/device/client portions of F2 remain individually blocked. Every current DBP-003 next action is non-destructive; no `OWNER DECISION REQUIRED` is raised. No destructive, Production, merge, data-repair or irreversible step was attempted.
 
 ## DBP-003 bounded unknowns
 
 | Unknown | Classification | Blocks |
 |---|---|---|
-| live/sanitized row counts, applied migration history, PostgreSQL roles/extensions/RLS and backup restore proof | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` | DBP-003 physical migration/activation only |
+| sanitized row counts/data shape, applied lineage on the safe copy, PostgreSQL roles/extensions/RLS and backup restore proof | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` | DBP-003 rehearsal entry/activation |
 | actual password-hash formats and safe upgrade policy | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` | Production identity adapter/login activation |
 | signing/password/device key custody and operator rotation/recovery evidence | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` | Production issuance/PoP activation |
-| nonce/replay/audit retention and legal hold | `OWNER/LEGAL DECISION REQUIRED — BOUNDED ITEM` | DBP-003/006 retention DDL only |
+| nonce/replay/audit retention and legal hold | `DEFERRED — DBP-006 EVIDENCE/DECISION REQUIRED` | DBP-003C/006 retention DDL only |
 | device MDM/attestation/platform key capability | `LIVE EXTERNAL EVIDENCE REQUIRED` | attestation strength and executable client release, not code-only lifecycle |

@@ -8,8 +8,8 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — W1 VERIFIED; SIX BOUNDED W2 PACKAGES ADOPTED; B2B CODE-ONLY VERIFIED | Control Tower independently revalidated the B2B checkpoint at `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`: exact `9c5b7a1...→cc67ad2...` diff is one commit/three new code-test files only; run `33191269475` completed success with 146/146, ten existing migrations/no drift on disposable PostgreSQL 18.6, API 401, Desktop and Mobile x3. AUTH-001 is resolved to local application authority. B2B persistence and W2-C2/D/E plus remaining F2 persistence/device/direct-DB/client evidence remain behind DBP-002/003/006. `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` is READY FOR DB-GOV REVIEW only. MISSION-03 remains open/not sealed; M04 stays WAIT. |
-| 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 is open/not sealed; B2B code-only checkpoint is not a final handoff |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED; B2B CODE-ONLY ADOPTED; DBP-003 HOLD | Current bounded baseline `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`. Exact diff/raw run `33191269475` independently verified: no persistence delta, 146/146 and existing disposable migration lineage pass. DBP-003A `REVISE BEFORE REHEARSAL`; DBP-003B/C `DEFERRED — DEPENDS ON DBP-002/006`; no migration authoring authority. Continue only satisfied non-destructive packages; no merge/rebase/cherry-pick/force-push/Production action or M04 handoff. |
+| 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 is open/not sealed; W2 partial adoption is not a final handoff |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
 ## Governing line decision
@@ -20,7 +20,7 @@ Authoritative current product line:
 
 MISSION-03 execution branch:
 
-`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint is `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; Control Tower adopted the bounded W2 baseline at `9c5b7a12e59d2c42e682717b8e90c491f8699b96`, and independently reverified the storage-neutral B2B child checkpoint at `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`. This does not authorize master merge, persistent session/device implementation, or full W2 exit.
+`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint is `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; Control Tower independently adopted W2 at `9c5b7a1...` and the B2B code-only child at `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` for bounded continued execution. This does not authorize DBP-003 rehearsal authoring, master merge or full W2 exit.
 
 MISSION-02 accepted package:
 

@@ -158,6 +158,15 @@ This is the current exact-head W2 evidence. Earlier successful and failed runs r
 | `T-W2/regression` | complete Release suite against disposable PostgreSQL | `PASS — 146/146; 0 failed/skipped` |
 | `T-W2/migrations` | EF list, model-drift check, database update | `PASS — existing 10/10; no pending model change` |
 | `T-W2/API boot` | protected boundary | `PASS — HTTP 401 expected` |
-| `T-W2/clients` | Desktop Windows and Mobile Admin/Customer/Driver build/probes | `PASS` |
+| `T-W2/clients` | Desktop Windows and Mobile Admin/Customer/Driver build/probes | build steps `PASS`; probes truthfully show Library-mode/non-executable surfaces |
 
 The test-only atomic store validates the code contract and is not registered by the API or represented as durable PostgreSQL evidence. DBP-003 integration, device registry/PoP/nonce and executable client credential-clearing tests remain blocked and are listed in `W2_F2_TEST_MATRIX.md`.
+
+## Independent DB-GOV raw-log disposition — 2026-08-28T17:17:41Z
+
+- Decoded jobs `98917044706` and `98917044568` independently prove exact SHA/tree, PostgreSQL 18.6, ten existing migration applies, no pending model drift, `146/146`, HTTP 401 and successful build steps.
+- Artifact probes show Desktop `OutputType=Library / HasDesktopEntryPoint=false`; all three Mobile projects show `OutputType=Library / MauiRuntimeReady=false`. These are successful build/probe captures, not executable-client runtime proof.
+- Four xUnit2031 warnings, Desktop CS8602 and runner Node deprecation remain recorded.
+- Raw PostgreSQL errors were reviewed: missing migration history is expected on the initial empty database; unique/serialization and append-only errors arise from bounded negative/concurrency tests and the full job exits success. They are not DBP-003 session-store evidence.
+- The B2B concurrency test uses `InMemoryAtomicSessionStore` and a process-local lock. No PostgreSQL session adapter, transaction or atomic audit path was tested.
+- DB-GOV disposition: code-only evidence `PASS`; `DBP-003 = HOLD AT REHEARSAL ENTRY`.

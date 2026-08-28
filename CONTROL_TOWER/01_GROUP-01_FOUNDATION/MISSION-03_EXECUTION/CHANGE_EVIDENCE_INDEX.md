@@ -47,6 +47,9 @@
 | `M03-EV-043` | W2-B2B exact code-only diff | `9c5b7a1...cc67ad2`; tree `ea940e59...` | three new code/test files; no Entity/DbContext/Migration/Schema/Seed/data/Production config |
 | `M03-EV-044` | W2-B2B exact-head run | run `33191269475`; jobs `98917044706`/`98917044568` | completed/success; 146/146; PostgreSQL 18.6; ten migrations/no drift; API 401; Desktop/Mobile x3 pass |
 | `M03-EV-045` | W2-B2B retained artifacts | Linux `9693887564`; Desktop `9693865549` | SHA-256 `aefddb63...`; `88e0e11f...`; unexpired |
-| `M03-EV-046` | DBP-003/C2/F2 preparation package | proposal and matrices at governance checkpoint | DBP-003 ready for review; no persistence execution; C2/F2 blockers separated |
+| `M03-EV-046` | DBP-003/C2/F2 preparation package | proposal and matrices at governance checkpoint | submitted input; no persistence execution; C2/F2 blockers separated |
+| `M03-EV-047` | independent DB-GOV raw-log/artifact review | run `33191269475`; jobs `98917044706`/`98917044568`; artifacts `9693887564`/`9693865549` | exact SHA/tree, PostgreSQL 18.6, ten existing migrations/no drift, 146/146 and HTTP 401 confirmed; client probes are Library-mode; warnings/errors classified |
+| `M03-EV-048` | exact DBP-003 source/model/dependency review | `9c5b7a1...cc67ad2`; User/Branch/DbContext/migration lineage/PasswordHash/session store | no persistence delta; User tenant FKs are not composite; hash policy and durable PostgreSQL rotation/audit proof absent |
+| `M03-EV-049` | DBP-003 independent decision | `DBP-003_DB_GOV_REVIEW_DECISION.md` | `003A REVISE BEFORE REHEARSAL; 003B/C DEFERRED; HOLD AT REHEARSAL ENTRY`; B2B code-only baseline adopted |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

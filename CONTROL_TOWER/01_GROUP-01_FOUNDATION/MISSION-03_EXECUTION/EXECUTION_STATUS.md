@@ -2,7 +2,7 @@
 
 - Mission: `MISSION-03 — EXECUTION AND REMEDIATION`
 - Directive: `START — EXECUTION UNDER SEALED MISSION-02 PLAN`
-- Status: `IN PROGRESS — W2-B2B CODE-ONLY IMPLEMENTED; DBP-003 READY FOR GOVERNANCE REVIEW`
+- Status: `IN PROGRESS — OPEN — NOT SEALED; W2-B2B CODE-ONLY ADOPTED; DBP-003 HOLD AT REHEARSAL ENTRY`
 - Checkpoint: `MISSION-03-W2-B2B-CODE-ONLY-CHECKPOINT-v0.7`
 - Last evidence time: `2026-08-28T16:44:49Z` / `2026-08-28T19:44:49+03:00`
 - Authoritative product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
@@ -20,7 +20,7 @@
 
 ## Control Tower revalidation decision
 
-The plan-deviation hold was honored and the candidate preserved. Control Tower then independently revalidated ADR-W2-001/002/003, the exact diff/source, package dependencies, DB-GOV boundary, rollback, GitHub logs and artifacts. `W2-A1/A2/B1/B2A/C1/F1` are now `ADOPT — REBOUND TO SEALED PLAN`; `9c5b7a1...` is the bounded execution baseline. See `W2_CONTROL_TOWER_REVALIDATION_DECISION.md`.
+The plan-deviation hold was honored and the candidate preserved. Control Tower independently revalidated ADR-W2-001/002/003 and adopted `W2-A1/A2/B1/B2A/C1/F1` at `9c5b7a1...`, then independently revalidated the exact B2B diff/raw CI and adopted `cc67ad2...` as the current bounded code-only execution baseline. See `W2_CONTROL_TOWER_REVALIDATION_DECISION.md` and `DBP-003_DB_GOV_REVIEW_DECISION.md`.
 
 ## Current gate
 
@@ -30,7 +30,7 @@ External workspaces, stashes and local-only assets outside this worker remain `A
 
 REM-100 then added the missing `Volume = x.Volume` mapping and one PostgreSQL create/update/persist/reload regression test. Exact-head run `33181376288` passed 125/125 tests, including the new Volume test and existing allocation/shipping measure tests. Status is `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION`.
 
-DEP-005, DEP-006 and DEP-007 are now resolved for bounded execution design in ADR-W2-001/002/003. The unresolved Production auth-mode choice is isolated as `AUTH-001`; live schema/roles/RLS and all persistence changes remain behind DBP-002/003.
+DEP-005, DEP-006 and DEP-007 are resolved for bounded execution design in ADR-W2-001/002/003. `AUTH-001` is resolved for local application authority; live schema/roles/RLS and all persistence changes remain behind DBP-002/003.
 
 Code-only packages W2-A1/B1/C1 first bound Sync to stored Company/Branch and persistent RBAC and applied owner checks to transition, retry, conflict and replacement paths. W2-A2/B2A then replaced duplicated claim-only authorization in all three Product API modules with one request-time resolver that reconciles active User/Company/Branch and persistent RBAC; token permission claims can only narrow the result. Issuer-specific login/refresh/session work remains the bounded W2-B2B item behind AUTH-001/DBP-003.
 
@@ -42,4 +42,4 @@ AUTH-001 selected local application authority. From exact adopted baseline `9c5b
 
 Exact-head disposable run `33191269475` completed successfully: 146/146 tests, all ten existing migrations on PostgreSQL 18.6 with no model drift, API protected boundary HTTP 401, Desktop build/probe and Mobile Admin/Customer/Driver builds/probes. The diff from `9c5b7a1...` is three new code/test files only. No Entity, DbContext, Migration, Seed, Schema, data or Production configuration change exists.
 
-`DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` is `READY FOR DB-GOV REVIEW — NOT AUTHORIZED FOR EXECUTION`. `W2_C2_PREPARATION.md` and `W2_F2_TEST_MATRIX.md` define the remaining non-destructive device/PoP and security-test work. W2-C2/D/E and the persistence/client portions of F2 remain separately blocked; MISSION-03 is not sealed.
+`DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` has been independently reviewed. Decision: DBP-003A `REVISE BEFORE REHEARSAL`; DBP-003B/C `DEFERRED — DEPENDS ON DBP-002/006`; overall `DBP-003 = HOLD AT REHEARSAL ENTRY`. No Entity/DbContext/Migration/schema/persistent-adapter authoring is open. `W2_C2_PREPARATION.md` and `W2_F2_TEST_MATRIX.md` remain inputs only. W2-C2/D/E and the persistence/client portions of F2 remain separately blocked; MISSION-03 is not sealed.

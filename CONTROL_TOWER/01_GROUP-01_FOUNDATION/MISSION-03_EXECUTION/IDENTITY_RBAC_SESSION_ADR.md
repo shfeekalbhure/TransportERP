@@ -54,7 +54,7 @@ The owner selected local application authority for the Production target. W2-B2B
 
 The API intentionally does not register a test/in-memory session store or expose local endpoints. Production activation requires a durable `ILocalSessionStore`, approved password-hash/current-identity adapter, atomic audit path and DBP-003 migration. Until then the existing authentication configuration remains preserved and local issuance fails closed by absence of registration.
 
-The DBP-003 design, rehearsal and recovery proposal is `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` and is `READY FOR DB-GOV REVIEW — NOT AUTHORIZED FOR EXECUTION`.
+The DBP-003 design, rehearsal and recovery proposal is `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md`. Independent disposition is recorded in `DBP-003_DB_GOV_REVIEW_DECISION.md`: DBP-003A `REVISE BEFORE REHEARSAL`, DBP-003B/C deferred behind DBP-002/006, and no Entity/DbContext/Migration/schema/persistent-adapter authoring is authorized.
 
 ## Negative tests
 

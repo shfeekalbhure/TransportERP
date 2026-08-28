@@ -31,21 +31,21 @@ PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714a
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — AUTH-001 RESOLVED; EXECUTE ALL NON-DESTRUCTIVE W2 WORK ENABLED BY LOCAL AUTHORITY DECISION`.
+- `CURRENT DIRECTIVE`: `CONTINUE — CODE-ONLY BASELINE ADOPTED; DBP-003 HOLD AT REHEARSAL ENTRY`.
 - MISSION-03 remains `IN PROGRESS` and `NOT SEALED`.
 - Accepted W1 checkpoint: `codex/mission-03-execution-20260828@069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`.
-- Adopted bounded W2 execution baseline: `codex/mission-03-execution-20260828@9c5b7a12e59d2c42e682717b8e90c491f8699b96`.
-- Current B2B code-only execution checkpoint: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`.
-- `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY SELECTED FOR PRODUCTION TARGET` by owner decision `DECISIONS/AUTH-001_PRODUCTION_AUTHORITY_MODE_2026-08-28.md`.
+- Current bounded execution baseline: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`.
 - DEP-005 is Control Tower revalidated for current-source design/code-only scope; live rows/roles/RLS remain DBP-002-only blockers.
-- DEP-006 is Control Tower revalidated; the prior authority-mode blocker is resolved by AUTH-001 while persistent session authority remains behind DBP-003.
+- DEP-006 is Control Tower revalidated for authority-neutral code-only implementation; `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY`.
 - DEP-007 is Control Tower revalidated for bounded owner/lifecycle code-only implementation; registry/PoP/nonce/replay/session-device persistence remains behind DBP-003/006.
 - W2-A1/A2/B1/B2A/C1/F1: `ADOPT — REBOUND TO SEALED PLAN` and ready for later independent verification.
-- W2-B2B code-only portion: `IMPLEMENTED — CONTROL TOWER REVERIFIED CHECKPOINT`; exact diff from `9c5b7a1...` is three new code/test files only and no Entity/DbContext/Migration/Schema/Seed/data/Production configuration change.
-- Exact-head run `33191269475` is independently reverified at `cc67ad2...`: 146/146 tests, ten existing migrations on disposable PostgreSQL 18.6, no model drift, API HTTP 401 protected boundary, Desktop build/probe and Mobile Admin/Customer/Driver builds/probes PASS. Four xUnit analyzer warnings and one Desktop nullable warning are non-failing evidence and remain visible.
-- `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` is `READY FOR DB-GOV REVIEW — NOT AUTHORIZED FOR EXECUTION`.
-- W2-B2B persistence, W2-C2 persistence/runtime, W2-D, W2-E and persistence/device/direct-DB/executable-client portions of W2-F2 remain individually blocked by DBP-002/003/006 and their evidence gates; unrelated satisfied code-only work may continue.
-- Mission-local manifest/handoff identify checkpoint v0.7 while the seal register remains `OPEN — NOT SEALED`; no MISSION-04 promotion is permitted.
+- W2-B2B code-only: `ADOPT — EXACT DIFF/RAW CI REVALIDATED` at `cc67ad2...`.
+- DBP-003A/W2-B2B persistence: `REVISE BEFORE REHEARSAL`; PasswordHash baseline, PostgreSQL rotation/atomic-audit design and safe-copy package are missing.
+- DBP-003B/C and W2-C2: `DEFERRED — DEPENDS ON DBP-002/006`; W2-D/E/F2 remain individually blocked. They do not stop unrelated satisfied packages.
+- Exact-head run `33185419917` and decoded logs/artifacts confirm 128/128, ten existing migrations/no drift, API 401, Desktop and Mobile x3 at `9c5b7a1...`; failed run `33184771338` remains historical evidence.
+- Raw run `33191269475` and artifacts confirm exact `cc67ad2...` / `ea940e5...`, PostgreSQL 18.6, ten existing migrations/no drift, 146/146 and HTTP 401. Desktop/Mobile x3 builds pass; probes remain Library-mode, not executable-runtime proof.
+- No Entity, DbContext model, Migration, schema, seed, data repair or Production configuration change occurred. No DBP-003 package is open for migration authoring.
+- The earlier retained-hold decision is preserved and superseded by `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/MISSION_03_W2_BOUNDED_ADOPTION_DECISION_2026-08-28.md`, which records the additional persistent-scope analysis and current owner direction.
 - Do not merge, delete, reset, rewrite, force-push, cherry-pick, mutate Production, or perform DB/schema/data work without its independent gate.
 - PR #69 remains comparative unmerged evidence only; no merge is authorized.
 
