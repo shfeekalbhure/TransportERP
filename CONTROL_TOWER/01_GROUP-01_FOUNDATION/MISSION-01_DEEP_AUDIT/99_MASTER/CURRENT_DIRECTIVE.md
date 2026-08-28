@@ -1,9 +1,24 @@
 # CURRENT DIRECTIVE — MISSION-01 MASTER
 
-`STOP`
+`REOPEN — REVALIDATE GATE ON OWNER-DESIGNATED AUTHORITATIVE PRODUCT LINE`
 
-Prerequisite satisfied: TEAM-E v1.1 is `SEALED — DELIVERED TO CONTROL TOWER — STOP`, and the reconciliation-reopen cycle is closed.
+Owner authority has resolved the authoritative-line blocker through:
 
-MASTER/GATE v1.0 is accepted: all 12 detached hashes passed; Master SHA `30eb7a91d3d704fc5212ca817e839d42a796088500f77c00308d619662563df8`; Gate SHA `d1e7f40864717a76ecb83058672e8384aa8cb0881df0f2cdee31605768a31e34`.
+`CONTROL_TOWER/00_GOVERNANCE/DECISIONS/AUTHORITATIVE_PRODUCT_LINE_DECISION_2026-08-28.md`
 
-Formal gate: `NOT READY — CRITICAL EVIDENCE GAPS REMAIN`. Do not edit this sealed package. Reconsideration requires owner/repository designation of the authoritative ref/full SHA, required evidence, `REOPEN`, revalidation, a new version, hashes, seal, and handoff.
+Authoritative product line for revalidation:
+
+`refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
+
+The previously sealed MASTER/GATE v1.0 remains preserved and immutable as historical evidence. Do not overwrite it silently.
+
+Required action:
+
+1. Revalidate all findings, blockers, tree/count assertions, current-state classifications, and gate conditions affected by authoritative-line uncertainty against the exact SHA above.
+2. Preserve all other unresolved critical evidence gaps unless independently resolved by evidence.
+3. Reclassify PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714ad84e307eb84fe5f` as `UNMERGED REMEDIATION / FINAL CANDIDATE`, not CURRENT.
+4. Produce a new version of the MASTER/GATE package with new hashes, manifest, seal, and handoff.
+5. If and only if every mandatory gate condition is satisfied, issue `READY FOR REMEDIATION PLANNING` and permit MISSION-02.
+6. If critical evidence gaps remain, issue the correct negative/conditional gate and identify exactly what still blocks MISSION-02.
+
+No Source, Tests, Migrations, Database, Production, merge, cleanup, or destructive Git action is authorized by this directive.
