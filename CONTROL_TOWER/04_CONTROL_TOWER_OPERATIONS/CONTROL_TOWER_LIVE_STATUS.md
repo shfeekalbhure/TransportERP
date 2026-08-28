@@ -13,7 +13,7 @@
 | CONTROL TOWER / GROUP-01 | IN PROGRESS | Greenfield owner decision and DB-GOV proposal evidence independently re-read | second Greenfield DB-GOV review completed; central records rebound | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; 153/153 baseline + disposable recovery remain accepted | `CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS` | NOT SEALED; no final handoff |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | execution head unchanged; exact v1.0 DBP physical bundle resubmitted | `CONTINUE — INDEPENDENT DB-GOV DECISION REQUIRED; NO REHEARSAL AUTHORITY` | NOT SEALED; no final handoff |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
@@ -41,6 +41,14 @@ The following are no longer target-database prerequisites: legacy target-row/bac
 | DBP-006 | `REVISE BEFORE REHEARSAL` | exact typed Offline persistence, version/fingerprint, claim/lease, retention/legal-hold and device dependencies |
 
 No proposal currently has disposable/Greenfield rehearsal authority. No Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data or Production database change is authorized.
+
+## New MISSION-03 evidence received
+
+The exact physical-design and acceptance gaps listed above are addressed in
+`DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0` and
+`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`. Proposal states are now
+`RESUBMITTED — AWAITING INDEPENDENT DB-GOV DECISION`. This live-status update
+does not self-approve them; material Product/database work remains prohibited.
 
 ## Remaining non-DB gates
 

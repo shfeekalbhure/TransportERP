@@ -93,3 +93,21 @@ MISSION-03 cannot be sealed: independent DB-GOV has not opened DBP-002/003/004/
 signing evidence are external, W6 lacks canonical programming authority, and
 the complete external preservation inventory is unavailable. This is
 `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED`, not mission closure.
+
+## v1.1 Greenfield exact-design resubmission checkpoint
+
+- Product head/tree: unchanged at `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` /
+  `00512125311306a43474638195d2cad97b76118e`.
+- Product/DB/Production mutation: `NONE`.
+- DBP-002/003A/B/C/004/005/006: exact physical design and Greenfield rehearsal
+  acceptance specification completed and centrally resubmitted.
+- Legacy password/safe-copy blockers: `NOT APPLICABLE` under DB-BASELINE-001.
+- Current material gate: `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL
+  AUTHORITY`.
+- W2 durable persistence, W3 Settlement/Audit and W4 typed Offline runtime
+  cannot begin until the corresponding exact DBP units receive bounded
+  rehearsal authority and pass rehearsal.
+- W5 executable clients, W6 canonical programming scope, W7 Production/release
+  authority and W8 external preservation inventory remain separately external.
+
+MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`; MISSION-04 remains WAIT.

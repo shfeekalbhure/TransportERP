@@ -1,6 +1,6 @@
 # CURRENT DIRECTIVE — MISSION-03
 
-`CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS; KEEP MISSION-03 OPEN`
+`CONTINUE — EXACT GREENFIELD PHYSICAL DESIGNS RESUBMITTED; INDEPENDENT DB-GOV DECISION REQUIRED; KEEP MISSION-03 OPEN`
 
 ## Current execution basis
 
@@ -69,6 +69,23 @@ MISSION-03 must continue automatically with non-destructive repository/governanc
 6. Re-submit proposal packages for independent DB-GOV decision. Do not author or execute candidate migrations until the exact proposal receives bounded rehearsal authority.
 7. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
 8. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
+
+## v1.0 resubmission checkpoint
+
+MISSION-03 completed the authorized non-destructive design revision in:
+
+- `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md`;
+- `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`.
+
+DBP-002/003A/B/C/004/005/006 now have exact dependency order, tables, columns,
+keys, tenant FKs, checks, indexes, RLS-equivalent roles/policies, new-system
+password/lockout/reset policy, session rotation/family revoke, caller-owned
+Audit V2/Outbox UoW, Settlement atomicity, typed Offline claim/lease/result,
+device/PoP/nonce/replay, retention/legal hold and recovery acceptance.
+
+The bundle is `RESUBMITTED — AWAITING INDEPENDENT DB-GOV DECISION`. It does not
+self-grant rehearsal. Entity/DbContext/Migration/Schema/Seed/persistent-adapter/
+data authority remains `NONE`. Product head/tree remain unchanged.
 
 A blocked DBP must not stop unrelated satisfied packages.
 

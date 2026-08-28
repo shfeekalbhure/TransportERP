@@ -23,3 +23,17 @@
 | `W6` | exact Library and screen-analysis locators reviewed; each disclaims programming authority | `BLOCKED — CANONICAL PROGRAMMING AUTHORITY NOT AVAILABLE` |
 | `W7` | exact-head baseline continued; disposable backup/restore workflow and fail-closed tooling added; failed rehearsal retained and corrected | `PARTIAL — DISPOSABLE RECOVERY EVIDENCE ONLY; PRODUCTION READINESS INPUTS EXTERNAL` |
 | `W8` | preservation gate rechecked | `NOT ENTERED — EXTERNAL PRESERVATION INVENTORY + W7 EXIT ABSENT` |
+
+## v1.1 Greenfield resubmission disposition
+
+| Wave | New internal result | Remaining exact gate |
+|---:|---|---|
+| `W2` | DBP-002/003A/B/C/006 exact physical and acceptance design complete | independent DB-GOV bounded rehearsal decision, then authorized implementation/rehearsal |
+| `W3` | DBP-004/005 exact Audit V2/Settlement/UoW design complete | independent DB-GOV bounded rehearsal decision; Production configuration remains external |
+| `W4` | DBP-006 exact typed inbox/queue/result/claim/lease/device binding complete | independent DB-GOV bounded rehearsal decision and successful W2/W3 durable authority |
+| `W5` | no new Product authority | executable Windows/Android environments, secure store, screen routes and signing custody |
+| `W6` | durable-source search/read confirms `HOLD/NEEDS_AUTHORITY` and no governing promotion | external canonical programming promotion |
+| `W7` | no new Product authority | Production recovery/privacy/KMS/supply/signing policy and stable W2-W6 |
+| `W8` | not entered | W7 exit and complete external preservation inventory |
+
+No wave exit was inflated from design completion. MISSION-03 remains open.

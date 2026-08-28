@@ -98,3 +98,23 @@ The following sources are now required externally before MISSION-03 can resume:
 
 No new owner decision is requested. MISSION-03 remains OPEN/NOT SEALED and
 MISSION-04 remains WAIT.
+
+## v1.1 DB-GOV resubmission handoff
+
+MISSION-03 completed every repository-resolvable revision requested by the
+controlling Greenfield DB-GOV re-review. Review these exact files:
+
+1. `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md`;
+2. `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`;
+3. the v1.1 updates in `DB_GOV_EXECUTION_REGISTER.md`,
+   `UNKNOWN_AND_BLOCKERS_REGISTER.md`, and the central proposal register.
+
+Requested independent disposition per DBP is either bounded Greenfield
+rehearsal approval or exact revision findings. Until that decision, Product
+remains `5d1352b...` / `00512125...`, material database execution is `NONE`,
+W2-W4 durable packages remain blocked and MISSION-03 cannot seal.
+
+W6 durable-source revalidation additionally proves that the currently located
+Ticketing/Shipping/screen material preserves future requirements but explicitly
+does not promote programming authority. W5/W7/W8 external gates remain
+unchanged. No MISSION-04 work is authorized.

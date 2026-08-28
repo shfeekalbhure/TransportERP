@@ -33,3 +33,15 @@
 
 No row above introduces an Entity, DbContext model change, Migration, Schema,
 Seed, persistent adapter, Product data repair or Production configuration.
+
+## v1.1 Greenfield governance work package
+
+| Work ID | Exact Product SHA | Scope | Evidence | Rollback / stop | Result |
+|---|---|---|---|---|---|
+| `M03-DBGOV-V1` | `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` | exact physical designs for DBP-002/003A/B/C/004/005/006 and Greenfield rehearsal acceptance | `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md`; `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` | normal governance-file revert; stop material work until independent approval | `DESIGN COMPLETE — RESUBMITTED — NO PRODUCT/DB MUTATION` |
+
+Preconditions recorded: Greenfield owner decision, existing ten-migration
+lineage, exact source inventory and controlling DB-GOV re-review. Preservation:
+legacy columns/tables and all prior decisions remain; no deletion/rewrite.
+Planned tests and recovery are bound in the acceptance spec. Material execution
+status remains `BLOCKED — INDEPENDENT DB-GOV ENTRY GATE NOT YET SATISFIED`.

@@ -98,3 +98,21 @@ MISSION-04 remains:
 `WAITING — NOT STARTED`
 
 No MISSION-03 seal or MISSION-04 start is authorized by this assessment.
+
+## v1.1 post-resubmission assessment
+
+MISSION-03 completed the exact Greenfield physical design and acceptance work
+requested by the controlling re-review. Legacy password/safe-copy assumptions
+are closed, and DBP-002/003A/B/C/004/005/006 are now resubmitted with precise
+dependencies, physical objects, RLS/UoW, retention and recovery.
+
+The next database step is not additional MISSION-03 design: it is an independent
+DB-GOV disposition. Until the independent authority records bounded rehearsal
+approval, candidate Entity/DbContext/Migration/adapter authoring and PostgreSQL
+rehearsal remain prohibited. This blocks W2–W4 durable exit and final regression.
+
+The durable Library recheck confirmed W6 authority is explicitly absent rather
+than merely undiscovered. W5 executable/signing, W7 Production/release policy
+and W8 external preservation inventory also remain external. Consequently the
+valid state is `EXTERNAL EVIDENCE REQUIRED — ALL CURRENT INTERNAL WORK
+EXHAUSTED`, not a seal.

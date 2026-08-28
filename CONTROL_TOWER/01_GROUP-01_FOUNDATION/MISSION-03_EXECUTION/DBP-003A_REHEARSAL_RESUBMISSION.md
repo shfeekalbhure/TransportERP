@@ -1,5 +1,13 @@
 # DBP-003A — Revised Rehearsal Entry Resubmission
 
+> Greenfield update: the legacy-target assumptions in sections 1, 5, 6, 7 and
+> 9 are preserved as historical v0.9 evidence but are superseded by
+> `DB-BASELINE-001` and
+> `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0`.
+> The controlling password/session/device/audit physical design and requested
+> rehearsal decision are in that v1.0 bundle. No rehearsal is authorized by
+> this notice.
+
 - Revision: `v0.9`
 - Product baseline: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Execution baseline: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
@@ -191,6 +199,8 @@ PostgreSQL evidence.
 
 ## 5. PasswordHash gate
 
+Historical v0.9 classification:
+
 `PASSWORD-HASH BASELINE = ACCESS BLOCKED — UNKNOWN — REQUIRES AUTHORIZED EXTERNAL EVIDENCE`
 
 Required authorized non-Production evidence:
@@ -209,6 +219,14 @@ Required authorized non-Production evidence:
 Until this evidence is accepted, login persistence and endpoint activation are
 prohibited. The proposal deliberately selects no algorithm.
 
+Greenfield supersession: there are no legacy target users or hashes. Therefore
+legacy prefix/fixture/verifier/rehash evidence is `NOT APPLICABLE` to the target.
+The v1.0 bundle defines a new-system PBKDF2-HMAC-SHA-256 versioned envelope,
+constant-time verifier, enrollment/reset, failure window, lockout,
+administrative unlock, security-version and session-family invalidation policy.
+That policy is submitted for independent DB-GOV/security review; it is not
+active Product code.
+
 ## 6. Safe-copy package
 
 The repository-preparable package is defined by:
@@ -223,6 +241,12 @@ PostgreSQL version, schema-only and custom-format backup digests, successful
 restore to a new disposable instance, applied-history/role/extension/RLS
 inventory, pre/post reconciliation, and operator/time/environment identity.
 
+Greenfield supersession: a copy of a pre-existing target is not required. The
+replacement rehearsal source is a new empty PostgreSQL 18.6 database to which
+the ten governed migrations are applied. Backup/restore remains mandatory for
+the base-ten and candidate states, as specified by
+`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`.
+
 ## 7. Dependency split
 
 - `DBP-003A`: this revised design is resubmitted; rehearsal remains closed until
@@ -232,6 +256,12 @@ inventory, pre/post reconciliation, and operator/time/environment identity.
   registry/assignment authority and tenant-consistent keys.
 - `DBP-003C`: `DEFERRED — DEPENDS ON DBP-002/006` for proof protocol,
   nonce/replay uniqueness and retention/legal-hold/key-recovery policy.
+
+Greenfield v1.0 disposition: the legacy password/safe-copy conditions above no
+longer apply. The exact membership, session, registry/assignment, proof,
+nonce/replay, retention and shared Audit/UoW designs are now jointly specified
+in the v1.0 bundle. DBP-003A/B/C still await an independent bounded rehearsal
+decision.
 
 ## 8. PR #69 disposition
 

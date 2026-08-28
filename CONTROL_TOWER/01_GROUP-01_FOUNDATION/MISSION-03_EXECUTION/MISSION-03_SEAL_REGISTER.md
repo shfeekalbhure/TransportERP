@@ -2,6 +2,7 @@
 
 - Current state: `OPEN — NOT SEALED`
 - Current checkpoint: `MISSION-03-INTERNAL-EXHAUSTION-v1.0`
+- Current superseding checkpoint: `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1`
 - Seal issued: `NO`
 - Handoff to MISSION-04: `PROHIBITED`
 
@@ -26,3 +27,15 @@ material exits and W8 entry remain unsatisfied for the external/DB-GOV reasons
 in `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. Therefore seal remains `NO` and
 the valid handoff state is `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK
 EXHAUSTED`. MISSION-04 is not started.
+
+## v1.1 Greenfield resubmission seal check
+
+- Exact physical DBP bundle: `COMPLETE / RESUBMITTED`.
+- Independent DB-GOV rehearsal decision: `NOT YET RECORDED`.
+- Candidate migrations/rehearsal: `NOT AUTHORIZED / NOT RUN`.
+- W2–W4 durable exits: `BLOCKED BY INDEPENDENT DB-GOV`.
+- W5/W6/W7/W8 exits: `EXTERNAL AUTHORITY/EVIDENCE BLOCKED`.
+- Final regression: `NOT ELIGIBLE`.
+- Seal: `OPEN — NOT SEALED`.
+
+No self-approval, transferred PASS or premature MISSION-04 start is recorded.

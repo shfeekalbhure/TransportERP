@@ -62,3 +62,22 @@ it does not authorize expansion of REM-600/610/620.
 - canonical Ticketing W1/W2/W3/UAT contracts;
 - DB-GOV decisions for DBP-007/008 and clarification of DBP-009 remediation
   ownership.
+
+## v1.1 durable-source recheck
+
+The durable Library sources were searched and the three relevant records were
+read in full. They confirm rather than clear the gate:
+
+- `03_FUTURE_PROGRAM_PRESERVATION_AND_GATES_V1.0.md` classifies post-DEPART
+  Shipping and Ticketing as preserved future families and requires a named
+  governing package, ownership, API, permission/lifecycle/offline contracts and
+  independent review before implementation.
+- `سجل_HOLD_الدفعة_الثانية_التذاكر_والركاب.csv` keeps all 11 Ticketing/Passenger
+  screens at `HOLD / NEEDS_AUTHORITY`; several contracts are still OPEN/NEXT.
+- `27_V113_SOURCE_FAMILY_COVERAGE_CLOSURE_V0.1_AO-001_2026-08-15.md` states
+  `GOVERNING PROMOTION = NONE` and preserves its material as historical/
+  superseded or future evidence.
+
+Therefore no W6 code/schema/API/screen implementation becomes authorized.
+This is not a missing-search inference; the located sources explicitly deny
+current promotion.

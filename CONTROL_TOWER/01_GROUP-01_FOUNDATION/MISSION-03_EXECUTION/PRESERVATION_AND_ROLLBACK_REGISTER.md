@@ -78,3 +78,18 @@ The entries below document recovery paths only. The candidate is adopted for bou
   performed.
 - External worktrees/stashes/local-only assets remain unknown. This blocks W8
   cleanup but not the additive branch evidence already produced.
+
+## v1.1 Greenfield proposal preservation
+
+- Product SHA/tree, entities, DbContext, snapshot and ten migration files remain
+  byte-identical to `5d1352b...` / `00512125...`.
+- Existing legacy-shaped tables/columns, V1 audit reader, Sync rows, accounting
+  history and all prior governance decisions are retained; the design proposes
+  no destructive removal or history rewrite.
+- The new proposal is additive and dependency-ordered. Before activation a
+  failed rehearsal recovers by discarding the named disposable database; after
+  activation it requires forward correction or verified restore.
+- Audit and posted accounting history are append-only; device/session/offline
+  revocation is a state transition, not deletion; legal hold defeats cleanup.
+- Governance-only rollback is a normal revert of the resubmission commit. No
+  Product/database rollback applies because neither changed.

@@ -1,5 +1,10 @@
 # DBP-002/004/005/006 — Review Preparation
 
+> Superseded for current Greenfield physical-design review by
+> `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0` and
+> `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`. This file remains preserved as
+> the pre-Greenfield preparation record and grants no execution authority.
+
 - Bound governance: `e8d443dc5cefb6a1ea131311cfb7b2ded569b8df`
 - Source baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
 - State: `READY FOR INDEPENDENT DB-GOV DESIGN REVIEW — NO REHEARSAL OR EXECUTION AUTHORITY`

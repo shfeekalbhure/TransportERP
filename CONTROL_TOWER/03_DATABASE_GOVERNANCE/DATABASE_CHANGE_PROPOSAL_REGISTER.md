@@ -13,13 +13,13 @@ Accordingly, legacy target-row inventory/backfill, legacy PasswordHash compatibi
 | Proposal ID | Requirement | Proposed Change | Review Status | Execution Status |
 |---|---|---|---|---|
 | `DBP-001` | `A-ARCH-002 / REM-100` | mapper correction plus any later conditional data repair | `REVIEWED — CODE-ONLY FIX IMPLEMENTED` | `GREENFIELD TARGET HAS NO LEGACY POPULATION TO REPAIR; NO NEW DB/DATA ACTION AUTHORIZED` |
-| `DBP-002` | tenant isolation | explicit membership plus tenant-consistent keys/FKs/indexes/checks and reviewed RLS/equivalent | `GREENFIELD RE-REVIEW COMPLETE` | `REVISE BEFORE REHEARSAL — EXACT PHYSICAL MEMBERSHIP/GRANT/RLS DESIGN REQUIRED` |
-| `DBP-003A` | auth/session | security-version/lockout state and durable session-family persistence | `GREENFIELD RE-REVIEW COMPLETE` | `REVISE BEFORE REHEARSAL — FINAL AUDIT/UOW + CANDIDATE PERSISTENCE MAPPING + NEW-SYSTEM PASSWORD POLICY REQUIRED` |
-| `DBP-003B` | device registry/assignment | membership-bound device registry and assignment persistence | `GREENFIELD RE-REVIEW COMPLETE` | `DEFERRED — DEPENDS ON DBP-002/006` |
-| `DBP-003C` | PoP/nonce/replay | proof-key, nonce/JTI and replay persistence | `GREENFIELD RE-REVIEW COMPLETE` | `DEFERRED — DEPENDS ON DBP-002/006; RETENTION/LEGAL-HOLD/RECOVERY REQUIRED` |
-| `DBP-004` | audit integrity | V2 hash marker/canonicalizer, stream sequence and atomic append boundary | `GREENFIELD RE-REVIEW COMPLETE` | `REVISE BEFORE REHEARSAL — EXACT V2 SCHEMA/CANONICALIZER/APPEND-ONLY/UOW DESIGN REQUIRED` |
-| `DBP-005` | accounting integrity | durable Settlement/journal/source links, uniqueness, reversal, period/currency/SoD constraints | `GREENFIELD RE-REVIEW COMPLETE` | `REVISE BEFORE REHEARSAL — EXACT CONSTRAINTS + ACCOUNT-ROLE/FX/ROUNDING/PERIOD/SOD CONTRACT REQUIRED` |
-| `DBP-006` | Offline protocol | typed queue/inbox/outbox/result, version/fingerprint, claim/lease, device/proof/retention fields | `GREENFIELD RE-REVIEW COMPLETE` | `REVISE BEFORE REHEARSAL — EXACT PHYSICAL PROTOCOL/RETENTION + DBP-002/003 DEPENDENCIES REQUIRED` |
+| `DBP-002` | tenant isolation | explicit membership plus tenant-consistent keys/FKs/indexes/checks and reviewed RLS/equivalent | `v1.0 EXACT PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-003A` | auth/session | security-version/lockout state and durable session-family persistence | `v1.0 EXACT PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-003B` | device registry/assignment | membership-bound device registry and assignment persistence | `v1.0 DEPENDENCY-BOUND PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-003C` | PoP/nonce/replay | proof-key, nonce/JTI and replay persistence | `v1.0 DEPENDENCY-BOUND PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-004` | audit integrity | V2 hash marker/canonicalizer, stream sequence and atomic append boundary | `v1.0 EXACT PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-005` | accounting integrity | durable Settlement/journal/source links, uniqueness, reversal, period/currency/SoD constraints | `v1.0 EXACT PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
+| `DBP-006` | Offline protocol | typed queue/inbox/outbox/result, version/fingerprint, claim/lease, device/proof/retention fields | `v1.0 EXACT PHYSICAL DESIGN RESUBMITTED` | `AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY` |
 | `DBP-007` | shipping lifecycle | later custody/delivery/settlement/return/claim/customs persistence | `REVIEWED — DEFERRED INTAKE` | `BLOCKED — CANONICAL SCOPE REQUIRED` |
 | `DBP-008` | ticketing | Ticketing tables/entities/indexes/numbering after contract authority | `REVIEWED — DEFERRED INTAKE` | `BLOCKED — CANONICAL REQUIREMENTS REQUIRED` |
 | `DBP-009` | reporting | read projections/materialized views if approved | `REVIEWED — DEFERRED INTAKE` | `BLOCKED — REPORTING REQUIREMENTS REQUIRED` |
@@ -58,5 +58,21 @@ Current result:
 `GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
 
 No proposal currently has `APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY` status.
+
+## v1.0 exact physical-design resubmission
+
+MISSION-03 has supplied the exact proposal-specific design requested by the
+controlling re-review in:
+
+- `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md`;
+- `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`.
+
+The bundle fixes migration order, membership/grant/RLS physical shapes,
+new-system password and lockout policy, session/family atomic rotation,
+device/assignment/PoP/replay persistence, caller-owned Audit V2/Outbox UoW,
+Settlement constraints and typed Offline inbox/queue/result/lease, plus
+retention/legal-hold/cleanup/recovery. It requests but does not grant bounded
+Greenfield rehearsal authority. Material execution remains `NONE` until an
+independent DB-GOV decision is recorded.
 
 Every deletion remains `CANDIDATE FOR REMOVAL` until separately proved and authorized.

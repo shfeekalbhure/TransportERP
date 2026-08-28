@@ -86,3 +86,23 @@ self-decide any DB-GOV approval.
   rehearsal authorization.
 - DBP-002/003/004/005/006 material portions remain exactly behind independent
   DB-GOV. `PASSWORD-HASH BASELINE = EXTERNAL EVIDENCE REQUIRED`.
+
+## v1.1 Greenfield exact physical-design resubmission
+
+`DB-BASELINE-001` supersedes the old legacy password and existing-target
+safe-copy assumptions. The new-system policy and exact physical bundle are:
+
+- `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0`;
+- `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`.
+
+The bundle specifies DBP-002/003A/B/C/004/005/006 independently and in migration
+dependency order. It includes exact membership/grant/RLS, PBKDF2 password and
+lockout/reset, security/session rotation, device/PoP/replay, Audit V2 caller-UoW,
+Settlement, Offline inbox/queue/result/lease, retention/hold and recovery gates.
+
+Current disposition for every listed DBP:
+
+`RESUBMITTED — AWAITING INDEPENDENT DB-GOV DECISION — NO REHEARSAL AUTHORITY`
+
+No Entity, DbContext, Migration, Schema, Seed, persistent adapter, database row,
+Production configuration or credential was created or changed.

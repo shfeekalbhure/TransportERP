@@ -205,3 +205,20 @@ runs pass every test executable on the repository/CI/disposable surface. They
 do not prove durable DBP session/device/accounting/offline persistence,
 executable client runtime/signing, W6 business scope or Production recovery;
 those gates remain explicitly blocked rather than receiving a transferred PASS.
+
+## v1.1 Greenfield proposal-validation checkpoint
+
+- Exact Product SHA/tree: unchanged `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` /
+  `00512125311306a43474638195d2cad97b76118e`.
+- Executed database tests: `NONE — NO REHEARSAL AUTHORITY`.
+- Executed Product tests: `NONE — NO PRODUCT DELTA`.
+- Governance validation: `git diff --check`, proposal completeness crosswalk,
+  detached SHA-256 manifest and exact-head/tree comparison.
+- Planned DBP tests: fully enumerated in
+  `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` for tenant/RLS, password/session,
+  device/PoP/replay, Audit V2, Settlement, Offline, concurrency/failure,
+  model drift and backup/restore.
+- Result: `DESIGN PASS / EXECUTION BLOCKED — INDEPENDENT DB-GOV DECISION REQUIRED`.
+
+No prior run is transferred to candidate persistence. Runs `33201720896` and
+`33201720878` remain evidence only for the unchanged ten-migration baseline.

@@ -140,3 +140,28 @@ The internal package is ready for Control Tower intake, but not for MISSION-04:
 Required evidence is enumerated in `CONTROL_TOWER_HANDOFF.md` and
 `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. MISSION-03 remains
 `IN PROGRESS — OPEN — NOT SEALED`; MISSION-04 remains WAIT.
+
+## v1.1 Greenfield exact-design resubmission addendum
+
+DB-BASELINE-001 removed the prior legacy target/hash/safe-copy assumptions.
+MISSION-03 then re-inventoried the exact Product model at `5d1352b...` and
+completed the repository-resolvable physical work for DBP-002/003A/B/C/004/005/
+006. The controlling files are the v1.0 exact physical bundle and Greenfield
+rehearsal acceptance specification.
+
+The design now fixes membership and grants, tenant composite keys/RLS roles,
+new-system password/lockout/reset, security version and atomic session-family
+rotation, device assignment/PoP/nonce/replay, caller-owned Audit V2/Outbox UoW,
+Settlement/journal/source-link integrity, typed Offline inbox/queue/result/
+claim/lease, retention/legal hold and recovery. Product/DB/Production change in
+this checkpoint is `NONE`.
+
+Independent DB-GOV has not yet reviewed this resubmission and MISSION-03 cannot
+approve itself. Therefore candidate migrations, PostgreSQL rehearsal and W2–W4
+durable implementation remain legally blocked. A durable-source recheck also
+confirmed that W6 inputs explicitly remain future/HOLD and grant no programming
+promotion. Executable client/signing, Production readiness and external Git
+preservation evidence remain outside the available repository/session.
+
+Disposition: `EXTERNAL EVIDENCE REQUIRED — ALL CURRENT INTERNAL WORK EXHAUSTED`.
+MISSION-03 remains open and MISSION-04 remains WAIT.

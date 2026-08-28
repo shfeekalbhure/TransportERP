@@ -1,7 +1,7 @@
 # MISSION-03 Execution Output Manifest
 
-- Package: `MISSION-03-INTERNAL-EXHAUSTION-v1.0`
-- State: `OPEN — NOT SEALED — EXTERNAL EVIDENCE REQUIRED; ALL INTERNAL WORK EXHAUSTED`
+- Package: `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1`
+- State: `OPEN — NOT SEALED — EXACT PHYSICAL DESIGNS COMPLETE; INDEPENDENT DB-GOV/EXTERNAL EVIDENCE REQUIRED`
 - Product baseline: `2ec6cccf...` / tree `516247dd...`
 - Execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / tree `00512125311306a43474638195d2cad97b76118e`
 - Product state: `bounded W1/W2/W3/W5 controls and W7 disposable recovery evidence`; no Product DB/migration/data change
@@ -29,6 +29,8 @@
 | `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` | submitted durable local-session/device persistence proposal | reviewed input; revision required |
 | `DBP-003_DB_GOV_REVIEW_DECISION.md` | independent exact-diff/raw-CI/model/design/dependency/rehearsal decision | `003A REVISE; 003B/C DEFERRED; NO MIGRATION AUTHORITY` |
 | `DBP-003A_REHEARSAL_RESUBMISSION.md` | revised physical/transaction/audit/retry/failure design | resubmitted design; no self-approval |
+| `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md` | exact Greenfield membership/session/device/audit/Settlement/Offline physical bundle | v1.0 resubmitted; awaiting independent DB-GOV |
+| `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` | ordered PostgreSQL 18.6 migration/negative/concurrency/failure/restore acceptance | prepared; not run without authority |
 | `DBP003A_SAFE_COPY_READONLY_INVENTORY.sql` | safe-copy schema/role/RLS/data-shape inventory | prepared; read-only; not run |
 | `DBP003A_RECONCILIATION.sql` | pre/post/restore reconciliation template | prepared; read-only; not run |
 | `DBP003A_REHEARSAL_RUNBOOK.md` | backup/restore/rehearsal/failure/recovery sequence | prepared; authorization required |
@@ -49,11 +51,14 @@
 | `EXECUTION_OUTPUT_SHA256.txt` | detached hashes for the prior v0.7 submission checkpoint | retained historical checkpoint |
 | `EXECUTION_OUTPUT_SHA256_v0.8.txt` | detached hashes for this DB-GOV review checkpoint | generated after content stabilization |
 | `EXECUTION_OUTPUT_SHA256_v0.9.txt` | detached hashes for the end-to-end gate checkpoint | generated after content stabilization |
-| `EXECUTION_OUTPUT_SHA256_v1.0.txt` | detached hashes for the internal-exhaustion checkpoint | current; validated with `sha256sum -c` |
+| `EXECUTION_OUTPUT_SHA256_v1.0.txt` | detached hashes for the internal-exhaustion checkpoint | historical; validated with `sha256sum -c` at that checkpoint |
+| `EXECUTION_OUTPUT_SHA256_v1.1.txt` | detached hashes for the Greenfield exact-design resubmission | current v1.1; generated after content stabilization |
 | `MISSION-03_SEAL_REGISTER.md` | seal state | `NOT SEALED` |
 | `CONTROL_TOWER_HANDOFF.md` | DBP-003 review decision checkpoint; not final handoff | `NOT READY FOR M04` |
 
-This manifest is provisional and not a seal. Later mission work must issue a new version and detached hashes; the prior v0.7 hash file remains historical and must not be represented as current.
+This manifest is provisional and not a seal. Later mission work must issue a
+new version and detached hashes; prior hash files remain historical and must
+not be represented as current.
 
-The v1.0 detached hash list is generated only after this package is stabilized.
-Prior v0.7/v0.8/v0.9 hash files remain immutable historical checkpoints.
+The v1.1 detached hash list is generated only after this package is stabilized.
+Prior v0.7/v0.8/v0.9/v1.0 hash files remain immutable historical checkpoints.

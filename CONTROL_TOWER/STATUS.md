@@ -1,14 +1,14 @@
 # CONTROL TOWER STATUS
 
 - Snapshot Asia/Aden: `2026-08-28`
-- Workspace: `CONTROL TOWER — MISSION-03 GREENFIELD DB-GOV RE-REVIEW COMPLETE / PROPOSAL REVISION REQUIRED`
+- Workspace: `CONTROL TOWER — MISSION-03 EXACT GREENFIELD DBP DESIGNS RESUBMITTED / INDEPENDENT REVIEW REQUIRED`
 - Branch: `governance/control-tower-20260828`
 - Governance update scope: `CONTROL_TOWER files only`
 - Group 01: `IN PROGRESS`
 - Mission 01 Deep Audit: `SEALED — COMPLETE`
 - MASTER/GATE v2.0: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - MISSION-02: `v1.2 SEALED — DELIVERED TO CONTROL TOWER — STOP`
-- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; GREENFIELD DB-GOV RE-REVIEW COMPLETE; DESIGN REVISION CONTINUES`
+- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; EXACT DBP DESIGNS RESUBMITTED; INDEPENDENT DB-GOV DECISION REQUIRED`
 - MISSION-04: `WAITING — MISSION-03 NOT SEALED`
 - MISSION-05: `WAITING`
 - Database Governance DB-GOV-001: `ACTIVE — GREENFIELD LEGACY BLOCKERS CLEARED; DBP-002/003A/004/005/006 REVISE BEFORE REHEARSAL; DBP-003B/C DEFERRED`
@@ -74,6 +74,15 @@ Current proposal decisions:
 - unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
 
 No Entity, DbContext, Migration, Schema, Seed, persistent adapter, Product data, Production credential or Production database change is authorized by this status.
+
+## Exact-design resubmission received
+
+MISSION-03 completed the requested physical specification in
+`DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0` and
+`GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md`. The central proposal register now
+records DBP-002/003A/B/C/004/005/006 as resubmitted and awaiting independent
+decision. This status does not perform that independent review and grants no
+rehearsal authority.
 
 ## Remaining non-DB / external blockers
 

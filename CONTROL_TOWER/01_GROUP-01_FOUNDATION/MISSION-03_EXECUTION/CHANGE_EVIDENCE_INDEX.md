@@ -71,5 +71,10 @@
 | `M03-EV-067` | W6 external-source exhaustion | named Library refs + `governance/...-screens-workspace@0ded42b...` | references available as analysis/locators only; READY FOR PROGRAMMING remains false |
 | `M03-EV-068` | second W7 recovery failure | `3602b97...`; run `33201475594`; job `98951714878`; artifact `9697944620` | backup/restore marker passed; reconciliation queried migration history in wrong schema; evidence retained |
 | `M03-EV-069` | corrected disposable recovery | `5d1352b...` / tree `00512125...`; run `33201720878`; job `98952548655`; artifact `9698042284` | PASS; 10 migration rows reconciled after backup/restore; artifact SHA-256 `4de574c1...` |
+| `M03-EV-070` | DB-BASELINE-001 Greenfield rebind and controlling DB-GOV re-review | governance `fc2e28f...`; central decision and proposal register | legacy target/hash/safe-copy blockers cleared; exact proposal design required; no rehearsal authority |
+| `M03-EV-071` | exact current-model and migration inventory | Product `5d1352b...`; DbContext/entities/ten migration implementations | required membership/session/device/Audit V2/Settlement/Offline durable objects absent; no candidate migration |
+| `M03-EV-072` | exact physical-design resubmission | `DBP-002_003_004_005_006_EXACT_PHYSICAL_DESIGN_RESUBMISSION.md v1.0` | DBP-002/003A/B/C/004/005/006 physical shapes, dependency order, RLS, UoW, retention and recovery fixed; no DDL executed |
+| `M03-EV-073` | Greenfield rehearsal acceptance | `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` | proposal-specific negative/concurrency/failure/restore matrix fixed; execution awaits independent DB-GOV |
+| `M03-EV-074` | W6 durable-source recheck | Library `03_FUTURE_PROGRAM_PRESERVATION_AND_GATES_V1.0.md`, Ticketing HOLD register, V1.13 coverage closure | Ticketing/Shipping future scope preserved but no programming promotion; Ticketing screen rows remain HOLD/NEEDS_AUTHORITY |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.
