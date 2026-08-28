@@ -1,0 +1,99 @@
+name: MISSION-03 W7 Disposable Recovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mission-03-w7-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backup-restore:
+    name: W7 / PostgreSQL backup and restore rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+      ALLOW_DISPOSABLE_RECOVERY: '1'
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      SOURCE_DB: transporterptest
+      RESTORE_DB: transporterprestore
+      EVIDENCE_DIR: mission-03-recovery-artifacts
+    steps:
+      - name: Checkout exact execution SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind evidence to exact SHA and tree
+        shell: bash
+        run: |
+          mkdir -p mission-03-recovery-artifacts
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          {
+            echo "ref=${GITHUB_REF}"
+            echo "sha=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse HEAD^{tree})"
+            echo "parent=$(git rev-parse HEAD^)"
+          } | tee mission-03-recovery-artifacts/exact-sha.txt
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Apply governed migration lineage to disposable source
+        shell: bash
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.0
+          dotnet restore TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+          dotnet ef migrations has-pending-model-changes \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-recovery-artifacts/model-drift.txt
+          dotnet ef database update \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            | tee mission-03-recovery-artifacts/migration-apply.txt
+
+      - name: Rehearse disposable backup and restore
+        shell: bash
+        run: bash eng/recovery/disposable-postgresql-backup-restore.sh
+
+      - name: Hash complete evidence package
+        if: always()
+        shell: bash
+        run: |
+          find mission-03-recovery-artifacts -maxdepth 1 -type f ! -name ALL_SHA256.txt \
+            -print0 | sort -z | xargs -0 sha256sum > mission-03-recovery-artifacts/ALL_SHA256.txt
+
+      - name: Upload W7 recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mission-03-w7-recovery-${{ github.sha }}
+          path: mission-03-recovery-artifacts
+          if-no-files-found: error
