@@ -63,20 +63,22 @@ PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714a
 ## MASTER REPORT + RECONCILIATION GATE
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `REOPEN`
-- Reopen basis: owner/repository authority has designated the authoritative product ref and full SHA.
-- Required target: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
-- Required action: revalidate all affected current-state claims, findings, blockers, counts, preservation classifications, and every mandatory gate condition on the exact SHA; preserve the sealed v1.0 package; create a new version, hashes, seal, and handoff.
-- Do not convert the gate to READY merely because the authority blocker is resolved. Other critical evidence gaps must be independently resolved or remain explicit blockers.
-- Next permitted action: perform read-only MASTER/GATE revalidation only.
+- `CURRENT DIRECTIVE`: `STOP`
+- Recorded disposition: `MASTER/GATE v2.0 — SEALED — DELIVERED TO CONTROL TOWER — STOP`.
+- Formal gate: `READY FOR REMEDIATION PLANNING`.
+- Authoritative target: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
+- Package: `MISSION-01_DEEP_AUDIT/99_MASTER/v2.0/`; all 14 detached hashes verified.
+- v1.0 remains preserved as historical sealed evidence.
+- Next permitted action: none unless controlled `REOPEN` is issued.
 
 ## MISSION-02
 
-- `CURRENT DIRECTIVE`: `WAIT — PENDING REVALIDATED MISSION-01 GATE`
-- Owner-decision blocker for authoritative line: `RESOLVED`.
-- Prerequisite: the reopened MISSION-01 gate must be resealed and formally state `READY FOR REMEDIATION PLANNING`.
-- If the revalidated gate is READY, Control Tower shall change MISSION-02 to `START` automatically without another owner message.
-- If the revalidated gate remains NOT READY, retain WAIT/HOLD only for the evidence conditions explicitly identified by the new gate.
+- `CURRENT DIRECTIVE`: `START`
+- Prerequisite: `SATISFIED — MISSION-01 MASTER/GATE v2.0 SEALED / READY FOR REMEDIATION PLANNING`.
+- State: `IN PROGRESS — PLANNING ONLY`.
+- Required action: directly reverify each finding before it enters the phased plan; define priorities, dependencies, preservation, tests, rollback/recovery, and explicit unknowns.
+- Binding first gates: preservation; `A-ARCH-002`; `DB-GOV-001`; exact-SHA quality matrix; security/tenant/device; transaction/Accounting ADR; PR69 adoption analysis; release/recovery evidence.
+- No implementation, Source, Tests, Migrations, Database, Production, merge, cleanup, or destructive Git action is authorized.
 
 ## MISSION-03
 

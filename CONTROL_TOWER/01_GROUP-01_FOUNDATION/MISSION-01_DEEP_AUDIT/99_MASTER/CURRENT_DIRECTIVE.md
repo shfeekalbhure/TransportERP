@@ -1,6 +1,6 @@
 # CURRENT DIRECTIVE — MISSION-01 MASTER
 
-`REOPEN — REVALIDATE GATE ON OWNER-DESIGNATED AUTHORITATIVE PRODUCT LINE`
+`STOP — MASTER/GATE v2.0 SEALED — DELIVERED TO CONTROL TOWER`
 
 Owner authority has resolved the authoritative-line blocker through:
 
@@ -10,15 +10,13 @@ Authoritative product line for revalidation:
 
 `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 
-The previously sealed MASTER/GATE v1.0 remains preserved and immutable as historical evidence. Do not overwrite it silently.
+The previously sealed MASTER/GATE v1.0 remains preserved and immutable as historical evidence. MASTER/GATE v2.0 is sealed in `99_MASTER/v2.0/` and supersedes v1.0 only for the current-line and gate decision.
 
-Required action:
+Completed action:
 
-1. Revalidate all findings, blockers, tree/count assertions, current-state classifications, and gate conditions affected by authoritative-line uncertainty against the exact SHA above.
-2. Preserve all other unresolved critical evidence gaps unless independently resolved by evidence.
-3. Reclassify PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714ad84e307eb84fe5f` as `UNMERGED REMEDIATION / FINAL CANDIDATE`, not CURRENT.
-4. Produce a new version of the MASTER/GATE package with new hashes, manifest, seal, and handoff.
-5. If and only if every mandatory gate condition is satisfied, issue `READY FOR REMEDIATION PLANNING` and permit MISSION-02.
-6. If critical evidence gaps remain, issue the correct negative/conditional gate and identify exactly what still blocks MISSION-02.
+1. All 64 governing rows, P0/P1, counts, line classifications, PR69 candidate evidence, unknowns, and mandatory gate conditions were revalidated.
+2. The v2.0 package passed all 14 detached SHA-256 checks.
+3. The formal gate is `READY FOR REMEDIATION PLANNING`.
+4. MISSION-02 has been started in planning-only mode.
 
-No Source, Tests, Migrations, Database, Production, merge, cleanup, or destructive Git action is authorized by this directive.
+No further MASTER editing is allowed without `REOPEN`. No Source, Tests, Migrations, Database, Production, merge, cleanup, implementation, or destructive Git action is authorized.

@@ -6,8 +6,8 @@
 | 2 | MISSION-01 | TEAM-D | A/B/C1 accepted | Complete reconciliation package | SEALED | D v1.1 accepted; historical v1.0 preserved |
 | 3 | MISSION-01 | TEAM-C2 | TEAM-D sealed | Target architecture proposal | SEALED | C2 v1.1 accepted |
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
-| 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | REOPENED / IN PROGRESS | Authoritative line blocker RESOLVED. Revalidate remaining critical evidence gaps on `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`; preserve prior sealed gate. |
-| 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | WAITING | Await resealed revalidated gate; no owner-line decision remains outstanding |
+| 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
+| 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | IN PROGRESS — START | Planning-only directive issued; first preservation/baseline workstream started; no implementation authority |
 | 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | WAITING | |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | |
