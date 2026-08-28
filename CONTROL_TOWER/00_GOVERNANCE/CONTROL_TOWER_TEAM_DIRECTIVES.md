@@ -41,21 +41,21 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-C2
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `CONTINUE`
+- `CURRENT DIRECTIVE`: `STOP`
 - Prerequisite: TEAM-D must be sealed and handed off.
 - Required scope: Build the target architecture proposal from the sealed TEAM-D reconciliation and predecessor packages without treating proposals as implemented state.
 - Governing limitations: `AUTHORITATIVE CURRENT LINE` remains `UNKNOWN`; confirmed P0 risks and `DB-GOV-001` must be preserved as design constraints, not silently remediated.
-- Recorded disposition: `v1.1 IN PROGRESS`; TEAM-D v1.1 accepted and handed off at `2026-08-28T02:40:21Z`.
-- Next permitted action: Preserve v1.0; reassess accepted C1/D v1.1 and seal a complete chronology-correct C2 v1.1.
+- Recorded disposition: `v1.1 SEALED — DELIVERED TO CONTROL TOWER — STOP`; v1.0 is preserved and superseded for downstream use.
+- Next permitted action: None unless new evidence causes `REOPEN REQUIRED`.
 
 ## TEAM-E
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `HOLD`
+- `CURRENT DIRECTIVE`: `CONTINUE`
 - Prerequisite: TEAM-C2 must be sealed and handed off.
 - Required scope: Multidisciplinary advisory review of sealed TEAM-D reconciliation and TEAM-C2 target proposal; review every P0/P1 and a justified P2/P3 sample; preserve assurance and authority limitations.
-- Recorded disposition: `HOLD FINAL SEAL — REOPEN CHAIN C1 → D → C2 REQUIRED`; current review evidence is preserved.
-- Next permitted action: Resume/re-review after accepted C1 v1.1, D v1.1, and C2 v1.1 handoffs; do not seal now.
+- Recorded disposition: `IN PROGRESS — FINAL ADVISORY RE-REVIEW`; accepted C1/D/C2 v1.1 inputs handed off at `2026-08-28T02:50:28Z`.
+- Next permitted action: Revalidate every P0/P1 and justified P2/P3 sample, dispose `BLK-B-001` truthfully, then issue complete final TEAM-E package.
 
 ## MASTER REPORT + RECONCILIATION GATE
 
