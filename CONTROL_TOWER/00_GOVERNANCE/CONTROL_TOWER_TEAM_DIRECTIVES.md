@@ -5,7 +5,7 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## TEAM-A
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `REOPEN`
+- `CURRENT DIRECTIVE`: `STOP`
 - Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - Reason: Package, manifest hashes, seal, and handoff were verified and centrally received.
 - Next permitted action: None unless Control Tower records `REOPEN`.
