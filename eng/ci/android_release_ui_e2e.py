@@ -104,6 +104,7 @@ SCROLL_OBSERVATION_IDS = tuple(candidate for candidate, _ in FOCUS_OWNER_ALLOWLI
     "driver_queue_party",
     "driver_operation_list",
 )
+FIND_EXHAUSTION_DIAGNOSTIC_TARGETS = frozenset({"driver_sign_out"})
 
 
 class UiE2EFailure(RuntimeError):
@@ -327,23 +328,100 @@ class Driver:
             return "UNCHANGED"
         return "UNKNOWN"
 
+    @staticmethod
+    def _safe_axis_relation(
+        target_start: int,
+        target_end: int,
+        root_start: int,
+        root_end: int,
+        before: str,
+        after: str,
+    ) -> str:
+        if target_end <= root_start:
+            return before
+        if target_start >= root_end:
+            return after
+        if target_start >= root_start and target_end <= root_end:
+            return "INSIDE"
+        return "OVERLAP"
+
+    def safe_find_exhaustion_observation(
+        self,
+        automation_id: str,
+        up_movements: list[str],
+        down_movements: list[str],
+    ) -> str:
+        if automation_id not in FIND_EXHAUSTION_DIAGNOSTIC_TARGETS:
+            return "OBSERVATION_UNAVAILABLE"
+        up = up_movements[-1] if up_movements and up_movements[-1] in {
+            "MOVED", "UNCHANGED", "UNKNOWN"
+        } else "UNKNOWN"
+        down = down_movements[-1] if down_movements and down_movements[-1] in {
+            "MOVED", "UNCHANGED", "UNKNOWN"
+        } else "UNKNOWN"
+        unavailable = (
+            "COUNT_UNKNOWN:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:"
+            f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+        )
+        try:
+            hierarchy = self.dump()
+            targets = [
+                node for node in hierarchy.iter("node") if self._matches(node, automation_id)
+            ]
+            count = "ZERO" if not targets else "ONE" if len(targets) == 1 else "MULTIPLE"
+            if len(targets) != 1:
+                return (
+                    f"COUNT_{count}:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:"
+                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+                )
+            target = targets[0]
+            visible = self._safe_boolean(target.attrib.get("visible-to-user"))
+            enabled = self._safe_boolean(target.attrib.get("enabled"))
+            roots = [
+                node for node in hierarchy.iter("node") if self._matches(node, AUTOMATION_ROOT)
+            ]
+            if len(roots) != 1:
+                return (
+                    f"COUNT_ONE:VISIBLE_{visible}:ENABLED_{enabled}:"
+                    f"X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}"
+                )
+            target_left, target_top, target_right, target_bottom = self._rectangle(target)
+            root_left, root_top, root_right, root_bottom = self._rectangle(roots[0])
+            x_relation = self._safe_axis_relation(
+                target_left, target_right, root_left, root_right, "LEFT", "RIGHT"
+            )
+            y_relation = self._safe_axis_relation(
+                target_top, target_bottom, root_top, root_bottom, "ABOVE", "BELOW"
+            )
+            return (
+                f"COUNT_ONE:VISIBLE_{visible}:ENABLED_{enabled}:"
+                f"X_{x_relation}:Y_{y_relation}:UP_{up}:DOWN_{down}"
+            )
+        except (UiE2EFailure, ValueError, TypeError):
+            return unavailable
+
     def find(self, automation_id: str) -> ET.Element:
         found = self.nodes(automation_id)
         if found:
             return found[0]
-        movements: list[str] = []
+        up_movements: list[str] = []
         for _ in range(6):
-            movements.append(self._scroll(toward_bottom=False))
+            up_movements.append(self._scroll(toward_bottom=False))
             found = self.nodes(automation_id, self._last_scroll_hierarchy)
             if found:
                 return found[0]
+        down_movements: list[str] = []
         for _ in range(14):
-            movements.append(self._scroll(toward_bottom=True))
+            down_movements.append(self._scroll(toward_bottom=True))
             found = self.nodes(automation_id, self._last_scroll_hierarchy)
             if found:
                 return found[0]
-        movement = self._aggregate_scroll_movement(movements)
-        raise UiE2EFailure(f"UI_AUTOMATION_ID_NOT_FOUND:SCROLL_{movement}")
+        movement = self._aggregate_scroll_movement(up_movements + down_movements)
+        observation = self.safe_find_exhaustion_observation(
+            automation_id, up_movements, down_movements
+        )
+        suffix = "" if observation == "OBSERVATION_UNAVAILABLE" else f":{observation}"
+        raise UiE2EFailure(f"UI_AUTOMATION_ID_NOT_FOUND:SCROLL_{movement}{suffix}")
 
     def wait_for(
         self,

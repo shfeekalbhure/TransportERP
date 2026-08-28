@@ -34,6 +34,70 @@ class OperationMobileTests(unittest.TestCase):
                     HARNESS.mobile_for_operation_suffix(suffix)
 
 
+class FindExhaustionObservationTests(unittest.TestCase):
+    def test_allowlisted_target_reports_only_safe_relative_geometry(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        hierarchy = HARNESS.ET.fromstring(
+            '<hierarchy><node resource-id="driver_main_scroll" bounds="[0,100][320,640]">'
+            '<node resource-id="driver_sign_out" visible-to-user="false" enabled="true" '
+            'bounds="[10,10][100,50]" text="secret-bearing-text" />'
+            '</node></hierarchy>'
+        )
+        driver.dump = lambda: hierarchy
+        actual = driver.safe_find_exhaustion_observation(
+            "driver_sign_out", ["MOVED"], ["UNCHANGED"]
+        )
+        self.assertEqual(
+            "COUNT_ONE:VISIBLE_FALSE:ENABLED_TRUE:X_INSIDE:Y_ABOVE:"
+            "UP_MOVED:DOWN_UNCHANGED",
+            actual,
+        )
+        self.assertNotIn("secret", actual)
+        self.assertNotIn("[10,10]", actual)
+
+    def test_ambiguous_target_count_never_reports_node_values(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        hierarchy = HARNESS.ET.fromstring(
+            '<hierarchy><node resource-id="driver_sign_out" text="first-secret" />'
+            '<node resource-id="driver_sign_out" text="second-secret" /></hierarchy>'
+        )
+        driver.dump = lambda: hierarchy
+        actual = driver.safe_find_exhaustion_observation(
+            "driver_sign_out", ["MOVED"], ["MOVED"]
+        )
+        self.assertEqual(
+            "COUNT_MULTIPLE:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:X_UNKNOWN:Y_UNKNOWN:"
+            "UP_MOVED:DOWN_MOVED",
+            actual,
+        )
+        self.assertNotIn("secret", actual)
+
+    def test_non_allowlisted_target_is_not_observed(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.dump = mock.Mock(side_effect=AssertionError("must not inspect hierarchy"))
+        self.assertEqual(
+            "OBSERVATION_UNAVAILABLE",
+            driver.safe_find_exhaustion_observation("secret-target", [], []),
+        )
+        driver.dump.assert_not_called()
+
+    def test_find_appends_only_allowlisted_exhaustion_observation(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.nodes = lambda *_: []
+        driver._scroll = lambda toward_bottom: "MOVED"
+        observation = (
+            "COUNT_ZERO:VISIBLE_UNKNOWN:ENABLED_UNKNOWN:X_UNKNOWN:Y_UNKNOWN:"
+            "UP_MOVED:DOWN_MOVED"
+        )
+        driver.safe_find_exhaustion_observation = mock.Mock(return_value=observation)
+        with self.assertRaisesRegex(
+            HARNESS.UiE2EFailure,
+            "^UI_AUTOMATION_ID_NOT_FOUND:SCROLL_MOVED:COUNT_ZERO:",
+        ) as raised:
+            driver.find("driver_sign_out")
+        self.assertNotIn("driver_sign_out", str(raised.exception))
+
+
 class ConditionalImeDismissalTests(unittest.TestCase):
     def driver(
         self,

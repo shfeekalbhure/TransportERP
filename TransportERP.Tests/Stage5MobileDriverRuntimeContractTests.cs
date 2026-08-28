@@ -212,6 +212,25 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.DoesNotContain("completed.stdout", focusObservation, StringComparison.Ordinal);
         Assert.DoesNotContain("{payload}", focusObservation, StringComparison.Ordinal);
         Assert.DoesNotContain("return payload", focusObservation, StringComparison.Ordinal);
+        Assert.Contains(
+            "FIND_EXHAUSTION_DIAGNOSTIC_TARGETS = frozenset({\"driver_sign_out\"})",
+            script, StringComparison.Ordinal);
+        Assert.Contains("def safe_find_exhaustion_observation(", script,
+            StringComparison.Ordinal);
+        Assert.Contains("X_UNKNOWN:Y_UNKNOWN:UP_{up}:DOWN_{down}", script,
+            StringComparison.Ordinal);
+        Assert.Contains("suffix = \"\" if observation == \"OBSERVATION_UNAVAILABLE\"",
+            script, StringComparison.Ordinal);
+        var findObservationStart = script.IndexOf(
+            "    def safe_find_exhaustion_observation(", StringComparison.Ordinal);
+        var findObservationEnd = script.IndexOf(
+            "    def find(self, automation_id: str)", findObservationStart,
+            StringComparison.Ordinal);
+        Assert.True(findObservationStart >= 0 && findObservationEnd > findObservationStart);
+        var findObservation = script[findObservationStart..findObservationEnd];
+        Assert.DoesNotContain("attrib.get(\"text\")", findObservation,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("{automation_id}", findObservation, StringComparison.Ordinal);
         var setTextStart = script.IndexOf("    def set_text(", StringComparison.Ordinal);
         var setTextEnd = script.IndexOf(
             "    def focus_input(self, automation_id: str)", setTextStart, StringComparison.Ordinal);
@@ -251,7 +270,11 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "test_state_read_failure_stops_before_focus_or_type",
                      "test_state_read_failure_after_back_stops_before_focus_or_type",
                      "test_hidden_requires_exactly_one_visible_root",
-                     "test_root_dump_failure_remains_fail_closed"
+                     "test_root_dump_failure_remains_fail_closed",
+                     "test_allowlisted_target_reports_only_safe_relative_geometry",
+                     "test_ambiguous_target_count_never_reports_node_values",
+                     "test_non_allowlisted_target_is_not_observed",
+                     "test_find_appends_only_allowlisted_exhaustion_observation"
                  })
             Assert.Contains(stateMachineTest, stateMachineTests, StringComparison.Ordinal);
         foreach (var safeResultTest in new[]
