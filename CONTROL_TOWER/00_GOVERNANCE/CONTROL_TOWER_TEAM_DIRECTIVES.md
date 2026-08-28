@@ -60,15 +60,17 @@ Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWN
 ## MASTER REPORT + RECONCILIATION GATE
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `START`
+- `CURRENT DIRECTIVE`: `STOP`
 - Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed.
-- Next permitted action: Produce the Master report and reconciliation gate from sealed accepted inputs only. Do not claim a final current line or `READY FOR REMEDIATION PLANNING` while authoritative-line and other critical gate evidence remain unresolved.
+- Recorded disposition: `SEALED — DELIVERED TO CONTROL TOWER — STOP`; gate `NOT READY — CRITICAL EVIDENCE GAPS REMAIN`.
+- Next permitted action: None unless Control Tower records `REOPEN` after required evidence/authority is supplied.
 
 ## MISSION-02
 
-- `CURRENT DIRECTIVE`: `WAIT`
+- `CURRENT DIRECTIVE`: `HOLD — OWNER DECISION REQUIRED`
 - Prerequisite: MISSION-01 gate must be formally `READY FOR REMEDIATION PLANNING`.
-- Next permitted action: Wait for a Control Tower `START` directive.
+- Blocker: owner/repository authority must designate one authoritative product ref and full SHA; the gate must then be revalidated. Other recorded evidence gaps also remain.
+- Next permitted action: Do not start. Resume only after the owner decision and a sealed revalidated MISSION-01 gate.
 
 ## MISSION-03
 

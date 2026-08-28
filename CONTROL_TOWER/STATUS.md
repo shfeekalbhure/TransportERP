@@ -1,29 +1,30 @@
 # CONTROL TOWER STATUS
 
-- Snapshot UTC: `2026-08-28T03:01:31Z`
-- Snapshot Asia/Aden: `2026-08-28T06:01:31+03:00`
-- Workspace: `CONTROL TOWER IN PROGRESS — OWNER DELEGATION ACTIVE`
+- Snapshot UTC: `2026-08-28T03:10:00Z`
+- Snapshot Asia/Aden: `2026-08-28T06:10:00+03:00`
+- Workspace: `CONTROL TOWER HOLD — OWNER DECISION REQUIRED`
 - Branch: `governance/control-tower-20260828`
 - Control Tower baseline HEAD before this governance package: `8a36f88b56a43cd5b47277b645ba2030ed3da4f1`
 - Remote Control Tower branch HEAD before this governance package: `8a36f88b56a43cd5b47277b645ba2030ed3da4f1`
 - Governance update scope: `CONTROL_TOWER files only`
-- Group 01: `IN PROGRESS`
-- Mission 01 Deep Audit: `IN PROGRESS — MASTER/GATE`
+- Group 01: `HOLD — OWNER DECISION REQUIRED`
+- Mission 01 Deep Audit: `SEALED — GATE NOT READY — HOLD`
 - TEAM-A: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - TEAM-B: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - TEAM-C1: `SEALED — v1.1 DELIVERED TO CONTROL TOWER — STOP`
 - TEAM-D: `SEALED — v1.1 DELIVERED TO CONTROL TOWER — STOP`
 - TEAM-C2: `SEALED — v1.1 DELIVERED TO CONTROL TOWER — STOP`
 - TEAM-E: `SEALED — v1.1 DELIVERED TO CONTROL TOWER — STOP`
-- MASTER/GATE: `IN PROGRESS — START`
+- MASTER/GATE: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
+- MISSION-02 transition: `OWNER DECISION REQUIRED — NOT STARTED`
 - Audit baseline: `ISSUED — HOLD RECORDED`
 - Authoritative current product line: `UNKNOWN — REQUIRES OWNER/REPOSITORY VERIFICATION`
-- Missions 02–05: `PREPARED / WAITING FOR PREREQUISITES`
+- Missions 02–05: `MISSION-02 OWNER DECISION REQUIRED; MISSION-03–05 WAITING`
 - Group 02: `PREPARED / LOCKED UNTIL FOUNDATION CLOSURE`
 - Database Governance DB-GOV-001: `ACTIVE`
 - Product Source modifications by Control Tower: `PROHIBITED`
 - Control Tower active-session monitoring cadence: `EVERY 10 MINUTES WHILE ACTIVE`
-- Monitoring state: `ACTIVE — NEXT PLANNED CHECK 2026-08-28T03:11:31Z`
+- Monitoring state: `MONITORING PAUSED — REQUIRES RESUME`
 
 ## Current blockers
 
@@ -39,4 +40,6 @@ TEAM-C2 v1.1: `SEALED — DELIVERED TO CONTROL TOWER — STOP`; report SHA-256 `
 
 TEAM-E v1.1: `SEALED — DELIVERED TO CONTROL TOWER — STOP`; report SHA-256 `8e6ac9b928fbb3ad954537e45f471328370aa273c2854f9b46a9a58884158d48`.
 
-TEAM-A, TEAM-B, corrected TEAM-C1 v1.1, TEAM-D v1.1, TEAM-C2 v1.1, and TEAM-E v1.1 are sealed. MASTER/GATE is in progress. Missions 02–05 remain waiting. The authoritative-line item is carried to the gate and may require an owner/repository authority decision before MISSION-02.
+MASTER/GATE: `SEALED — NOT READY — STOP`; Master SHA `30eb7a91d3d704fc5212ca817e839d42a796088500f77c00308d619662563df8`; Gate SHA `d1e7f40864717a76ecb83058672e8384aa8cb0881df0f2cdee31605768a31e34`.
+
+All MISSION-01 team packages and MASTER/GATE are sealed and stopped. The gate is `NOT READY — CRITICAL EVIDENCE GAPS REMAIN`; MISSION-02–05 remain unstarted. `OWNER DECISION REQUIRED`: designate the authoritative product ref and full SHA, after which affected evidence and the gate must be revalidated before MISSION-02.

@@ -1,7 +1,9 @@
 # CURRENT DIRECTIVE — MISSION-01 MASTER
 
-`START`
+`STOP`
 
 Prerequisite satisfied: TEAM-E v1.1 is `SEALED — DELIVERED TO CONTROL TOWER — STOP`, and the reconciliation-reopen cycle is closed.
 
-Read all accepted sealed packages and issue the required Master Deep Audit Report plus Audit Reconciliation Gate. Preserve `AUTHORITATIVE CURRENT LINE = UNKNOWN`, both P0s, `BLK-B-001` provenance/mitigation, `E-BLK-013`, DB-GOV-001, and all inaccessible evidence. Do not issue `READY FOR REMEDIATION PLANNING` unless every governing gate condition is actually satisfied. Do not implement or modify product files.
+MASTER/GATE v1.0 is accepted: all 12 detached hashes passed; Master SHA `30eb7a91d3d704fc5212ca817e839d42a796088500f77c00308d619662563df8`; Gate SHA `d1e7f40864717a76ecb83058672e8384aa8cb0881df0f2cdee31605768a31e34`.
+
+Formal gate: `NOT READY — CRITICAL EVIDENCE GAPS REMAIN`. Do not edit this sealed package. Reconsideration requires owner/repository designation of the authoritative ref/full SHA, required evidence, `REOPEN`, revalidation, a new version, hashes, seal, and handoff.
