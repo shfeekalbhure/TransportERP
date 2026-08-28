@@ -354,11 +354,14 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                 schema: "transport_erp",
                 table: "user_role_grants",
                 columns: new[] { "UserId", "Status" });
+            migrationBuilder.Sql(GreenfieldDbp002PhysicalSql.Up);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(GreenfieldDbp002PhysicalSql.Down);
+
             migrationBuilder.DropTable(
                 name: "user_permission_grants",
                 schema: "transport_erp");
