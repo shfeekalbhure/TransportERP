@@ -1,0 +1,39 @@
+name: MISSION-03 DBP-002 Test Connection Wiring Fix
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+    paths:
+      - .github/workflows/mission-03-dbp002-test-connstr-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-connection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Export the connection variable names required by all PostgreSQL regression suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/mission-03-dbp002-rehearsal-v3.sh')
+          s = p.read_text()
+          old = "export TRANSPORTERP_TEST_POSTGRESQL='Host=127.0.0.1;Port=5432;Database=mission03_regression;Username=postgres;Password=postgres;Include Error Detail=true'"
+          new = "export TRANSPORTERP_TEST_CONNSTR='Host=127.0.0.1;Port=5432;Database=mission03_regression;Username=postgres;Password=postgres;Include Error Detail=true'\nexport TRANSPORTERP_P1_POSTGRES_CONNECTION=\"$TRANSPORTERP_TEST_CONNSTR\"\nexport TRANSPORTERP_TEST_POSTGRESQL=\"$TRANSPORTERP_TEST_CONNSTR\""
+          if old not in s:
+              raise SystemExit('Expected regression connection export not found')
+          p.write_text(s.replace(old, new))
+          PY
+          git diff --check
+          git add scripts/mission-03-dbp002-rehearsal-v3.sh
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'MISSION-03 DBP-002: wire PostgreSQL full regression connection variables'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
