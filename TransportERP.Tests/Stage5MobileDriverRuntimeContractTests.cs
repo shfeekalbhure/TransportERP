@@ -455,7 +455,9 @@ public sealed class Stage5MobileDriverRuntimeContractTests
             StringComparison.Ordinal);
         Assert.DoesNotContain("--cacert \"$tls_dir/server.crt\"", workflow,
             StringComparison.Ordinal);
-        Assert.Contains("/apex/com.android.conscrypt/cacerts/${certificate_alias}", workflow,
+        Assert.Contains("conscrypt_directory = \"/apex/com.android.conscrypt/cacerts\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("certificate_path = f\"{conscrypt_directory}/{self.conscrypt_alias}\"", script,
             StringComparison.Ordinal);
         Assert.Contains("cp -a \"${conscrypt_certificate_directory}/.\"", workflow,
             StringComparison.Ordinal);
