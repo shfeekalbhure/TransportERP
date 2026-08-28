@@ -6,16 +6,16 @@
 | `PRES-002` | M02 parent/delivery and current governance lineage retained | `SATISFIED` |
 | `PRES-003` | sealed M02 checksums passed; sealed predecessors not edited | `SATISFIED` |
 | `PRES-004` | PR69 ref/tree/delta frozen; no merge/rebase/cherry-pick/copy | `SATISFIED` |
-| `PRES-005` | 50 remote heads bundled; current local refs/worktrees/stash inventoried; external workspaces unknown | `PARTIAL — EXTERNAL INVENTORY BLOCKED` |
-| `PRES-006` | ordered migration filenames and SHA-256 hashes captured; applied live history unavailable | `PARTIAL` |
+| `PRES-005` | 50 remote heads bundled; local refs/stash inventoried; an additive detached worktree verifies exact remote execution head `069a311...`; external workspaces remain unknown | `PARTIAL — EXTERNAL INVENTORY BLOCKED` |
+| `PRES-006` | ordered migration hashes retained; model-drift check passed and all 10 committed migrations applied to an empty disposable PostgreSQL 18.6 DB; live applied history remains unavailable | `SATISFIED FOR EXECUTION / LIVE UNKNOWN` |
 | `PRES-007` | no data access or mutation | `NOT ACTIVATED; LIVE IMPACT UNKNOWN` |
-| `PRES-008` | historical exact-SHA CI retained; no new regression run possible | `PARTIAL` |
+| `PRES-008` | fresh exact-head runs passed before and after REM-100: 124/124 then 125/125 | `SATISFIED FOR W0/W1` |
 | `PRES-009` | audit bytes untouched | `PRESERVED / NOT ACTIVATED` |
 | `PRES-010` | accounting history untouched | `PRESERVED / NOT ACTIVATED` |
-| `PRES-011` | contracts untouched | `PRESERVED / NOT ACTIVATED` |
+| `PRES-011` | contracts untouched; only missing mapper assignment was added | `SATISFIED FOR REM-100` |
 | `PRES-012` | Offline payload/history untouched | `PRESERVED / NOT ACTIVATED` |
 | `PRES-013` | screen/client assets untouched | `PRESERVED / NOT ACTIVATED` |
-| `PRES-014` | 22 C# test files and 103 static attributes counted; runtime discovery unavailable | `PARTIAL` |
+| `PRES-014` | runtime execution retained 124 pre-change tests and added one focused regression; 125/125 pass | `SATISFIED FOR W0/W1` |
 | `PRES-015` | no Production secret/data used; logs record tool absence and synthetic CI only | `SATISFIED FOR W0` |
 
 ## Recovery evidence
@@ -28,4 +28,6 @@
 
 ## Rollback status
 
-No Product change exists to roll back. The execution branch can be recreated exactly from `master@2ec6cccf...`. Governance checkpoint files are isolated to the MISSION-03 directory and remain uncommitted at this point.
+- W0 evidence harness rollback: revert `a48b68023072122c3f71941b861d8b9eeca82d34`; authoritative master is unchanged.
+- REM-100 rollback: revert `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`, restoring the mapper and test files to the W0 tree. No schema/data rollback is required because no DB/data mutation exists.
+- Recovery source remains authoritative master plus the verified preservation bundle. No merge, deletion, force-push or history rewrite was performed.

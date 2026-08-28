@@ -2,7 +2,7 @@
 
 ## Disposition
 
-`W0 EXECUTED — MATERIAL EVIDENCE PRODUCED — EXIT BLOCKED`
+`W0 EXIT CLOSED FOR ISOLATED NON-DESTRUCTIVE EXECUTION — NOT GLOBAL PASS`
 
 W0 started from the sealed MISSION-02 v1.2 package. All 15 detached package hashes passed. The authoritative remote master and PR69 refs remained exactly bound to their recorded SHAs and trees.
 
@@ -29,8 +29,16 @@ The repository exposed 50 remote branch heads and no remote tags. Current local 
 
 ## Runtime evidence
 
-The current worker cannot execute .NET or PostgreSQL; all requested `dotnet` probes exited 127. Exact-SHA GitHub run `32867082533` historically passed core/PostgreSQL and Desktop Library-mode jobs: 124 tests passed with zero failed/skipped, and all 10 migrations applied to PostgreSQL 18.6. No artifacts remain; API boot and Mobile were not covered.
+Disposable run `33181045881` executed at `a48b68023072122c3f71941b861d8b9eeca82d34`, tree `638a4f331e03150fcb9aebf61fbbb4af9f930401`, direct parent authoritative master. Its only tree delta is the W0 evidence workflow. Ubuntu used .NET SDK 10.0.400 and a PostgreSQL 18.6 service; Windows covered Desktop.
+
+- restore and Release builds: PASS;
+- committed migration list/model-drift/apply to empty disposable DB: PASS, all 10 migrations;
+- complete suite: 124 passed, zero failed/skipped;
+- API process booted on `127.0.0.1:5080`; protected endpoint returned expected HTTP 401;
+- Desktop actual configuration: `net10.0-windows`, Library, no entry point; build PASS with one existing nullable warning;
+- Mobile Admin/Customer/Driver actual configuration: `net10.0`, Library, MAUI runtime not ready; all three restore/build probes PASS;
+- retained artifacts: Linux `9689746319` (`fdc6933d...`), Desktop `9689710882` (`c09c6e20...`).
 
 ## Gate decision
 
-W0 exit requires complete preservation inventory and retained exact-SHA restore/build/test/migrate/boot evidence. Those conditions are not fully met. W1 therefore remains blocked, and no Product/DB change was made.
+T-000 and recovery requirements are met for an isolated non-destructive code-only execution path. External workspace/local-only/stash state outside the worker remains `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION`; W0 is not labelled a global PASS and destructive/merge/cleanup operations remain prohibited. Because REM-100 neither merges nor deletes nor touches those assets, the bounded W0 exit is closed and W1 was allowed to proceed.

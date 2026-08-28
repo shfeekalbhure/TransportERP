@@ -1,12 +1,12 @@
 # DB-GOV Execution Register
 
-`DB-GOV-001` is binding. No database, schema, entity, migration, field, relationship, index, constraint, type, seed, precision or numbering change was executed.
+`DB-GOV-001` is binding. No database, schema, entity, migration, field, relationship, index, constraint, type, seed, precision or numbering change was executed. Applying the already-committed migration lineage to an empty disposable PostgreSQL database was verification only.
 
-The central `DATABASE_CURRENT_STATE_REGISTER.md` and `DATABASE_CHANGE_PROPOSAL_REGISTER.md` were inspected and contain no reviewed execution rows.
+The central proposal register was re-read at governance `ebe74e0...`; DBP-001..009 are registered for intake. DBP-001 explicitly authorizes the REM-100 code-only mapper fix after W0 exit while retaining the data-repair prohibition.
 
 | Proposal | Relevant REM | Current execution gate | Result |
 |---|---|---|---|
-| `DBP-001` | `REM-100` | not copied/reconciled as a reviewed central proposal; safe DB baseline unavailable | `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` |
+| `DBP-001` | `REM-100` | code-only mapper path authorized; no schema/migration/data mutation; disposable PostgreSQL test path passed | `CODE-ONLY IMPLEMENTED; DATA ASSESSMENT/REPAIR REMAINS BLOCKED` |
 | `DBP-002` | `REM-210` | tenant cardinality/live schema/roles absent | `BLOCKED` |
 | `DBP-003` | `REM-200/220` | auth/device design and live baseline absent | `BLOCKED` |
 | `DBP-004` | `REM-320` | UoW ADR/legacy sample/live controls absent | `BLOCKED` |
@@ -16,4 +16,4 @@ The central `DATABASE_CURRENT_STATE_REGISTER.md` and `DATABASE_CHANGE_PROPOSAL_R
 | `DBP-008` | `REM-610` | canonical Ticketing requirements absent | `BLOCKED` |
 | `DBP-009` | reporting | requirements absent | `BLOCKED` |
 
-W0 performed only read-only source/migration inventory and hashing. No Production data or credential was used.
+No Production data or credential was used. No affected-row assessment or data repair was attempted.

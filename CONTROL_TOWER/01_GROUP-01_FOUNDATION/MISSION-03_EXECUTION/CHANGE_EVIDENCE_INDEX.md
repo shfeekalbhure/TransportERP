@@ -19,5 +19,11 @@
 | `M03-EV-015` | GitHub artifact query | run `32867082533` | zero retained artifacts |
 | `M03-EV-016` | product change check | execution branch vs authoritative master | zero changed product files |
 | `M03-EV-017` | W1 exact-source preflight | `W1_PREFLIGHT_REPORT.md`; exact master and PR69 file comparison | mapper omission confirmed; PR69 identical; implementation blocked by W0/DBP-001 |
+| `M03-EV-018` | disposable T-000 workflow lineage | `a48b680...` / tree `638a4f33...` / parent exact master `2ec6cccf...` | evidence-only workflow is the sole baseline delta |
+| `M03-EV-019` | W0 exact-head run and retained artifacts | run `33181045881`; artifacts `9689746319`, `9689710882` | both jobs PASS; artifact SHA-256 `fdc6933d...`, `c09c6e20...` |
+| `M03-EV-020` | W0 runtime results | .NET SDK 10.0.400; PostgreSQL 18.6; Windows and Ubuntu runners | restore/build PASS; 10 migrations PASS; 124/124 tests; API listening + HTTP 401; Desktop and Mobile x3 probes PASS |
+| `M03-EV-021` | REM-100 exact diff | before `a48b680...`; after `069a311...`; tree `561d5862...` | one mapper assignment plus one focused PostgreSQL test; no DB/migration change |
+| `M03-EV-022` | REM-100 exact-head verification | run `33181376288`; Linux artifact `9689871882`, SHA-256 `a68e0948...` | 125/125 PASS; focused Volume and split allocation/shipping tests PASS; API/client/migration gates PASS |
+| `M03-EV-023` | W2 dependency revalidation | M02 dependencies/waves plus central DB register at `ebe74e0...` | DEP-005/006/007 and DBP-002/003 remain blocked; no W2 implementation authorized |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

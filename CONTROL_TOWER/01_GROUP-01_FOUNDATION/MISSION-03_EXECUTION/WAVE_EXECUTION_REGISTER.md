@@ -2,9 +2,9 @@
 
 | Wave | Entry result | Work performed | Exit result | Product modification | Next action |
 |---:|---|---|---|---|---|
-| `W0` | `PASS — START AUTHORIZED AND M02 v1.2 HASHES VERIFIED` | exact refs/trees, Git state, 50 remote heads, two worktrees, empty local stash, 378-file tree, 10 projects, 10 migrations, 22 C# test files, 103 static Fact/Theory attributes, 7 workflows, PR69 delta, bundle and recovery test, runtime/CI probes | `BLOCKED — T-000 AND EXTERNAL PRESERVATION INVENTORY INCOMPLETE` | none | provide executable .NET/PostgreSQL/client environment and external workspace inventory; rerun T-000 |
-| `W1` | `FAIL-CLOSED — W0 exit and DBP-001 review absent` | static prerequisite check only | `NOT STARTED` | none | review DBP-001 and satisfy W0 |
-| `W2` | dependency gate unmet | none | `NOT STARTED` | none | W1 then tenant/IdP/DB authority |
+| `W0` | `PASS — START AUTHORIZED AND M02 v1.2 HASHES VERIFIED` | prior preservation inventory plus disposable .NET 10/PostgreSQL 18.6/Windows matrix, restore/build, 10 migrations, 124/124 tests, API boot, Desktop and three Mobile probes, retained artifacts | `CLOSED FOR ISOLATED NON-DESTRUCTIVE EXECUTION — NOT GLOBAL PASS; EXTERNAL INVENTORY UNKNOWN` | evidence workflow only | retain external inventory UNKNOWN; no merge/delete/destructive action until verified |
+| `W1` | `PASS — BOUNDED W0 EXIT AND DBP-001 CODE-ONLY AUTHORITY` | defect re-proved; minimal mapper assignment; create/update/persist/reload PostgreSQL regression; complete regression and shipping/allocation checks | `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION` | two Product/test files; no DB/migration/data change | independent verification in MISSION-04 after M03 handoff |
+| `W2` | `BLOCKED — DEP-005/006/007 AND DBP-002/003` | exact-current dependency revalidation only | `NOT STARTED — NO CODE/DB CHANGE` | none | Control Tower must supply tenant cardinality ADR, IdP/session design, device/PoP policy and DB-GOV execution authority |
 | `W3` | dependency/canonical authority unmet | none | `NOT STARTED` | none | approved UoW/accounting ADR and DB entries |
 | `W4` | dependency/offline authority unmet | none | `NOT STARTED` | none | W2/W3 and operation-level authority |
 | `W5` | dependency/scope/signing unmet | none | `NOT STARTED` | none | stable W2/W4 and client environments |
