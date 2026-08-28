@@ -8,7 +8,7 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED | Execution remains `5d1352b...` / `00512125...`. Post-resubmission Control Tower revalidation found a DB-GOV sequencing conflict: the exact physical design requires DBP-003B/C before DBP-006, while the earlier review decision requires DBP-006 before DBP-003B/C. Coordinated candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring and candidate migration application are on HOLD until a corrected post-resubmission dependency decision is recorded. Unrelated non-destructive M03 work may continue. Remaining non-DB gates are canonical Shipping/Ticketing/screen programming promotion, executable Windows/Android + secure-store/signing proof, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and Git worktree/stash/local-only preservation inventory before W8. |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED — DB-GOV PASS — AUTHORING/REHEARSAL START AUTHORIZED — WAITING FOR WORKER SESSION | Fresh post-correction independent DB-GOV PASS accepts the physical order `DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005` and authorizes bounded candidate authoring plus disposable/Greenfield non-Production PostgreSQL 18.6 rehearsal on the isolated execution branch. Execution head remains `5d1352b...` / tree `00512125...`; no post-authorization candidate/rehearsal worker output is yet evidenced. Production, master merge, destructive Git, preserved-data mutation and PR #69 merge remain prohibited. Remaining non-DB gates include canonical Shipping/Ticketing/screen authority, real Windows/Android runtime + secure-store/signing proof, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and preservation inventory before W8. |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 remains open/not sealed; no final exact-head acceptance package/seal/handoff exists |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
@@ -30,16 +30,20 @@ PR #69 at `601f2d1cad61d62e590a6714ad84e307eb84fe5f` remains `UNMERGED REMEDIATI
 
 ## Current MISSION-03 priority
 
-Controlling DB-GOV revalidation:
+Controlling DB-GOV decision:
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_CORRECTION_PASS_DECISION_2026-08-29.md`
 
 Current result:
 
-`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+`PASS RECORDED — BOUNDED GREENFIELD AUTHORING/REHEARSAL AUTHORIZED`
 
-Required immediate work is non-destructive: reconcile the DBP-003B/C ↔ DBP-006 physical order, bind the corrected package to the exact current execution SHA/tree and acceptance matrix, then obtain a fresh independent DB-GOV decision after that corrected repository package exists. Do not author or apply candidate database persistence changes before that gate reopens.
+Only approved coordinated physical order:
 
-`MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is an open historical checkpoint after this Control Tower transition. The next worker checkpoint must regenerate its manifest and detached SHA-256 set.
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-No `OWNER DECISION REQUIRED` is active for the immediate work.
+The prior DBP-order hold is closed. The execution team may begin proposal-scoped candidate Entity/DbContext/additive forward-only Migration/persistent-adapter authoring and disposable Greenfield PostgreSQL 18.6 rehearsal under the mission-local directive. Before any candidate migration application it must retain exact candidate SHA/tree/parent, changed-file inventory, migration/hash, model snapshot diff, generated SQL, pending-model evidence, empty-baseline catalog and backup/restore proof, plus proposal-specific recovery/test evidence.
+
+Repository evidence still shows the execution branch at the pre-authorization head `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`; therefore the authorized DB workstream is `START AUTHORIZED — WAITING FOR WORKER SESSION`, not completed and not separately promoted as post-authorization execution evidence.
+
+No `OWNER DECISION REQUIRED` is active for the immediate authorized work. MISSION-04 remains WAIT until MISSION-03 is conclusively sealed and handed off.
