@@ -234,7 +234,9 @@ reconcile_structural ef-candidate sql-candidate
 
 # Full regression, including bypass-RLS resolver regression, on a third fresh database.
 docker exec "$PGCID" createdb -U postgres mission03_regression
-export TRANSPORTERP_TEST_POSTGRESQL='Host=127.0.0.1;Port=5432;Database=mission03_regression;Username=postgres;Password=postgres;Include Error Detail=true'
+export TRANSPORTERP_TEST_CONNSTR='Host=127.0.0.1;Port=5432;Database=mission03_regression;Username=postgres;Password=postgres;Include Error Detail=true'
+export TRANSPORTERP_P1_POSTGRES_CONNECTION="$TRANSPORTERP_TEST_CONNSTR"
+export TRANSPORTERP_TEST_POSTGRESQL="$TRANSPORTERP_TEST_CONNSTR"
 dotnet test TransportERP.Tests/TransportERP.Tests.csproj -c Release --no-restore --logger 'trx;LogFileName=dbp002-full-regression-v3.trx' | tee evidence/full-regression.log
 grep -Eq 'Passed!|Passed:' evidence/full-regression.log
 find TransportERP.Tests -name dbp002-full-regression-v3.trx -exec cp {} evidence/ \; || true
