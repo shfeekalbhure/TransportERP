@@ -1,10 +1,10 @@
 # MISSION-03 Execution Output Manifest
 
-- Package: `MISSION-03-END-TO-END-GATE-ASSESSMENT-v0.9`
-- State: `OPEN — NOT SEALED — REPOSITORY-RESOLVABLE PREPARATION EXHAUSTED; OWNER/EXTERNAL GATES`
+- Package: `MISSION-03-INTERNAL-EXHAUSTION-v1.0`
+- State: `OPEN — NOT SEALED — EXTERNAL EVIDENCE REQUIRED; ALL INTERNAL WORK EXHAUSTED`
 - Product baseline: `2ec6cccf...` / tree `516247dd...`
-- Execution head: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / tree `ea940e592cb11f5fff736e68055ebf77d2eece88`
-- Product state: `prior W1/W2 packages preserved; W2-B2B code-only independently adopted at cc67ad2...`; no DB/migration/data change
+- Execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / tree `00512125311306a43474638195d2cad97b76118e`
+- Product state: `bounded W1/W2/W3/W5 controls and W7 disposable recovery evidence`; no Product DB/migration/data change
 
 | Output | Function | State |
 |---|---|---|
@@ -40,16 +40,20 @@
 | `W6_BUSINESS_SCOPE_REVALIDATION.md` | Shipping/Ticketing/screen authority reconciliation | prepared; canonical inputs external |
 | `W7_W8_READINESS_AND_ENTRY.md` | release/recovery/privacy readiness and W8 entry decision | prepared; W8 not entered |
 | `MISSION03_COMPLETION_GATE_ASSESSMENT.md` | bounded owner decisions and exact external completion blockers | current governing checkpoint assessment |
+| `TRANSPORTERP_MASTER_REMEDIATION_EXECUTION_REPORT.md` | consolidated execution, tests, impacts, deviations and external handoff | v1.0 internal-exhaustion report |
+| `OWNER_DECISION_REBIND_AND_PACKAGE_DISPOSITION.md` | AUTH/ACC/OFFLINE/CLIENT rebind | current |
+| `DBP-002_004_005_006_REVIEW_PREPARATION.md` | consolidated DB-GOV review inputs | prepared; no execution authority |
 | `W2_PLAN_DEVIATION.md` | superseding directive, containment and completed revalidation trail | historical deviation resolved for six bounded packages |
 | `W2_CONTROL_TOWER_REVALIDATION_DECISION.md` | independent package-by-package disposition and new baseline | adopted bounded checkpoint |
 | `EVIDENCE/W0/*` | generated exact-baseline evidence | checkpoint |
 | `EXECUTION_OUTPUT_SHA256.txt` | detached hashes for the prior v0.7 submission checkpoint | retained historical checkpoint |
 | `EXECUTION_OUTPUT_SHA256_v0.8.txt` | detached hashes for this DB-GOV review checkpoint | generated after content stabilization |
 | `EXECUTION_OUTPUT_SHA256_v0.9.txt` | detached hashes for the end-to-end gate checkpoint | generated after content stabilization |
+| `EXECUTION_OUTPUT_SHA256_v1.0.txt` | detached hashes for the internal-exhaustion checkpoint | current; validated with `sha256sum -c` |
 | `MISSION-03_SEAL_REGISTER.md` | seal state | `NOT SEALED` |
 | `CONTROL_TOWER_HANDOFF.md` | DBP-003 review decision checkpoint; not final handoff | `NOT READY FOR M04` |
 
 This manifest is provisional and not a seal. Later mission work must issue a new version and detached hashes; the prior v0.7 hash file remains historical and must not be represented as current.
 
-The v0.9 detached hash list is generated only after this package is stabilized.
-Prior v0.7/v0.8 hash files remain immutable historical checkpoints.
+The v1.0 detached hash list is generated only after this package is stabilized.
+Prior v0.7/v0.8/v0.9 hash files remain immutable historical checkpoints.

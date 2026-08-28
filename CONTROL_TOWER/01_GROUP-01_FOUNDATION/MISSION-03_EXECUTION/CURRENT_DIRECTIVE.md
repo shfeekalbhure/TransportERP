@@ -1,13 +1,13 @@
 # CURRENT DIRECTIVE — MISSION-03
 
-`CONTINUE — ACC-001 / OFFLINE-001 / CLIENT-001 RESOLVED; EXECUTE ALL ENABLED WORK; EXTERNAL + DB-GOV GATES REMAIN`
+`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED; KEEP MISSION-03 OPEN`
 
 ## Current execution basis
 
 - MISSION-03: `IN PROGRESS — OPEN — NOT SEALED`.
 - Product authority: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
-- Execution branch/baseline: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`.
-- Execution tree: `ea940e592cb11f5fff736e68055ebf77d2eece88`.
+- Execution branch/baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`.
+- Execution tree: `00512125311306a43474638195d2cad97b76118e`.
 - W2 B2B code-only checkpoint: independently reverified; run `33191269475 = 146/146 PASS`; no new persistence Product change.
 - PR #69 remains `UNMERGED EVIDENCE ONLY`.
 
@@ -90,5 +90,13 @@ A blocked package must not stop unrelated satisfied packages.
 Do not merge to master. Do not rebase, cherry-pick, force-push or rewrite history. Do not mutate Production. Do not commit signing/private secrets. Do not cross a DB-GOV gate. Do not start MISSION-04 before a valid final MISSION-03 seal/handoff.
 
 Before every material Product commit, re-fetch this file and the governance branch head.
+
+## v1.0 exhaustion directive
+
+All work that can lawfully be completed from repository source, reachable
+history, current CI and disposable synthetic evidence has now been executed or
+prepared. Preserve `5d1352b...` as the bounded execution head. Do not open a
+new Product package until its named external evidence and independent DB-GOV
+decision are available. Do not seal MISSION-03 and do not start MISSION-04.
 
 Return to the owner only for a genuinely new owner-reserved decision not covered by AUTH-001/ACC-001/OFFLINE-001/CLIENT-001, or an external evidence source that cannot be obtained through authorized project resources. Otherwise continue toward full MISSION-03 completion.

@@ -19,3 +19,17 @@
 | `M03-W6-PREP` | `REM-600/610/620` | business/screens findings | `cc67ad2...` | Shipping/Ticketing/screen authority reconciliation | W2/W3/W4 and canonical inputs unmet | P2-D/legacy/current identities preserved | DBP-007/008 blocked; DBP-009 ownership deviation | T-600/610/620 matrix prepared | route/module disabled; no history deletion | `PREPARATION COMPLETE — EXTERNAL CANONICAL INPUTS REQUIRED` |
 | `M03-W7-PREP` | `REM-700/710/720/730/900` | QA/supply/release/privacy/tooling | `cc67ad2...` | gap inventory and ordered CI/supply/recovery/privacy preparation | stable W2-W6 absent | raw failure/evidence retained | no DB/deploy action | final matrix designed | no release on missing gate | `PREPARATION COMPLETE — FINAL W7 ENTRY BLOCKED` |
 | `M03-W8-*` | `REM-800` | structural debt | `cc67ad2...` | entry/candidate inventory only | W7 stable baseline and complete preservation absent | all assets preserved | no physical DB/refactor work | T-800 not runnable | no move/rename/delete | `NOT ENTERED — W8 MUST REMAIN LAST` |
+
+## v1.0 executed work packages
+
+| Work ID | Before → after | Files / purpose | Verification / rollback | Result |
+|---|---|---|---|---|
+| `M03-W2-FC` | `cc67ad2... → 4a1e3e8...` | `TransportErpDbContextFactoryTests.cs`; prove design tooling refuses an absent isolated connection | revert `4a1e3e8...`; no DB rollback | `IMPLEMENTED — exact-head superseded by later passing lineage` |
+| `M03-W2-C1-HARDEN` | `4a1e3e8... → 777cb5a...` | API default-deny server device trust + negative tests; `0d705b3...` build import failure fixed by `777cb5a...` | ordered normal revert; failed run `33200155177` retained; run `33200344976` passed 148/148 | `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION` |
+| `M03-W3-C` | `777cb5a... → 5b246ed...` | direct receipt/payment post guard + unchanged-state/zero-journal tests | revert `5b246ed...`; no DB/data rollback | `IMPLEMENTED — run 33200589267 passed 150/150` |
+| `M03-W5-ID` | `5b246ed... → 30f89df...` | three approved Android application IDs; iOS deferred from release surface | revert `30f89df...`; no package published | `IMPLEMENTED — run 33200829088 passed; runtime remains unproved` |
+| `M03-W2-B2B-ATOMIC` | `30f89df... → 86ddaed...` | storage-neutral mutation+audit atomic contract; one-successor/race and failure-injection tests | revert `86ddaed...`; no persistent adapter/data exists | `IMPLEMENTED — run 33201080024 passed` |
+| `M03-W7-RECOVERY` | `86ddaed... → 5d1352b...` | guarded disposable PG18 backup/restore workflow and script | ordered reverts `5d1352b...`, `3602b97...`, `fb93261...`; disposable DBs only | `IMPLEMENTED; failed runs preserved; corrected run 33201720878 PASS` |
+
+No row above introduces an Entity, DbContext model change, Migration, Schema,
+Seed, persistent adapter, Product data repair or Production configuration.

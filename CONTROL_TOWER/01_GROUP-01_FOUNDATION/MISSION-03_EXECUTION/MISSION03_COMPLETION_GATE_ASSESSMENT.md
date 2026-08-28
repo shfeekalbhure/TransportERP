@@ -1,7 +1,7 @@
 # MISSION-03 End-to-End Completion Gate Assessment
 
-- Assessment baseline: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
-- Tree: `ea940e592cb11f5fff736e68055ebf77d2eece88`
+- Assessment baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
+- Tree: `00512125311306a43474638195d2cad97b76118e`
 - Owner decisions update: `ACC-001 / OFFLINE-001 / CLIENT-001 = RESOLVED`
 - Assessment: `MISSION-03 REMAINS OPEN — OWNER DECISION GATE CLEARED; AUTHORIZED EXTERNAL EVIDENCE + DB-GOV GATES REMAIN`
 - Product/DB/Production mutation in this assessment: `NONE`
@@ -84,3 +84,19 @@ The bounded owner-decision gate is closed. MISSION-03 must resume automatically 
 A final regression or seal still cannot be issued until the remaining external evidence and DB-GOV gates necessary for W2–W7 exits are actually satisfied. W8 remains last and cannot begin before a stable W7/preservation baseline. MISSION-04 remains waiting.
 
 This remains an evidence-backed completion blocker only for the explicitly listed external/DB-GOV inputs, not for owner decisions.
+
+## v1.0 internal-exhaustion proof
+
+Since the prior assessment, the execution team implemented every additionally
+independent repository-resolvable control: design-tool fail-closed evidence,
+server-side default-deny device trust, atomic session mutation/audit contracts,
+the ACC-001 direct-posting denial, approved Android package identities, and a
+guarded disposable PostgreSQL backup/restore drill. W4's action classification,
+W6's named external locators and DBP-002/004/005/006 review packages are fully
+recorded. No lawful internal step remains that can satisfy the material exits
+without inventing external truth, self-approving DB-GOV, or falsely treating a
+Library/scaffold build as runtime proof.
+
+Therefore the controlling outcome is:
+
+`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED`

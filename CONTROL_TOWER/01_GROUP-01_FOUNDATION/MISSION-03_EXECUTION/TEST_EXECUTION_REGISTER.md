@@ -184,3 +184,24 @@ The test-only atomic store validates the code contract and is not registered by 
   named authorized safe copy or rehearsal authorization exists.
 - Final MISSION-03 regression is `BLOCKED — W2-W7 EXIT GATES NOT SATISFIED`; it
   was not represented by reusing an earlier run.
+
+## v1.0 exact-head execution and recovery runs
+
+| Run | Exact SHA | Result | Evidence |
+|---:|---|---|---|
+| `33200155177` | `0d705b3...` | `FAIL` | core build CS1061: missing DI extension import; Desktop passed; later migration/test/API steps skipped; Linux artifact `9697430085` retained |
+| `33200344976` | `777cb5a...` | `PASS` | 148/148; 10 migrations/no drift; API 401; artifacts `9697531844` (`714f079d...`) and `9697503552` (`ddb881d3...`) |
+| `33200589267` | `5b246ed...` | `PASS` | 150/150 including direct-post denial/zero-journal tests; artifacts `9697619359` (`beca0c81...`) and `9697592646` (`ae65cf7b...`) |
+| `33200829088` | `30f89df...` | `PASS` | baseline matrix after client package identities; artifacts `9697726068` (`09fd0265...`) and `9697703313` (`bec34339...`) |
+| `33201080024` | `86ddaed...` | `PASS` | atomic session/audit tests and full matrix; artifacts `9697816068` (`59dcb14a...`) and `9697781863` (`715603c4...`) |
+| `33201278545` | `fb93261...` | `FAIL` | migrations/no drift passed; recovery marker absent because Docker stdin was not attached; job `98951060543`; artifact `9697864425` (`ec50b8e6...`) |
+| `33201475594` | `3602b97...` | `FAIL` | backup/restore marker succeeded; reconciliation used unqualified migration-history table; job `98951714878`; artifact `9697944620` (`93728824...`) |
+| `33201720878` | `5d1352b...` | `PASS` | PostgreSQL 18.6 backup/restore, marker match, source/restored migration count `10/10`; job `98952548655`; artifact `9698042284` (`4de574c1...`) |
+| `33201720896` | `5d1352b...` | `PASS` | restore/build; 153/153; 10 migrations/no drift; API 401; Desktop/Mobile build probes; artifacts `9698055349` (`a88a9e55...`) and `9698030402` (`b0159d44...`) |
+
+Final exact execution binding is `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
+with tree `00512125311306a43474638195d2cad97b76118e`. The two final
+runs pass every test executable on the repository/CI/disposable surface. They
+do not prove durable DBP session/device/accounting/offline persistence,
+executable client runtime/signing, W6 business scope or Production recovery;
+those gates remain explicitly blocked rather than receiving a transferred PASS.

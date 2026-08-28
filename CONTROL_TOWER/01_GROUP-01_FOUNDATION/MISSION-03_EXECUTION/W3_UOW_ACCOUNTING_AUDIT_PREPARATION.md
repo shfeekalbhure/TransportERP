@@ -1,8 +1,8 @@
 # W3 — Unit of Work, Accounting and Audit Preparation
 
-- Baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
+- Revalidation baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
 - Product modification: `NONE`
-- State: `DEP-008/010 DESIGN PREPARED; DEP-009 OWNER/ACCOUNTING DECISION REQUIRED — BOUNDED`
+- State: `DEP-009 RESOLVED BY ACC-001; DEP-008/010 DESIGN PREPARED; MATERIAL ACCOUNTING REMAINS DB-GOV GATED`
 
 ## Revalidated defects
 
@@ -31,7 +31,17 @@ atomically. Retry encloses the entire orchestration and uses a stable
 idempotency key. Nested autonomous audit transactions and a physical DbContext
 split are prohibited in W3.
 
-## DEP-009 invariant boundary
+## DEP-009 invariant boundary and ACC-001 rebind
+
+`DEP-009 = RESOLVED FOR EXECUTION DESIGN BY ACC-001`
+
+Collection is operational/auditable, may exist without a pre-created voucher
+and never posts GL directly. A later governed Settlement is the accounting
+boundary and atomically creates/posts the voucher, balanced journal, source
+links, audit and outbox. Reversal appends an inverse entry and never erases
+history. Maker-checker is mandatory; closed periods do not reopen
+automatically; FX, rounding and account roles are configuration authority rather
+than hard-coded values.
 
 The sealed evidence proves these mandatory invariants:
 
@@ -44,21 +54,11 @@ The sealed evidence proves these mandatory invariants:
 - reversal uses a linked inverse entry and never mutates history;
 - journal, source link/state, audit and outbox share one Unit of Work.
 
-The following materially different business choices are not selected by source,
-history, sealed requirements or PR #69:
-
-1. collection requires a pre-posted voucher;
-2. collection atomically creates/posts its voucher and journal;
-3. collection remains operational and a later governed settlement posts it.
-
-Debit/credit mappings, cash/bank/clearing accounts, subledger authority, FX
-rounding policy, SoD roles/thresholds and period reopen/override authority are
-also absent. Therefore:
-
-`DEP-009 = OWNER/ACCOUNTING DECISION REQUIRED — BOUNDED ITEM`
-
-Status-only posting must remain unavailable until that choice and mapping pack
-are authoritative. No guessed mapping is permitted.
+The first two alternatives are rejected. Exact debit/credit mappings,
+cash/bank/clearing accounts, minor-unit/FX configuration values and role
+assignments remain governed configuration evidence; their absence blocks
+durable Settlement activation, not the ACC-001 design or fail-closed posting
+guard. No guessed mapping is permitted.
 
 ## DEP-010 proposed audit design
 
@@ -75,13 +75,13 @@ DBP-004 work. Mixed V1/V2 verification must never rehash historical V1 rows.
 | Package | Current result |
 |---|---|
 | `W3-A / REM-300` | governance ADR prepared; requires Control Tower approval before Product code |
-| `W3-B / REM-310` | invariant matrix prepared; accounting choices isolated to bounded owner decision |
-| `W3-C` | fail-closed status-only posting guard is planned, but cannot precede approved DEP-008 entry |
+| `W3-B / REM-310` | ACC-001 rebound; operational Collection and governed Settlement boundaries fixed |
+| `W3-C` | fail-closed status-only posting guard is independently executable; exact Product SHA/run must be recorded |
 | `W3-D` | orchestration/ledger/mapping/audit/outbox contracts planned; mapping stays injected authority |
 | `W3-E` | payload-complete Waybill finance idempotency hardening planned after entry |
 | `W3-F/G / REM-320` | inactive V2 canonicalizer and transaction-aware audit planned after DEP-008 approval |
 | `W3-H / DBP-004` | proposal requires legacy sample, stream ordering, append-only DB controls and safe-copy evidence |
-| `W3-I / DBP-005` | physical accounting proposal waits for DEP-009 decision and safe-copy evidence |
+| `W3-I / DBP-005` | design proposal enabled by ACC-001; physical work waits for safe-copy/config and independent DB-GOV |
 
 ## Required tests
 
@@ -106,7 +106,8 @@ cross-tenant link or reconciliation mismatch stops the affected package.
 
 ## External evidence gates
 
-- authoritative accounting mapping/subledger/FX/SoD/period decision;
+- authoritative accounting mapping/subledger/FX/rounding configuration values
+  and role assignments consistent with ACC-001;
 - sanitized legacy audit vectors;
 - authorized non-Production applied lineage, roles/triggers and reconciliation
   population;

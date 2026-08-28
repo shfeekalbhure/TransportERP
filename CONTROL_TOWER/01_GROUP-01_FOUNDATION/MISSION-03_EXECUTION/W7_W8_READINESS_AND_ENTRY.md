@@ -18,11 +18,14 @@
 - Audit currently records Waybill party Name/Mobile in `AfterJson` and has no
   central privacy minimization/retention/legal-hold policy.
 - EF design tooling fails closed without its synthetic connection and has
-  disposable migration/model-drift evidence; REM-900 remains partial.
+  disposable migration/model-drift evidence. A focused fail-closed test was
+  added after this revalidation; its exact passing SHA/run is required before
+  REM-900 can advance beyond candidate status.
 
 ## Prepared W7 sequence
 
-1. EF/provenance fail-closed test and authority/supersession index.
+1. EF/provenance fail-closed test and authority/supersession index (Product
+   candidate authored; validation tracked separately).
 2. Current exact dependency graph, SDK/source/assets/vulnerability/deprecation
    evidence before any lock change.
 3. SDK pin/lock/SBOM/license reproducibility increment after graph review.

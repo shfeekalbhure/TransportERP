@@ -8,7 +8,7 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED; OWNER DECISIONS RESOLVED | Execution remains `cc67ad2...` / `ea940e59...`; no new Product/DB mutation is evidenced after the owner decisions. ACC-001/OFFLINE-001/CLIENT-001 are resolved and must be consumed without another owner round-trip. Remaining completion gates are authorized external PasswordHash/safe-copy/audit/accounting/Kurrasa/Ticketing/Shipping/release/privacy/KMS/workspace evidence plus DB-GOV approvals. `DBP-003 = HOLD AT REHEARSAL ENTRY`; revised DBP-003A awaits independent DB-GOV disposition. The v0.9 detached hash register predates later updates to the completion assessment/current directive and is historical for those prior bytes; a new checkpoint version with regenerated hashes is required before the next integrity claim. W8 remains closed. M04 remains WAIT. |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED; ALL INTERNAL WORK EXHAUSTED | Execution is `5d1352b...` / `00512125...`. Owner decisions were consumed. Exact-head runs `33201720878` and `33201720896` pass disposable PG18 recovery and 153/153 baseline tests. No Product DB model/migration/data change exists. Remaining completion gates are authorized external PasswordHash/safe-copy/audit/accounting/business/client-signing/release/privacy/KMS/workspace evidence plus independent DB-GOV. W8 remains closed. M04 remains WAIT. |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 is open/not sealed; no final exact-head acceptance package/seal/handoff exists |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
@@ -20,7 +20,7 @@ Authoritative current product line:
 
 MISSION-03 execution branch:
 
-`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint is `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; Control Tower independently adopted W2 at `9c5b7a1...` and the B2B code-only child at `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` for bounded continued execution. This does not authorize DBP-003 rehearsal authoring, master merge or full W2 exit.
+`codex/mission-03-execution-20260828` — isolated remediation branch. The accepted W1 checkpoint is `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; Control Tower adopted bounded W2 through `cc67ad2...`; current internal-exhaustion head is `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`. This does not authorize DBP-003 material persistence, master merge or full wave exit.
 
 MISSION-02 accepted package:
 

@@ -60,3 +60,21 @@ The entries below document recovery paths only. The candidate is adopted for bou
   refactor occurred.
 - Rollback for this checkpoint is a normal revert of the governance-only v0.9
   commit. Product/database rollback is not applicable.
+
+## v1.0 preservation and rollback evidence
+
+- Linear Product ancestry is `cc67ad2... → 4a1e3e8... → 0d705b3... →
+  777cb5a... → 5b246ed... → 30f89df... → 86ddaed... → fb93261... →
+  3602b97... → 5d1352b...`; master and PR #69 were not moved or merged.
+- The complete delta contains 13 paths and no Entity, DbContext model,
+  migration, schema, seed, persistent adapter, repair or Production setting.
+- Failed runs `33200155177`, `33201278545` and `33201475594` are retained; corrections are
+  additive commits, not rewritten history.
+- Rollback is ordered normal revert per package. The W7 rehearsal databases are
+  name-guarded `transporterptest*`/`transporterprestore*`, local-host-only and
+  ephemeral. No Production rollback exists because Production was untouched.
+- The orphaned local commit `06c1155...` has the same client-identity tree as
+  remote `30f89df...` and remains reachable through local reflog; no cleanup was
+  performed.
+- External worktrees/stashes/local-only assets remain unknown. This blocks W8
+  cleanup but not the additive branch evidence already produced.

@@ -1,14 +1,14 @@
 # CONTROL TOWER STATUS
 
 - Snapshot Asia/Aden: `2026-08-28`
-- Workspace: `CONTROL TOWER — MISSION-03 IN PROGRESS / OWNER DECISIONS RESOLVED`
+- Workspace: `CONTROL TOWER — MISSION-03 INTERNAL WORK EXHAUSTED / EXTERNAL EVIDENCE REQUIRED`
 - Branch: `governance/control-tower-20260828`
 - Governance update scope: `CONTROL_TOWER files only`
 - Group 01: `IN PROGRESS`
 - Mission 01 Deep Audit: `SEALED — COMPLETE`
 - MASTER/GATE v2.0: `SEALED — DELIVERED TO CONTROL TOWER — STOP`
 - MISSION-02: `v1.2 SEALED — DELIVERED TO CONTROL TOWER — STOP`
-- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; AUTH-001/ACC-001/OFFLINE-001/CLIENT-001 RESOLVED; EXTERNAL + DB-GOV GATES REMAIN`
+- MISSION-03: `IN PROGRESS — OPEN — NOT SEALED; ALL INTERNAL WORK EXHAUSTED; AUTHORIZED EXTERNAL EVIDENCE + DB-GOV REQUIRED`
 - MISSION-04: `WAITING — MISSION-03 NOT SEALED`
 - MISSION-05: `WAITING`
 - Database Governance DB-GOV-001: `ACTIVE — DBP-003 HOLD AT REHEARSAL ENTRY; NO UNAUTHORIZED MIGRATION AUTHORITY`
@@ -17,7 +17,7 @@
 ## Authoritative lines
 
 - Product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
-- MISSION-03 execution: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`.
+- MISSION-03 execution: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
 - PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f — UNMERGED EVIDENCE ONLY`.
 
 No merge, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit or unauthorized database/data change is authorized by this status.
@@ -57,6 +57,10 @@ Decision files are under `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/`.
 
 ## Current directive
 
-`CONTINUE — OWNER DECISIONS RESOLVED; EXECUTE ALL ENABLED WORK; EXTERNAL + DB-GOV GATES REMAIN`
+`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED; KEEP MISSION-03 OPEN`
 
-MISSION-03 must continue from `cc67ad2...` into every independently satisfied package and continue DB-GOV proposal/rehearsal preparation without crossing a closed gate. A blocked package must not stop unrelated work. MISSION-04 remains WAIT until a valid MISSION-03 seal and handoff.
+MISSION-03 preserves `5d1352b...`. Final internal runs `33201720878` and
+`33201720896` pass the disposable recovery and 153-test baseline surfaces. No
+further lawful internal package remains; material DB/client/business/release
+and preservation exits require the named external evidence. MISSION-04 remains
+WAIT until a valid MISSION-03 seal and handoff.

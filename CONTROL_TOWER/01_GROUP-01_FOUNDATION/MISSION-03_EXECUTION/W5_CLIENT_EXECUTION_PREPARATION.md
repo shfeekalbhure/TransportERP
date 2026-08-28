@@ -1,7 +1,7 @@
 # W5 — Desktop/Mobile Execution Preparation
 
 - Baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
-- State: `PREPARATION COMPLETE — PRODUCT ENTRY BLOCKED`
+- State: `CLIENT-001 RESOLVED TARGETS — BOUNDED BOOTSTRAP/SAFETY PREPARATION READY; FULL PRODUCT ENTRY BLOCKED`
 - Product modification: `NONE`
 
 ## Truthful client inventory
@@ -23,8 +23,14 @@ storage, logout/revoke, offline queue or reconnect logic.
 - durable session/device/tenant controls are incomplete;
 - W4 Offline authority/runtime is incomplete;
 - no accepted canonical screen/route/supersession registry exists;
-- delivery platforms, application IDs, signing identities/custody and channels
-  are not authorized.
+- release targets are fixed by CLIENT-001, while signing identity/custody,
+  distribution channels and Production artifacts remain external evidence.
+
+Approved release targets are `TransportERP.Desktop` as a Windows executable and
+Android packages `com.altayer.transporterp.admin`,
+`com.altayer.transporterp.customer`, and `com.altayer.transporterp.driver`.
+iOS is deferred. The dormant `com.companyname.*` project properties are not
+accepted identities and Library builds remain non-executable evidence.
 
 ## Prepared packages
 
@@ -49,6 +55,7 @@ migration requires its own DB-GOV path.
 ## External evidence required
 
 - accepted canonical screen/supersession registry (`DEP-013`);
-- approved client/delivery/platform scope and signing authority (`DEP-014`);
+- Production signing certificate/keystore identity and custody (`DEP-014`
+  residual only; platform/package scope is resolved by CLIENT-001);
 - signing certificate/keystore custody without exposing secrets;
 - Windows/Android execution environments and signed install/launch evidence.

@@ -1,7 +1,7 @@
 # W4 — Offline/Sync Preparation and Entry Revalidation
 
 - Baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
-- State: `PREPARATION COMPLETE — PRODUCT ENTRY NOT SATISFIED`
+- State: `DEP-011 RESOLVED BY OFFLINE-001 — CODE-ONLY CONTAINMENT READY; RUNTIME/DB ENTRY NOT SATISFIED`
 - Product/DB mutation: `NONE`
 
 ## Current reality
@@ -19,27 +19,34 @@ generic `CREATE/UPDATE/DELETE/COMMAND` types remain accepted.
 
 - W2 tenant/session/device persistence is incomplete.
 - W3 transaction/accounting/audit atomicity is incomplete.
-- `DEP-011` has no accepted per-action Offline authority matrix.
+- `DEP-011` is resolved by OFFLINE-001, but W2/W3 durable authority and atomic
+  completion remain incomplete.
 - `DBP-006` has no rehearsal or execution authority.
 
-The current signed repository authority for FLOW01 is
-`ONLINE_ONLY / OFFLINE_WRITE=0 / Can Queue=NO`. The P1 Sync contract remains
-`READY_FOR_OWNER_ACCEPTANCE`, not accepted. PR #69's five available actions are
-evidence only and cannot widen authority.
+OFFLINE-001 supersedes the unresolved classification question with default deny.
+The effective 44-action P2 register classifies 11 queue candidates, one
+read-cache action and 32 online-authoritative actions. Current Product handlers
+exist for only five queue candidates: `CreateWaybillDraft`,
+`UpdateWaybillDraft`, `CreateOperationalParty`, `RecordCollection`, and
+`LoadAllocatedQuantity`. Attachment/arrival/unload/delivery/POD/exception remain
+authorized in principle but unavailable until their Product contracts exist.
+Accounting/security/permission/device administration/posting/settlement/period
+operations remain online-authoritative.
 
 ## Prepared package split
 
 | Package | Prepared boundary |
 |---|---|
 | `W4-P01` | default-closed intake/worker design; unknown version/action and DELETE deny with no side effect |
-| `W4-P02` | typed request/result/error/version contracts and strict payload/hash/size validation; executable catalog empty |
+| `W4-P02` | typed request/result/error/version contracts and strict payload/hash/size validation; catalog has five AVAILABLE and six AUTHORIZED-BUT-UNAVAILABLE operations |
 | `W4-P03` | server-side action-authority, dispatcher and worker-reauthorization ports; missing authority fails closed |
 | `W4-P04 / DBP-006` | split into protocol compatibility, inbox/claim/lease/outbox, device/PoP, and retention/legal-hold proposals |
 | `W4-P05` | encrypted client outbox/restart/quarantine/credential-separation design; local schema separately governed |
 | `W4-R01/R02` | runtime activation waits for DEP-011, W2/W3 and DBP-002/003/006 |
 
-No Product implementation is started because the sealed W4 dependency entry is
-not met. The planned fail-closed packages do not authorize an action or worker.
+Runtime activation remains prohibited. PR #69 accounting-draft queue entries
+are rejected; catalog/dispatcher patterns may only be selectively
+reimplemented and exact-head tested after the code-only package gate.
 
 ## DBP-006 boundary
 

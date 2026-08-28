@@ -60,5 +60,16 @@
 | `M03-EV-056` | W6 business authority revalidation | current Shipping, P2-D, Ticketing search, screen registries/Kurrasa references | current ends at DEPART; Ticketing absent; screen authority conflict/external inputs confirmed |
 | `M03-EV-057` | W7/W8 readiness revalidation | workflows/project graph/release/privacy source and sealed ordering | release/recovery/supply/privacy gaps confirmed; W8 not entered and no cleanup authority |
 | `M03-EV-058` | end-to-end completion gate assessment | `MISSION03_COMPLETION_GATE_ASSESSMENT.md` | true bounded decisions and authorized external evidence prevent legal W2-W7 exit/final seal |
+| `M03-EV-059` | owner-decision governance rebind | governance `e8d443dc...`; AUTH/ACC/OFFLINE/CLIENT decision files | all four decisions consumed; none reopened |
+| `M03-EV-060` | default-deny design tooling and device authority lineage | `4a1e3e8...`, `0d705b3...`, `777cb5a...` | no model delta; historical build failure `33200155177` retained; corrected run `33200344976` success, 148/148 |
+| `M03-EV-061` | ACC-001 fail-closed posting guard | `5b246ed...` / tree `bde8e328...`; run `33200589267` | 150/150; receipt/payment remain approved; zero journals; no DB model delta |
+| `M03-EV-062` | CLIENT-001 package identity binding | `30f89df...` / tree `437e3fe0...`; run `33200829088` | baseline success; exact package IDs present; probes still show non-executable scaffolds |
+| `M03-EV-063` | atomic session mutation/audit boundary | `86ddaed...` / tree `d7fbcdd1...`; run `33201080024` | exact-head success; test-only failure injection and one-successor invariant; no durable adapter |
+| `M03-EV-064` | W7 first recovery rehearsal failure | `fb93261...`; run `33201278545`; job `98951060543`; artifact `9697864425` | migration/no-drift passed; recovery failed because Docker stdin was not attached; evidence retained |
+| `M03-EV-065` | W7 recovery correction | `3602b97...` / tree `37f485c1...`; one-line `docker run -i` correction | final W0/W7 exact-head runs recorded in TEST register after completion |
+| `M03-EV-066` | full cc67ad2→3602b97 change inventory | 13 paths, +536/-64 | no Entity/DbContext/Migration/Schema/Seed/data repair/Production config; PR69 untouched |
+| `M03-EV-067` | W6 external-source exhaustion | named Library refs + `governance/...-screens-workspace@0ded42b...` | references available as analysis/locators only; READY FOR PROGRAMMING remains false |
+| `M03-EV-068` | second W7 recovery failure | `3602b97...`; run `33201475594`; job `98951714878`; artifact `9697944620` | backup/restore marker passed; reconciliation queried migration history in wrong schema; evidence retained |
+| `M03-EV-069` | corrected disposable recovery | `5d1352b...` / tree `00512125...`; run `33201720878`; job `98952548655`; artifact `9698042284` | PASS; 10 migration rows reconciled after backup/restore; artifact SHA-256 `4de574c1...` |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

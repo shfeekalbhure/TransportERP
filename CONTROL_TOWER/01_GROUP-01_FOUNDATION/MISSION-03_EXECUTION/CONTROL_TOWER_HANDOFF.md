@@ -1,11 +1,11 @@
-# MISSION-03 End-to-End Gate Checkpoint to Control Tower
+# MISSION-03 Internal-Exhaustion Checkpoint to Control Tower
 
-- Handoff type: `REPOSITORY-RESOLVABLE WORK EXHAUSTED — OWNER/EXTERNAL GATES — NOT FINAL HANDOFF`
+- Handoff type: `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED — NOT FINAL HANDOFF`
 - Mission: `IN PROGRESS — OPEN — NOT SEALED`
 - Product baseline: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
-- Execution branch/head: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
-- Execution tree: `ea940e592cb11f5fff736e68055ebf77d2eece88`
-- Product state: `prior W1/W2 packages preserved; W2-B2B storage-neutral lifecycle independently adopted as bounded code-only baseline`
+- Execution branch/head: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
+- Execution tree: `00512125311306a43474638195d2cad97b76118e`
+- Product state: `bounded W1/W2/W3/W5 controls plus W7 disposable recovery evidence preserved; material wave exits remain gated`
 - DB/Production changes: `NO NEW PERSISTENCE CHANGE; disposable test DB mutation occurred only in CI validation`
 - MISSION-04 readiness: `NO — MISSION-03 OPEN/NOT SEALED`
 - Current directive: `CONTINUE — CODE-ONLY BASELINE ADOPTED; DBP-003 HOLD AT REHEARSAL ENTRY`
@@ -72,3 +72,29 @@ remains WAIT.
 This checkpoint preserves the B2B code-only head and the negative DBP-003
 rehearsal gate. It is not a migration authorization, full W2 exit, mission seal,
 master merge, or MISSION-04 handoff.
+
+## v1.0 delivery disposition
+
+Execution advanced linearly through `5d1352b...`. Final exact-head baseline run
+`33201720896` passed 153/153, ten existing migrations/no drift, API HTTP 401 and
+all four build probes. Recovery run `33201720878` passed PostgreSQL 18.6
+backup/restore with marker equality and 10/10 migration-history reconciliation.
+Artifacts and digests are in `TEST_EXECUTION_REGISTER.md`.
+
+The following sources are now required externally before MISSION-03 can resume:
+
+1. Independent DB-GOV decisions opening the named scope of DBP-002/003/004/005/
+   006, plus a named sanitized non-Production safe copy.
+2. Sanitized PasswordHash format/verifier/lockout fixtures and legacy policy.
+3. Sanitized accounting/audit reconciliation data and approved configured
+   account-role, FX and rounding values.
+4. Canonical programming authority for post-DEPART Shipping, Ticketing and
+   screen routes; the reachable Library material is analysis-only.
+5. Windows/Android executable environments, canonical route/screen registry,
+   secure-store integration and protected Production signing custody evidence.
+6. Non-secret Production recovery topology/RPO/RTO, privacy/retention/KMS and
+   dependency/license/provenance approvals.
+7. Complete external worktree/stash/local-only inventory before W8 cleanup.
+
+No new owner decision is requested. MISSION-03 remains OPEN/NOT SEALED and
+MISSION-04 remains WAIT.

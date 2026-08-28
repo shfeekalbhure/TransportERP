@@ -70,7 +70,7 @@ and never infers a password format.
 | `LifecycleState` | bounded `ACTIVE`, `ROTATED`, or `REVOKED` |
 | issue/expiry fields | `IssuedAt < AccessExpiresAt <= RefreshExpiresAt` |
 | consumption/revoke fields | nullable `ConsumedAt`, `RevokedAt`, bounded `RevokeReason` |
-| `ReplacedBySessionId uuid` | nullable self-FK; immutable after transition |
+| `PredecessorSessionId uuid` | nullable immutable self-FK carried by the successor; root generation is null |
 | `CreatedByOperationId uuid` | required correlation/idempotency key for ambiguous-commit reconciliation |
 | `ConcurrencyVersion bigint` | required, check `>= 1` |
 
@@ -78,7 +78,8 @@ Required keys and indexes:
 
 1. unique global `RefreshTokenDigest`;
 2. unique `(FamilyId, Generation)`;
-3. unique non-null `ReplacedBySessionId`;
+3. named unique non-null `PredecessorSessionId` constraint
+   `uq_auth_sessions_predecessor_once`;
 4. partial unique `(FamilyId)` where state is `ACTIVE`;
 5. unique `CreatedByOperationId`;
 6. indexes `(FamilyId, Id)`, `(UserId, SecurityVersionAtIssue)`,
@@ -87,13 +88,24 @@ Required keys and indexes:
 
 State rules:
 
-- `ACTIVE`: no consumed/revoked timestamp and no successor.
-- `ROTATED`: consumed timestamp and exactly one successor are present.
+- `ACTIVE`: no consumed/revoked timestamp; it has no successor at the instant
+  it becomes active.
+- `ROTATED`: consumed timestamp is present and exactly one successor references
+  it through `PredecessorSessionId`.
 - `REVOKED`: revoked timestamp/reason are present and no active successor can be
   created by the same command.
-- Successor must have the same family, user, company, branch and device, and
-  generation `predecessor + 1`. These cross-row facts require transactional
-  validation/trigger review; a plain row check is insufficient.
+- A named deferred constraint trigger
+  `trg_auth_sessions_validate_successor_lineage` must reject a successor unless
+  it has the same family, user, company, branch and device as its locked
+  predecessor and `Generation = predecessor.Generation + 1`. It must also
+  reject predecessor mutation after a successor exists. The trigger function,
+  lock order and deferrability are review artifacts before rehearsal; this is
+  not permission to author or execute DDL.
+- `uq_auth_sessions_predecessor_once` conflict is classified as a concurrent
+  rotation/reuse candidate and requires a new transaction, locked family
+  re-read, family revoke and atomic denial audit. A
+  `trg_auth_sessions_validate_successor_lineage` rejection is a hard invariant
+  failure, not a retryable token collision.
 
 ### Tenant consistency boundary
 

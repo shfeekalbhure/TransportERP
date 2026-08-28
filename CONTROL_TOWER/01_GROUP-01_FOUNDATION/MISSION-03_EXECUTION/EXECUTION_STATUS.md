@@ -2,20 +2,20 @@
 
 - Mission: `MISSION-03 — EXECUTION AND REMEDIATION`
 - Directive: `START — EXECUTION UNDER SEALED MISSION-02 PLAN`
-- Status: `IN PROGRESS — OPEN — NOT SEALED; REPOSITORY-RESOLVABLE W2-W8 PREPARATION EXHAUSTED; EXTERNAL/OWNER GATES BLOCK COMPLETION`
-- Checkpoint: `MISSION-03-END-TO-END-GATE-ASSESSMENT-v0.9`
-- Last evidence time: `2026-08-28T17:58:45Z` / `2026-08-28T20:58:45+03:00`
+- Status: `IN PROGRESS — OPEN — NOT SEALED; ALL CURRENT INTERNAL WORK EXHAUSTED; AUTHORIZED EXTERNAL EVIDENCE + INDEPENDENT DB-GOV REQUIRED`
+- Checkpoint: `MISSION-03-INTERNAL-EXHAUSTION-v1.0`
+- Last evidence time: `2026-08-28T18:55:30Z` / `2026-08-28T21:55:30+03:00`
 - Authoritative product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Authoritative tree: `516247dd320cfc0ef71607cd3d8e7946fe9375ab`
 - Execution branch: `codex/mission-03-execution-20260828`
 - Exact execution checkout: `/workspace/scratch/2cc4cde701d9/TransportERP-M03-EXACT` (detached at the remote execution-branch head)
-- Execution head: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`
-- Execution tree: `ea940e592cb11f5fff736e68055ebf77d2eece88`
+- Execution head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`
+- Execution tree: `00512125311306a43474638195d2cad97b76118e`
 - Security implementation commits: `a157c34d6767deeb5544adf456a2a36946a599a9`, `d1c0a2571bf3d240b9134e8614186acd70a6bd5d`, `d74074045491ed2259c4ed3f411f84b0bd82356a`, `9c5b7a12e59d2c42e682717b8e90c491f8699b96`
 - Governance execution base initially observed: `b3c57873c609e6209dcebcb0de6751ce8963c39a`; superseding hold observed before handoff: `c274f9ab66a507e59eaf31cd850d88d9e1ff17d2`
 - PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f` — `UNMERGED EVIDENCE ONLY`
 - W2 distinct source/test files changed: `14`; evidence workflow changed separately by `1` line
-- Database changes: `NONE — DBP-003 PROPOSAL ONLY`
+- Database changes: `NONE IN PRODUCT — EXISTING 10 MIGRATIONS ONLY IN DISPOSABLE CI; RECOVERY PROBE IS DISPOSABLE/EPHEMERAL`
 - Production access/change: `NONE`
 
 ## Control Tower revalidation decision
@@ -63,3 +63,33 @@ was performed. `MISSION03_COMPLETION_GATE_ASSESSMENT.md` isolates the true
 bounded accounting/Offline/client decisions and the exact authorized external
 evidence required. No Product, Entity, DbContext, Migration, schema, seed, data,
 Production configuration or secret changed in this checkpoint.
+
+## v1.0 owner-decision execution result
+
+The owner decisions at governance `e8d443dc5cefb6a1ea131311cfb7b2ded569b8df`
+were consumed without reopening them. The execution line advanced linearly from
+`cc67ad2...` to `5d1352b...` without merge, rebase, cherry-pick, force-push or
+master mutation.
+
+- W2: the API now requires a server-side device-trust authority; the default
+  resolver denies, and a client JWT claim cannot establish registration. Local
+  session mutations now require mutation+audit atomicity at the DBP-003 adapter
+  boundary, with test-only one-successor/concurrency and failure-injection proof.
+- W3: direct receipt/payment voucher posting now fails closed with
+  `GOVERNED_SETTLEMENT_REQUIRED`, preserving approved state and producing no
+  journal. The future Settlement boundary remains behind DBP-004/005.
+- W5: the three approved Android package identifiers are bound. The projects
+  remain non-executable scaffolds in the available CI environment; no runtime or
+  Production signing PASS is claimed.
+- W7: a guarded PostgreSQL 18.6 disposable backup/restore rehearsal was added.
+  Failed run `33201278545` exposed a missing Docker stdin attachment and is
+  preserved; `3602b97...` fixed stdin and exposed the schema-qualified history
+  mismatch; `5d1352b...` is the verified correction.
+- W4/W6/W8: only governed preparation/disposition was possible. No Sync worker,
+  business module, structural cleanup or deletion was activated.
+
+MISSION-03 cannot be sealed: independent DB-GOV has not opened DBP-002/003/004/
+005/006, PasswordHash and safe-copy truth are external, executable client and
+signing evidence are external, W6 lacks canonical programming authority, and
+the complete external preservation inventory is unavailable. This is
+`EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED`, not mission closure.

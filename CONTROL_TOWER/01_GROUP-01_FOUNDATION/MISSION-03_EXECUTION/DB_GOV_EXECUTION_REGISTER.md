@@ -2,7 +2,10 @@
 
 `DB-GOV-001` is binding. No database, schema, entity, migration, field, relationship, index, constraint, type, seed, precision or numbering change was executed. Applying the already-committed migration lineage to an empty disposable PostgreSQL database was verification only.
 
-The central proposal register was re-read through governance `6b2d238...`; DBP-001..009 are registered for intake. W2 ADRs and AUTH-001 resolve design dependencies but do not grant schema/data execution authority.
+The central proposal register was re-read through governance `e8d443dc...`;
+DBP-001..009 are registered for intake. AUTH-001, ACC-001, OFFLINE-001 and
+CLIENT-001 resolve bounded design/target questions but do not grant schema/data
+execution authority.
 
 Control Tower independently revalidated and adopted the authority-neutral code-only W2 controls and the B2B code-only head `cc67ad2...`. DBP-002/003/006 remain blocked for every material database/schema/persistence/data action; the adopted code does not activate those proposals.
 
@@ -13,9 +16,9 @@ Control Tower independently revalidated and adopted the authority-neutral code-o
 | `DBP-003A` | `REM-200` | exact code-only diff and run 33191269475 verified; `user_security_state` omits claimed lockout shape/concurrency detail; `auth_sessions` lacks executable PostgreSQL family-lock/single-successor/atomic-audit design; PasswordHash and safe-copy evidence absent | `REVISE BEFORE REHEARSAL — NO ENTITY/DBCONTEXT/MIGRATION/ADAPTER AUTHORITY` |
 | `DBP-003B` | `REM-220` | registry/assignment depends on device lifecycle plus explicit membership/cardinality and tenant-consistent keys | `DEFERRED — DEPENDS ON DBP-002/006` |
 | `DBP-003C` | `REM-220` | PoP/nonce/replay store, uniqueness scope, retention/legal hold and recovery not established | `DEFERRED — DEPENDS ON DBP-002/006` |
-| `DBP-004` | `REM-320` | UoW ADR/legacy sample/live controls absent | `BLOCKED` |
-| `DBP-005` | `REM-310` | accounting authority/reconciliation absent | `BLOCKED` |
-| `DBP-006` | `REM-400` | offline authority/protocol and DB baseline absent; no nonce/replay/offline persistence authorized | `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` |
+| `DBP-004` | `REM-320` | V2/atomic-enlistment proposal prepared; legacy sample/live controls/safe copy absent | `READY FOR DESIGN REVIEW; REHEARSAL BLOCKED` |
+| `DBP-005` | `REM-310` | ACC-001 resolves posting boundary; additive Settlement proposal prepared; exact mapping/reconciliation/safe copy absent | `READY FOR DESIGN REVIEW; REHEARSAL BLOCKED` |
+| `DBP-006` | `REM-400` | OFFLINE-001 resolves action policy; typed persistence gap/proposal prepared; DBP-002/003 and safe-copy/retention/key evidence absent | `READY FOR DESIGN REVIEW; REHEARSAL BLOCKED` |
 | `DBP-007` | `REM-600` | canonical scope absent | `BLOCKED` |
 | `DBP-008` | `REM-610` | canonical Ticketing requirements absent | `BLOCKED` |
 | `DBP-009` | reporting | requirements absent | `BLOCKED` |
@@ -43,6 +46,17 @@ W3/W4/W6 revalidation additionally confirms DBP-004/005/006/007/008 remain
 blocked at proposal/external-authority gates. Reporting ownership under DBP-009
 is a bounded plan-deviation item, not an execution authority.
 
+## Owner-decision rebind review package
+
+`DBP-002_004_005_006_REVIEW_PREPARATION.md` records the exact current-model
+inventory, additive designs, preservation, compatible-reader, safe-copy,
+rollback/recovery, reconciliation and negative/concurrency gates. The
+DBP-003A resubmission now specifies successor-side `PredecessorSessionId`, named
+one-successor uniqueness/lineage trigger semantics, exact conflict
+classification and a read-only inventory of roles, memberships, grants and
+default privileges. These are proposal corrections only; material execution
+authority remains `NONE`.
+
 ## DBP-003 review boundary
 
 - Reviewed execution head/tree: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / `ea940e592cb11f5fff736e68055ebf77d2eece88`.
@@ -55,3 +69,20 @@ is a bounded plan-deviation item, not an execution authority.
 The v0.9 end-to-end assessment now raises bounded non-DB business decisions for
 accounting, Offline actions and client delivery/signing. It does not raise or
 self-decide any DB-GOV approval.
+
+## v1.0 execution reconciliation
+
+- Product head `5d1352b...` changes no Entity, DbContext model, Migration,
+  Schema, Seed, persistent adapter or Product data.
+- DBP-003A code contracts now require atomic mutation+audit and exercise
+  one-successor/failure-injection semantics in a test-only store. This is not a
+  PostgreSQL adapter and does not lift the HOLD.
+- Runs `33201720878` and `33201720896` use PostgreSQL 18.6, apply only the ten
+  existing migrations to disposable databases, report no model drift, and
+  prove a disposable backup/restore with source/restored migration counts 10/10.
+- The recovery probe creates an ephemeral schema only in the disposable source
+  after the governed lineage is applied, verifies the restored marker, and
+  discards the rehearsal databases. It is not a Product migration or safe-copy
+  rehearsal authorization.
+- DBP-002/003/004/005/006 material portions remain exactly behind independent
+  DB-GOV. `PASSWORD-HASH BASELINE = EXTERNAL EVIDENCE REQUIRED`.

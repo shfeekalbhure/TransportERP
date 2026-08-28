@@ -1,19 +1,19 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T18:18:56Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T21:18:56+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T18:59:51Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T21:59:51+03:00`
 - `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
 - `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
-- MISSION-03 bounded execution baseline: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`
+- MISSION-03 bounded execution baseline: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
 | CONTROL TOWER / GROUP-01 | IN PROGRESS | owner-decision files independently re-read; current execution branch unchanged; v0.9 remains open | keep M03 active; route only external/DB-GOV gates; require new hash-bound checkpoint after modified v0.9 files | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | B2B code-only retained; ACC-001/OFFLINE-001/CLIENT-001 resolved; no new execution commit beyond `cc67ad2...` | `CONTINUE — EXECUTE ENABLED WORK; EXTERNAL + DB-GOV GATES REMAIN` | NOT SEALED; v0.9 checkpoint is non-final and its old detached hash set no longer binds later-modified assessment/directive bytes |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | internal head `5d1352b...`; recovery and baseline runs pass; no Product DB model delta | `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK EXHAUSTED` | NOT SEALED; v1.0 checkpoint/hash set required |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
@@ -41,6 +41,6 @@
 - `OFFLINE-001 = RESOLVED — DEFAULT DENY; EXPLICIT QUEUE FOR BOUNDED OPERATIONAL CAPTURE`.
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS IS DEFERRED`.
 
-The execution branch still points to exact `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / tree `ea940e592cb11f5fff736e68055ebf77d2eece88`; no later Product execution is evidenced in the repository. `DBP-003 = HOLD AT REHEARSAL ENTRY`; DBP-002/003/006 remain blocked for material persistence changes. PR #69 remains unmerged candidate evidence only. No current owner-decision blocker exists for the allowed non-destructive next actions. MISSION-04 remains WAIT.
+The execution branch points to exact `5d1352b4fb6d56261dff8b8a622bacb2786f56d9` / tree `00512125311306a43474638195d2cad97b76118e`. `DBP-003 = HOLD AT REHEARSAL ENTRY`; DBP-002/003/004/005/006 remain blocked for material persistence changes. PR #69 remains unmerged evidence only. No current owner-decision blocker exists; all remaining blockers require authorized external evidence or independent DB-GOV. MISSION-04 remains WAIT.
 
 The v0.9 package was explicitly `OPEN — NOT SEALED`. Its detached SHA-256 register was generated before the later owner-decision modifications to `MISSION03_COMPLETION_GATE_ASSESSMENT.md` and `CURRENT_DIRECTIVE.md`; it therefore remains historical checkpoint evidence and must not be used as a current integrity claim. A later checkpoint/final package must regenerate its manifest/hash set after content stabilization.

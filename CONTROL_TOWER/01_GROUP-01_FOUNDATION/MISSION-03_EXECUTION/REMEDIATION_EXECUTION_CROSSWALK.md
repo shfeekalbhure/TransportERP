@@ -24,3 +24,21 @@
 | `REM-900` | W0/W7 | `PARTIAL — DISPOSABLE TOOLCHAIN VERIFIED` | provenance retained; .NET/EF restore, migration apply/model-drift check and exact-head tests passed in disposable CI, while later release/SBOM/deploy controls remain W7 work |
 
 No finding is marked closed by this checkpoint.
+
+## v1.0 superseding dispositions
+
+- `REM-200/210/220`: all non-persistent code-only work available from current
+  authority is implemented and exact-head tested; material exits remain
+  DBP-002/003/006 and external-evidence blocked.
+- `REM-300/310/320`: ACC-001 is consumed and direct posting fails closed;
+  governed Settlement/audit persistence remains DBP-004/005/external blocked.
+- `REM-400`: OFFLINE-001 is consumed and the complete action classification is
+  prepared; runtime remains dependency/DBP-006 blocked.
+- `REM-500`: approved Android identities are implemented; executable/security/
+  signing proof remains external.
+- `REM-600/610/620`: reachable inputs are explicitly non-governing; no Product
+  implementation was guessed.
+- `REM-700/720/900`: exact-head 153/153 baseline and disposable PG18 recovery
+  pass at `5d1352b...`; Production policy/topology evidence remains external.
+- `REM-800`: not entered. No finding is falsely closed and no mission seal is
+  claimed.

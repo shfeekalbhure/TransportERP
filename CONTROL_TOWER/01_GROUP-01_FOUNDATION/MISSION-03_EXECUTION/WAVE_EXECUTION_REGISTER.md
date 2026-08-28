@@ -11,3 +11,15 @@
 | `W6` | Product entry unmet | Shipping/Ticketing/screen authority and PR69/P2-D dispositions revalidated | `PREPARATION COMPLETE — CANONICAL EXTERNAL INPUTS REQUIRED` | none | Kurrasa/Ticketing/Shipping authority, DBP-007/008 |
 | `W7` | stable prior waves absent | CI/supply/recovery/privacy/provenance gap and package sequence prepared | `PREPARATION COMPLETE — FINAL W7 ENTRY BLOCKED` | none | immutable W2-W6 plus topology/signing/license/privacy/KMS evidence |
 | `W8` | must remain last | entry and candidate-only structural inventory revalidated | `NOT ENTERED — NO CLEANUP AUTHORIZED` | none | W7 stable baseline and complete preservation inventory |
+
+## Superseding v1.0 package disposition
+
+| Wave | Internal execution completed at `5d1352b...` | Exit state |
+|---:|---|---|
+| `W2` | server-authoritative default-deny device trust; atomic session mutation+audit contracts; one-successor/race/failure-injection tests; DBP-003A constraints and safe-copy inventory revised | `PARTIAL — CODE-ONLY EXHAUSTED; DBP-002/003/006 + EXTERNAL PASSWORD/SAFE-COPY EVIDENCE BLOCK EXIT` |
+| `W3` | ACC-001 rebound; direct receipt/payment posting denied; no journal/state mutation; Settlement/DBP-004/005 package prepared | `PARTIAL — FAIL-CLOSED CONTROL IMPLEMENTED; SETTLEMENT PERSISTENCE/CONFIG/LEGACY EVIDENCE BLOCK EXIT` |
+| `W4` | OFFLINE-001 rebound; 44 actions classified as 32 online, 11 queue candidates and 1 read cache; five existing handler surfaces mapped | `PREPARED — RUNTIME ENTRY BLOCKED BY W2/W3 AND DBP-006` |
+| `W5` | CLIENT-001 rebound; exact Android package identities corrected; iOS removed from the release-target surface | `PARTIAL — IDENTITY READY; EXECUTABLE/RUNTIME/SECURE-STORAGE/SIGNING EVIDENCE EXTERNAL` |
+| `W6` | exact Library and screen-analysis locators reviewed; each disclaims programming authority | `BLOCKED — CANONICAL PROGRAMMING AUTHORITY NOT AVAILABLE` |
+| `W7` | exact-head baseline continued; disposable backup/restore workflow and fail-closed tooling added; failed rehearsal retained and corrected | `PARTIAL — DISPOSABLE RECOVERY EVIDENCE ONLY; PRODUCTION READINESS INPUTS EXTERNAL` |
+| `W8` | preservation gate rechecked | `NOT ENTERED — EXTERNAL PRESERVATION INVENTORY + W7 EXIT ABSENT` |

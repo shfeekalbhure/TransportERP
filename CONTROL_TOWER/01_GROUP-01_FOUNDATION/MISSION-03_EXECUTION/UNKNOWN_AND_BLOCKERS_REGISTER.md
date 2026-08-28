@@ -15,22 +15,22 @@
 | `M03-BLK-W2-004` | Production external authority vs local session issuer | owner decision at governance `6b2d238...` selects local application authority | none for code-only lifecycle | `RESOLVED — AUTH-001 LOCAL APPLICATION AUTHORITY`; persistence remains DBP-003 |
 | `M03-BLK-W2-005` | live tenant rows/applied history/roles/RLS and full DBP-002 impact/backfill/recovery | no authorized live DB evidence | W2-D DB mutation and W2 exit | `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION` |
 | `M03-BLK-W2-006` | registry/session/device persistence migration, retention and recovery evidence | independent DB-GOV review `DBP-003_DB_GOV_REVIEW_DECISION.md` | durable B2B adapter, W2-C2/E and full PoP/revoke matrix | `DBP-003 HOLD AT REHEARSAL ENTRY — 003A REVISE; 003B/C DEFERRED` |
-| `M03-BLK-W2-007` | emergency non-owner override authority | no owner/security-approved permission/reason/audit contract | override only | default deny implemented; `OWNER DECISION REQUIRED — BOUNDED ITEM` before any override |
+| `M03-BLK-W2-007` | emergency non-owner override authority | no approved permission/reason/audit contract | no required package; optional future override only | `FINAL DISPOSITION — DEFAULT DENY; NO OWNER DECISION REQUIRED FOR MISSION-03` |
 | `M03-BLK-W2-008` | Control Tower issued a superseding W2 STOP/REPLAN directive at c274f9a after the worker's prior fetched base | current directive, exact diff/source, ADRs, run 33185419917, artifact digests and revalidation decision | none for adopted A1/A2/B1/B2A/C1/F1; historical deviation remains evidence | `RESOLVED BY CONTROL TOWER REVALIDATION — SIX BOUNDED PACKAGES ADOPTED` |
 | `M03-BLK-EXT-001` | live DB/schema/applied history/backups unavailable | no authorized DB connection/evidence | DB impacts and release | safe-copy/read-only inventory and restore drill |
 | `M03-BLK-EXT-002` | IdP/tenant/cardinality/accounting/offline/Kurrasa authority unavailable | M02 blockers retained | W2–W6 affected packages | provide approved ADRs/authority records |
 | `M03-BLK-EXT-003` | signing/release/privacy/Production topology unavailable | M02 blockers retained | W5/W7 | approved non-secret topology and drills |
-| `DBP003-BLK-001` | no executable PostgreSQL refresh-family lock/single-successor/atomic-audit transaction design; tests use process-local lock only | exact source and `LocalSessionLifecycleTests` at `cc67ad2...` | DBP-003A rehearsal authoring | revise constraints/transaction/audit UoW/retry/failure-injection specification; resubmit DB-GOV |
+| `DBP003-BLK-001` | PostgreSQL refresh-family lock/single-successor/atomic-audit design required revision | revised proposal, named constraints and atomic code contract; test-only store remains non-durable | independent DBP-003A review/rehearsal gate | `INTERNAL DESIGN RESOLVED — INDEPENDENT DB-GOV + SAFE-COPY EVIDENCE REQUIRED` |
 | `DBP003-BLK-002` | password algorithm/format/salt/legacy/rehash/failure/lockout reality unknown | source exposes only `PasswordHash varchar(500)` and test-only literals | login persistence activation | authorized sanitized inventory plus approved verifier/upgrade/lockout policy |
 | `DBP003-BLK-003` | no bound safe-copy schema/data snapshot, backup digest, restore proof or reconciliation package | empty disposable CI only | DBP-003A rehearsal entry | prepare named non-Production safe copy and pre/post/restore evidence |
 | `DBP003-BLK-004` | User Company/Branch are independent FKs and no User composite alternate key exists | exact `P1Entities.cs` / `TransportErpDbContext.cs` | tenant-consistent session/user and device assignment FKs | split dependency and obtain DBP-002 physical-key decision |
 | `DBP003-BLK-005` | device/PoP/nonce store and retention not established | DBP-006, MDM/attestation and retention evidence absent | DBP-003B/C | keep deferred; settle DBP-006 lifecycle/storage/retention |
 | `DBP003-BLK-006` | Production signing/encryption/pepper custody/rotation/recovery unproved | no approved operational evidence | Production activation only | provide secret-store ownership and rotation/recovery drill; non-blocking for proposal revision |
-| `M03-BLK-W3-001` | accounting posting model, mappings, subledger, FX, SoD and period override are not selected | current source, M01/M02 and PR69 exhaustion leaves three materially different valid collection-posting models | REM-310/DBP-005 and W3 exit | `OWNER/ACCOUNTING DECISION REQUIRED — BOUNDED ITEM` |
+| `M03-BLK-W3-001` | accounting posting model was unresolved | ACC-001 selects operational Collection and later governed Settlement posting | no longer blocks execution design; exact mappings/config still block DBP-005 | `RESOLVED BY ACC-001`; configuration/safe-copy evidence remains external |
 | `M03-BLK-W3-002` | sanitized legacy audit vectors and representative posting reconciliation unavailable | only repository tests/empty disposable DB are accessible | DBP-004/005 rehearsal and W3 exit | `ACCESS BLOCKED — AUTHORIZED EXTERNAL EVIDENCE REQUIRED` |
-| `M03-BLK-W4-001` | per-action Offline authority remains unaccepted | P1 Sync contract is READY_FOR_OWNER_ACCEPTANCE; FLOW01 says OFFLINE_WRITE=0; PR69 is evidence only | DEP-011, DBP-006 runtime and W4 exit | `OWNER DECISION REQUIRED — BOUNDED ITEM`; default closed remains authoritative |
-| `M03-BLK-W5-001` | canonical screen/supersession and client delivery/signing scope absent | clients are Library/scaffold; screen registers are review-pending/conflicting | DEP-013/014, executable clients and W5 exit | `OWNER/EXTERNAL AUTHORITY REQUIRED — BOUNDED`; no executable claim |
-| `M03-BLK-W6-001` | canonical post-departure Shipping, Ticketing and screen/Kurrasa inputs inaccessible | current source ends at DEPART; Ticketing absent; external artifacts/Kurrasa not present | REM-600/610/620 and DBP-007/008 | `ACCESS BLOCKED — AUTHORIZED EXTERNAL EVIDENCE REQUIRED` |
+| `M03-BLK-W4-001` | per-action Offline authority was unaccepted | OFFLINE-001 supplies default-deny classification and bounded queue criteria | no longer blocks DEP-011 design; DBP-003/006 and W2/W3 atomicity still block runtime | `RESOLVED BY OFFLINE-001` |
+| `M03-BLK-W5-001` | client release target scope was absent | CLIENT-001 fixes Windows Desktop + three Android package IDs; iOS deferred | target identity resolved; DEP-013, upstream runtime and Production signing still block W5 exit | `PARTIALLY RESOLVED BY CLIENT-001 — EXTERNAL SIGNING/ROUTE EVIDENCE REMAINS` |
+| `M03-BLK-W6-001` | canonical post-departure Shipping/Ticketing/screen authority remains incomplete | current source ends at DEPART; exact Library and screens-workspace locators are reachable but explicitly analysis/design-only and not programming authority | REM-600/610/620 and DBP-007/008 | `AVAILABLE AS NON-GOVERNING ANALYSIS/LOCATORS — CANONICAL PROGRAMMING AUTHORITY REQUIRED` |
 | `M03-BLK-W6-002` | DBP-009 Reporting has no distinct sealed REM owner | M02 DB register/test plan include Reporting but REM inventory has no matching package | Reporting only | `PLAN DEVIATION — CONTROL TOWER REVALIDATION REQUIRED`; no scope expansion |
 | `M03-BLK-W7-001` | deploy/recovery/RPO/RTO/signing/license/privacy/KMS policies and evidence absent | repository has no publish/sign/backup-restore topology or governing legal/security policy | REM-710/720/730 and W7 exit | `ACCESS BLOCKED — AUTHORIZED EXTERNAL EVIDENCE REQUIRED` |
 | `M03-BLK-W8-001` | no stable W7 baseline or complete external workspace ownership inventory | sealed ordering and W0 external inventory unknown | all W8 work | `BLOCKED — W8 NOT ENTERED; NO CLEANUP AUTHORIZED` |
@@ -49,7 +49,17 @@ No blocker is converted into a guessed implementation. W2 A1/A2/B1/B2A/C1/F1 and
 
 ## End-to-end completion disposition
 
-The repository/history/CI path is exhausted for the listed external facts.
+The repository/history/CI and reachable Library evidence paths are exhausted
+for the listed external facts.
 `MISSION03_COMPLETION_GATE_ASSESSMENT.md` defines the precise evidence and
 bounded choices required. Independent packages remain isolated; no blocker is
 used to justify a guess or unauthorized mutation.
+
+## v1.0 final blocker reconciliation
+
+Final execution `5d1352b...` and runs `33201720878`/`33201720896` exhaust the
+available repository, CI and disposable recovery surfaces. Remaining items are
+all external or independently governed: sanitized password/safe-copy/roles/RLS;
+legacy accounting/audit/config mappings; executable client/secure-store/signing;
+canonical W6 programming authority; Production recovery/privacy/KMS/supply
+policy; and complete preservation inventory. No unresolved owner item is raised.

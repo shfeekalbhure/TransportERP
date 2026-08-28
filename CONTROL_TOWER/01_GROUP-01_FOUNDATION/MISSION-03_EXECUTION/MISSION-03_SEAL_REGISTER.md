@@ -1,7 +1,7 @@
 # MISSION-03 Seal Register
 
 - Current state: `OPEN — NOT SEALED`
-- Current checkpoint: `MISSION-03-END-TO-END-GATE-ASSESSMENT-v0.9`
+- Current checkpoint: `MISSION-03-INTERNAL-EXHAUSTION-v1.0`
 - Seal issued: `NO`
 - Handoff to MISSION-04: `PROHIBITED`
 
@@ -18,3 +18,11 @@
 - W8 was not entered and no cleanup was authorized.
 
 The phrase `MISSION-03 = SEALED — DELIVERED TO CONTROL TOWER — READY FOR MISSION-04` is not authorized at this checkpoint.
+
+## v1.0 seal decision
+
+Exact-head internal validation at `5d1352b...` is successful, but W2–W7
+material exits and W8 entry remain unsatisfied for the external/DB-GOV reasons
+in `MISSION03_COMPLETION_GATE_ASSESSMENT.md`. Therefore seal remains `NO` and
+the valid handoff state is `EXTERNAL EVIDENCE REQUIRED — ALL INTERNAL WORK
+EXHAUSTED`. MISSION-04 is not started.

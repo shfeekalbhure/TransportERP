@@ -21,8 +21,11 @@ Disposition: `COMPARE → REIMPLEMENT SELECTIVELY AFTER AUTHORITY/DEPENDENCIES`.
 
 Ticketing has no Product entity, model, migration, API, application service,
 client or test. Existing CSV/domain references are `DOCUMENTED_ONLY` or legacy
-lineage. The source Library artifacts named by MISSION-01 are not accessible in
-this workspace. DBP-008 therefore has no canonical input.
+lineage. The exact Ticketing Library artifacts are accessible and were read.
+They contain `DEC-TRV-001..006`, a screen register and detailed `TRV-*`
+contracts, but each states that it does not itself grant programming,
+DDL/API/DTO/Permission or Offline-write authority. DBP-008 therefore has useful
+non-governing input but still lacks a canonical programming package.
 
 ## REM-620 Screens/Kurrasa
 
@@ -36,7 +39,7 @@ implementation is authorized from this collision set.
 
 | Package | Gate/result |
 |---|---|
-| `W6-G0` | preserve/hash current, P2-D and PR69 sources; recover canonical external inputs |
+| `W6-G0` | preserve/hash current, P2-D, PR69, screens-workspace and exact Library sources; completed as evidence inventory |
 | `W6-620A` | immutable screen/alias/route/DTO/permission/test/supersession inventory; closure requires external authority |
 | `W6-600A` | arrival/transit contract comparison only; no runtime activation |
 | `DBP-007A` | proposal for arrival/holding/movement tenant keys, audit/UoW, idempotency, safe-copy and recovery |
@@ -51,9 +54,11 @@ it does not authorize expansion of REM-600/610/620.
 
 ## External evidence required
 
-- latest canonical Kurrasa and screen supersession authority;
+- adoption/supersession authority for the reachable analysis-only Kurrasa and
+  screen workspace; that workspace reports `READY FOR PROGRAMMING = 0`;
 - accepted post-departure Shipping increment and accounting/Offline binding;
-- the exact Library Ticketing artifacts, versions and authority disposition;
+- programming authority that promotes or supersedes the now-readable Ticketing
+  artifacts; their current status is design/contract evidence only;
 - canonical Ticketing W1/W2/W3/UAT contracts;
 - DB-GOV decisions for DBP-007/008 and clarification of DBP-009 remediation
   ownership.

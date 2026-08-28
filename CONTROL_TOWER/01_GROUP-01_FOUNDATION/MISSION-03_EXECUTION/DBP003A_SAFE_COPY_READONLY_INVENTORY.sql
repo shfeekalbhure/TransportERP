@@ -13,6 +13,62 @@ ORDER BY "MigrationId";
 
 SELECT extname, extversion FROM pg_extension ORDER BY extname;
 
+-- Role metadata only. Password verifiers, connection strings and secrets are
+-- intentionally excluded. Memberships and grants are required to reproduce
+-- the authorization surface of the safe copy without guessing it.
+SELECT rolname,
+       rolsuper,
+       rolinherit,
+       rolcreaterole,
+       rolcreatedb,
+       rolcanlogin,
+       rolreplication,
+       rolbypassrls,
+       rolconnlimit,
+       rolvaliduntil
+FROM pg_roles
+ORDER BY rolname;
+
+SELECT member_role.rolname AS member_role,
+       granted_role.rolname AS granted_role,
+       grantor_role.rolname AS grantor_role,
+       membership.admin_option,
+       membership.inherit_option,
+       membership.set_option
+FROM pg_auth_members membership
+JOIN pg_roles member_role ON member_role.oid = membership.member
+JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
+JOIN pg_roles grantor_role ON grantor_role.oid = membership.grantor
+ORDER BY member_role.rolname, granted_role.rolname;
+
+SELECT table_schema, table_name, grantor, grantee, privilege_type, is_grantable
+FROM information_schema.role_table_grants
+WHERE table_schema = 'transport_erp'
+ORDER BY table_name, grantee, privilege_type;
+
+SELECT table_schema, table_name, column_name, grantor, grantee, privilege_type, is_grantable
+FROM information_schema.role_column_grants
+WHERE table_schema = 'transport_erp'
+ORDER BY table_name, column_name, grantee, privilege_type;
+
+SELECT specific_schema, routine_name, grantor, grantee, privilege_type, is_grantable
+FROM information_schema.role_routine_grants
+WHERE specific_schema = 'transport_erp'
+ORDER BY routine_name, grantee, privilege_type;
+
+SELECT object_schema, object_name, object_type, grantor, grantee, privilege_type, is_grantable
+FROM information_schema.role_usage_grants
+WHERE object_schema = 'transport_erp'
+ORDER BY object_type, object_name, grantee, privilege_type;
+
+SELECT defaclrole::regrole::text AS owner_role,
+       COALESCE(n.nspname, '<all schemas>') AS schema_name,
+       d.defaclobjtype AS object_type,
+       d.defaclacl::text AS default_acl
+FROM pg_default_acl d
+LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+ORDER BY owner_role, schema_name, object_type;
+
 SELECT n.nspname AS schema_name,
        c.relname AS relation_name,
        c.relrowsecurity AS rls_enabled,
