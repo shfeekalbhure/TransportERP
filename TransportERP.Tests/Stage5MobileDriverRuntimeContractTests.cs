@@ -124,6 +124,13 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("UI_TEXT_VERIFY_ELEMENT_COUNT_INVALID", script, StringComparison.Ordinal);
         Assert.Contains("UI_TEXT_VERIFY_{text_state}_{focus_state}", script,
             StringComparison.Ordinal);
+        Assert.Contains("self.focus_input(automation_id)", script, StringComparison.Ordinal);
+        Assert.Contains("def focus_input(self, automation_id: str)", script,
+            StringComparison.Ordinal);
+        Assert.Contains("node.attrib.get(\"focused\") == \"true\"", script,
+            StringComparison.Ordinal);
+        Assert.Contains("UI_INPUT_FOCUS_FAILED", script, StringComparison.Ordinal);
+        Assert.Contains("for attempt in range(5)", script, StringComparison.Ordinal);
         Assert.Contains("observed == value", script, StringComparison.Ordinal);
         Assert.Contains("else \"EMPTY\" if not observed else \"MISMATCH\"", script,
             StringComparison.Ordinal);
