@@ -35,6 +35,19 @@ FOCUS_OWNER_ALLOWLIST = (
     ("driver_device_id", "DEVICE_ID"),
     ("driver_device_credential", "DEVICE_CREDENTIAL"),
 )
+SCROLL_OBSERVATION_IDS = tuple(candidate for candidate, _ in FOCUS_OWNER_ALLOWLIST) + (
+    "driver_mode",
+    "driver_reason",
+    "driver_evidence",
+    "driver_action_result",
+    "driver_sign_in",
+    "driver_sign_out",
+    "driver_party_name",
+    "driver_party_mobile",
+    "driver_party_address",
+    "driver_queue_party",
+    "driver_operation_list",
+)
 
 
 class UiE2EFailure(RuntimeError):
@@ -46,6 +59,7 @@ class Driver:
         self.adb = adb
         self.package = package
         self.timeout_seconds = timeout_seconds
+        self._last_scroll_hierarchy: ET.Element | None = None
 
     def run(self, *arguments: str, timeout: int = 30) -> str:
         try:
@@ -127,10 +141,12 @@ class Driver:
             raise UiE2EFailure("UI_ELEMENT_BOUNDS_INVALID")
         return left, top, right, bottom
 
-    def _scroll(self, toward_bottom: bool) -> None:
-        roots = self.nodes(AUTOMATION_ROOT)
+    def _scroll(self, toward_bottom: bool) -> str:
+        before = self.dump()
+        roots = self.nodes(AUTOMATION_ROOT, before)
         if len(roots) != 1:
             raise UiE2EFailure("UI_SCROLL_ROOT_INVALID")
+        before_signature = self._safe_scroll_signature(before)
         left, top, right, bottom = self._rectangle(roots[0])
         x = (left + right) // 2
         upper = top + max(20, (bottom - top) // 4)
@@ -138,22 +154,55 @@ class Driver:
         start, end = (lower, upper) if toward_bottom else (upper, lower)
         self.run("shell", "input", "swipe", str(x), str(start), str(x), str(end), "250")
         time.sleep(0.25)
+        self._last_scroll_hierarchy = None
+        after = self.dump()
+        self._last_scroll_hierarchy = after
+        after_signature = self._safe_scroll_signature(after)
+        if before_signature is None or after_signature is None:
+            return "UNKNOWN"
+        return "UNCHANGED" if before_signature == after_signature else "MOVED"
+
+    def _safe_scroll_signature(
+        self,
+        hierarchy: ET.Element,
+    ) -> tuple[tuple[str, tuple[int, int, int, int]], ...] | None:
+        signature: list[tuple[str, tuple[int, int, int, int]]] = []
+        try:
+            for automation_id in SCROLL_OBSERVATION_IDS:
+                found = self.nodes(automation_id, hierarchy)
+                if len(found) > 1:
+                    return None
+                if found:
+                    signature.append((automation_id, self._rectangle(found[0])))
+        except UiE2EFailure:
+            return None
+        return tuple(signature) if signature else None
+
+    @staticmethod
+    def _aggregate_scroll_movement(movements: list[str]) -> str:
+        if "MOVED" in movements:
+            return "MOVED"
+        if movements and all(movement == "UNCHANGED" for movement in movements):
+            return "UNCHANGED"
+        return "UNKNOWN"
 
     def find(self, automation_id: str) -> ET.Element:
         found = self.nodes(automation_id)
         if found:
             return found[0]
+        movements: list[str] = []
         for _ in range(6):
-            self._scroll(toward_bottom=False)
-            found = self.nodes(automation_id)
+            movements.append(self._scroll(toward_bottom=False))
+            found = self.nodes(automation_id, self._last_scroll_hierarchy)
             if found:
                 return found[0]
         for _ in range(14):
-            self._scroll(toward_bottom=True)
-            found = self.nodes(automation_id)
+            movements.append(self._scroll(toward_bottom=True))
+            found = self.nodes(automation_id, self._last_scroll_hierarchy)
             if found:
                 return found[0]
-        raise UiE2EFailure("UI_AUTOMATION_ID_NOT_FOUND")
+        movement = self._aggregate_scroll_movement(movements)
+        raise UiE2EFailure(f"UI_AUTOMATION_ID_NOT_FOUND:SCROLL_{movement}")
 
     def wait_for(
         self,
@@ -202,6 +251,7 @@ class Driver:
                 raise UiE2EFailure(f"UI_TEXT_VERIFY_{text_state}_{focus_state}") from error
 
     def focus_input(self, automation_id: str) -> None:
+        movements: list[str] = []
         for attempt in range(5):
             self.click(automation_id)
             try:
@@ -215,15 +265,17 @@ class Driver:
                 if str(error) != "UI_WAIT_TIMEOUT":
                     raise
                 if attempt == 4:
-                    observation = self.safe_focus_observation(automation_id)
+                    movement = self._aggregate_scroll_movement(movements)
+                    observation = self.safe_focus_observation(automation_id, movement)
                     raise UiE2EFailure(f"UI_INPUT_FOCUS_FAILED:{observation}") from error
-                self._scroll(toward_bottom=True)
+                movements.append(self._scroll(toward_bottom=True))
         raise UiE2EFailure("UI_INPUT_FOCUS_FAILED")
 
-    def safe_focus_observation(self, automation_id: str) -> str:
+    def safe_focus_observation(self, automation_id: str, scroll_movement: str) -> str:
+        ime = self.safe_ime_state()
         unavailable = (
             "COUNT_UNKNOWN:VISIBLE_UNKNOWN:FOCUSABLE_UNKNOWN:CLICKABLE_UNKNOWN:"
-            "OWNER_UNKNOWN:ZONE_UNKNOWN:IME_UNKNOWN"
+            f"OWNER_UNKNOWN:ZONE_UNKNOWN:SCROLL_{scroll_movement}:IME_{ime}"
         )
         try:
             hierarchy = self.dump()
@@ -232,7 +284,8 @@ class Driver:
             if len(targets) != 1:
                 return (
                     f"COUNT_{count}:VISIBLE_UNKNOWN:FOCUSABLE_UNKNOWN:CLICKABLE_UNKNOWN:"
-                    f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_UNKNOWN:IME_UNKNOWN"
+                    f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_UNKNOWN:"
+                    f"SCROLL_{scroll_movement}:IME_{ime}"
                 )
             target = targets[0]
             visible = self._safe_boolean(target.attrib.get("visible-to-user"))
@@ -241,7 +294,8 @@ class Driver:
             zone = self._safe_vertical_zone(hierarchy, target)
             return (
                 f"COUNT_ONE:VISIBLE_{visible}:FOCUSABLE_{focusable}:CLICKABLE_{clickable}:"
-                f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_{zone}:IME_UNKNOWN"
+                f"OWNER_{self._safe_focus_owner(hierarchy)}:ZONE_{zone}:"
+                f"SCROLL_{scroll_movement}:IME_{ime}"
             )
         except (UiE2EFailure, ValueError, TypeError):
             return unavailable
@@ -280,6 +334,25 @@ class Driver:
             return "MIDDLE"
         return "LOWER"
 
+    def safe_ime_state(self) -> str:
+        try:
+            payload = self.run("shell", "dumpsys", "input_method")
+        except UiE2EFailure:
+            return "UNKNOWN"
+        return self._parse_ime_state(payload)
+
+    @staticmethod
+    def _parse_ime_state(payload: str) -> str:
+        matches = re.findall(
+            r"(?m)^\s*(?:mShowRequested=(?:true|false)\s+"
+            r"mShowExplicitlyRequested=(?:true|false)\s+"
+            r"mShowForced=(?:true|false)\s+)?mInputShown=(true|false)\s*$",
+            payload,
+        )
+        if len(matches) != 1:
+            return "UNKNOWN"
+        return "SHOWN" if matches[0] == "true" else "HIDDEN"
+
     def hide_keyboard(self) -> None:
         self.run("shell", "input", "keyevent", "KEYCODE_BACK")
         time.sleep(0.25)
@@ -293,7 +366,7 @@ class Driver:
             try:
                 node = self.find(automation_id)
             except UiE2EFailure as error:
-                if str(error) != "UI_AUTOMATION_ID_NOT_FOUND":
+                if not str(error).startswith("UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"):
                     raise
             else:
                 if node.attrib.get("text") == expected:
@@ -439,6 +512,7 @@ def main() -> int:
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
         phase = "INITIAL_CLOSED_REASON"
         driver.wait_text("driver_reason", "Reason: OFFLINE_CLOSED")
+        phase = "INITIAL_CLOSED_WRITE_CONTROL"
         if driver.find("driver_queue_party").attrib.get("enabled") != "false":
             raise UiE2EFailure("CLOSED_DEFAULT_WRITE_ENABLED")
         evidence["closedDefault"] = True
@@ -488,6 +562,7 @@ def main() -> int:
         driver.click("driver_sign_out")
         phase = "SIGN_OUT_CLOSED_MODE"
         driver.wait_text("driver_mode", "Offline runtime: CLOSED")
+        phase = "SIGN_OUT_WRITE_CONTROL"
         if driver.find("driver_queue_party").attrib.get("enabled") != "false":
             raise UiE2EFailure("SIGNED_OUT_WRITE_ENABLED")
         evidence["signedOutClosed"] = True
