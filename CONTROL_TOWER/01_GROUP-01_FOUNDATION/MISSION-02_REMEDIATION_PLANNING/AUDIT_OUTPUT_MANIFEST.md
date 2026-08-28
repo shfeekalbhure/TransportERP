@@ -1,12 +1,12 @@
 # MISSION-02 Remediation Planning Output Manifest
 
-- Version / Seal ID: `MISSION-02-v1.1 / M02-SEAL-20260828-v1.1`
-- State: `SEALED — READY FOR CONTROL TOWER VERIFICATION`
-- Closure: `2026-08-28T13:41:55Z` / `2026-08-28T16:41:55+03:00`
+- Version / Seal ID: `MISSION-02-v1.2 / M02-SEAL-20260828-v1.2`
+- State: `SEALED — DELIVERED TO CONTROL TOWER — READY FOR MISSION-03`
+- Closure: `2026-08-28T13:51:26Z` / `2026-08-28T16:51:26+03:00`
 - Authoritative product line: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Product tree: `516247dd320cfc0ef71607cd3d8e7946fe9375ab`
 - MISSION-01 gate: `READY FOR REMEDIATION PLANNING`
-- MISSION-02 result: `SEALED — READY FOR MISSION-03`
+- MISSION-02 result: `SEALED — DELIVERED TO CONTROL TOWER — READY FOR MISSION-03`
 
 | Output | Function | State | SHA-256 |
 |---|---|---|---|
@@ -20,7 +20,7 @@
 | `ROLLBACK_AND_RECOVERY_PLAN.md` | wave-specific rollback, compensation and recovery controls | SEALED | `a46be03b9b0f02114a08d9f9ff2c28302ff989da21f696126a7545431bf8d1f7` |
 | `UNKNOWN_AND_BLOCKERS_REGISTER.md` | bounded unknowns, resolution actions and owner gates | SEALED | `3d88e909a70f920b37538f385f8412ead2eef3e49eb99c62a883663e1535d395` |
 | `PR69_ADOPTION_ANALYSIS.md` | finding/component adoption analysis for the unmerged candidate | SEALED | `aceecca2fe294cad6ea571f9ba362ba1890d99e92aa1d8ce29a9beae60fd4b7a` |
-| `EVIDENCE_INDEX.md` | baseline- and candidate-bound evidence map | SEALED | `6ca50da052d34e34bb212dd68ea6fcb10ff0e970302b6814fb6ed7603a62b82f` |
+| `EVIDENCE_INDEX.md` | baseline-, candidate- and delivery-bound evidence map | SEALED | `636d69c4721d5195b1ae47a636478c9b5710fee6e338e9a1c2a136ac860451d6` |
 | `AUDIT_OUTPUT_MANIFEST.md` | this manifest | SEALED | recorded in detached checksum list |
 | `AUDIT_OUTPUT_SHA256.txt` | detached hashes for every sealed output except itself | SEALED | self-hash intentionally not embedded |
 | `MISSION-02_SEAL_REGISTER.md` | closure assertions and execution-authority boundary | SEALED | recorded in detached checksum list |
@@ -35,3 +35,7 @@ Version `v1.1` supersedes `v1.0` only to express every completed planning
 workstream using the mandated disposition vocabulary (`PLANNED`,
 `BLOCKED — EVIDENCE REQUIRED`, or `N/A — EVIDENCE-BASED`). No finding,
 priority, implementation scope, product baseline or execution authority changed.
+
+Version `v1.2` supersedes `v1.1` only to bind the successful remote delivery
+and GitHub verification evidence. The planning content, workstream
+dispositions, product baseline and MISSION-03 authority boundary are unchanged.
