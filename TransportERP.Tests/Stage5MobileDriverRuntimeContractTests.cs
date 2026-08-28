@@ -74,6 +74,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
     {
         var page = Read("TransportERP.Mobile.Driver", "MainPage.cs");
         var script = Read("eng", "ci", "android_release_ui_e2e.py");
+        var stateMachineTests = Read("eng", "ci", "test_android_release_ui_e2e.py");
+        var workflow = Read(".github", "workflows", "ci.yml");
 
         Assert.Contains("Content = new ScrollView", page, StringComparison.Ordinal);
         Assert.Contains("AutomationId = \"driver_main_scroll\"", page, StringComparison.Ordinal);
@@ -140,8 +142,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "COUNT_UNKNOWN", "VISIBLE_UNKNOWN", "FOCUSABLE_UNKNOWN", "CLICKABLE_UNKNOWN",
                      "OWNER_UNKNOWN", "ZONE_UNKNOWN", "SCROLL_", "IME_", "FOCUS_OWNER_ALLOWLIST",
                      "SCROLL_OBSERVATION_IDS", "def safe_ime_state(self)",
+                     "def _read_ime_state(self)", "def dismiss_ime_if_shown(self)",
                      "def _parse_ime_state(payload: str)", "mInputShown=(true|false)",
-                     "UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"
+                     "UI_AUTOMATION_ID_NOT_FOUND:SCROLL_", "UI_IME_DISMISS_ROOT_INVALID",
+                     "UI_IME_DISMISS_TIMEOUT"
                  })
             Assert.Contains(focusDiagnostic, script, StringComparison.Ordinal);
         var focusObservationStart = script.IndexOf(
@@ -155,6 +159,51 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.DoesNotContain("completed.stdout", focusObservation, StringComparison.Ordinal);
         Assert.DoesNotContain("{payload}", focusObservation, StringComparison.Ordinal);
         Assert.DoesNotContain("return payload", focusObservation, StringComparison.Ordinal);
+        var setTextStart = script.IndexOf("    def set_text(", StringComparison.Ordinal);
+        var setTextEnd = script.IndexOf(
+            "    def focus_input(self, automation_id: str)", setTextStart, StringComparison.Ordinal);
+        Assert.True(setTextStart >= 0 && setTextEnd > setTextStart);
+        var setText = script[setTextStart..setTextEnd];
+        var dismissCall = setText.IndexOf("self.dismiss_ime_if_shown()", StringComparison.Ordinal);
+        var focusCall = setText.IndexOf("self.focus_input(automation_id)", StringComparison.Ordinal);
+        Assert.True(dismissCall >= 0 && focusCall > dismissCall);
+        var dismissStart = script.IndexOf(
+            "    def dismiss_ime_if_shown(self)", StringComparison.Ordinal);
+        var dismissEnd = script.IndexOf(
+            "    def hide_keyboard(self)", dismissStart, StringComparison.Ordinal);
+        Assert.True(dismissStart >= 0 && dismissEnd > dismissStart);
+        var dismissIme = script[dismissStart..dismissEnd];
+        Assert.Contains("if self._read_ime_state() != \"SHOWN\"", dismissIme,
+            StringComparison.Ordinal);
+        Assert.Contains("if self._read_ime_state() == \"HIDDEN\"", dismissIme,
+            StringComparison.Ordinal);
+        Assert.Contains("self.nodes(AUTOMATION_ROOT)", dismissIme, StringComparison.Ordinal);
+        Assert.DoesNotContain("_scroll(", dismissIme, StringComparison.Ordinal);
+        Assert.DoesNotContain("value", dismissIme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("payload", dismissIme, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, script.Split("KEYCODE_BACK", StringSplitOptions.None).Length - 1);
+        var hideKeyboardStart = script.IndexOf(
+            "    def hide_keyboard(self)", dismissEnd, StringComparison.Ordinal);
+        var hideKeyboardEnd = script.IndexOf(
+            "    def text(self, automation_id: str)", hideKeyboardStart, StringComparison.Ordinal);
+        Assert.True(hideKeyboardStart >= 0 && hideKeyboardEnd > hideKeyboardStart);
+        Assert.Contains("self.dismiss_ime_if_shown()",
+            script[hideKeyboardStart..hideKeyboardEnd], StringComparison.Ordinal);
+        foreach (var stateMachineTest in new[]
+                 {
+                     "test_shown_is_hidden_before_focus_and_type",
+                     "test_hidden_and_unknown_never_send_back",
+                     "test_never_hidden_times_out_before_focus_or_type",
+                     "test_back_failure_stops_before_focus_or_type",
+                     "test_state_read_failure_stops_before_focus_or_type",
+                     "test_state_read_failure_after_back_stops_before_focus_or_type",
+                     "test_hidden_requires_exactly_one_visible_root",
+                     "test_root_dump_failure_remains_fail_closed"
+                 })
+            Assert.Contains(stateMachineTest, stateMachineTests, StringComparison.Ordinal);
+        Assert.DoesNotContain("events.append(value", stateMachineTests, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("python3 eng/ci/test_android_release_ui_e2e.py", workflow,
+            StringComparison.Ordinal);
         Assert.Contains("observed == value", script, StringComparison.Ordinal);
         Assert.Contains("else \"EMPTY\" if not observed else \"MISMATCH\"", script,
             StringComparison.Ordinal);
