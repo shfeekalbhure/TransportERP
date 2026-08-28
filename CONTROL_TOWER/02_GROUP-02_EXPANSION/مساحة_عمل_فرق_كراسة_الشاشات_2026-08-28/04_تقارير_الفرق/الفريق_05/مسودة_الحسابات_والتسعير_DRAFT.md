@@ -392,7 +392,7 @@ TEAM-04 يثبت الحدث التشغيلي وحجمه وتوقيته وسلس�
 | P04 — `STILL UNRESOLVED` | 1 |
 | P04 — `NEEDS OWNER DECISION` | 7 |
 | حالات `PENDING TEAM-04 OPERATIONAL INPUT` المتبقية | 0 |
-| أفعال مالية حساسة مرسلة إلى TEAM-07 | 8 |
+| أفعال مالية حساسة مرسلة إلى TEAM-07 | 9 |
 | SHP-046 موضع الواجهة | `NEEDS TEAM CORRECTION — TEAM-03/06` |
 | حالة Offline | `CORRECTED — ELIGIBILITY ≠ ACTION AUTHORITY` |
 | أسئلة مالك المتبقية | 16 |
