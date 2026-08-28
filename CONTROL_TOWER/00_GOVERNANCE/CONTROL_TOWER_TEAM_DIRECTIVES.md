@@ -2,6 +2,8 @@
 
 Every team or mission must read its own section here before starting or resuming work. Only Control Tower changes a `CURRENT DIRECTIVE`. A sealed team must not modify its output unless this file issues `REOPEN` or `RETURN FOR REWORK`.
 
+During an active Control Tower session, teams should re-check this file approximately every 10 minutes and immediately after a known upstream handoff. If no active session is running, no continuous monitoring may be assumed.
+
 ## TEAM-A
 
 - Mission: `MISSION-01`
@@ -30,10 +32,13 @@ Every team or mission must read its own section here before starting or resuming
 ## TEAM-D
 
 - Mission: `MISSION-01`
-- `CURRENT DIRECTIVE`: `HOLD — OWNER DECISION REQUIRED`
-- Prerequisite status: TEAM-A, TEAM-B, and TEAM-C1 are sealed and centrally received.
-- Hold reason: `AUTHORITATIVE CURRENT LINE FOR THIS AUDIT` is unresolved; TEAM-A reports governing P0 findings, including valuable-work preservation risk, while TEAM-B reports zero confirmed P0.
-- Next permitted action: Read this directive only and wait. Do not start reconciliation until Control Tower records `START`.
+- `CURRENT DIRECTIVE`: `START`
+- Prerequisite status: `SATISFIED — TEAM-A, TEAM-B, TEAM-C1 SEALED AND HASH-VERIFIED`.
+- Required work: Perform full Finding-by-Finding reconciliation, including agreement, disagreement, single-team findings, P0/P1 classification conflicts, preservation findings, assurance limitations, and authoritative-line candidates.
+- Special instruction: The unresolved `AUTHORITATIVE CURRENT LINE` and TEAM-A/TEAM-B P0 disagreement are **inputs to reconciliation**, not owner holds at this stage.
+- Authoritative-line task: classify candidate refs/SHAs, recommend the governing candidate, and explicitly mark anything unresolved. Do not guess.
+- Required output: `TEAM-D_EVIDENCE_RECONCILIATION_REPORT.md` plus crosswalk/evidence/unknown registers required by the governing command.
+- Next permitted action after completion: Seal and hand off to Control Tower. Do not start TEAM-C2 yourself.
 
 ## TEAM-C2
 
@@ -53,7 +58,7 @@ Every team or mission must read its own section here before starting or resuming
 
 - Mission: `MISSION-01`
 - `CURRENT DIRECTIVE`: `WAIT`
-- Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed.
+- Prerequisite: TEAM-E must be sealed and handed off; all governing assurance conditions must be addressed or explicitly carried as final decision items.
 - Next permitted action: Wait for a Control Tower `START` directive.
 
 ## MISSION-02
