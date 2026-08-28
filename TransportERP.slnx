@@ -3,10 +3,13 @@
   <Project Path="TransportERP.Application/TransportERP.Application.csproj" />
   <Project Path="TransportERP.Contracts/TransportERP.Contracts.csproj" />
   <Project Path="TransportERP.Desktop/TransportERP.Desktop.csproj" />
+  <Project Path="TransportERP.Desktop.E2ETests/TransportERP.Desktop.E2ETests.csproj" />
   <Project Path="TransportERP.Infrastructure/TransportERP.Infrastructure.csproj" />
   <Project Path="TransportERP.Mobile.Admin/TransportERP.Mobile.Admin.csproj" />
   <Project Path="TransportERP.Mobile.Customer/TransportERP.Mobile.Customer.csproj" />
   <Project Path="TransportERP.Mobile.Driver/TransportERP.Mobile.Driver.csproj" />
+  <Project Path="TransportERP.Offline/TransportERP.Offline.csproj" />
+  <Project Path="TransportERP.Offline.Tests/TransportERP.Offline.Tests.csproj" />
   <Project Path="TransportERP.Tests/TransportERP.Tests.csproj" />
   <Project Path="TransportERP/TransportERP.Domain.csproj" />
 </Solution>

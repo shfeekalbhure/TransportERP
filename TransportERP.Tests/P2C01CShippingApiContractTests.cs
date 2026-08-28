@@ -37,12 +37,15 @@ public sealed class P2C01CShippingApiContractTests
         {
             using (var deniedRequest = route.CreateRequest())
             {
+                var deniedCorrelationId = Guid.NewGuid();
                 deniedRequest.Headers.Authorization = new AuthenticationHeaderValue(
                     "Bearer", CreateToken(userId, companyId, branchId, "other.permission"));
+                deniedRequest.Headers.TryAddWithoutValidation("X-Correlation-Id", deniedCorrelationId.ToString());
                 var denied = await client.SendAsync(deniedRequest);
                 Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
                 var error = await denied.Content.ReadFromJsonAsync<ApiError>();
                 Assert.Equal("SCOPE_DENIED", error?.ErrorCode);
+                Assert.Equal(deniedCorrelationId, error?.CorrelationId);
             }
 
             store.Reset();
@@ -85,6 +88,7 @@ public sealed class P2C01CShippingApiContractTests
         {
             var response = await client.SendAsync(unauthenticated);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Empty(await response.Content.ReadAsStringAsync());
         }
 
         using (var missingBranch = route.CreateRequest())
@@ -249,12 +253,22 @@ public sealed class P2C01CShippingApiContractTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IShippingExecutionStore>();
+                services.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>();
+                services.RemoveAll<ISystemPermissionCatalogVerifier>();
                 services.AddSingleton(store);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+                services.AddSingleton<ISystemPermissionCatalogVerifier, TestPermissionCatalogVerifier>();
             });
         });
+
+    private sealed class TestPermissionCatalogVerifier : ISystemPermissionCatalogVerifier
+    {
+        public Task VerifyAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
 
     private static string CreateToken(
         Guid userId, Guid companyId, Guid? branchId, string permission)
@@ -275,7 +289,7 @@ public sealed class P2C01CShippingApiContractTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" },
                 SecurityAlgorithms.HmacSha256)
         };
         var handler = new JwtSecurityTokenHandler();
@@ -365,7 +379,7 @@ public sealed class P2C01CShippingApiContractTests
             Capture("LoadManifestLine", context);
             return Task.FromResult(new ManifestLineResponse(
                 lineId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), request.Quantity,
-                request.Quantity, 0m, 0m, "LOADED"));
+                request.Quantity, 0m, 0m, "LOADED", Guid.NewGuid()));
         }
 
         public Task<ManifestResponse> FinalizeManifestAsync(

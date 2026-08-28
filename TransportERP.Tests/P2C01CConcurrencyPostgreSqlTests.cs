@@ -274,7 +274,7 @@ public sealed class P2C01CConcurrencyPostgreSqlTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة اختبار تزامن C", MinorUnit = 2, IsBase = true, Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -295,7 +295,7 @@ public sealed class P2C01CConcurrencyPostgreSqlTests
         {
             Id = Guid.NewGuid(), UserName = $"p2c-conc-{Guid.NewGuid():N}",
             NormalizedUserName = $"P2CC{suffix}{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم تزامن C", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم تزامن C", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

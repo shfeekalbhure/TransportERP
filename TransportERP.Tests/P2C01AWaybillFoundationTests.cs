@@ -234,8 +234,11 @@ public sealed class P2C01AWaybillFoundationTests
         public Task<(IReadOnlyList<OperationalPartyRecord> Items, long Total)> SearchAsync(Guid companyId, Guid branchId, string? query, int skip, int take, CancellationToken cancellationToken)
             => Task.FromResult(((IReadOnlyList<OperationalPartyRecord>)Array.Empty<OperationalPartyRecord>(), 0L));
 
-        public Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, string clientOperationId, CancellationToken cancellationToken)
+        public Task<OperationalPartyRecord?> GetByClientOperationAsync(Guid companyId, Guid branchId, string clientOperationId, CancellationToken cancellationToken)
             => Task.FromResult<OperationalPartyRecord?>(null);
+
+        public Task EnsureUsableAsync(Guid companyId, Guid branchId, IReadOnlyCollection<Guid> operationalPartyIds, CancellationToken cancellationToken)
+            => Task.CompletedTask;
 
         public Task<OperationalPartyRecord> CreateAsync(Guid companyId, Guid branchId, string partyNo, OperationalPartyCreateRequest request, CancellationToken cancellationToken)
             => Task.FromResult(new OperationalPartyRecord(Guid.NewGuid(), companyId, branchId, partyNo, request.Name, request.Mobile,

@@ -67,13 +67,115 @@ public sealed class User : P1Entity
     public string NormalizedUserName { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? Email { get; set; }
+    public string? NormalizedEmail { get; set; }
     public string? Phone { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
     public string Status { get; set; } = "ACTIVE";
     public Guid? CompanyId { get; set; }
     public Guid? BranchId { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+    public int AccessFailedCount { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+    public int AuthVersion { get; set; } = 1;
     public DateTimeOffset? DeletedAt { get; set; }
+}
+
+public sealed class AuthSession : P1Entity
+{
+    public Guid UserId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid? BranchId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public string Mode { get; set; } = "LOCAL";
+    public string SecurityStampAtIssue { get; set; } = string.Empty;
+    public int AuthVersionAtIssue { get; set; }
+    public string RefreshTokenHash { get; set; } = string.Empty;
+    public Guid RefreshTokenFamilyId { get; set; }
+    public Guid? ReplacedBySessionId { get; set; }
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset AccessTokenExpiresAt { get; set; }
+    public DateTimeOffset RefreshTokenExpiresAt { get; set; }
+    public DateTimeOffset? LastUsedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public string? RevokeReason { get; set; }
+    public Guid? RegisteredDeviceId { get; set; }
+    public int? DeviceCredentialVersion { get; set; }
+}
+
+public sealed class RegisteredDevice : P1Entity
+{
+    public Guid CompanyId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Platform { get; set; } = string.Empty;
+    public string AppVersion { get; set; } = string.Empty;
+    public string? DeviceModel { get; set; }
+    public string? OsVersion { get; set; }
+    public string RegistrationRequestId { get; set; } = string.Empty;
+    public string CredentialHash { get; set; } = string.Empty;
+    public int CredentialVersion { get; set; } = 1;
+    public string Status { get; set; } = "PENDING";
+    public Guid RegisteredByUserId { get; set; }
+    public Guid? ApprovedByUserId { get; set; }
+    public DateTimeOffset? ApprovedAt { get; set; }
+    public DateTimeOffset? SuspendedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? LastSeenAt { get; set; }
+    public string? ProofPublicJwkCanonicalJson { get; set; }
+    public string? ProofKeyThumbprint { get; set; }
+    public int? ProofKeyVersion { get; set; }
+    public DateTimeOffset? ProofKeyChangedAt { get; set; }
+    public Guid? ProofKeyChangedByUserId { get; set; }
+}
+
+public sealed class RegisteredDeviceAssignment : P1Entity
+{
+    public Guid RegisteredDeviceId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid BranchId { get; set; }
+    public string Status { get; set; } = "ACTIVE";
+    public Guid AssignedByUserId { get; set; }
+    public Guid? RemovedByUserId { get; set; }
+    public DateTimeOffset AssignedAt { get; set; }
+    public DateTimeOffset? RemovedAt { get; set; }
+}
+
+public sealed class RegisteredDeviceProofKeyChallenge
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid ChangeRequestId { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int? ExpectedProofKeyVersion { get; set; }
+    public string NewProofKeyThumbprint { get; set; } = string.Empty;
+    public byte[] ChallengeHash { get; set; } = [];
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? ConsumedAt { get; set; }
+    public Guid CreatedByUserId { get; set; }
+}
+
+public sealed class RegisteredDeviceProofKeyChange
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid ChangeRequestId { get; set; }
+    public Guid ChallengeId { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int? ExpectedProofKeyVersion { get; set; }
+    public string? PreviousProofKeyThumbprint { get; set; }
+    public string NewProofKeyThumbprint { get; set; } = string.Empty;
+    public int ResultProofKeyVersion { get; set; }
+    public Guid ChangedByUserId { get; set; }
+    public string? Reason { get; set; }
+    public DateTimeOffset ChangedAt { get; set; }
 }
 
 public sealed class Role : P1Entity
@@ -272,6 +374,7 @@ public sealed class PaymentVoucher : P1Entity, IP1Voucher
 public sealed class AuditEvent
 {
     public Guid Id { get; set; }
+    public long SequenceNo { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
     public Guid? ActorUserId { get; set; }
     public Guid? CompanyId { get; set; }
@@ -281,6 +384,7 @@ public sealed class AuditEvent
     public string EntityType { get; set; } = string.Empty;
     public Guid? EntityId { get; set; }
     public Guid CorrelationId { get; set; }
+    public Guid? OperationCorrelationId { get; set; }
     public string? DeviceId { get; set; }
     public string? BeforeJson { get; set; }
     public string? AfterJson { get; set; }
@@ -288,6 +392,13 @@ public sealed class AuditEvent
     public string? Ip { get; set; }
     public string Hash { get; set; } = string.Empty;
     public string? PreviousHash { get; set; }
+}
+
+public sealed class AuditStreamHead
+{
+    public string StreamKey { get; set; } = string.Empty;
+    public string? LastHash { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class ConflictCase : P1Entity
@@ -298,6 +409,10 @@ public sealed class ConflictCase : P1Entity
     public long? BaseVersion { get; set; }
     public string DeviceSnapshot { get; set; } = string.Empty;
     public string ServerSnapshot { get; set; } = string.Empty;
+    public bool LegalHold { get; set; }
+    public bool ParentLegalHold { get; set; }
+    public int? RetentionDaysApplied { get; set; }
+    public DateTimeOffset? RedactedAt { get; set; }
     public string ConflictReason { get; set; } = string.Empty;
     public string? Resolution { get; set; }
     public string? ResolvedBy { get; set; }
@@ -315,10 +430,14 @@ public sealed class SyncOperation : P1Entity
     public Guid? BranchId { get; set; }
     public string OperationType { get; set; } = string.Empty;
     public string EntityType { get; set; } = string.Empty;
-    public Guid EntityId { get; set; }
+    public Guid? EntityId { get; set; }
+    public Guid? ResultEntityId { get; set; }
     public string ClientOperationId { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
+    public bool LegalHold { get; set; }
+    public int? RetentionDaysApplied { get; set; }
+    public DateTimeOffset? RedactedAt { get; set; }
     public DateTimeOffset ClientOccurredAt { get; set; }
     public DateTimeOffset? ServerReceivedAt { get; set; }
     public long? BaseVersion { get; set; }
@@ -327,5 +446,51 @@ public sealed class SyncOperation : P1Entity
     public int RetryCount { get; set; }
     public DateTimeOffset? NextRetryAt { get; set; }
     public string? ErrorCode { get; set; }
+    public Guid? ExecutionClaimToken { get; set; }
+    public DateTimeOffset? ExecutionAttemptStartedAt { get; set; }
+    public DateTimeOffset? ExecutionLeaseExpiresAt { get; set; }
+    public Guid? RegisteredDeviceId { get; set; }
+    public int? RegisteredDeviceCredentialVersion { get; set; }
+    public string? ActionCode { get; set; }
+    public string? ProtocolVersion { get; set; }
+    public Guid? OperationCorrelationId { get; set; }
+    public string? RequestFingerprintVersion { get; set; }
+    public byte[]? RequestFingerprintHash { get; set; }
+    public int? ProofKeyVersion { get; set; }
+    public string? ProofKeyThumbprint { get; set; }
+    public Guid? AcceptedProofReplayId { get; set; }
     public ConflictCase? ConflictCase { get; set; }
+}
+
+public sealed class SyncProofNonce
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public int ProofKeyVersion { get; set; }
+    public byte[] NonceHash { get; set; } = [];
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+public sealed class SyncProofReplay
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid RegisteredDeviceId { get; set; }
+    public string DeviceId { get; set; } = string.Empty;
+    public Guid DeviceAssignmentId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid BranchId { get; set; }
+    public int ProofKeyVersion { get; set; }
+    public string ProofKeyThumbprint { get; set; } = string.Empty;
+    public byte[] JtiHash { get; set; } = [];
+    public byte[] HtuHash { get; set; } = [];
+    public string HttpMethod { get; set; } = string.Empty;
+    public Guid NonceRecordId { get; set; }
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset FirstSeenAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public Guid AttemptCorrelationId { get; set; }
 }

@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
@@ -104,10 +105,105 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         Assert.Equal(1, await verifyDb.Set<FinancialLinkEntity>().CountAsync(x =>
             x.WaybillId == scope.WaybillId && x.DocumentId == scope.ReceiptVoucherId && x.LinkType == "COLLECTION"));
         Assert.Contains("PayerRole", planAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("PaymentMethodCode", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("CollectedById", collectionAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
+        Assert.Null(collectionAudit.BeforeJson);
+        Assert.Null(collectionAudit.AfterJson);
+        Assert.Equal("CollectionRecorded", collectionAudit.Reason);
         Assert.Contains("ReversalOfId", reversalAudit.AfterJson ?? string.Empty, StringComparison.Ordinal);
         Assert.Equal(context.CorrelationId, collectionAudit.CorrelationId);
+    }
+
+    [Theory]
+    [InlineData("40001")]
+    [InlineData("40P01")]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Payment_plan_maps_audit_serialization_failure_and_rolls_back_business_and_stream_head(string sqlState)
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BSERIAL");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var operationId = $"plan-serial-{Guid.NewGuid():N}";
+        var suffix = Guid.NewGuid().ToString("N");
+        var function = $"fail_payment_plan_serial_{suffix}";
+        var trigger = $"trg_fail_payment_plan_serial_{suffix}";
+        await using var admin = CreateP2Db(connection);
+        await admin.Database.ExecuteSqlRawAsync($$"""
+            CREATE FUNCTION transport_erp.{{function}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+              IF NEW."Action" = 'WaybillPaymentPlanSet' THEN
+                RAISE EXCEPTION 'forced serialization failure' USING ERRCODE = '{{sqlState}}';
+              END IF;
+              RETURN NEW;
+            END $body$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON transport_erp.audit_events
+              FOR EACH ROW EXECUTE FUNCTION transport_erp.{{function}}();
+            """);
+        try
+        {
+            await using var db = CreateP2Db(connection);
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).SetPaymentPlanAsync(context, scope.WaybillId, new SetPaymentPlanRequest(
+                    1,
+                    [new PaymentPlanLineInput(1, "SENDER", null, "CASH",
+                        new MoneyAmount(scope.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+                    operationId)));
+            Assert.Equal("CONCURRENCY_CONFLICT", ex.Code);
+        }
+        finally
+        {
+            await admin.Database.ExecuteSqlRawAsync($$"""
+                DROP TRIGGER IF EXISTS {{trigger}} ON transport_erp.audit_events;
+                DROP FUNCTION IF EXISTS transport_erp.{{function}}();
+                """);
+        }
+
+        await using var verify = CreateP2Db(connection);
+        var waybill = await verify.Set<WaybillEntity>().AsNoTracking().SingleAsync(x => x.Id == scope.WaybillId);
+        Assert.Equal(1, waybill.Version);
+        Assert.NotEqual(operationId, waybill.LastClientOperationId);
+        Assert.False(await verify.Set<PaymentPlanLineEntity>().AnyAsync(x => x.WaybillId == scope.WaybillId));
+        Assert.False(await verify.AuditEvents.AnyAsync(x =>
+            x.Action == "WaybillPaymentPlanSet" && x.CorrelationId == context.CorrelationId));
+        Assert.False(await verify.AuditStreamHeads.AnyAsync(x =>
+            x.StreamKey == AuditEventService.GetStreamKey(scope.CompanyId, scope.BranchId, null)));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Payment_plan_replay_is_idempotent_only_when_the_complete_plan_matches()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BPLANREPLAY");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var request = new SetPaymentPlanRequest(1,
+            [new PaymentPlanLineInput(1, "SENDER", null, "CASH",
+                new MoneyAmount(scope.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+            $"plan-replay-{Guid.NewGuid():N}");
+        PaymentPlanResponse first;
+        await using (var db = CreateP2Db(connection))
+            first = await CreateService(db).SetPaymentPlanAsync(context, scope.WaybillId, request);
+        await using (var db = CreateP2Db(connection))
+        {
+            var replay = await CreateService(db).SetPaymentPlanAsync(context, scope.WaybillId, request);
+            Assert.Equal(first.Lines[0].Id, replay.Lines[0].Id);
+        }
+        await using (var db = CreateP2Db(connection))
+        {
+            var altered = request with
+            {
+                Lines = [request.Lines[0] with { PaymentMethodCode = "BANK" }]
+            };
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).SetPaymentPlanAsync(context, scope.WaybillId, altered));
+            Assert.Equal("IDEMPOTENCY_CONFLICT", ex.Code);
+        }
     }
 
     [Fact]
@@ -144,6 +240,245 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         await using var verifyDb = CreateP2Db(connection);
         Assert.Equal(1, await verifyDb.Set<CollectionTransactionEntity>().CountAsync(x =>
             x.CompanyId == scope.CompanyId && x.ClientOperationId == operationId));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Collection_replay_compares_every_caller_controlled_business_field()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedApprovedWaybillAsync(seedDb, "BFINGERPRINT");
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var request = NewCollection(scope, 30m, $"fingerprint-{Guid.NewGuid():N}") with
+        {
+            CollectedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+        await using (var db = CreateP2Db(connection))
+            _ = await CreateService(db).RecordCollectionAsync(context, scope.WaybillId, request);
+
+        var mutations = new[]
+        {
+            request with { PayerRole = "RECEIVER" },
+            request with { PaymentMethodCode = "BANK" },
+            request with { Amount = new MoneyAmount(Guid.NewGuid(), request.Amount.Amount) },
+            request with { Amount = new MoneyAmount(request.Amount.CurrencyId, request.Amount.Amount + 1m) },
+            request with { ExchangeRate = request.ExchangeRate + 1m },
+            request with { CollectedAt = request.CollectedAt.AddSeconds(1) },
+            request with { AccountingReferenceId = Guid.NewGuid(), AccountingDocumentType = "RECEIPT_VOUCHER" }
+        };
+        foreach (var mutation in mutations)
+        {
+            await using var db = CreateP2Db(connection);
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).RecordCollectionAsync(context, scope.WaybillId, mutation));
+            Assert.Equal("IDEMPOTENCY_CONFLICT", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Finance_application_rejects_cross_company_party_and_unproven_collector_before_store()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope local;
+        FinanceScope foreign;
+        Guid foreignPartyId;
+        Guid foreignBranchPartyId;
+        await using (var db = CreateP2Db(connection))
+        {
+            local = await SeedApprovedWaybillAsync(db, "BLOCAL");
+            foreign = await SeedApprovedWaybillAsync(db, "BFOREIGN");
+            foreignPartyId = await SeedPartyAsync(db, foreign, "FOREIGN");
+            var foreignBranch = await SeedSecondBranchWaybillAsync(db, local, "BFOREIGNBRANCH");
+            foreignBranchPartyId = await SeedPartyAsync(db, foreignBranch, "FOREIGNBRANCH");
+        }
+
+        var context = new OperationContext(local.UserId, local.CompanyId, local.BranchId, Guid.NewGuid());
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).SetPaymentPlanAsync(context, local.WaybillId, new SetPaymentPlanRequest(
+                    1,
+                    [new PaymentPlanLineInput(1, "SENDER", foreignPartyId, "CASH",
+                        new MoneyAmount(local.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+                    $"foreign-plan-{Guid.NewGuid():N}")));
+            Assert.Equal("SCOPE_DENIED", ex.Code);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).SetPaymentPlanAsync(context, local.WaybillId, new SetPaymentPlanRequest(
+                    1,
+                    [new PaymentPlanLineInput(1, "SENDER", foreignBranchPartyId, "CASH",
+                        new MoneyAmount(local.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+                    $"foreign-branch-plan-{Guid.NewGuid():N}")));
+            Assert.Equal("SCOPE_DENIED", ex.Code);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var request = NewCollection(local, 10m, $"spoofed-collector-{Guid.NewGuid():N}") with
+            {
+                CollectedById = foreign.UserId
+            };
+            var ex = await Assert.ThrowsAsync<WaybillFinanceApplicationException>(() =>
+                CreateService(db).RecordCollectionAsync(context, local.WaybillId, request));
+            Assert.Equal("SCOPE_DENIED", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task PostgreSQL_triggers_reject_cross_company_party_in_all_three_reference_tables()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope local;
+        FinanceScope foreign;
+        Guid foreignPartyId;
+        await using (var db = CreateP2Db(connection))
+        {
+            local = await SeedApprovedWaybillAsync(db, "BDBLOCAL");
+            foreign = await SeedApprovedWaybillAsync(db, "BDBFOREIGN");
+            foreignPartyId = await SeedPartyAsync(db, foreign, "DBFOREIGN");
+        }
+
+        await AssertDatabaseScopeDenied(connection, db => db.Set<WaybillPartyEntity>().Add(new WaybillPartyEntity
+        {
+            Id = Guid.NewGuid(), WaybillId = local.WaybillId, Sequence = 1, Role = "SENDER",
+            OperationalPartyId = foreignPartyId, NameSnapshot = "masked", MobileSnapshot = "masked"
+        }));
+        await AssertDatabaseScopeDenied(connection, db => db.Set<PaymentPlanLineEntity>().Add(new PaymentPlanLineEntity
+        {
+            Id = Guid.NewGuid(), WaybillId = local.WaybillId, LineNo = 1, PayerRole = "SENDER",
+            PartyId = foreignPartyId, PaymentMethodCode = "CASH", AmountCurrencyId = local.CurrencyId,
+            Amount = 100m, DueTrigger = "ON_APPROVAL", Status = "ACTIVE",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, Version = 1
+        }));
+        await AssertDatabaseScopeDenied(connection, db => db.Set<CollectionTransactionEntity>().Add(new CollectionTransactionEntity
+        {
+            Id = Guid.NewGuid(), WaybillId = local.WaybillId, CompanyId = local.CompanyId, BranchId = local.BranchId,
+            PayerRole = "SENDER", PartyId = foreignPartyId, PaymentMethodCode = "CASH",
+            CurrencyId = local.CurrencyId, ExchangeRate = 2m, Amount = 10m,
+            CollectedByType = "USER", CollectedById = local.UserId, CollectedAt = DateTimeOffset.UtcNow,
+            ClientOperationId = $"db-scope-{Guid.NewGuid():N}", Status = "ACCEPTED"
+        }));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Waybill_party_reference_and_waybill_scope_drift_are_serialized_in_both_directions(
+        bool referenceStartsFirst)
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        FinanceScope local;
+        FinanceScope secondBranch;
+        Guid partyId;
+        await using (var seedDb = CreateP2Db(connection))
+        {
+            local = await SeedApprovedWaybillAsync(seedDb, "BSCOPERACE");
+            secondBranch = await SeedSecondBranchWaybillAsync(seedDb, local, "BSCOPERACE2");
+            partyId = await SeedPartyAsync(seedDb, local, "SCOPERACE");
+        }
+
+        var referenceId = Guid.NewGuid();
+        if (referenceStartsFirst)
+        {
+            await using var referenceDb = CreateP2Db(connection);
+            await using var referenceTransaction = await referenceDb.Database.BeginTransactionAsync();
+            referenceDb.Set<WaybillPartyEntity>().Add(NewPartyReference(referenceId, local.WaybillId, partyId));
+            await referenceDb.SaveChangesAsync();
+
+            var updateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var updateTask = Task.Run(async () =>
+            {
+                await using var updateDb = CreateP2Db(connection);
+                await using var updateTransaction = await updateDb.Database.BeginTransactionAsync();
+                await updateDb.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='5s'");
+                updateStarted.SetResult();
+                try
+                {
+                    await updateDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                        UPDATE transport_erp.waybills SET "BranchId"={{secondBranch.BranchId}}
+                        WHERE "Id"={{local.WaybillId}}
+                        """);
+                    await updateTransaction.CommitAsync();
+                    return (Exception?)null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+
+            await updateStarted.Task;
+            await Task.Delay(100);
+            Assert.False(updateTask.IsCompleted);
+            await referenceTransaction.CommitAsync();
+            var updateError = await updateTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotNull(updateError);
+            Assert.Contains("waybill scope change would strand", updateError.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        else
+        {
+            await using var updateDb = CreateP2Db(connection);
+            await using var updateTransaction = await updateDb.Database.BeginTransactionAsync();
+            await updateDb.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE transport_erp.waybills SET "BranchId"={{secondBranch.BranchId}}
+                WHERE "Id"={{local.WaybillId}}
+                """);
+
+            var insertStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var insertTask = Task.Run(async () =>
+            {
+                await using var referenceDb = CreateP2Db(connection);
+                await using var referenceTransaction = await referenceDb.Database.BeginTransactionAsync();
+                await referenceDb.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='5s'");
+                referenceDb.Set<WaybillPartyEntity>().Add(NewPartyReference(referenceId, local.WaybillId, partyId));
+                insertStarted.SetResult();
+                try
+                {
+                    await referenceDb.SaveChangesAsync();
+                    await referenceTransaction.CommitAsync();
+                    return (Exception?)null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+
+            await insertStarted.Task;
+            await Task.Delay(100);
+            Assert.False(insertTask.IsCompleted);
+            await updateTransaction.CommitAsync();
+            var insertError = await insertTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotNull(insertError);
+            Assert.Contains("operational party reference scope denied", insertError.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using var verifyDb = CreateP2Db(connection);
+        var invalidReferences = await verifyDb.Database.SqlQuery<int>($$"""
+            SELECT count(*)::int AS "Value"
+            FROM transport_erp.waybill_parties r
+            JOIN transport_erp.waybills w ON w."Id"=r."WaybillId"
+            JOIN transport_erp.operational_parties p ON p."Id"=r."OperationalPartyId"
+            WHERE r."Id"={{referenceId}}
+              AND (p."CompanyId"<>w."CompanyId" OR
+                   (p."BranchId" IS NOT NULL AND p."BranchId"<>w."BranchId"))
+            """).SingleAsync();
+        Assert.Equal(0, invalidReferences);
     }
 
     [Fact]
@@ -260,8 +595,14 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var connection = RequireConnection();
         await EnsureMigratedAsync(connection);
         FinanceScope scope;
+        FinanceScope foreign;
+        Guid foreignPartyId;
         await using (var seedDb = CreateP2Db(connection))
+        {
             scope = await SeedApprovedWaybillAsync(seedDb, "BHTTP");
+            foreign = await SeedApprovedWaybillAsync(seedDb, "BHTTPFOREIGN");
+            foreignPartyId = await SeedPartyAsync(seedDb, foreign, "HTTPFOREIGN");
+        }
 
         using var factory = CreateFactory(connection);
         using var client = factory.CreateClient();
@@ -279,6 +620,13 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var allowed = await client.PutAsJsonAsync($"/api/v1/waybills/{scope.WaybillId}/payment-plan", request);
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
 
+        var crossCompanyParty = await client.PutAsJsonAsync($"/api/v1/waybills/{scope.WaybillId}/payment-plan",
+            new SetPaymentPlanRequest(2,
+                [new PaymentPlanLineInput(1, "SENDER", foreignPartyId, "CASH",
+                    new MoneyAmount(scope.CurrencyId, 100m), null, "ON_APPROVAL", null)],
+                $"http-cross-company-party-{Guid.NewGuid():N}"));
+        Assert.Equal(HttpStatusCode.Forbidden, crossCompanyParty.StatusCode);
+
         var foreignBranchToken = CreateToken(scope.UserId, scope.CompanyId, Guid.NewGuid(), WaybillFinancePermissionCodes.PaymentPlan);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", foreignBranchToken);
         var scoped = await client.PutAsJsonAsync($"/api/v1/waybills/{scope.WaybillId}/payment-plan", request with
@@ -294,7 +642,9 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             "USER", scope.UserId, DateTimeOffset.UtcNow, operationId, accountingReferenceId, accountingDocumentType);
 
     private static WaybillFinanceApplicationService CreateService(TransportErpDbContext db)
-        => new(new EfWaybillFinanceStore(db, new EfWaybillAuditSink(db, new AuditEventService(db))));
+        => new(
+            new EfWaybillFinanceStore(db, new EfWaybillAuditSink(db, new AuditEventService(db))),
+            new EfOperationalPartyRepository(db));
 
     private static string RequireConnection()
         => Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR")
@@ -320,6 +670,12 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
+            builder.ConfigureServices(services =>
+            {
+                Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>(services);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+            });
         });
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string permission)
@@ -338,7 +694,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
             Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)), SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" }, SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
@@ -348,7 +704,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة اختبار B", MinorUnit = 2, IsBase = true,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -367,7 +723,7 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"p2b-{Guid.NewGuid():N}", NormalizedUserName = $"P2B{suffix}{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم اختبار B", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم اختبار B", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -407,6 +763,42 @@ public sealed class P2C01BFinancePostgreSqlIntegrationTests
         await db.SaveChangesAsync();
         return new FinanceScope(first.CompanyId, branch.Id, first.UserId, first.CurrencyId, waybill.Id, Guid.Empty);
     }
+
+    private static async Task<Guid> SeedPartyAsync(TransportErpDbContext db, FinanceScope scope, string suffix)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var party = new OperationalPartyEntity
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            PartyNo = $"P-{suffix}-{Guid.NewGuid():N}"[..30], Name = "Party scope test", Mobile = "+967700000000",
+            Status = "ACTIVE", ClientOperationId = $"party-{suffix}-{Guid.NewGuid():N}",
+            CreatedAt = now, UpdatedAt = now, Version = 1
+        };
+        db.Set<OperationalPartyEntity>().Add(party);
+        await db.SaveChangesAsync();
+        return party.Id;
+    }
+
+    private static async Task AssertDatabaseScopeDenied(
+        string connection,
+        Action<TransportErpDbContext> addInvalidReference)
+    {
+        await using var db = CreateP2Db(connection);
+        addInvalidReference(db);
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        Assert.Contains("operational party reference scope denied", ex.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static WaybillPartyEntity NewPartyReference(Guid id, Guid waybillId, Guid partyId) => new()
+    {
+        Id = id,
+        WaybillId = waybillId,
+        Sequence = 99,
+        Role = "SENDER",
+        OperationalPartyId = partyId,
+        NameSnapshot = "masked",
+        MobileSnapshot = "masked"
+    };
 
     private static WaybillEntity NewApprovedWaybill(Guid companyId, Guid branchId, Guid currencyId, string suffix, DateTimeOffset now)
         => new()

@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
@@ -74,12 +75,23 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         Assert.Single(manifest.Lines);
         Assert.Equal(10m, manifest.Lines[0].Quantity);
 
+        Guid loadMovementId;
+        var loadRequest = new LoadManifestLineRequest(
+            10m, DateTimeOffset.UtcNow, true, $"load-{Guid.NewGuid():N}");
         await using (var db = CreateP2Db(connection))
         {
             var line = await CreateService(db).LoadManifestLineAsync(context, manifest.Id, manifest.Lines[0].Id,
-                new LoadManifestLineRequest(10m, DateTimeOffset.UtcNow, true, $"load-{Guid.NewGuid():N}"));
+                loadRequest);
             Assert.Equal("LOADED", line.LoadStatus);
             Assert.Equal(10m, line.LoadedQuantity);
+            Assert.True(line.MovementEventId.HasValue);
+            loadMovementId = line.MovementEventId.Value;
+        }
+        await using (var db = CreateP2Db(connection))
+        {
+            var replay = await CreateService(db).LoadManifestLineAsync(
+                context, manifest.Id, manifest.Lines[0].Id, loadRequest);
+            Assert.Equal(loadMovementId, replay.MovementEventId);
         }
 
         await using (var db = CreateP2Db(connection))
@@ -112,7 +124,11 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemRelease"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemAllocate"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestGenerate"));
-        Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestLineLoad"));
+        var loadAudit = await verify.AuditEvents.AsNoTracking().SingleAsync(x =>
+            x.Action == "ManifestLineLoad" && x.EntityId == loadMovementId);
+        Assert.Null(loadAudit.BeforeJson);
+        Assert.Null(loadAudit.AfterJson);
+        Assert.Equal("QuantityLoaded", loadAudit.Reason);
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestFinalize"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestHandover"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "TripStart"));
@@ -244,6 +260,12 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            builder.UseSetting("Auth:SigningKeyId", "test-current");
+            builder.ConfigureServices(services =>
+            {
+                Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<TransportERP.Api.Security.ICurrentSecurityContext>(services);
+                services.AddSingleton<TransportERP.Api.Security.ICurrentSecurityContext, ClaimTestSecurityContext>();
+            });
         });
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string permission)
@@ -260,7 +282,7 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
             Subject = new ClaimsIdentity(claims), Issuer = Issuer, Audience = Audience,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)), SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)) { KeyId = "test-current" }, SecurityAlgorithms.HmacSha256)
         };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }
@@ -270,7 +292,7 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(), NameAr = "عملة اختبار C",
+            Id = Guid.NewGuid(), Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db), NameAr = "عملة اختبار C",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -289,7 +311,7 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"p2c-{Guid.NewGuid():N}", NormalizedUserName = $"P2C{suffix}{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم اختبار C", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم اختبار C", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

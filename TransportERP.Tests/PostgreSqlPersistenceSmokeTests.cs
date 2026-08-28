@@ -36,7 +36,8 @@ public sealed class PostgreSqlPersistenceSmokeTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"p1-{Guid.NewGuid():N}"[..14], NormalizedUserName = "P1TEST",
-            DisplayName = "مستخدم اختبار", PasswordHash = "test-only", CompanyId = company.Id, BranchId = branch.Id,
+            DisplayName = "مستخدم اختبار", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1,
+            CompanyId = company.Id, BranchId = branch.Id,
             CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, RowVersion = Guid.NewGuid().ToByteArray()
         };
         db.Currencies.Add(currency);
@@ -55,14 +56,5 @@ public sealed class PostgreSqlPersistenceSmokeTests
     }
 
     private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)
-    {
-        for (var attempt = 0; attempt < 16; attempt++)
-        {
-            var code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant();
-            if (!await db.Currencies.AnyAsync(x => x.Code == code))
-                return code;
-        }
-
-        throw new InvalidOperationException("Unable to allocate a unique three-character currency code for the PostgreSQL smoke test.");
-    }
+        => await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db);
 }

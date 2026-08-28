@@ -34,7 +34,9 @@ public interface IWaybillFinanceStore
         OperationContext context, Guid waybillId, CancellationToken cancellationToken);
 }
 
-public sealed class WaybillFinanceApplicationService(IWaybillFinanceStore store)
+public sealed class WaybillFinanceApplicationService(
+    IWaybillFinanceStore store,
+    IOperationalPartyRepository parties)
 {
     public async Task<PaymentPlanResponse> SetPaymentPlanAsync(
         OperationContext context,
@@ -45,7 +47,9 @@ public sealed class WaybillFinanceApplicationService(IWaybillFinanceStore store)
         context.EnsureComplete();
         EnsureOperation(request.ClientOperationId);
         var basis = await RequireBasis(context, waybillId, cancellationToken);
-        if (basis.Version != request.ExpectedVersion)
+        var operationId = request.ClientOperationId.Trim();
+        if (!string.Equals(basis.LastClientOperationId, operationId, StringComparison.Ordinal) &&
+            basis.Version != request.ExpectedVersion)
             throw new WaybillFinanceApplicationException("CONCURRENCY_CONFLICT");
         if (basis.OperationalStatus is not ("DRAFT" or "APPROVED"))
             throw new WaybillFinanceApplicationException("INVALID_STATE");
@@ -61,6 +65,9 @@ public sealed class WaybillFinanceApplicationService(IWaybillFinanceStore store)
             Required(x.DueTrigger, "DUE_TRIGGER_INVALID").ToUpperInvariant(),
             x.DueAt)).ToList();
 
+        await parties.EnsureUsableAsync(context.CompanyId, context.BranchId,
+            values.Where(x => x.PartyId.HasValue).Select(x => x.PartyId!.Value).Distinct().ToArray(),
+            cancellationToken);
         WaybillFinancialRules.ValidatePaymentPlan(basis.NetAmount, basis.CurrencyId, values);
         return await store.SetPaymentPlanAsync(context, waybillId, request, cancellationToken);
     }
@@ -80,15 +87,24 @@ public sealed class WaybillFinanceApplicationService(IWaybillFinanceStore store)
             throw new WaybillFinanceApplicationException("AMOUNT_INVALID");
         _ = NormalizePayerRole(request.PayerRole);
         _ = Required(request.PaymentMethodCode, "PAYMENT_METHOD_INVALID");
-        _ = Required(request.CollectedByType, "COLLECTOR_REQUIRED");
+        var collectedByType = Required(request.CollectedByType, "COLLECTOR_REQUIRED").ToUpperInvariant();
         if (request.CollectedById == Guid.Empty || request.CollectedAt == default)
             throw new WaybillFinanceApplicationException("COLLECTOR_REQUIRED");
+        // No scoped driver/agent resolver exists in the current contract. Fail closed instead of
+        // accepting a caller-supplied identity that cannot be proven in the operation scope.
+        if (collectedByType != "USER" || request.CollectedById != context.UserId)
+            throw new WaybillFinanceApplicationException("SCOPE_DENIED");
         if (request.AccountingReferenceId.HasValue && string.IsNullOrWhiteSpace(request.AccountingDocumentType))
+            throw new WaybillFinanceApplicationException("ACCOUNTING_REFERENCE_INVALID");
+        if (!request.AccountingReferenceId.HasValue && !string.IsNullOrWhiteSpace(request.AccountingDocumentType))
             throw new WaybillFinanceApplicationException("ACCOUNTING_REFERENCE_INVALID");
 
         var basis = await RequireBasis(context, waybillId, cancellationToken);
         if (basis.OperationalStatus != "APPROVED")
             throw new WaybillFinanceApplicationException("INVALID_STATE");
+
+        await parties.EnsureUsableAsync(context.CompanyId, context.BranchId,
+            request.PartyId.HasValue ? new[] { request.PartyId.Value } : Array.Empty<Guid>(), cancellationToken);
 
         return await store.RecordCollectionAsync(context, waybillId, request, cancellationToken);
     }
@@ -104,6 +120,8 @@ public sealed class WaybillFinanceApplicationService(IWaybillFinanceStore store)
         if (string.IsNullOrWhiteSpace(request.Reason))
             throw new WaybillFinanceApplicationException("REASON_REQUIRED");
         if (request.AccountingReferenceId.HasValue && string.IsNullOrWhiteSpace(request.AccountingDocumentType))
+            throw new WaybillFinanceApplicationException("ACCOUNTING_REFERENCE_INVALID");
+        if (!request.AccountingReferenceId.HasValue && !string.IsNullOrWhiteSpace(request.AccountingDocumentType))
             throw new WaybillFinanceApplicationException("ACCOUNTING_REFERENCE_INVALID");
         return await store.ReverseCollectionAsync(context, collectionId, request, cancellationToken);
     }

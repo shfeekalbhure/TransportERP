@@ -1,5 +1,7 @@
 # تقرير تنفيذ اختبارات القبول الفعلية لـP1
 
+> **`HISTORICAL_BASELINE_SUPERSEDED` — 2026-08-27:** هذا التقرير يصف baseline سابقًا ولا يثبت حالة الرأس الحالي. استخدم `PR69_FULL_EXECUTION_AND_COMPLETION_REPORT.md` ومصفوفة G4/G5 الحالية.
+
 **التاريخ:** 2026-08-19
 
 **الحالة:** `BASELINE_EXECUTED_ACCEPTANCE_NOT_CLOSED`

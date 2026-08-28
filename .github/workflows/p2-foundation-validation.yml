@@ -49,5 +49,5 @@ jobs:
       - name: Test P1 and P2-C01-A non-database runtime
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"
 
-      - name: Compile Desktop recovered contract surface as library
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+      - name: Build Desktop executable
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore

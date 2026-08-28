@@ -466,7 +466,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
         {
             if (!LoadReplayMatches(replay, manifestId, lineId, request))
                 throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT");
-            return await ManifestLineResponseOf(context, lineId, cancellationToken);
+            var lineResponse = await ManifestLineResponseOf(context, lineId, cancellationToken);
+            return lineResponse with { MovementEventId = replay.Id };
         }
 
         try
@@ -517,14 +518,9 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 : ShippingExecutionStatuses.Load.Partial;
             await Save(cancellationToken);
             await audit.WriteAsync(context, "ManifestLineLoad", "SUCCESS", "MovementEvent", movement.Id,
-                null, JsonSerializer.Serialize(new
-                {
-                    movement.ManifestId, movement.ManifestLineId, movement.AllocationId,
-                    movement.WaybillItemId, movement.Quantity, movement.OccurredAt,
-                    request.ResourceConstraintConfirmed
-                }), null, cancellationToken);
+                null, null, "QuantityLoaded", cancellationToken);
             await tx.CommitAsync(cancellationToken);
-            return ManifestLineResponseOf(line);
+            return ManifestLineResponseOf(line) with { MovementEventId = movement.Id };
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
@@ -534,7 +530,10 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 x.ClientOperationId == storedOperationId && x.EventType == "LOAD",
                 cancellationToken);
             if (replay is not null && LoadReplayMatches(replay, manifestId, lineId, request))
-                return await ManifestLineResponseOf(context, lineId, cancellationToken);
+            {
+                var lineResponse = await ManifestLineResponseOf(context, lineId, cancellationToken);
+                return lineResponse with { MovementEventId = replay.Id };
+            }
             throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
         }
         catch (Exception ex) when (IsSerializationFailure(ex))
@@ -977,7 +976,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             .OrderBy(x => x.Id)
             .Select(x => new ManifestLineResponse(
                 x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId,
-                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus))
+                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus, null))
             .ToListAsync(ct);
         return new ManifestResponse(
             manifest.Id, manifest.TripId, manifest.ManifestNo, manifest.CreatedAt,
@@ -993,12 +992,12 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 x.Manifest.BranchId == context.BranchId)
             .Select(x => new ManifestLineResponse(
                 x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId,
-                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus))
+                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus, null))
             .SingleAsync(ct);
 
     private static ManifestLineResponse ManifestLineResponseOf(ManifestLineEntity x)
         => new(x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId, x.Quantity,
-            x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus);
+            x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus, null);
 
     private static AllocationResponse AllocationResponseOf(
         OperationContext context, TripAllocationEntity x)

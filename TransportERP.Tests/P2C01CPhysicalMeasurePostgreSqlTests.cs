@@ -15,13 +15,17 @@ public sealed class P2C01CPhysicalMeasurePostgreSqlTests
     public async Task Split_item_across_two_trips_preserves_total_weight_and_volume()
     {
         var connection = RequireConnection();
+        string currencyCode;
         await using (var migrate = CreateDb(connection))
+        {
             await migrate.Database.MigrateAsync();
+            currencyCode = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(migrate);
+        }
 
         var now = DateTimeOffset.UtcNow;
         var currency = new Currency
         {
-            Id = Guid.NewGuid(), Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(), NameAr = "عملة قياسات C",
+            Id = Guid.NewGuid(), Code = currencyCode, NameAr = "عملة قياسات C",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
@@ -40,7 +44,7 @@ public sealed class P2C01CPhysicalMeasurePostgreSqlTests
         var user = new User
         {
             Id = Guid.NewGuid(), UserName = $"measure-{Guid.NewGuid():N}", NormalizedUserName = $"MEASURE{Guid.NewGuid():N}"[..24],
-            DisplayName = "مستخدم قياسات", PasswordHash = "test-only", Status = "ACTIVE",
+            DisplayName = "مستخدم قياسات", PasswordHash = "test-only", SecurityStamp = Guid.NewGuid().ToString("N"), AuthVersion = 1, Status = "ACTIVE",
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };

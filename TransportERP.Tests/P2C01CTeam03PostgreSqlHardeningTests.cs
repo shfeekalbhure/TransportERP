@@ -509,7 +509,7 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
             .OrderBy(x => x.Id)
             .Select(x => new ManifestLineResponse(
                 x.Id, x.AllocationId, x.WaybillId, x.WaybillItemId,
-                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus))
+                x.Quantity, x.LoadedQuantity, x.Weight, x.Volume, x.LoadStatus, null))
             .ToListAsync();
         return new ManifestResponse(
             manifest.Id, manifest.TripId, manifest.ManifestNo, manifest.CreatedAt,
@@ -546,7 +546,7 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
         var currency = new Currency
         {
             Id = Guid.NewGuid(),
-            Code = Guid.NewGuid().ToString("N")[..3].ToUpperInvariant(),
+            Code = await PostgreSqlTestCurrencyCodeAllocator.NextAsync(db),
             NameAr = "عملة TEAM-03",
             MinorUnit = 2, IsBase = true, Status = "ACTIVE",
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
@@ -611,6 +611,8 @@ public sealed class P2C01CTeam03PostgreSqlHardeningTests
             NormalizedUserName = $"TEAM03{suffix}{Guid.NewGuid():N}"[..24],
             DisplayName = "مستخدم TEAM-03",
             PasswordHash = "test-only",
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            AuthVersion = 1,
             Status = "ACTIVE",
             CompanyId = companyId, BranchId = branchId,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()

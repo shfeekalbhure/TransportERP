@@ -1,12 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- The repository can carry the Desktop contract surface before the executable shell is restored.
-         Build as WinExe only when the real entry point exists; otherwise keep the project visible/buildable as a library. -->
-    <HasDesktopEntryPoint Condition="Exists('Program.cs')">true</HasDesktopEntryPoint>
-    <HasDesktopEntryPoint Condition="'$(HasDesktopEntryPoint)' == ''">false</HasDesktopEntryPoint>
-    <OutputType Condition="'$(HasDesktopEntryPoint)' == 'true'">WinExe</OutputType>
-    <OutputType Condition="'$(HasDesktopEntryPoint)' != 'true'">Library</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
@@ -14,7 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TransportERP.Application\TransportERP.Application.csproj" />
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
+    <ProjectReference Include="..\TransportERP.Offline\TransportERP.Offline.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TransportERP.Desktop.E2ETests" />
   </ItemGroup>
 
 </Project>

@@ -90,8 +90,8 @@ jobs:
           dotnet-version: 10.0.x
       - name: Restore Desktop
         run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
-      - name: Build Desktop contract surface
-        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+      - name: Build Desktop executable
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore
       - name: Confirm P2-C01-A screen contracts only
         shell: pwsh
         run: |
