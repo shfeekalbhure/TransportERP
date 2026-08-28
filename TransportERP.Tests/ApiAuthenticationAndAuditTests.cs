@@ -6,8 +6,10 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TransportERP.Api.Security;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Tests;
@@ -83,6 +85,43 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.Single(body!.Results);
         Assert.Equal("QUEUED", body.Results[0].Status);
         Assert.Equal(scope.DeviceId, await db.SyncOperations.Select(x => x.DeviceId).SingleAsync(x => x == scope.DeviceId));
+    }
+
+    [Fact]
+    [Trait("Category", "HTTP")]
+    public async Task Sync_batch_does_not_treat_device_registered_claim_as_server_authority()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "HTTPD");
+        using var factory = CreateFactory(connection, installTestDeviceAuthority: false);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(
+            scope.UserId, scope.CompanyId, scope.BranchId, scope.DeviceId,
+            "sync.operations.execute"));
+
+        var response = await client.PostAsJsonAsync("/api/v1/sync/operations:batch", new
+        {
+            DeviceId = scope.DeviceId,
+            ProtocolVersion = "P1",
+            Operations = new[]
+            {
+                new
+                {
+                    OperationType = "UPDATE", EntityType = "TestEntity",
+                    EntityId = Guid.NewGuid().ToString(),
+                    ClientOperationId = $"claim-only-{Guid.NewGuid():N}",
+                    PayloadJson = "{}", PayloadHash = Sha256("{}"),
+                    ClientOccurredAt = DateTimeOffset.UtcNow, BaseVersion = 1L
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("DEVICE_NOT_REGISTERED", await response.Content.ReadAsStringAsync());
+        Assert.False(await db.SyncOperations.AnyAsync(x => x.DeviceId == scope.DeviceId));
     }
 
     [Fact]
@@ -180,14 +219,34 @@ public sealed class ApiAuthenticationAndAuditTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string connection)
+    private static WebApplicationFactory<Program> CreateFactory(
+        string connection,
+        bool installTestDeviceAuthority = true)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:TransportErp", connection);
             builder.UseSetting("Auth:Issuer", Issuer);
             builder.UseSetting("Auth:Audience", Audience);
             builder.UseSetting("Auth:SigningKey", SigningKey);
+            if (installTestDeviceAuthority)
+                builder.ConfigureTestServices(services =>
+                    services.AddSingleton<IDeviceTrustAuthority, TestDeviceTrustAuthority>());
         });
+
+    private sealed class TestDeviceTrustAuthority : IDeviceTrustAuthority
+    {
+        public Task<DeviceTrustResolution> ResolveAsync(
+            DeviceTrustRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(
+                string.IsNullOrWhiteSpace(request.RequestedDeviceId) ||
+                !string.Equals(
+                    request.RequestedDeviceId,
+                    request.ClaimedDeviceSelector,
+                    StringComparison.Ordinal)
+                    ? DeviceTrustResolution.Denied()
+                    : DeviceTrustResolution.Trusted());
+    }
 
     private static string CreateToken(Guid userId, Guid companyId, Guid branchId, string deviceId,
         string permission, string issuer = Issuer)

@@ -18,6 +18,7 @@ builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
 builder.Services.AddScoped<IEffectivePermissionResolver, PersistentPermissionResolver>();
 builder.Services.AddScoped<ICurrentRequestSecurityResolver, CurrentRequestSecurityResolver>();
+builder.Services.AddSingleton<IDeviceTrustAuthority, DefaultDenyDeviceTrustAuthority>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),
@@ -83,6 +84,7 @@ app.MapPost("/api/v1/sync/operations:batch", async (
     SyncBatchRequest request,
     HttpContext httpContext,
     SyncOperationService sync,
+    IDeviceTrustAuthority deviceTrust,
     CancellationToken cancellationToken) =>
 {
     var correlationId = GetCorrelationId(httpContext);
@@ -99,11 +101,21 @@ app.MapPost("/api/v1/sync/operations:batch", async (
 
     Guid? branchId = TryGetGuidClaim(httpContext.User, "branch_id", null, out var parsedBranch) ? parsedBranch : null;
     var claimedDeviceId = httpContext.User.FindFirstValue("device_id");
-    var isDeviceRegistered = string.Equals(
-        httpContext.User.FindFirstValue("device_registered"), "true", StringComparison.OrdinalIgnoreCase);
-    if (!isDeviceRegistered || string.IsNullOrWhiteSpace(claimedDeviceId) ||
+    if (string.IsNullOrWhiteSpace(claimedDeviceId) ||
         !string.Equals(claimedDeviceId, request.DeviceId.Trim(), StringComparison.Ordinal))
         return Results.Json(new { ErrorCode = "DEVICE_NOT_REGISTERED", CorrelationId = correlationId }, statusCode: StatusCodes.Status403Forbidden);
+
+    Guid? sessionId = TryGetGuidClaim(httpContext.User, "session_id", null, out var parsedSession)
+        ? parsedSession
+        : null;
+    var deviceTrustResolution = await deviceTrust.ResolveAsync(
+        new DeviceTrustRequest(
+            userId, companyId, branchId, sessionId, request.DeviceId.Trim(), claimedDeviceId),
+        cancellationToken);
+    if (!deviceTrustResolution.IsTrusted)
+        return Results.Json(
+            new { ErrorCode = deviceTrustResolution.FailureCode, CorrelationId = correlationId },
+            statusCode: StatusCodes.Status403Forbidden);
 
     var hasPermission = HasPermission(httpContext.User, "sync.operations.execute");
     if (!hasPermission)
