@@ -87,6 +87,46 @@ public sealed class ApiAuthenticationAndAuditTests
 
     [Fact]
     [Trait("Category", "HTTP")]
+    public async Task Sync_batch_rejects_a_valid_claim_scope_that_does_not_match_stored_user_membership()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var owner = await SeedScopeAsync(db, "HTTPO");
+        var foreign = await SeedScopeAsync(db, "HTTPF");
+        using var factory = CreateFactory(connection);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(
+            owner.UserId, foreign.CompanyId, foreign.BranchId, owner.DeviceId,
+            "sync.operations.execute"));
+
+        const string payload = "{\"crossTenant\":true}";
+        var response = await client.PostAsJsonAsync("/api/v1/sync/operations:batch", new
+        {
+            DeviceId = owner.DeviceId,
+            ProtocolVersion = "P1",
+            Operations = new[]
+            {
+                new
+                {
+                    OperationType = "UPDATE", EntityType = "TestEntity", EntityId = Guid.NewGuid().ToString(),
+                    ClientOperationId = $"cross-{Guid.NewGuid():N}", PayloadJson = payload,
+                    PayloadHash = Sha256(payload), ClientOccurredAt = DateTimeOffset.UtcNow, BaseVersion = 1L
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<SyncBatchResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("REJECTED", Assert.Single(body!.Results).Status);
+        Assert.Equal("SCOPE_DENIED", body.Results[0].ErrorCode);
+        Assert.False(await db.SyncOperations.AnyAsync(x => x.UserId == owner.UserId && x.CompanyId == foreign.CompanyId));
+    }
+
+    [Fact]
+    [Trait("Category", "HTTP")]
     public async Task Audit_read_requires_permission_and_cannot_escape_company_scope()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -212,10 +252,35 @@ public sealed class ApiAuthenticationAndAuditTests
                 CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
                 RowVersion = Guid.NewGuid().ToByteArray()
             };
-            db.Currencies.Add(currency);
-            db.Companies.Add(company);
-            db.Branches.Add(branch);
-            db.Users.Add(user);
+            var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == "sync.operations.execute");
+            if (permission is null)
+            {
+                permission = new Permission
+                {
+                    Id = Guid.NewGuid(), Code = "sync.operations.execute", NameAr = "تنفيذ عمليات المزامنة",
+                    Resource = "sync.operations", Action = "execute", ScopeType = "BRANCH", IsSystem = true,
+                    Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+                };
+                db.Permissions.Add(permission);
+            }
+            var role = new Role
+            {
+                Id = Guid.NewGuid(), Code = $"HTTP-{Guid.NewGuid():N}"[..24], NameAr = "دور اختبار HTTP",
+                CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.AddRange(currency, company, branch, user, role);
+            db.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+                CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            });
+            db.RolePermissions.Add(new RolePermission
+            {
+                RoleId = role.Id, PermissionId = permission.Id, ScopeType = "BRANCH",
+                CompanyId = company.Id, BranchId = branch.Id,
+                CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            });
             try
             {
                 await db.SaveChangesAsync();

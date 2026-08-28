@@ -61,7 +61,8 @@ public sealed class SyncRuleException(string code, string detail) : InvalidOpera
 public sealed class SyncOperationService(
     TransportErpDbContext db,
     AuditEventService audit,
-    SyncRetryPolicy retryPolicy)
+    SyncRetryPolicy retryPolicy,
+    IEffectivePermissionResolver permissions)
 {
     private readonly SyncRetryPolicy _retryPolicy = retryPolicy.Validate();
 
@@ -144,7 +145,7 @@ public sealed class SyncOperationService(
     {
         var operation = await db.SyncOperations.SingleOrDefaultAsync(x => x.Id == command.OperationId, cancellationToken)
             ?? throw new SyncRuleException("OPERATION_NOT_FOUND", command.OperationId.ToString());
-        EnsureTenantScope(operation, security);
+        EnsureSameOwnerScope(operation, security);
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
 
         var newStatus = command.NewStatus.Trim().ToUpperInvariant();
@@ -186,7 +187,7 @@ public sealed class SyncOperationService(
     {
         var operation = await db.SyncOperations.SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken)
             ?? throw new SyncRuleException("OPERATION_NOT_FOUND", operationId.ToString());
-        EnsureTenantScope(operation, security);
+        EnsureSameOwnerScope(operation, security);
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
         if (operation.Status != "FAILED")
             throw new SyncRuleException("RETRY_NOT_ALLOWED", operation.ClientOperationId);
@@ -242,7 +243,8 @@ public sealed class SyncOperationService(
         await EnsureSecurityAsync(security, security.CompanyId, security.BranchId, cancellationToken);
         var dueAt = now ?? DateTimeOffset.UtcNow;
         var query = db.SyncOperations.AsNoTracking()
-            .Where(x => x.CompanyId == security.CompanyId && x.Status == "FAILED" &&
+            .Where(x => x.CompanyId == security.CompanyId && x.UserId == security.UserId &&
+                        x.DeviceId == security.DeviceId && x.Status == "FAILED" &&
                         x.NextRetryAt != null && x.NextRetryAt <= dueAt &&
                         (x.ErrorCode == null || x.ErrorCode == "RATE_LIMITED"));
         if (security.BranchId is not null)
@@ -262,7 +264,7 @@ public sealed class SyncOperationService(
 
         var operation = await db.SyncOperations.SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken)
             ?? throw new SyncRuleException("OPERATION_NOT_FOUND", operationId.ToString());
-        EnsureTenantScope(operation, security);
+        EnsureSameOwnerScope(operation, security);
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
         if (operation.Status != "CONFLICT")
             throw new SyncRuleException("CONFLICT_NOT_FOUND", operation.ClientOperationId);
@@ -310,7 +312,7 @@ public sealed class SyncOperationService(
             .SingleOrDefaultAsync(x => x.Id == conflictCaseId, cancellationToken)
             ?? throw new SyncRuleException("CONFLICT_NOT_FOUND", conflictCaseId.ToString());
         var operation = conflict.SyncOperation ?? throw new SyncRuleException("OPERATION_NOT_FOUND", conflict.SyncOperationId.ToString());
-        EnsureTenantScope(operation, security);
+        EnsureSameOwnerScope(operation, security);
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
         if (conflict.Status != "OPEN" || operation.Status != "CONFLICT")
             throw new SyncRuleException("CONFLICT_ALREADY_RESOLVED", conflictCaseId.ToString());
@@ -320,7 +322,7 @@ public sealed class SyncOperationService(
             var replacement = await db.SyncOperations.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == command.ReplacedByOperationId.Value, cancellationToken)
                 ?? throw new SyncRuleException("REPLACEMENT_NOT_FOUND", command.ReplacedByOperationId.Value.ToString());
-            EnsureTenantScope(replacement, security);
+            EnsureSameOwnerScope(replacement, security);
         }
 
         var now = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
@@ -363,8 +365,15 @@ public sealed class SyncOperationService(
         if (!companyExists) throw new SyncRuleException("COMPANY_NOT_FOUND", companyId.ToString());
         if (branchId is not null && !await db.Branches.AnyAsync(x => x.Id == branchId && x.CompanyId == companyId && x.Status == "ACTIVE", cancellationToken))
             throw new SyncRuleException("BRANCH_NOT_FOUND", branchId.ToString()!);
-        if (!await db.Users.AnyAsync(x => x.Id == security.UserId && x.Status == "ACTIVE", cancellationToken))
-            throw new SyncRuleException("USER_NOT_FOUND", security.UserId.ToString());
+        var userInScope = await db.Users.AnyAsync(x =>
+            x.Id == security.UserId && x.Status == "ACTIVE" &&
+            x.CompanyId == companyId &&
+            (!x.BranchId.HasValue || x.BranchId == branchId), cancellationToken);
+        if (!userInScope)
+            throw new SyncRuleException("SCOPE_DENIED", security.UserId.ToString());
+        if (!await permissions.HasPermissionAsync(
+                security.UserId, companyId, branchId, "sync.operations.execute", cancellationToken))
+            throw new SyncRuleException("PERMISSION_DENIED", "sync.operations.execute");
     }
 
     private static void EnsureTenantScope(SyncOperation operation, SyncSecurityContext security)

@@ -15,6 +15,7 @@ var connectionString = builder.Configuration.GetConnectionString("TransportErp")
 
 builder.Services.AddTransportErpPostgreSql(connectionString);
 builder.Services.AddScoped<AuditEventService>();
+builder.Services.AddScoped<IEffectivePermissionResolver, PersistentPermissionResolver>();
 builder.Services.AddScoped<SyncOperationService>(services =>
     new SyncOperationService(
         services.GetRequiredService<TransportErpDbContext>(),
@@ -22,7 +23,8 @@ builder.Services.AddScoped<SyncOperationService>(services =>
         new SyncRetryPolicy(
             builder.Configuration.GetValue("Sync:MaxRetryCount", 5),
             TimeSpan.FromSeconds(builder.Configuration.GetValue("Sync:BaseRetrySeconds", 5)),
-            TimeSpan.FromMinutes(builder.Configuration.GetValue("Sync:MaxRetryMinutes", 30)))));
+            TimeSpan.FromMinutes(builder.Configuration.GetValue("Sync:MaxRetryMinutes", 30))),
+        services.GetRequiredService<IEffectivePermissionResolver>()));
 builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();

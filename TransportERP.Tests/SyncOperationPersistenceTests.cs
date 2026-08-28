@@ -56,6 +56,115 @@ public sealed class SyncOperationPersistenceTests
 
     [Fact]
     [Trait("Category", "PostgreSQL")]
+    public async Task Enqueue_rejects_claim_only_permission_and_stored_membership_mismatch()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "AUTHZ");
+        var service = CreateService(db);
+        var command = CreateCommand(scope, "{\"authority\":true}");
+
+        var grant = await db.RolePermissions.SingleAsync(x =>
+            x.PermissionId == scope.PermissionId && x.RoleId == scope.RoleId);
+        db.RolePermissions.Remove(grant);
+        await db.SaveChangesAsync();
+
+        var claimOnly = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            service.EnqueueSyncOperationAsync(command, scope.Security));
+        Assert.Equal("PERMISSION_DENIED", claimOnly.Code);
+
+        db.RolePermissions.Add(grant);
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            UserId = scope.Security.UserId, PermissionId = scope.PermissionId, IsAllowed = false,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Reason = "revoked during test",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();
+        var revoked = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            service.EnqueueSyncOperationAsync(command with { ClientOperationId = $"revoked-{Guid.NewGuid():N}" }, scope.Security));
+        Assert.Equal("PERMISSION_DENIED", revoked.Code);
+        db.UserPermissionOverrides.Remove(await db.UserPermissionOverrides.SingleAsync(x =>
+            x.UserId == scope.Security.UserId && x.PermissionId == scope.PermissionId));
+
+        var otherBranch = new Branch
+        {
+            Id = Guid.NewGuid(), CompanyId = scope.CompanyId, Code = $"B{Guid.NewGuid():N}"[..12],
+            NameAr = "فرع آخر", Timezone = "Asia/Aden", Status = "ACTIVE",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        db.Branches.Add(otherBranch);
+        await db.SaveChangesAsync();
+
+        var wrongBranchSecurity = scope.Security with { BranchId = otherBranch.Id };
+        var wrongBranchCommand = command with { BranchId = otherBranch.Id };
+        var membership = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            service.EnqueueSyncOperationAsync(wrongBranchCommand, wrongBranchSecurity));
+        Assert.Equal("SCOPE_DENIED", membership.Code);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Lifecycle_mutations_deny_same_tenant_different_user_or_device()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "OWNER");
+        var otherUser = await AddUserWithRoleAsync(db, scope, "other-owner");
+        var otherUserSecurity = scope.Security with { UserId = otherUser.Id };
+        var otherDeviceSecurity = scope.Security with { DeviceId = "other-device" };
+        var service = CreateService(db);
+
+        var transitionOperation = await service.EnqueueSyncOperationAsync(
+            CreateCommand(scope, "{\"transition\":true}"), scope.Security);
+        await AssertScopeDeniedAsync(() => service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(transitionOperation.Id, "SENDING"), otherUserSecurity));
+        await AssertScopeDeniedAsync(() => service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(transitionOperation.Id, "SENDING"), otherDeviceSecurity));
+
+        await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(transitionOperation.Id, "SENDING"), scope.Security);
+        await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(transitionOperation.Id, "FAILED", "RATE_LIMITED"), scope.Security);
+        await AssertScopeDeniedAsync(() => service.RetryOperationAsync(transitionOperation.Id, otherUserSecurity));
+        await AssertScopeDeniedAsync(() => service.RetryOperationAsync(transitionOperation.Id, otherDeviceSecurity));
+
+        var conflictOperation = await service.EnqueueSyncOperationAsync(
+            CreateCommand(scope, "{\"conflict\":true}"), scope.Security);
+        await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(conflictOperation.Id, "SENDING"), scope.Security);
+        await service.TransitionSyncOperationAsync(
+            new TransitionSyncOperationCommand(conflictOperation.Id, "CONFLICT"), scope.Security);
+        var draft = new ConflictCaseDraft("{\"device\":1}", "{\"server\":2}", "OWNER_TEST");
+        await AssertScopeDeniedAsync(() => service.CreateConflictCaseAsync(
+            conflictOperation.Id, draft, otherUserSecurity));
+        await AssertScopeDeniedAsync(() => service.CreateConflictCaseAsync(
+            conflictOperation.Id, draft, otherDeviceSecurity));
+
+        var conflict = await service.CreateConflictCaseAsync(conflictOperation.Id, draft, scope.Security);
+        await AssertScopeDeniedAsync(() => service.ResolveSyncConflictAsync(
+            conflict.Id, new ResolveSyncConflictCommand("DENIED"), otherUserSecurity));
+        await AssertScopeDeniedAsync(() => service.ResolveSyncConflictAsync(
+            conflict.Id, new ResolveSyncConflictCommand("DENIED"), otherDeviceSecurity));
+
+        var replacementPayload = "{\"replacement\":true}";
+        var replacementCommand = new EnqueueSyncOperationCommand(
+            otherUserSecurity.DeviceId, otherUser.Id, scope.CompanyId, scope.BranchId,
+            "UPDATE", "TestEntity", Guid.NewGuid(), $"client-{Guid.NewGuid():N}", replacementPayload,
+            Hash(replacementPayload), DateTimeOffset.UtcNow, 1);
+        var replacement = await service.EnqueueSyncOperationAsync(replacementCommand, otherUserSecurity);
+        await AssertScopeDeniedAsync(() => service.ResolveSyncConflictAsync(
+            conflict.Id, new ResolveSyncConflictCommand("FOREIGN_REPLACEMENT", replacement.Id), scope.Security));
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
     public async Task Lifecycle_retry_backoff_conflict_case_and_resolution_are_persisted()
     {
         var connection = PostgreSqlTestEnvironment.RequireConnection();
@@ -134,7 +243,9 @@ public sealed class SyncOperationPersistenceTests
     private static SyncOperationService CreateService(
         TransportErpDbContext db,
         SyncRetryPolicy? retryPolicy = null)
-        => new(db, new AuditEventService(db), retryPolicy ?? new SyncRetryPolicy(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30)));
+        => new(db, new AuditEventService(db),
+            retryPolicy ?? new SyncRetryPolicy(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30)),
+            new PersistentPermissionResolver(db));
 
     private static EnqueueSyncOperationCommand CreateCommand(TestScope scope, string payload)
         => new(scope.Security.DeviceId, scope.Security.UserId, scope.Security.CompanyId, scope.Security.BranchId,
@@ -175,13 +286,65 @@ public sealed class SyncOperationPersistenceTests
             CompanyId = company.Id, BranchId = branch.Id, CreatedAt = now, UpdatedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray()
         };
-        db.Currencies.Add(currency);
-        db.Companies.Add(company);
-        db.Branches.Add(branch);
-        db.Users.Add(user);
+        var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == "sync.operations.execute");
+        if (permission is null)
+        {
+            permission = new Permission
+            {
+                Id = Guid.NewGuid(), Code = "sync.operations.execute", NameAr = "تنفيذ عمليات المزامنة",
+                Resource = "sync.operations", Action = "execute", ScopeType = "BRANCH", IsSystem = true,
+                Status = "ACTIVE", CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.Permissions.Add(permission);
+        }
+        var role = new Role
+        {
+            Id = Guid.NewGuid(), Code = $"SYNC-{Guid.NewGuid():N}"[..24], NameAr = "دور اختبار مزامنة",
+            CompanyId = company.Id, Status = "ACTIVE", CreatedAt = now, UpdatedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        db.AddRange(currency, company, branch, user, role);
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = role.Id, PermissionId = permission.Id, ScopeType = "BRANCH",
+            CompanyId = company.Id, BranchId = branch.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
         await db.SaveChangesAsync();
-        return new TestScope(company.Id, branch.Id,
+        return new TestScope(company.Id, branch.Id, permission.Id, role.Id,
             new SyncSecurityContext(user.Id, $"device-{suffix}-{Guid.NewGuid():N}", company.Id, branch.Id, true, true));
+    }
+
+    private static async Task<User> AddUserWithRoleAsync(TransportErpDbContext db, TestScope scope, string suffix)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var user = new User
+        {
+            Id = Guid.NewGuid(), UserName = $"{suffix}-{Guid.NewGuid():N}",
+            NormalizedUserName = $"{suffix}-{Guid.NewGuid():N}".ToUpperInvariant(),
+            DisplayName = "مستخدم مالك آخر", PasswordHash = "test-only", Status = "ACTIVE",
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        };
+        db.Users.Add(user);
+        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = scope.RoleId, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();
+        return user;
+    }
+
+    private static async Task AssertScopeDeniedAsync(Func<Task> action)
+    {
+        var exception = await Assert.ThrowsAsync<SyncRuleException>(action);
+        Assert.Equal("SCOPE_DENIED", exception.Code);
     }
 
     private static async Task<string> NextCurrencyCodeAsync(TransportErpDbContext db)
@@ -196,5 +359,10 @@ public sealed class SyncOperationPersistenceTests
         throw new InvalidOperationException("Unable to allocate a unique three-character currency code for the PostgreSQL sync test.");
     }
 
-    private sealed record TestScope(Guid CompanyId, Guid BranchId, SyncSecurityContext Security);
+    private sealed record TestScope(
+        Guid CompanyId,
+        Guid BranchId,
+        Guid PermissionId,
+        Guid RoleId,
+        SyncSecurityContext Security);
 }
