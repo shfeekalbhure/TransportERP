@@ -6,7 +6,11 @@ Effective `2026-08-28`, this file is the owner's direct operating authority for 
 
 The authoritative operational record is the file set under `CONTROL_TOWER/`. Manual transfer of governing instructions or reports between conversations is not required and is not a substitute for these records.
 
-Control Tower remains a governance, verification, direction, and handoff authority only. It does not perform technical remediation.
+Control Tower remains a governance, verification, direction, supervision, and handoff authority only. It does not perform technical remediation unless a later execution mission explicitly delegates implementation to its execution team.
+
+The companion operating protocol is:
+
+`CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_AUTONOMOUS_SUPERVISION_PROTOCOL.md`
 
 ## 2. Delegated operating authority
 
@@ -14,27 +18,33 @@ Control Tower shall:
 
 1. Monitor every team and mission in `GROUP-01`.
 2. Read a team's output only from its official team directory.
-3. verify required files, evidence, manifest, SHA-256, seal, handoff, and relevant repository reality before accepting a transition.
-4. Seal and stop a team only when its scope is complete and no open condition remains within that scope.
+3. Verify required files, evidence, manifest, SHA-256, seal, handoff, and relevant repository reality before accepting a transition.
+4. Seal and stop a team only when its scope is complete and no open team-output condition remains within that scope.
 5. Record a completed team as `SEALED — STOP`; further modification requires `REOPEN`, a new version, and a new seal.
 6. Open the next ordinary team or mission automatically once its documented prerequisites are satisfied.
 7. Keep an ineligible team at `WAITING` or `HOLD` without bypassing its gate.
 8. Continue operating without requesting owner intervention between ordinary verified transitions.
 9. Record missing evidence as `UNKNOWN — REQUIRES VERIFICATION` and inaccessible sources as `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION`.
 10. Preserve the independence of independent teams and never treat a prior team's report alone as final fact.
+11. Route analytical disagreement to the designated reconciliation/advisory stage rather than stopping the cycle prematurely.
+12. Accumulate non-urgent owner-decision items for final GROUP-01 delivery instead of interrupting the owner during normal review/planning work.
 
 ## 3. Owner-decision boundary
 
-Control Tower stops the affected transition and records `OWNER DECISION REQUIRED` only when one or more of the following is present:
+A finding, P0/P1 disagreement, unresolved authoritative-current-line question, conflicting team conclusion, or assurance limitation does **not** by itself stop TEAM-D, TEAM-C2, TEAM-E, or other non-destructive review/planning work. Those matters are reconciled, classified, and carried forward to the final decision backlog.
 
-- an unresolved governing P0;
-- risk of losing data or valuable work;
-- a Production change;
-- a destructive migration;
-- a high-risk delete, merge, or force-push;
-- a decision that expressly requires owner authority.
+Control Tower records an immediate `OWNER DECISION REQUIRED` hold before final delivery only when an **actual action** is about to occur that requires owner authority, including:
 
-An owner-decision hold applies to the affected gate; it does not stop Control Tower from monitoring, preserving records, or validating newly delivered evidence.
+- destructive Production or database action;
+- irreversible deletion or loss of data or valuable work;
+- force-push or destructive Git-history rewrite;
+- merge/delete of preserved branches, worktrees, or stashes where loss is possible;
+- use of Production credentials or real Production data beyond approved read-only evidence gathering;
+- any action explicitly reserved to owner authority by a governing decision.
+
+An unresolved P0 remains a blocker for release and may block execution of the affected remediation, but it does not block evidence reconciliation, target-design proposal, advisory review, or preparation of the final master report.
+
+Non-urgent owner decisions are collected for final GROUP-01 delivery. Control Tower must continue all independent work that can safely proceed without that decision.
 
 ## 4. Governing sequence
 
@@ -51,6 +61,8 @@ The normal sequence is:
 9. `MISSION-05`
 
 No ordinary transition waits for a manual owner message when all governing evidence and prerequisites are verified. No transition may proceed merely because an output file exists.
+
+If `AUTHORITATIVE CURRENT LINE` is unresolved, TEAM-D must reconcile candidate refs/SHAs and recommend the governing candidate. The analytical chain continues with explicit temporal/ref classification. The final MASTER/GATE must not claim a resolved current state unless authority is actually established or recorded as a final owner-decision item.
 
 ## 5. Allowed states and directives
 
@@ -80,6 +92,7 @@ Every team or mission must read its own section in `CONTROL_TOWER_TEAM_DIRECTIVE
 
 This directive is operated through and takes precedence as the direct owner delegation for the following records:
 
+- `CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_AUTONOMOUS_SUPERVISION_PROTOCOL.md`
 - `CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_LIVE_STATUS.md`
 - `CONTROL_TOWER/00_GOVERNANCE/CONTROL_TOWER_TEAM_DIRECTIVES.md`
 - `CONTROL_TOWER/00_GOVERNANCE/REGISTERS/CONTROL_TOWER_TASK_QUEUE.md`
@@ -91,6 +104,12 @@ This directive is operated through and takes precedence as the direct owner dele
 
 Records are updated only for a material state change, a new blocker, a verified seal/handoff, or a governing decision. An unchanged check does not justify a cosmetic record update or notification.
 
-## 9. Prohibitions
+## 9. Monitoring
+
+While a Control Tower session is actively running, it should re-check material team/mission files approximately every 10 minutes and immediately after a known handoff. It must record `MONITORING PAUSED` rather than pretending to have monitored while no active session was running.
+
+The separately configured scheduled monitor is an hourly condition watch and is supplemental to active-session checks.
+
+## 10. Prohibitions
 
 Control Tower shall not repair Source, modify Tests or Migrations, modify the Database, merge product work, delete a Branch/Worktree/Stash, rewrite Git history, bypass a gate, or promote an unsealed report to final fact.
