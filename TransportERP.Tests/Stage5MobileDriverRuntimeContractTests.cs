@@ -118,11 +118,23 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "MODE_READY"
                  })
             Assert.Contains($"phase = \"{signInPhase}\"", script, StringComparison.Ordinal);
-        Assert.Contains("re.fullmatch(r\"Result: ([A-Z0-9_]{1,64})\"", script,
+        Assert.Contains("SAFE_RESULT = re.compile(r\"Result: ([A-Z0-9_]{1,64})\")", script,
+            StringComparison.Ordinal);
+        Assert.Contains("SAFE_SIGN_IN_RESULT_CODES = frozenset(", script, StringComparison.Ordinal);
+        Assert.Contains("if code in SAFE_SIGN_IN_RESULT_CODES else \"UI_RESULT_OTHER\"", script,
             StringComparison.Ordinal);
         Assert.Contains("re.fullmatch(r\"Offline runtime: (CLOSED|READY)\"", script,
             StringComparison.Ordinal);
         Assert.Contains("OBSERVATION_UNAVAILABLE", script, StringComparison.Ordinal);
+        Assert.Contains("driver.wait_result_code(\"driver_action_result\", \"OFFLINE_ACTIVATED\")", script,
+            StringComparison.Ordinal);
+        foreach (var safeResultDiagnostic in new[]
+                 {
+                     "RESULT_COUNT_", "RESULT_INITIAL_PROMPT", "RESULT_EMPTY", "RESULT_OTHER",
+                     "MODE_COUNT_", "MODE_CLOSED", "MODE_READY", "MODE_OTHER",
+                     "SIGN_IN_COUNT_", "SIGN_IN_ENABLED_"
+                 })
+            Assert.Contains(safeResultDiagnostic, script, StringComparison.Ordinal);
         Assert.DoesNotContain("{phase}:{value}", script, StringComparison.Ordinal);
         Assert.Contains("UI_TEXT_VERIFY_ELEMENT_COUNT_INVALID", script, StringComparison.Ordinal);
         Assert.Contains("UI_TEXT_VERIFY_{text_state}_{focus_state}", script,
@@ -201,6 +213,20 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "test_root_dump_failure_remains_fail_closed"
                  })
             Assert.Contains(stateMachineTest, stateMachineTests, StringComparison.Ordinal);
+        foreach (var safeResultTest in new[]
+                 {
+                     "test_expected_result_returns_without_exposing_values",
+                     "test_unexpected_safe_result_fails_immediately_with_only_the_code",
+                     "test_invalid_expected_result_is_rejected_before_ui_access",
+                     "test_observation_classifies_only_allowlisted_states",
+                     "test_observation_never_emits_unrecognized_text",
+                     "test_element_count_failures_remain_fixed_and_value_free",
+                     "test_unknown_safe_shaped_result_is_not_emitted",
+                     "test_prompt_and_unrecognized_text_wait_for_timeout_without_emission",
+                     "test_missing_element_retries_but_non_scroll_failure_stops",
+                     "test_observation_does_not_emit_unknown_safe_shaped_result"
+                 })
+            Assert.Contains(safeResultTest, stateMachineTests, StringComparison.Ordinal);
         Assert.DoesNotContain("events.append(value", stateMachineTests, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("python3 eng/ci/test_android_release_ui_e2e.py", workflow,
             StringComparison.Ordinal);
@@ -219,6 +245,29 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.DoesNotContain("http://", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("https://", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("run-as", script, StringComparison.Ordinal);
+
+        var renderClosedStart = page.IndexOf(
+            "    private void RenderClosed(bool preserveActionResult = false)", StringComparison.Ordinal);
+        var renderClosedEnd = page.IndexOf(
+            "    private void OnSelectionChanged", renderClosedStart, StringComparison.Ordinal);
+        Assert.True(renderClosedStart >= 0 && renderClosedEnd > renderClosedStart);
+        var renderClosed = page[renderClosedStart..renderClosedEnd];
+        Assert.Contains("if (!preserveActionResult) _actionResult.Text = InitialActionPrompt;",
+            renderClosed, StringComparison.Ordinal);
+        Assert.Contains("private const string InitialActionPrompt", page, StringComparison.Ordinal);
+        Assert.Equal(2, page.Split("RefreshAsync(preserveActionResult: true)",
+            StringSplitOptions.None).Length - 1);
+        var signInStart = page.IndexOf("    private async Task SignInAndActivateAsync()",
+            StringComparison.Ordinal);
+        var signOutStart = page.IndexOf("    private async Task SignOutAsync()", signInStart,
+            StringComparison.Ordinal);
+        var resolveStart = page.IndexOf("    private async Task ResolveSelectedAsync", signOutStart,
+            StringComparison.Ordinal);
+        Assert.True(signInStart >= 0 && signOutStart > signInStart && resolveStart > signOutStart);
+        Assert.Contains("RefreshAsync(preserveActionResult: true)", page[signInStart..signOutStart],
+            StringComparison.Ordinal);
+        Assert.Contains("RefreshAsync(preserveActionResult: true)", page[signOutStart..resolveStart],
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -335,6 +384,22 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("image: postgres:18.6-bookworm", workflow, StringComparison.Ordinal);
         Assert.Contains("Verify Android business result in PostgreSQL 18.6", workflow,
             StringComparison.Ordinal);
+        Assert.Contains("Capture sanitized Android PostgreSQL diagnostics", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("if: ${{ always() }}", workflow, StringComparison.Ordinal);
+        foreach (var releaseDiagnostic in new[]
+                 {
+                     "device=$device_label;auth_session_count=",
+                     "device=$device_label;identity_login_success_count=",
+                     "device=$device_label;identity_login_failure_count=",
+                     "device=$device_label;proof_key_bound_count=",
+                     "device=$device_label;proof_key_challenge_count=",
+                     "device=$device_label;proof_key_change_count=",
+                     "device=$device_label;nonce_count=",
+                     "device=$device_label;replay_count=",
+                     "device=$device_label;sync_operation_count="
+                 })
+            Assert.Contains(releaseDiagnostic, workflow, StringComparison.Ordinal);
         Assert.Contains("TransportERPDeviceTestServerCertificateSha256", workflow,
             StringComparison.Ordinal);
         Assert.Contains("ValidatePinnedDeviceTestCertificate", network, StringComparison.Ordinal);

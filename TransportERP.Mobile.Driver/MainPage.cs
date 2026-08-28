@@ -8,6 +8,9 @@ namespace TransportERP.Mobile.Driver;
 
 public sealed class MainPage : ContentPage
 {
+    private const string InitialActionPrompt =
+        "Sign in and explicitly activate an authorized scope to use synchronization.";
+
     private readonly DriverOfflineActivationService _activation;
     private readonly DriverAuthenticatedActivationCoordinator _authenticatedActivation;
     private readonly ObservableCollection<DriverOfflineOperationStatusView> _operations = [];
@@ -19,7 +22,11 @@ public sealed class MainPage : ContentPage
         AutomationId = "driver_conflict_review",
         Text = "Conflict review: NOT_SELECTED"
     };
-    private readonly Label _actionResult = new() { AutomationId = "driver_action_result" };
+    private readonly Label _actionResult = new()
+    {
+        AutomationId = "driver_action_result",
+        Text = InitialActionPrompt
+    };
     private readonly CollectionView _operationList;
     private readonly Button _retry = new()
     {
@@ -278,7 +285,7 @@ public sealed class MainPage : ContentPage
     private void OnActivationStateChanged(object? sender, EventArgs args) =>
         MainThread.BeginInvokeOnMainThread(async () => await RefreshAsync());
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(bool preserveActionResult = false)
     {
         if (_busy) return;
         _busy = true;
@@ -287,7 +294,7 @@ public sealed class MainPage : ContentPage
             var active = _activation.Active;
             if (active is null)
             {
-                RenderClosed();
+                RenderClosed(preserveActionResult);
                 return;
             }
 
@@ -319,12 +326,12 @@ public sealed class MainPage : ContentPage
         }
     }
 
-    private void RenderClosed()
+    private void RenderClosed(bool preserveActionResult = false)
     {
         _mode.Text = "Offline runtime: CLOSED";
         _reason.Text = "Reason: OFFLINE_CLOSED";
         _evidence.Text = "No offline store is opened and no local operation evidence is available.";
-        _actionResult.Text = "Sign in and explicitly activate an authorized scope to use synchronization.";
+        if (!preserveActionResult) _actionResult.Text = InitialActionPrompt;
         _signIn.IsEnabled = true;
         _signOut.IsEnabled = false;
         _queueParty.IsEnabled = false;
@@ -437,7 +444,7 @@ public sealed class MainPage : ContentPage
             _password.Text = string.Empty;
             _deviceCredential.Text = string.Empty;
             _busy = false;
-            await RefreshAsync();
+            await RefreshAsync(preserveActionResult: true);
         }
     }
 
@@ -459,7 +466,7 @@ public sealed class MainPage : ContentPage
             _password.Text = string.Empty;
             _deviceCredential.Text = string.Empty;
             _busy = false;
-            await RefreshAsync();
+            await RefreshAsync(preserveActionResult: true);
         }
     }
 

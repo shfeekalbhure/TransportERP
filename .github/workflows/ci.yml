@@ -2198,6 +2198,7 @@ jobs:
         env:
           PGPASSWORD: android-ci-database-password
         run: |
+          set -euo pipefail
           mkdir -p ci-evidence/android-runtime
           diagnostic=ci-evidence/android-runtime/business-postgresql-diagnostics.txt
           if ! psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc 'SELECT 1' >/dev/null 2>&1; then
@@ -2223,6 +2224,31 @@ jobs:
               "SELECT 'replay_count=' || count(*) FROM transport_erp.sync_proof_replays r JOIN transport_erp.sync_proof_nonces n ON n.\"Id\" = r.\"NonceRecordId\" WHERE r.\"DeviceId\" IN ('android-ci-device','android-ci-release-device')"
             psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
               "SELECT 'audit_action=' || \"Action\" || ';count=' || count(*) FROM transport_erp.audit_events WHERE \"OperationCorrelationId\" IN (SELECT \"OperationCorrelationId\" FROM transport_erp.sync_operations WHERE \"ActionCode\" = 'CreateOperationalParty' AND \"RegisteredDeviceId\" IN (SELECT \"Id\" FROM transport_erp.registered_devices WHERE \"DeviceId\" IN ('android-ci-device','android-ci-release-device'))) GROUP BY \"Action\" ORDER BY \"Action\""
+            for device_id in android-ci-device android-ci-release-device; do
+              case "$device_id" in
+                android-ci-device) device_label=native ;;
+                android-ci-release-device) device_label=release ;;
+                *) exit 1 ;;
+              esac
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;auth_session_count=' || count(*) FROM transport_erp.auth_sessions WHERE \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;identity_login_success_count=' || count(*) FROM transport_erp.audit_events WHERE \"Action\"='IdentityLogin' AND \"Outcome\"='SUCCESS' AND \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;identity_login_failure_count=' || count(*) FROM transport_erp.audit_events WHERE \"Action\"='IdentityLogin' AND \"Outcome\"='FAILURE' AND \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;proof_key_bound_count=' || count(*) FROM transport_erp.registered_devices WHERE \"DeviceId\"='$device_id' AND \"ProofKeyVersion\">=1 AND \"ProofKeyThumbprint\" IS NOT NULL"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;proof_key_challenge_count=' || count(*) FROM transport_erp.registered_device_proof_key_challenges WHERE \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;proof_key_change_count=' || count(*) FROM transport_erp.registered_device_proof_key_changes WHERE \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;nonce_count=' || count(*) FROM transport_erp.sync_proof_nonces WHERE \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;replay_count=' || count(*) FROM transport_erp.sync_proof_replays WHERE \"DeviceId\"='$device_id'"
+              psql -h 127.0.0.1 -U transporter_android_ci -d transporter_android_ci -Atc \
+                "SELECT 'device=$device_label;sync_operation_count=' || count(*) FROM transport_erp.sync_operations WHERE \"DeviceId\"='$device_id' AND \"ActionCode\"='CreateOperationalParty'"
+            done
           } > "$diagnostic"
 
       - name: Verify Android business result in PostgreSQL 18.6

@@ -27,6 +27,47 @@ AUTOMATION_ROOT = "driver_main_scroll"
 SAFE_INPUT = re.compile(r"^[A-Za-z0-9@._+/:=%-]+$")
 BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 OPERATION_ID = re.compile(r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \|")
+SAFE_RESULT = re.compile(r"Result: ([A-Z0-9_]{1,64})")
+INITIAL_ACTION_PROMPT = "Sign in and explicitly activate an authorized scope to use synchronization."
+SAFE_SIGN_IN_RESULT_CODES = frozenset(
+    {
+        "AUTHENTICATED_SCOPE_INVALID",
+        "AUTHENTICATION_FAILED",
+        "AUTHENTICATION_INPUT_INVALID",
+        "BUILD_IDENTITY_UNAVAILABLE",
+        "BUILD_SIGNER_IDENTITY_UNAVAILABLE",
+        "DEVICE_KEY_ALREADY_PROVISIONED",
+        "DEVICE_KEY_ENROLLMENT_AUTHORITY_INVALID",
+        "DEVICE_KEY_ENROLLMENT_CHALLENGE_INVALID",
+        "DEVICE_KEY_ENROLLMENT_CHALLENGE_REJECTED",
+        "DEVICE_KEY_ENROLLMENT_NOT_AUTHORIZED",
+        "DEVICE_KEY_ENROLLMENT_REJECTED",
+        "DEVICE_KEY_ENROLLMENT_RESPONSE_INVALID",
+        "DEVICE_KEY_REBIND_REQUIRED",
+        "DEVICE_KEY_RECOVERY_REAUTHENTICATION_REQUIRED",
+        "DRIVER_OFFLINE_ALREADY_ACTIVE",
+        "NATIVE_DEVICE_SIGNATURE_DER_INVALID",
+        "NATIVE_DEVICE_SIGNING_INITIALIZATION_FAILED",
+        "NATIVE_DEVICE_SIGNING_INPUT_FAILED",
+        "NATIVE_DEVICE_SIGNING_KEY_READ_FAILED",
+        "NATIVE_DEVICE_SIGNING_KEY_UNAVAILABLE",
+        "NATIVE_DEVICE_SIGNING_OPERATION_FAILED",
+        "NATIVE_DEVICE_SIGNING_PROVIDER_UNAVAILABLE",
+        "NATIVE_SECURE_STORAGE_KEY_INVALID",
+        "NATIVE_SECURE_STORAGE_UNAVAILABLE",
+        "NETWORK_UNAVAILABLE",
+        "OFFLINE_ACTIVATED",
+        "OFFLINE_ACTIVATION_AUTHORITY_UNAVAILABLE",
+        "OFFLINE_ACTIVATION_DECISION_INVALID",
+        "OFFLINE_CLOSED",
+        "OPERATION_FAILED",
+        "PROOF_KEY_BINDING_REQUIRED",
+        "SERVER_ORIGIN_INVALID",
+        "SERVER_RESPONSE_INVALID",
+        "SERVER_RESPONSE_TOO_LARGE",
+        "SESSION_TOKEN_UNAVAILABLE",
+    }
+)
 IME_DISMISS_TIMEOUT_SECONDS = 5
 IME_DISMISS_POLL_SECONDS = 0.25
 FOCUS_OWNER_ALLOWLIST = (
@@ -393,6 +434,30 @@ class Driver:
             time.sleep(0.5)
         raise UiE2EFailure("UI_WAIT_TIMEOUT")
 
+    def wait_result_code(self, automation_id: str, expected_code: str) -> None:
+        if expected_code not in SAFE_SIGN_IN_RESULT_CODES:
+            raise UiE2EFailure("EXPECTED_RESULT_CODE_INVALID")
+        expected = f"Result: {expected_code}"
+        deadline = time.monotonic() + self.timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                node = self.find(automation_id)
+            except UiE2EFailure as error:
+                if not str(error).startswith("UI_AUTOMATION_ID_NOT_FOUND:SCROLL_"):
+                    raise
+            else:
+                value = node.attrib.get("text", "")
+                if value == expected:
+                    return
+                match = SAFE_RESULT.fullmatch(value)
+                if match is not None:
+                    code = match.group(1)
+                    raise UiE2EFailure(
+                        f"UI_RESULT_{code}" if code in SAFE_SIGN_IN_RESULT_CODES else "UI_RESULT_OTHER"
+                    )
+            time.sleep(0.5)
+        raise UiE2EFailure("UI_WAIT_TIMEOUT")
+
     def operation_summaries(self) -> list[str]:
         self.find("driver_operation_list")
         return [node.attrib.get("text", "") for node in self.nodes("driver_operation_summary")]
@@ -453,19 +518,61 @@ def operation_ids(summaries: Iterable[str]) -> set[str]:
     return values
 
 
-def safe_sign_in_observation(driver: Driver, phase: str) -> str:
+def safe_visible_element(driver: Driver, automation_id: str) -> tuple[str, ET.Element | None]:
     try:
-        if phase == "ACTION_RESULT":
-            value = driver.text("driver_action_result")
-            match = re.fullmatch(r"Result: ([A-Z0-9_]{1,64})", value)
-            return "OBSERVED_RESULT_" + match.group(1) if match is not None else "OBSERVATION_UNAVAILABLE"
-        if phase == "MODE_READY":
-            value = driver.text("driver_mode")
-            match = re.fullmatch(r"Offline runtime: (CLOSED|READY)", value)
-            return "OBSERVED_MODE_" + match.group(1) if match is not None else "OBSERVATION_UNAVAILABLE"
+        driver.find(automation_id)
+        hierarchy = driver.dump()
+        nodes = driver.nodes(automation_id, hierarchy)
     except UiE2EFailure:
-        pass
-    return "OBSERVATION_UNAVAILABLE"
+        return "UNKNOWN", None
+    if not nodes:
+        return "ZERO", None
+    if len(nodes) != 1:
+        return "MULTIPLE", None
+    return "ONE", nodes[0]
+
+
+def safe_sign_in_observation(driver: Driver, phase: str) -> str:
+    if phase not in ("ACTION_RESULT", "MODE_READY"):
+        return "OBSERVATION_UNAVAILABLE"
+
+    result_count, result_node = safe_visible_element(driver, "driver_action_result")
+    if result_node is None:
+        result_state = "UNKNOWN"
+    else:
+        value = result_node.attrib.get("text", "")
+        match = SAFE_RESULT.fullmatch(value)
+        result_state = (
+            "CODE_" + match.group(1)
+            if match is not None and match.group(1) in SAFE_SIGN_IN_RESULT_CODES
+            else "OTHER"
+            if match is not None
+            else "INITIAL_PROMPT"
+            if value == INITIAL_ACTION_PROMPT
+            else "EMPTY"
+            if not value
+            else "OTHER"
+        )
+
+    mode_count, mode_node = safe_visible_element(driver, "driver_mode")
+    if mode_node is None:
+        mode_state = "UNKNOWN"
+    else:
+        match = re.fullmatch(r"Offline runtime: (CLOSED|READY)", mode_node.attrib.get("text", ""))
+        mode_state = match.group(1) if match is not None else "OTHER"
+
+    sign_in_count, sign_in_node = safe_visible_element(driver, "driver_sign_in")
+    if sign_in_node is None:
+        sign_in_state = "UNKNOWN"
+    else:
+        enabled = sign_in_node.attrib.get("enabled")
+        sign_in_state = "TRUE" if enabled == "true" else "FALSE" if enabled == "false" else "UNKNOWN"
+
+    return (
+        f"RESULT_COUNT_{result_count}:RESULT_{result_state}:"
+        f"MODE_COUNT_{mode_count}:MODE_{mode_state}:"
+        f"SIGN_IN_COUNT_{sign_in_count}:SIGN_IN_ENABLED_{sign_in_state}"
+    )
 
 
 def sign_in_and_activate(driver: Driver, secret_input: dict[str, str]) -> None:
@@ -491,7 +598,7 @@ def sign_in_and_activate(driver: Driver, secret_input: dict[str, str]) -> None:
         phase = "SUBMIT"
         driver.click("driver_sign_in")
         phase = "ACTION_RESULT"
-        driver.wait_text("driver_action_result", "Result: OFFLINE_ACTIVATED")
+        driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
         phase = "MODE_READY"
         driver.wait_text("driver_mode", "Offline runtime: READY")
     except UiE2EFailure as error:

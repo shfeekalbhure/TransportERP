@@ -119,5 +119,128 @@ class ConditionalImeDismissalTests(unittest.TestCase):
         self.assertEqual(["READ_IME", "BACK", "READ_IME", "ROOT"], events)
 
 
+class SafeActionResultTests(unittest.TestCase):
+    @staticmethod
+    def node(text: str = "", enabled: str = "true") -> object:
+        return mock.Mock(attrib={"text": text, "enabled": enabled})
+
+    def test_expected_result_returns_without_exposing_values(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = lambda _: self.node("Result: OFFLINE_ACTIVATED")
+        driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+
+    def test_unexpected_safe_result_fails_immediately_with_only_the_code(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = lambda _: self.node("Result: AUTHENTICATION_FAILED")
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_RESULT_AUTHENTICATION_FAILED$"):
+            driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+
+    def test_invalid_expected_result_is_rejected_before_ui_access(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = mock.Mock(side_effect=AssertionError("UI must not be accessed"))
+        for expected in ("unsafe-result", "UNKNOWN_BUT_SAFE_SHAPED"):
+            with self.subTest(expected=expected):
+                with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^EXPECTED_RESULT_CODE_INVALID$"):
+                    driver.wait_result_code("driver_action_result", expected)
+        driver.find.assert_not_called()
+
+    def test_unknown_safe_shaped_result_is_not_emitted(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = lambda _: self.node("Result: SECRET_SHAPED_IDENTIFIER")
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_RESULT_OTHER$") as raised:
+            driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+        self.assertNotIn("SECRET", str(raised.exception))
+
+    def test_prompt_and_unrecognized_text_wait_for_timeout_without_emission(self) -> None:
+        for value in (HARNESS.INITIAL_ACTION_PROMPT, "secret-bearing unexpected text"):
+            with self.subTest(value_type="prompt" if value == HARNESS.INITIAL_ACTION_PROMPT else "other"):
+                driver = HARNESS.Driver("adb", "pkg", 30)
+                driver.find = mock.Mock(return_value=self.node(value))
+                with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 31)):
+                    with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_WAIT_TIMEOUT$") as raised:
+                            driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+                self.assertNotIn("secret", str(raised.exception))
+
+    def test_missing_element_retries_but_non_scroll_failure_stops(self) -> None:
+        driver = HARNESS.Driver("adb", "pkg", 30)
+        driver.find = mock.Mock(
+            side_effect=HARNESS.UiE2EFailure("UI_AUTOMATION_ID_NOT_FOUND:SCROLL_UNCHANGED")
+        )
+        with mock.patch.object(HARNESS.time, "monotonic", side_effect=(0, 1, 31)):
+            with mock.patch.object(HARNESS.time, "sleep", return_value=None):
+                with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_WAIT_TIMEOUT$"):
+                    driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+        driver.find = mock.Mock(side_effect=HARNESS.UiE2EFailure("UI_HIERARCHY_INVALID"))
+        with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_HIERARCHY_INVALID$"):
+            driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+
+    def test_observation_classifies_only_allowlisted_states(self) -> None:
+        driver = mock.Mock()
+        nodes = {
+            "driver_action_result": self.node(HARNESS.INITIAL_ACTION_PROMPT),
+            "driver_mode": self.node("Offline runtime: CLOSED"),
+            "driver_sign_in": self.node(enabled="true"),
+        }
+        with mock.patch.object(
+            HARNESS,
+            "safe_visible_element",
+            side_effect=lambda _, automation_id: ("ONE", nodes[automation_id]),
+        ):
+            actual = HARNESS.safe_sign_in_observation(driver, "ACTION_RESULT")
+        self.assertEqual(
+            "RESULT_COUNT_ONE:RESULT_INITIAL_PROMPT:MODE_COUNT_ONE:MODE_CLOSED:"
+            "SIGN_IN_COUNT_ONE:SIGN_IN_ENABLED_TRUE",
+            actual,
+        )
+
+    def test_observation_never_emits_unrecognized_text(self) -> None:
+        driver = mock.Mock()
+        nodes = {
+            "driver_action_result": self.node("secret-bearing unexpected text"),
+            "driver_mode": self.node("unexpected mode text"),
+            "driver_sign_in": self.node(enabled="unknown"),
+        }
+        with mock.patch.object(
+            HARNESS,
+            "safe_visible_element",
+            side_effect=lambda _, automation_id: ("ONE", nodes[automation_id]),
+        ):
+            actual = HARNESS.safe_sign_in_observation(driver, "ACTION_RESULT")
+        self.assertEqual(
+            "RESULT_COUNT_ONE:RESULT_OTHER:MODE_COUNT_ONE:MODE_OTHER:"
+            "SIGN_IN_COUNT_ONE:SIGN_IN_ENABLED_UNKNOWN",
+            actual,
+        )
+        self.assertNotIn("secret", actual)
+
+    def test_observation_does_not_emit_unknown_safe_shaped_result(self) -> None:
+        driver = mock.Mock()
+        nodes = {
+            "driver_action_result": self.node("Result: SECRET_SHAPED_IDENTIFIER"),
+            "driver_mode": self.node("Offline runtime: CLOSED"),
+            "driver_sign_in": self.node(enabled="true"),
+        }
+        with mock.patch.object(
+            HARNESS,
+            "safe_visible_element",
+            side_effect=lambda _, automation_id: ("ONE", nodes[automation_id]),
+        ):
+            actual = HARNESS.safe_sign_in_observation(driver, "ACTION_RESULT")
+        self.assertIn("RESULT_OTHER", actual)
+        self.assertNotIn("SECRET", actual)
+
+    def test_element_count_failures_remain_fixed_and_value_free(self) -> None:
+        driver = mock.Mock()
+        states = iter((("ZERO", None), ("MULTIPLE", None), ("UNKNOWN", None)))
+        with mock.patch.object(HARNESS, "safe_visible_element", side_effect=lambda *_: next(states)):
+            actual = HARNESS.safe_sign_in_observation(driver, "MODE_READY")
+        self.assertEqual(
+            "RESULT_COUNT_ZERO:RESULT_UNKNOWN:MODE_COUNT_MULTIPLE:MODE_UNKNOWN:"
+            "SIGN_IN_COUNT_UNKNOWN:SIGN_IN_ENABLED_UNKNOWN",
+            actual,
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
