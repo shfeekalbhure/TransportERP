@@ -1,0 +1,53 @@
+name: MISSION-03 DBP-002 Wire Physical Hardening
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Wire governed physical SQL into Migration 11
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('TransportERP.Infrastructure/Persistence/Migrations/20260828224241_GreenfieldTenantMembershipIsolation.cs')
+          raw = p.read_bytes()
+          bom = raw.startswith(b'\xef\xbb\xbf')
+          s = raw.decode('utf-8-sig')
+          if 'GreenfieldDbp002PhysicalSql.Up' in s:
+              print('Migration 11 already wired; no action required.')
+              raise SystemExit(0)
+          up_marker = '        }\n\n        /// <inheritdoc />\n        protected override void Down(MigrationBuilder migrationBuilder)'
+          if s.count(up_marker) != 1:
+              raise SystemExit('Unable to identify unique Up/Down boundary')
+          s = s.replace(up_marker, '            migrationBuilder.Sql(GreenfieldDbp002PhysicalSql.Up);\n        }\n\n        /// <inheritdoc />\n        protected override void Down(MigrationBuilder migrationBuilder)', 1)
+          down_marker = '        protected override void Down(MigrationBuilder migrationBuilder)\n        {\n'
+          if s.count(down_marker) != 1:
+              raise SystemExit('Unable to identify unique Down body')
+          s = s.replace(down_marker, down_marker + '            migrationBuilder.Sql(GreenfieldDbp002PhysicalSql.Down);\n\n', 1)
+          out = s.encode('utf-8')
+          if bom:
+              out = b'\xef\xbb\xbf' + out
+          p.write_bytes(out)
+          PY
+          if git diff --quiet -- TransportERP.Infrastructure/Persistence/Migrations/20260828224241_GreenfieldTenantMembershipIsolation.cs; then
+            exit 0
+          fi
+          git diff --check
+          git add TransportERP.Infrastructure/Persistence/Migrations/20260828224241_GreenfieldTenantMembershipIsolation.cs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'MISSION-03 DBP-002: wire RLS hardening into Migration 11'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
