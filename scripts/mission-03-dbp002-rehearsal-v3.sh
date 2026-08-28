@@ -128,13 +128,18 @@ test "$(q "SELECT count(*) FROM pg_indexes WHERE schemaname='transport_erp' AND 
 test "$(q "SELECT count(*) FROM pg_indexes WHERE schemaname='transport_erp' AND indexname IN ('IX_user_permission_grants_MembershipId_PermissionId','IX_user_role_grants_MembershipId_RoleId') AND indexdef ILIKE '%Status%ACTIVE%';")" = "2"
 q "SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relkind='r' ORDER BY c.relname;" | tee evidence/rls-catalog.txt
 q "SELECT c.relname,p.polname,pg_get_expr(p.polqual,p.polrelid),pg_get_expr(p.polwithcheck,p.polrelid) FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('users','role_permissions','user_memberships','user_role_grants','user_permission_grants') ORDER BY c.relname;" | tee evidence/dbp002-sensitive-policies.txt
-grep -q 'users.*current_membership_id' evidence/dbp002-sensitive-policies.txt
-grep -q 'users.*current_security_version' evidence/dbp002-sensitive-policies.txt
-grep -q 'role_permissions.*current_membership_id' evidence/dbp002-sensitive-policies.txt
-grep -q 'role_permissions.*current_security_version' evidence/dbp002-sensitive-policies.txt
-grep -q 'role_permissions.*IS NOT DISTINCT FROM.*current_branch_id' evidence/dbp002-sensitive-policies.txt
-grep -q 'user_permission_grants.*current_security_version' evidence/dbp002-sensitive-policies.txt
-grep -q 'user_role_grants.*current_security_version' evidence/dbp002-sensitive-policies.txt
+policy_expr() {
+  q "SELECT replace(replace(replace(COALESCE(pg_get_expr(p.polqual,p.polrelid),''), chr(10), ' '), chr(13), ' '), chr(9), ' ') FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname='$1' AND p.polname='tenant_scope';"
+}
+users_policy="$(policy_expr users)"
+role_permissions_policy="$(policy_expr role_permissions)"
+permission_grants_policy="$(policy_expr user_permission_grants)"
+role_grants_policy="$(policy_expr user_role_grants)"
+[[ "$users_policy" == *"current_membership_id"* && "$users_policy" == *"current_security_version"* && "$users_policy" == *"current_company_id"* && "$users_policy" == *"current_branch_id"* ]]
+[[ "$role_permissions_policy" == *"current_membership_id"* && "$role_permissions_policy" == *"current_security_version"* && "$role_permissions_policy" == *"current_company_id"* && "$role_permissions_policy" == *"current_branch_id"* && "$role_permissions_policy" == *"IS DISTINCT FROM"* ]]
+[[ "$permission_grants_policy" == *"current_membership_id"* && "$permission_grants_policy" == *"current_security_version"* && "$permission_grants_policy" == *"current_company_id"* && "$permission_grants_policy" == *"current_branch_id"* ]]
+[[ "$role_grants_policy" == *"current_membership_id"* && "$role_grants_policy" == *"current_security_version"* && "$role_grants_policy" == *"current_company_id"* && "$role_grants_policy" == *"current_branch_id"* ]]
+printf '%s\n' "users|$users_policy" "role_permissions|$role_permissions_policy" "user_permission_grants|$permission_grants_policy" "user_role_grants|$role_grants_policy" > evidence/dbp002-sensitive-policy-assertions.normalized.txt
 q "SELECT c.relname,con.conname,con.contype,con.condeferrable,con.condeferred,pg_get_constraintdef(con.oid,true) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='transport_erp' AND c.relname IN ('user_memberships','user_role_grants','user_permission_grants') ORDER BY c.relname,con.conname;" | tee evidence/dbp002-constraints.raw
 q "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='transport_erp' AND tablename IN ('user_memberships','user_role_grants','user_permission_grants') ORDER BY tablename,indexname;" | tee evidence/dbp002-indexes.raw
 q "SELECT rolname,rolcanlogin,rolbypassrls FROM pg_roles WHERE rolname LIKE 'transporterp_%' ORDER BY rolname;" | tee evidence/runtime-roles.txt
