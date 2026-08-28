@@ -31,25 +31,29 @@ PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714a
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE`.
+- `CURRENT DIRECTIVE`: `CONTINUE` for non-destructive prerequisite/evidence reconciliation only; the affected W2 Product directive remains `HOLD`.
 - MISSION-03 remains `IN PROGRESS` and `NOT SEALED`.
 - Accepted execution checkpoint: W0 bounded exit plus W1 `REM-100` at `codex/mission-03-execution-20260828@069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`; exact-head run `33181376288` and retained artifacts were independently reverified by Control Tower.
 - W1 disposition: `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION` later by MISSION-04 after a valid final MISSION-03 seal/handoff.
-- `W2 AFFECTED DIRECTIVE`: `HOLD — STOP/REPLAN REQUIRED`.
-- Reason: after the accepted W1 checkpoint, the isolated execution branch advanced through W2-scope security/tenant/RBAC/Sync Product changes beginning at `a157c34d6767deeb5544adf456a2a36946a599a9` and later `d1c0a2571bf3d240b9134e8614186acd70a6bd5d`, while the governing MISSION-02/MISSION-03 records still show `DEP-005`, `DEP-006`, `DEP-007`, `DBP-002`, and `DBP-003` unsatisfied/blocked.
-- CI success on those candidate commits is evidence only; it does not satisfy or replace missing design, authority, live-baseline, preservation, rollback/recovery, or DB-GOV entry gates.
-- Preserve the later commits as `UNACCEPTED ISOLATED CANDIDATE EVIDENCE`. Do not merge, delete, rewrite, force-push, or silently adopt them.
-- No further W2 Product modification is authorized until the missing W2 prerequisites are supplied, independently reverified, and the affected package is rebound/replanned through the sealed MISSION-02 contract.
-- Non-destructive read-only evidence gathering, ADR preparation, dependency reconciliation, safe test design, and DB-GOV proposal preparation may continue where they do not cross an unmet execution gate.
+- Latest received checkpoint: `MISSION-03-W2-REVALIDATION-HOLD-CHECKPOINT-v0.5` at `codex/mission-03-execution-20260828@9c5b7a12e59d2c42e682717b8e90c491f8699b96`.
+- Control Tower independently reverified the exact candidate head, the W1→W2 compare, Actions run `33185419917`, both successful jobs and retained artifact digests. The candidate is technically successful evidence and contains no Entity, DbContext, Migration, Seed, schema, data or Production configuration change.
+- `W2 AFFECTED DIRECTIVE`: `HOLD — RETAINED AFTER INDEPENDENT REVALIDATION — NO FURTHER W2 PRODUCT MODIFICATION`.
+- Control Tower revalidation decision: `CONTROL_TOWER/00_GOVERNANCE/DECISIONS/MISSION_03_W2_REVALIDATION_DECISION_2026-08-28.md`.
+- Reason: the sealed MISSION-02 contract still requires live-role evidence for `DEP-005`, IdP mode/config plus DEP-005 for `DEP-006`, and DEP-005/006 for `DEP-007`; W2 entry also requires the recorded tenant/IdP evidence and `DBP-002/003` review state. Current MISSION-03 DB-GOV records still mark DBP-002/003 entry gates unsatisfied. Candidate authorization logic also relies on null/company-wide branch-scope semantics that are not yet proven against authoritative live user/role evidence.
+- ADR-W2-001/002/003 are retained as substantive candidate design evidence but do not release their sealed W2 execution gates at this checkpoint.
+- Candidate packages `W2-A1/A2/B1/B2A/C1/F1` remain `PRESERVED TECHNICAL CANDIDATE — NOT ADOPTED AS EXECUTION BASELINE`.
+- `W2-B2B/C2/D/E/F2` remain blocked by their recorded owner-authority, live-baseline, upstream dependency and/or DB-GOV conditions.
+- Preserve all post-W1 commits and exact run evidence. Do not merge, delete, reset, rewrite, force-push, cherry-pick, silently adopt or continue Product implementation from them.
+- Permitted work is limited to non-destructive authoritative evidence gathering, live-role/tenant-cardinality reconciliation where access is authorized, IdP authority evidence, ADR/package rebinding, safe test design and DB-GOV impact/preservation/recovery proposal preparation.
 - DB/data portions remain separately blocked. No Production or database mutation is authorized.
-- No owner-decision hold is required at this checkpoint because the candidate is isolated/unmerged and no destructive, Production, irreversible, data-repair, merge, or history-rewrite action is presently required.
+- Bounded owner items such as `AUTH-001` remain carried forward but do not create an immediate global owner hold while the actual next permitted work is non-destructive prerequisite reconciliation.
 - PR #69 remains comparative unmerged evidence only; no merge is authorized.
 
 ## MISSION-04
 
 - `CURRENT DIRECTIVE`: `WAIT`.
 - Prerequisite: MISSION-03 must be sealed and handed off with exact execution SHAs, tests/evidence, preservation/rollback and DB-GOV compliance verified.
-- MISSION-03 is not sealed; the W2 governance hold prevents M04 dispatch.
+- MISSION-03 is not sealed; the independently revalidated W2 hold remains in force and prevents M04 dispatch.
 - Independence from MISSION-03 execution remains mandatory.
 
 ## MISSION-05
