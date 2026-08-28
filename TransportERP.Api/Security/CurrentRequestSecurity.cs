@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
-using TransportERP.Application.Waybills;
+using TransportERP.Contracts.Core;
 using TransportERP.Infrastructure.Persistence;
 
 namespace TransportERP.Api.Security;
