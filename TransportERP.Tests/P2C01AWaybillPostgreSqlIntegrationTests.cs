@@ -127,6 +127,65 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
 
     [Fact]
     [Trait("Category", "P2PostgreSQL")]
+    public async Task Create_update_persist_reload_preserves_explicit_item_volume()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        TestScope scope;
+        await using (var seedDb = CreateP2Db(connection))
+            scope = await SeedScopeAsync(seedDb, "P2VOL", withSequence: false);
+
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        WaybillResponse draft;
+        await using (var db = CreateP2Db(connection))
+            draft = await CreateService(db).CreateDraftAsync(context, new CreateWaybillDraftRequest(
+                scope.BranchId, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), scope.CurrencyId,
+                1m, "STANDARD", "NORMAL", $"create-volume-{Guid.NewGuid():N}"));
+
+        const decimal expectedVolume = 42.125m;
+        var address = new GeoAddressSnapshot(null, null, null, null, "عنوان اختبار Volume");
+        WaybillResponse updated;
+        await using (var db = CreateP2Db(connection))
+            updated = await CreateService(db).UpdateDraftAsync(context, draft.Id, new UpdateWaybillDraftRequest(
+                draft.Version, draft.WaybillDateTime, draft.OriginId, draft.DestinationId, draft.CurrencyId,
+                1m, 100m, 0m, "STANDARD", "NORMAL",
+                [
+                    new WaybillPartyInput("SENDER", null, "مرسل Volume", "777200001", null, null, address),
+                    new WaybillPartyInput("RECEIVER", null, "مستلم Volume", "777200002", null, null, address)
+                ],
+                [new WaybillItemInput(
+                    Id: null,
+                    LineNo: 1,
+                    ItemType: "GENERAL",
+                    Contents: "Explicit volume",
+                    Quantity: 2m,
+                    Pieces: 2,
+                    Weight: 12m,
+                    Length: 2m,
+                    Width: 3m,
+                    Height: 4m,
+                    DeclaredValue: 500m,
+                    OriginCountryId: null,
+                    RiskFlags: [],
+                    Notes: null,
+                    Volume: expectedVolume)],
+                $"update-volume-{Guid.NewGuid():N}"));
+
+        Assert.Equal(expectedVolume, updated.Items.Single().Volume);
+
+        await using var reloadDb = CreateP2Db(connection);
+        var reloaded = await new ConcurrencySafeWaybillRepository(reloadDb)
+            .GetAsync(scope.CompanyId, scope.BranchId, draft.Id, CancellationToken.None);
+        var persisted = await reloadDb.Set<WaybillItemEntity>().AsNoTracking()
+            .SingleAsync(x => x.WaybillId == draft.Id);
+
+        Assert.NotNull(reloaded);
+        Assert.Equal(expectedVolume, reloaded!.Items.Single().Volume);
+        Assert.Equal(expectedVolume, persisted.Volume);
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
     public async Task Waybill_create_API_enforces_permission_and_branch_scope()
     {
         var connection = RequireConnection();

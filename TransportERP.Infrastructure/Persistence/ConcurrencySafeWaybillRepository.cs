@@ -130,6 +130,7 @@ public sealed class ConcurrencySafeWaybillRepository(TransportErpDbContext db) :
             Length = x.Length,
             Width = x.Width,
             Height = x.Height,
+            Volume = x.Volume,
             DeclaredValue = x.DeclaredValue,
             OriginCountryId = x.OriginCountryId,
             RiskFlagsJson = x.RiskFlagsJson,
