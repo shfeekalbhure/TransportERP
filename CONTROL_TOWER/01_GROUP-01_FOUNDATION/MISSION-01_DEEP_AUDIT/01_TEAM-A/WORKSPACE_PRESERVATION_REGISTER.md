@@ -1,6 +1,24 @@
-# TEAM-A WORKSPACE PRESERVATION REGISTER
+# TEAM-A — Workspace Preservation Register
 
-| Preservation ID | Type | Path / Ref | Branch / Full SHA | State | Value / Work | Evidence / Findings | Preservation status | Reason | Dependencies | Risk | Authority required |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+Version: `A-PRES-v1.0`. Presence here never means merge approval. No destructive or history-rewriting operation was performed.
 
-No TEAM-A preservation judgment recorded. PRE-START inventory is available in `../00_REGISTERS/WORKSPACE_PRESERVATION_REGISTER.md`; TEAM-A must independently verify relevant assets after the gate opens.
+| Preservation ID | Asset type | Name/path/reference | Branch/ref/full SHA | State | Value/work description | Evidence / Findings | Proposed preservation | Reason / dependencies | Loss or wrong-merge risk | Required authority/decision |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A-PRES-001 | BRANCH | audited governance branch | `refs/heads/governance/control-tower-20260828` / `8a36f88b56a43cd5b47277b645ba2030ed3da4f1` | CURRENT | Immutable audit anchor | A-EV-001; baseline | PRESERVE | All findings/evidence depend on it | Loss breaks traceability | Control Tower |
+| A-PRES-002 | BRANCH | remote default master | `refs/heads/master` / `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5` | CURRENT | Source baseline four governance commits behind audit line | A-EV-001/002 | PRESERVE | Historical/current comparison | Conflating verification states | Repo owner/Control Tower |
+| A-PRES-003 | BRANCH | PR #69 security/offline | `78b68bea7683ebef7118f06785b1a572b38c3e7f` then `939f49fa9c2ae57fa532ad55f67461c5f3f256f3` | UNMERGED | Moving draft with Android/runtime evidence | A-EV-024/025; A-CI-001 | KEEP UNTIL RECONCILED | SHA-bound runs and independent review | Wrong-head merge/evidence inheritance | Repo owner after governed PASS/review |
+| A-PRES-004 | BRANCH | PR #58 Wave1 | `e3a2fe2ebefe478191446407153f099b36d9e2ca` | UNMERGED | Targeted successes and UI/readiness work | A-EV-025 | KEEP UNTIL RECONCILED | May overlap newer work | Loss or duplicate merge | Repo owner/TEAM-D later |
+| A-PRES-005 | BRANCH | PR #63 W0 | `31ed28b2b4d314fa1c9665fc1e5b5e6f397f221a` | UNMERGED | Shared UI foundation candidate | A-EV-025 | KEEP UNTIL RECONCILED | Architecture overlap | Loss/incorrect promotion | Repo owner/TEAM-D later |
+| A-PRES-006 | BRANCH | PR #49 arrival/transit/warehouse | `05ea90b6eb2fb8edc8764d4bddacf2cc132051d8` | UNMERGED | Later shipping capability candidate | A-EV-025; A-BIZ-001 | KEEP UNTIL RECONCILED | Domain overlap/current absence | Duplicate/conflicting merge | Repo owner/TEAM-D later |
+| A-PRES-007 | OTHER | migration lineage | current ref / ten migrations + snapshot | CURRENT | Database evolution including manual hardening | A-EV-008; DB findings | PRESERVE | Future fixes must remain forward-only | Rewriting loses upgrade/audit lineage | DB owner + Control Tower |
+| A-PRES-008 | OTHER | audit-chain lineage | current ref | CURRENT | Existing hash/append-only history | A-EV-010; A-AUD-006 | PRESERVE | Hash expansion must be versioned | Old events become unverifiable | Security/DB owner |
+| A-PRES-009 | OTHER | PostgreSQL safety controls | current ref | CURRENT | CAS/idempotency/serializable/append-only patterns | A-EV-007/010/011; A-DB-INFO-009 | PRESERVE | Remediation regression dependency | Safety regression | DB owner/reviewer |
+| A-PRES-010 | OTHER | test corpus | current ref | CURRENT | Auth/tenant/audit/concurrency/PostgreSQL tests | A-EV-026; A-QA-001 | PRESERVE | New tests must add, not weaken | False green/regression | QA owner |
+| A-PRES-011 | OTHER | Kurrasa authority labels | v72/v9 and ticket versions | CURRENT | Separates discussion/design/programming authority | A-EV-018/019/020; A-KUR-002 | PRESERVE | Governance dependency | Silent authority promotion | Kurrasa/governance owner |
+| A-PRES-012 | OTHER | screen-lineage evidence | current ref | CURRENT | Queue/spec/reconciliation documents | A-EV-017; A-SCR-001 | PRESERVE | Needed for canonical crosswalk | Evidence bound to wrong ID | Screen governance owner |
+| A-PRES-013 | UNTRACKED ARTIFACT | TEAM-A output package in `01_TEAM-A/` | audit ref | LOCAL-ONLY | Independent audit report/registers | A-EV-029; all findings | PRESERVE | Control Tower intake/seal | Loss of independent evidence | Control Tower |
+| A-PRES-014 | ALTERNATIVE COPY | `/workspace/scratch/143c66febc8c/TransportERP` | `3bc7f431964b5d068ae2bab4205aa0c949fc0343` | LOCAL-ONLY | 13 patch-unique commits in appendix | A-EV-030; A-PRES-001 | KEEP UNTIL RECONCILED | PR69 comparison base; full list in appendix | P0 irreversible work loss or unsafe merge | Workspace owner + Control Tower |
+| A-PRES-015 | ALTERNATIVE COPY | `/workspace/scratch/263a0f4a787d/TransportERP` | `7df4743ee3d13540ea82c4505e8e657e6abb6e65` | LOCAL-ONLY | 3 patch-unique commits in appendix | A-EV-030; A-PRES-001 | KEEP UNTIL RECONCILED | Stage-4 candidate/proof work | P0 irreversible work loss or false proof merge | Workspace owner + Control Tower |
+| A-PRES-016 | DIRTY WORKTREE | `/workspace/scratch/4c170dbb8858/TransportERP` + RolesPermissions PNG | `06146e0f3ad6249e69d13239bbaf1c9d9ed472ea`; file SHA-256 `e0631df6b985f6a2f68538d6ee52b4783376ca3f8e3887c9bd97e5b9279fda36` | LOCAL-ONLY | Tracked modified image, 1,687,552 bytes | A-EV-030; A-PRES-001 | PRESERVE | Visual/source provenance review | P0 evidence loss or wrong screenshot | Workspace/screen owner |
+
+The full unique-commit and dirty-file integrity manifest is `LOCAL_ASSET_PRESERVATION_APPENDIX.md`.

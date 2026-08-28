@@ -9,6 +9,14 @@
 - انتقال المهمة يتم بعد إقفال المخرج السابق وتسجيل التسليم.
 - الإجراءات عالية الخطورة (حذف/دمج/نشر/تغيير مدمر للبيانات) لا تنفذ تلقائيًا.
 
+## التشغيل المباشر
+
+- تفويض المالك الحاكم: `00_GOVERNANCE/OWNER_DELEGATION_AND_OPERATING_DIRECTIVE.md`
+- الحالة الحية: `00_GOVERNANCE/CONTROL_TOWER_LIVE_STATUS.md`
+- أوامر الفرق الحالية: `00_GOVERNANCE/CONTROL_TOWER_TEAM_DIRECTIVES.md`
+- قائمة المهام: `00_GOVERNANCE/REGISTERS/CONTROL_TOWER_TASK_QUEUE.md`
+- سجل التسليم والختم: `00_GOVERNANCE/REGISTERS/MISSION_HANDOFF_AND_SEAL_REGISTER.md`
+
 ## المجموعات
 
 1. `01_GROUP-01_FOUNDATION` — التأسيس والتثبيت.

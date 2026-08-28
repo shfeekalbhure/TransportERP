@@ -1,5 +1,9 @@
 # MASTER CONTROL ORDER — TransportERP
 
+## المرجع التشغيلي المباشر للمالك
+
+يطبق هذا الأمر من خلال `OWNER_DELEGATION_AND_OPERATING_DIRECTIVE.md`. الحالة الحية في `CONTROL_TOWER_LIVE_STATUS.md`، وأمر كل فريق أو مهمة في `CONTROL_TOWER_TEAM_DIRECTIVES.md`. تفويض المالك يحكم الانتقالات التشغيلية العادية؛ ولا يغير النطاق الفني للأوامر الحاكمة الخاصة بكل مهمة.
+
 ## الدور
 Control Tower جهة رقابة وتوجيه وتسليم، وليست فريق تنفيذ فني.
 
