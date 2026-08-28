@@ -2,13 +2,17 @@
 
 Every team or mission must first read, in order: `CONTROL_TOWER/README.md`, `OWNER_DELEGATION_AND_OPERATING_DIRECTIVE.md`, its own section here, its mission order, its mission-local `CURRENT_DIRECTIVE.md`, and all required sealed predecessor outputs. Only Control Tower changes a `CURRENT DIRECTIVE`. A team at `WAIT`, `HOLD`, or `STOP` must not work. A sealed team must not modify its output unless this file issues `REOPEN` or `RETURN FOR REWORK`.
 
-## Governing owner decision now in force
+## Governing owner decisions now in force
 
 Authoritative current product line:
 
 `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 
 PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714ad84e307eb84fe5f` is `UNMERGED REMEDIATION / FINAL CANDIDATE`, not CURRENT. No merge is authorized.
+
+Target database authority:
+
+`DB-BASELINE-001 = GREENFIELD — NEW — EMPTY — NO LEGACY TABLES / NO LEGACY DATA`.
 
 ## MISSION-01 TEAMS
 
@@ -31,33 +35,67 @@ PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714a
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — ACC-001 / OFFLINE-001 / CLIENT-001 RESOLVED; EXECUTE ALL ENABLED WORK; EXTERNAL + DB-GOV GATES REMAIN`.
+- `CURRENT DIRECTIVE`: `CONTINUE — GREENFIELD DB-GOV RE-REVIEW COMPLETE; REVISE PROPOSALS; KEEP MISSION-03 OPEN`.
 - MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`.
-- Accepted W1 checkpoint: `codex/mission-03-execution-20260828@069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`.
-- Current bounded execution baseline: `codex/mission-03-execution-20260828@cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, tree `ea940e592cb11f5fff736e68055ebf77d2eece88`.
-- DEP-005 is Control Tower revalidated for current-source design/code-only scope; live rows/roles/RLS remain DBP-002-only blockers.
-- DEP-006 is Control Tower revalidated for authority-neutral code-only implementation; `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY`.
-- DEP-007 is Control Tower revalidated for bounded owner/lifecycle code-only implementation; registry/PoP/nonce/replay/session-device persistence remains behind DBP-003/006.
+- Product authority remains `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
+- Current execution branch/head: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
+- PR #69 remains comparative unmerged evidence only; no merge is authorized.
+
+### Accepted bounded execution evidence
+
+- W1 REM-100 checkpoint: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`.
+- W2-A1/A2/B1/B2A/C1/F1: `ADOPT — REBOUND TO SEALED PLAN`.
+- W2-B2B code-only: `ADOPT — EXACT DIFF/RAW CI REVALIDATED` through `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`.
+- Final current internal head: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`.
+- Run `33201720896`: `153/153 PASS`, PostgreSQL 18.6, ten existing migrations, no model drift, expected API HTTP 401; Desktop/Mobile probes remain build/scaffold evidence rather than executable runtime proof.
+- Run `33201720878`: disposable PostgreSQL backup/restore `PASS`, source/restored migration-history `10/10`.
+- No Entity, DbContext model, Migration, Schema, Seed, persistent adapter, Product data or Production configuration delta is authorized or claimed by Control Tower.
+
+### Binding owner decisions
+
+- `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY`.
 - `ACC-001 = RESOLVED — OPERATIONAL COLLECTION; GOVERNED SETTLEMENT POSTS THE LEDGER`.
 - `OFFLINE-001 = RESOLVED — DEFAULT DENY; EXPLICIT QUEUE FOR BOUNDED OPERATIONAL CAPTURE`.
-- `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS IS DEFERRED`.
-- W2-A1/A2/B1/B2A/C1/F1: `ADOPT — REBOUND TO SEALED PLAN` and ready for later independent verification.
-- W2-B2B code-only: `ADOPT — EXACT DIFF/RAW CI REVALIDATED` at `cc67ad2...`.
-- DBP-003 remains `HOLD AT REHEARSAL ENTRY`. The revised DBP-003A package is submitted for independent review/evidence preparation only; no Entity/DbContext/Migration/schema/persistent-adapter authoring is authorized until DB-GOV explicitly opens the exact gate.
-- DBP-003B/C and W2-C2 remain dependent on DBP-002/006; W2-D/E/F2 remain individually blocked. They do not stop unrelated satisfied packages.
-- Remaining true completion inputs are external/DB-GOV evidence: authorized PasswordHash/verifier/legacy/lockout evidence; named non-Production safe copy with migration/roles/RLS/backup/restore/reconciliation proof; sanitized legacy audit/accounting samples; canonical Kurrasa/Ticketing/post-departure Shipping authority; deploy/recovery/RPO-RTO/signing-custody/dependency/privacy/KMS evidence; and complete external workspace/stash/local-only inventory before W8.
-- Exact-head run `33185419917` and decoded logs/artifacts confirm 128/128, ten existing migrations/no drift, API 401, Desktop and Mobile x3 at `9c5b7a1...`; failed run `33184771338` remains historical evidence.
-- Raw run `33191269475` and artifacts confirm exact `cc67ad2...` / `ea940e5...`, PostgreSQL 18.6, ten existing migrations/no drift, 146/146 and HTTP 401. Desktop/Mobile x3 builds pass; probes remain Library-mode, not executable-runtime proof.
-- No Entity, DbContext model, Migration, schema, seed, data repair or Production configuration change occurred. No DBP-003 package is open for migration authoring.
-- The v0.9 checkpoint remains `OPEN — NOT SEALED`. Its detached SHA-256 register predates the later owner-decision updates to `MISSION03_COMPLETION_GATE_ASSESSMENT.md` and `CURRENT_DIRECTIVE.md`; therefore that v0.9 hash set is historical for those prior bytes and must not be represented as binding the current modified files. The next checkpoint/final package must issue a new version and regenerated detached hashes.
-- Do not merge, delete, reset, rewrite, force-push, cherry-pick, mutate Production, or perform DB/schema/data work without its independent gate.
-- PR #69 remains comparative unmerged evidence only; no merge is authorized.
+- `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
+- `DB-BASELINE-001 = RESOLVED — GREENFIELD / NEW / EMPTY TARGET DATABASE`.
+
+### Greenfield DB-GOV re-review
+
+Control Tower completed the second independent Greenfield review in:
+
+`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_GREENFIELD_REREVIEW_DECISION_2026-08-28.md`
+
+Result:
+
+`GREENFIELD LEGACY-DATA BLOCKERS CLEARED — PROPOSAL-SPECIFIC DESIGN GATES REMAIN — NO DB/MIGRATION REHEARSAL AUTHORITY YET`
+
+Therefore legacy target-row/backfill evidence, legacy PasswordHash/verifier/rehash compatibility, legacy audit/accounting row reconciliation, and a safe-copy of a pre-existing target database are no longer MISSION-03 target-database prerequisites.
+
+Current DB-GOV dispositions:
+
+- `DBP-002 = REVISE BEFORE REHEARSAL`.
+- `DBP-003A = REVISE BEFORE REHEARSAL`.
+- `DBP-003B/C = DEFERRED — DEPENDS ON DBP-002/006`.
+- `DBP-004 = REVISE BEFORE REHEARSAL`.
+- `DBP-005 = REVISE BEFORE REHEARSAL`.
+- `DBP-006 = REVISE BEFORE REHEARSAL`.
+- no proposal is currently `APPROVED FOR DISPOSABLE/GREENFIELD NON-PRODUCTION REHEARSAL ONLY`.
+
+### Required continuation
+
+MISSION-03 must continue non-destructive design/governance refinement: exact candidate physical specifications for DBP-002/003A/004/005/006; new-system password hash/verify/lockout policy; shared caller-owned transaction/audit boundary; Greenfield PostgreSQL role/RLS-equivalent bootstrap; retention/legal-hold/cleanup/recovery for device proof, nonce/replay, Offline queue and audit; then re-submit to independent DB-GOV.
+
+Remaining non-DB gates include canonical post-DEPART Shipping/Ticketing/screen authority, real Windows/Android executable runtime and secure-store proof, protected signing custody, Production recovery/RPO-RTO/privacy/KMS/dependency/license/provenance approvals, and complete Git worktree/stash/local-only preservation inventory before destructive/global W8 cleanup.
+
+Do not merge, delete, reset, rewrite, force-push, cherry-pick, mutate Production, commit secrets, or perform Entity/DbContext/Migration/Schema/Seed/Data work without the exact independently opened gate.
+
+No `OWNER DECISION REQUIRED` is active from the Greenfield DB-GOV re-review; the next permitted work is non-destructive.
 
 ## MISSION-04
 
 - `CURRENT DIRECTIVE`: `WAIT`.
-- Prerequisite: MISSION-03 must be sealed and handed off with exact execution SHAs, tests/evidence, preservation/rollback and DB-GOV compliance verified.
-- MISSION-03 is not sealed; the v0.9/open checkpoints are not a final handoff and M04 dispatch remains prohibited.
+- Prerequisite: MISSION-03 must be conclusively sealed and handed off with exact execution SHAs, report/evidence/manifest/detached SHA-256/seal/handoff, preservation/rollback and DB-GOV compliance independently verified.
+- MISSION-03 is still open/not sealed; M04 dispatch remains prohibited.
 - Independence from MISSION-03 execution remains mandatory.
 
 ## MISSION-05
@@ -65,4 +103,4 @@ PR #69 `codex/p1-security-device-sync-offline-20260825@601f2d1cad61d62e590a6714a
 - `CURRENT DIRECTIVE`: `WAIT`.
 - Prerequisite: MISSION-04 must be sealed and handed off.
 
-`DB-GOV-001` remains binding throughout. No Database, Schema, Entity, Migration, field, or relationship change may execute without its required governance, impact, preservation, test/recovery and execution authority.
+`DB-GOV-001` remains binding throughout. No Database, Schema, Entity, Migration, field, relationship, index, constraint, seed or data change may execute without its required governance, impact, preservation, test/recovery and explicit execution authority.
