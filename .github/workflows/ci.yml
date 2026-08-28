@@ -1839,6 +1839,7 @@ jobs:
       - name: Start API 35 emulator
         shell: bash
         run: |
+          set -euo pipefail
           adb_root_bounded() {
             local attempt
             for attempt in $(seq 1 6); do
@@ -1912,7 +1913,32 @@ jobs:
             sleep 2
           done
           test "$booted" = true
-          adb shell test -r "/system/etc/security/cacerts/${certificate_hash}.0"
+          system_certificate_path="/system/etc/security/cacerts/${certificate_hash}.0"
+          conscrypt_certificate_path="/apex/com.android.conscrypt/cacerts/${certificate_hash}.0"
+          adb shell test -r "$system_certificate_path"
+          conscrypt_certificate_state=ABSENT
+          if ! adb shell test -d /apex/com.android.conscrypt/cacerts; then
+            conscrypt_certificate_state=STORE_UNAVAILABLE
+          elif adb shell test -r "$conscrypt_certificate_path"; then
+            expected_certificate_sha=$(cat "$tls_dir/server-cert-sha256.txt")
+            if actual_certificate_sha=$(adb exec-out cat "$conscrypt_certificate_path" \
+                | openssl x509 -outform der 2>/dev/null \
+                | sha256sum | awk '{print $1}'); then
+              if [[ ! "$actual_certificate_sha" =~ ^[0-9a-f]{64}$ ]]; then
+                conscrypt_certificate_state=INVALID
+              elif [ "$actual_certificate_sha" = "$expected_certificate_sha" ]; then
+                conscrypt_certificate_state=MATCH
+              else
+                conscrypt_certificate_state=MISMATCH
+              fi
+            else
+              conscrypt_certificate_state=INVALID
+            fi
+          fi
+          case "$conscrypt_certificate_state" in
+            MATCH|ABSENT|MISMATCH|INVALID|STORE_UNAVAILABLE) ;;
+            *) exit 1 ;;
+          esac
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
@@ -1921,6 +1947,7 @@ jobs:
             echo 'tls_validation=android-system-trust-store'
             echo "tls_certificate_sha256=$(cat "$tls_dir/server-cert-sha256.txt")"
             echo "tls_system_alias=${certificate_hash}.0"
+            echo "tls_conscrypt_certificate_state=$conscrypt_certificate_state"
             echo 'application_certificate_bypass=false'
           } > ci-evidence/android-runtime/tls-trust-evidence.txt
 

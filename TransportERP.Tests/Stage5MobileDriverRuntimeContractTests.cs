@@ -10,6 +10,10 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         var activation = Read("TransportERP.Mobile.Driver", "Offline", "DriverOfflineActivationService.cs");
         var authenticated = Read("TransportERP.Mobile.Driver", "Offline",
             "DriverAuthenticatedActivationCoordinator.cs");
+        var transportClassifier = Read("TransportERP.Application", "Sync",
+            "SyncAuthSessionTransportFailureClassifier.cs");
+        var transportClassifierTests = Read("TransportERP.Tests",
+            "SyncAuthSessionTransportFailureClassifierTests.cs");
         var authority = Read("TransportERP.Application", "Sync", "SyncClientDeploymentAuthority.cs");
         var applicationProject = Read("TransportERP.Application", "TransportERP.Application.csproj");
 
@@ -23,6 +27,29 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("!request.OfflineRuntimeAuthorized || !featureGate.Allows(bindingContext)",
             activation, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/sessions", authenticated, StringComparison.Ordinal);
+        Assert.Contains("SendSessionAsync", authenticated, StringComparison.Ordinal);
+        Assert.Equal(2, authenticated.Split("SendSessionAsync(",
+            StringSplitOptions.None).Length - 1);
+        foreach (var transportDiagnostic in new[]
+                 {
+                     "HttpRequestError.SecureConnectionError", "AUTH_SESSION_TLS_FAILED",
+                     "HttpRequestError.NameResolutionError", "AUTH_SESSION_NAME_RESOLUTION_FAILED",
+                     "HttpRequestError.ConnectionError", "AUTH_SESSION_CONNECTION_FAILED",
+                     "HttpRequestError.HttpProtocolError", "AUTH_SESSION_HTTP_PROTOCOL_FAILED",
+                     "AUTH_SESSION_TRANSPORT_FAILED"
+                 })
+            Assert.Contains(transportDiagnostic, transportClassifier, StringComparison.Ordinal);
+        Assert.Contains("AUTH_SESSION_TIMEOUT", authenticated, StringComparison.Ordinal);
+        Assert.Contains("when (cancellationToken.IsCancellationRequested)", authenticated,
+            StringComparison.Ordinal);
+        Assert.Contains("SyncAuthSessionTransportFailureClassifier.Classify(exception)", authenticated,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", authenticated, StringComparison.Ordinal);
+        Assert.DoesNotContain("exception.Message", transportClassifier, StringComparison.Ordinal);
+        Assert.Contains("SECRET_MESSAGE_MUST_NOT_ESCAPE", transportClassifierTests,
+            StringComparison.Ordinal);
+        Assert.Contains("Classifier_returns_only_the_fixed_code", transportClassifierTests,
+            StringComparison.Ordinal);
         Assert.Contains("/api/v1/sync/activation", authenticated, StringComparison.Ordinal);
         Assert.Contains("ValidateDecision(request, session, decision, measuredBuildIdentity)", authenticated,
             StringComparison.Ordinal);
@@ -227,7 +254,8 @@ public sealed class Stage5MobileDriverRuntimeContractTests
                      "test_unknown_safe_shaped_result_is_not_emitted",
                      "test_prompt_and_unrecognized_text_wait_for_timeout_without_emission",
                      "test_missing_element_retries_but_non_scroll_failure_stops",
-                     "test_observation_does_not_emit_unknown_safe_shaped_result"
+                     "test_observation_does_not_emit_unknown_safe_shaped_result",
+                     "test_allowlisted_transport_results_remain_fixed_and_message_free"
                  })
             Assert.Contains(safeResultTest, stateMachineTests, StringComparison.Ordinal);
         Assert.DoesNotContain("events.append(value", stateMachineTests, StringComparison.OrdinalIgnoreCase);
@@ -386,6 +414,14 @@ public sealed class Stage5MobileDriverRuntimeContractTests
         Assert.Contains("run_phase loss", workflow, StringComparison.Ordinal);
         Assert.Contains("image: postgres:18.6-bookworm", workflow, StringComparison.Ordinal);
         Assert.Contains("Verify Android business result in PostgreSQL 18.6", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("- name: Start API 35 emulator\n        shell: bash\n        run: |\n          set -euo pipefail",
+            workflow.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("/apex/com.android.conscrypt/cacerts/${certificate_hash}.0", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("tls_conscrypt_certificate_state=$conscrypt_certificate_state", workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("[[ ! \"$actual_certificate_sha\" =~ ^[0-9a-f]{64}$ ]]", workflow,
             StringComparison.Ordinal);
         Assert.Contains("Capture sanitized Android PostgreSQL diagnostics", workflow,
             StringComparison.Ordinal);

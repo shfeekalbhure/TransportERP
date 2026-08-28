@@ -135,6 +135,22 @@ class SafeActionResultTests(unittest.TestCase):
         with self.assertRaisesRegex(HARNESS.UiE2EFailure, "^UI_RESULT_AUTHENTICATION_FAILED$"):
             driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
 
+    def test_allowlisted_transport_results_remain_fixed_and_message_free(self) -> None:
+        for code in (
+            "AUTH_SESSION_CONNECTION_FAILED",
+            "AUTH_SESSION_HTTP_PROTOCOL_FAILED",
+            "AUTH_SESSION_NAME_RESOLUTION_FAILED",
+            "AUTH_SESSION_TIMEOUT",
+            "AUTH_SESSION_TLS_FAILED",
+            "AUTH_SESSION_TRANSPORT_FAILED",
+        ):
+            with self.subTest(code=code):
+                driver = HARNESS.Driver("adb", "pkg", 30)
+                driver.find = lambda _, result=code: self.node(f"Result: {result}")
+                with self.assertRaisesRegex(HARNESS.UiE2EFailure, f"^UI_RESULT_{code}$") as raised:
+                    driver.wait_result_code("driver_action_result", "OFFLINE_ACTIVATED")
+                self.assertEqual(f"UI_RESULT_{code}", str(raised.exception))
+
     def test_invalid_expected_result_is_rejected_before_ui_access(self) -> None:
         driver = HARNESS.Driver("adb", "pkg", 30)
         driver.find = mock.Mock(side_effect=AssertionError("UI must not be accessed"))

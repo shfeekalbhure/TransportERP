@@ -173,8 +173,8 @@ public sealed class DriverAuthenticatedActivationCoordinator(
                 deviceCredential = request.DeviceCredential
             })
         };
-        using var response = await network.SyncHttpClient.SendAsync(
-            message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await SendSessionAsync(
+            network.SyncHttpClient, message, cancellationToken);
         if (response.StatusCode != HttpStatusCode.OK)
             throw new DriverOfflineUnavailableException("AUTHENTICATION_FAILED");
         var session = await ReadJsonAsync<DriverSessionResponse>(response, cancellationToken);
@@ -448,6 +448,31 @@ public sealed class DriverAuthenticatedActivationCoordinator(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
         request.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString("D"));
         return request;
+    }
+
+    private static async Task<HttpResponseMessage> SendSessionAsync(
+        HttpClient client,
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await client.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException exception)
+        {
+            throw new DriverOfflineUnavailableException("AUTH_SESSION_TIMEOUT", exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new DriverOfflineUnavailableException(
+                SyncAuthSessionTransportFailureClassifier.Classify(exception), exception);
+        }
     }
 
     private const int MaximumJsonResponseBytes = 65_536;
