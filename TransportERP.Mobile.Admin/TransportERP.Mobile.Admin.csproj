@@ -8,8 +8,6 @@
 
     <TargetFramework Condition="'$(MauiRuntimeReady)' != 'true'">net10.0</TargetFramework>
     <TargetFrameworks Condition="'$(MauiRuntimeReady)' == 'true'">net10.0-android</TargetFrameworks>
-    <TargetFrameworks Condition="'$(MauiRuntimeReady)' == 'true' and !$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
-    <TargetFrameworks Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
     <OutputType Condition="'$(MauiRuntimeReady)' == 'true'">Exe</OutputType>
     <OutputType Condition="'$(MauiRuntimeReady)' != 'true'">Library</OutputType>
@@ -21,16 +19,10 @@
     <MauiXamlInflator Condition="'$(MauiRuntimeReady)' == 'true'">SourceGen</MauiXamlInflator>
 
     <ApplicationTitle Condition="'$(MauiRuntimeReady)' == 'true'">TransportERP.Mobile.Admin</ApplicationTitle>
-    <ApplicationId Condition="'$(MauiRuntimeReady)' == 'true'">com.companyname.transporterp.mobile.admin</ApplicationId>
+    <ApplicationId Condition="'$(MauiRuntimeReady)' == 'true'">com.altayer.transporterp.admin</ApplicationId>
     <ApplicationDisplayVersion Condition="'$(MauiRuntimeReady)' == 'true'">1.0</ApplicationDisplayVersion>
     <ApplicationVersion Condition="'$(MauiRuntimeReady)' == 'true'">1</ApplicationVersion>
-    <WindowsPackageType Condition="'$(MauiRuntimeReady)' == 'true'">None</WindowsPackageType>
-
-    <SupportedOSPlatformVersion Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-    <TargetPlatformMinVersion Condition="'$(MauiRuntimeReady)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MauiRuntimeReady)' == 'true'">
