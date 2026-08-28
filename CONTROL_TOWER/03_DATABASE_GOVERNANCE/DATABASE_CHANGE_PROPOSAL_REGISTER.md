@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|---|
 | `DBP-001` | `A-ARCH-002 / REM-100` | Separate mapper code correction from read-only affected-row assessment and any later conditional data repair | Waybill API / Shipping allocation / stored items | Preserve Volume meaning, precision and nullability; code change isolated from data repair; row backup before any mutation | create/update/reload/allocate tests; read-only impact query; disposable dry-run before any repair | `REVIEWED — MISSION-03 INTAKE` | `CODE-ONLY FIX MAY PROCEED AFTER W0 EXIT; DB/DATA MUTATION BLOCKED PENDING DB-GOV EVIDENCE/AUTHORITY` |
 | `DBP-002` | tenant isolation | Tenant-consistent keys/FKs/indexes/checks and reviewed RLS/equivalent | APIs / workers / reporting / accounting / Sync | Preserve IDs/data/current predicates; additive staged transition | cross-tenant negatives + migration/restore rehearsal | `REVIEWED — DESIGN INTAKE` | `BLOCKED — CARDINALITY/LIVE SCHEMA/ROLES UNKNOWN` |
-| `DBP-003` | auth/device/session | Session, membership, permission scope and device registry/assignment/PoP persistence if selected | Auth / clients / Offline | Preserve permission codes/users; staged enrollment; no Production secret | login/refresh/revoke/device/replay negatives | `REVIEWED — CANDIDATE INTAKE` | `BLOCKED — AUTH/DEVICE DESIGN + LIVE BASELINE REQUIRED` |
+| `DBP-003` | auth/device/session | Local-authority session/security-version plus governed device registry/assignment/PoP/nonce persistence | Auth / clients / Offline | Preserve permission codes/users/current singular scope; staged enrollment; no Production secret | safe-copy upgrade/restore; login/refresh/reuse/revoke/device/replay negatives | `READY FOR DB-GOV DESIGN REVIEW — M03 PROPOSAL ATTACHED` | `BLOCKED — LIVE/SANITIZED BASELINE + CUSTODY/RETENTION + EXECUTION AUTHORIZATION REQUIRED` |
 | `DBP-004` | audit integrity | Hash-version marker, append-only controls, outbox/audit atomicity | Audit / export / compliance / all writes | Preserve old events immutable/verifiable; no rehash | legacy/new chain + raw-SQL denial + failure injection | `REVIEWED — DEPENDENT INTAKE` | `BLOCKED — UOW ADR/LEGACY SAMPLE/LIVE CONTROLS REQUIRED` |
 | `DBP-005` | accounting integrity | Durable journal/source links, uniqueness, reversal, period/currency/SoD constraints | Accounting / collection / vouchers / reports | Preserve IDs/precision/history; reconciliation before cutover | balance/duplicate/period/reversal/concurrency tests | `REVIEWED — DEPENDENT INTAKE` | `BLOCKED — ACCOUNTING AUTHORITY/RECONCILIATION REQUIRED` |
 | `DBP-006` | offline protocol | Typed queue/inbox/outbox, version/result, owner/device/proof/retention fields/constraints | Sync API / workers / clients / audit | Compatible protocol; quarantine; legacy rows retained | replay/reorder/restart/conflict/revocation/schema/owner negatives | `REVIEWED — CANDIDATE INTAKE` | `BLOCKED — AUTHORITY/PROTOCOL/LIVE BASELINE REQUIRED` |
@@ -20,6 +20,10 @@
 - No live database/schema/roles/RLS/applied-history truth is inferred from source files.
 - `DBP-001` must remain split: the mapper code defect can be corrected as a code-only change after W0 exit; affected-row assessment is read-only; any data repair remains a separate DB-GOV-controlled action.
 - All database/data mutations remain prohibited until their exact execution gates are satisfied.
+
+## DBP-003 AUTH-001 preparation note — 2026-08-28
+
+AUTH-001 selected local application authority. MISSION-03 prepared `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` with the current persistence inventory, proposed additive objects/constraints, tenant/session/device relationships, atomic refresh-reuse semantics, preservation, safe-copy upgrade rehearsal, tests and forward recovery. This advances the proposal to review readiness only. No Entity, DbContext, Migration, Schema, Seed, data, secret or Production change was executed.
 
 ## MISSION-03 W2 Control Tower revalidation note — 2026-08-28
 

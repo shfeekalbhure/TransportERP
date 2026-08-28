@@ -43,5 +43,10 @@
 | `M03-EV-039` | Control Tower GitHub run/log/artifact revalidation | run `33185419917`; jobs `98897056951`/`98897057221`; artifacts `9691527827`/`9691490016` | exact head/tree, 128/128, PostgreSQL 18.6, 10 migrations/no drift, API 401, Desktop/Mobile pass and artifact digests independently confirmed |
 | `M03-EV-040` | historical failed-run revalidation | run `33184771338`; head `d1c0a257...`; core job `98894801318` | failure and CS0246 independently confirmed; later steps did not run; recovery commit and passing head retained |
 | `M03-EV-041` | package-by-package Control Tower decision | `W2_CONTROL_TOWER_REVALIDATION_DECISION.md` | DEP-005/006/007 revalidated; A1/A2/B1/B2A/C1/F1 each ADOPT/REBOUND; B2B/C2/D/E/F2 remain bounded blockers |
+| `M03-EV-042` | AUTH-001 owner decision | governance `6b2d238...` | local application authority selected; code-only B2B released while DBP-003 remains gated |
+| `M03-EV-043` | W2-B2B exact code-only diff | `9c5b7a1...cc67ad2`; tree `ea940e59...` | three new code/test files; no Entity/DbContext/Migration/Schema/Seed/data/Production config |
+| `M03-EV-044` | W2-B2B exact-head run | run `33191269475`; jobs `98917044706`/`98917044568` | completed/success; 146/146; PostgreSQL 18.6; ten migrations/no drift; API 401; Desktop/Mobile x3 pass |
+| `M03-EV-045` | W2-B2B retained artifacts | Linux `9693887564`; Desktop `9693865549` | SHA-256 `aefddb63...`; `88e0e11f...`; unexpired |
+| `M03-EV-046` | DBP-003/C2/F2 preparation package | proposal and matrices at governance checkpoint | DBP-003 ready for review; no persistence execution; C2/F2 blockers separated |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

@@ -138,3 +138,26 @@ The run emitted existing analyzer/runner warnings (xUnit2031, Desktop nullable a
 - Disposition: exact-head evidence supports adoption of bounded W2-A1/A2/B1/B2A/C1/F1 only. It does not cover W2-B2B/C2/D/E/F2 or complete T-200/T-210/T-220.
 
 This is the current exact-head W2 evidence. Earlier successful and failed runs remain historical evidence and are not substituted for it.
+
+## W2-B2B code-only exact-head verification — run 33191269475
+
+- Exact SHA/tree/parent: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / `ea940e592cb11f5fff736e68055ebf77d2eece88` / adopted baseline `9c5b7a1...`.
+- Environment: GitHub-hosted Ubuntu 24.04 and Windows; .NET SDK 10.0.400; disposable PostgreSQL 18.6; synthetic test identities/session store only; no Production credentials/data.
+- Core job `98917044706`: `PASS`; Desktop job `98917044568`: `PASS`.
+- Linux artifact `9693887564`, SHA-256 `aefddb63270b0bdd18a18893a0dff41bdf5604dc79d991badb7a48add621e5cd`.
+- Desktop artifact `9693865549`, SHA-256 `88e0e11f46115cc46f7ec3ed717a93010fd245c0672326e581906e02954de80f`.
+
+| Test ID | Exact-head evidence | Result |
+|---|---|---|
+| `T-200/B2B login` | valid, invalid, disabled and wrong-tenant cases | `PASS` |
+| `T-200/B2B access` | issued access accepted, expiry/revoke/security-version/current-membership/cross-company denials | `PASS` |
+| `T-200/B2B refresh` | rotation, expiry, device mismatch, reuse-family revoke and concurrent race | `PASS` |
+| `T-200/B2B logout` | logout/current/family revoke; access and refresh denied | `PASS` |
+| `T-200/B2B authority` | JWT cryptographically valid with no role/permission authority claims; persistent RBAC regression retained | `PASS` |
+| `T-220/offline revoke` | revoked family returns `ClearAndSuspendOffline` and denies Offline mutation | `PASS` |
+| `T-W2/regression` | complete Release suite against disposable PostgreSQL | `PASS — 146/146; 0 failed/skipped` |
+| `T-W2/migrations` | EF list, model-drift check, database update | `PASS — existing 10/10; no pending model change` |
+| `T-W2/API boot` | protected boundary | `PASS — HTTP 401 expected` |
+| `T-W2/clients` | Desktop Windows and Mobile Admin/Customer/Driver build/probes | `PASS` |
+
+The test-only atomic store validates the code contract and is not registered by the API or represented as durable PostgreSQL evidence. DBP-003 integration, device registry/PoP/nonce and executable client credential-clearing tests remain blocked and are listed in `W2_F2_TEST_MATRIX.md`.

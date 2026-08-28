@@ -1,14 +1,14 @@
 # ADR-W2-002 — Identity, RBAC and session authority
 
-Control Tower disposition: `DEP-006 = CONTROL TOWER REVALIDATED FOR AUTHORITY-NEUTRAL CODE-ONLY IMPLEMENTATION` at execution baseline `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. `AUTH-001 = OWNER DECISION REQUIRED — BOUNDED ITEM` remains limited to Production issuer/session authority and issuer-specific lifecycle work.
+Control Tower disposition: `DEP-006 = CONTROL TOWER REVALIDATED FOR AUTHORITY-NEUTRAL CODE-ONLY IMPLEMENTATION` at execution baseline `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. `AUTH-001 = RESOLVED — LOCAL APPLICATION AUTHORITY SELECTED FOR PRODUCTION TARGET`. The code-only lifecycle checkpoint is `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`; persistent adapters remain behind DBP-003.
 
 - Decision date: `2026-08-28`
 - Execution baseline: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`
 - Governing dependency: `DEP-006`
 - Findings: `A-SEC-001`, `A-SEC-002`, `TB-F-002`, `TB-F-003`
 - Decision: `DEP-006 = RESOLVED FOR IMPLEMENTATION` for the authority-neutral request pipeline
-- Governance acceptance: `PENDING CONTROL TOWER INDEPENDENT REVALIDATION/REBIND UNDER c274f9a HOLD`
-- Bounded owner item: `AUTH-001 — select Production token/session authority mode`
+- Governance acceptance: `CONTROL TOWER REVALIDATED; AUTH-001 OWNER DECISION RECORDED`
+- Production authority: `LOCAL APPLICATION AUTHORITY`
 - DB execution: `NOT AUTHORIZED — DBP-003 remains gated`
 
 ## Reconciliation
@@ -18,7 +18,7 @@ Control Tower disposition: `DEP-006 = CONTROL TOWER REVALIDATED FOR AUTHORITY-NE
 | JWT validation | Authority or issuer+symmetric key; audience/lifetime checked | `CURRENT — retain as authentication boundary` | options validation is a candidate, not an adopted authority decision |
 | User/tenant binding | independent claims; active user check only in Sync | `GAP — REIMPLEMENT` | `CurrentSecurityContext` is a useful candidate but null-company scope selection needs redesign |
 | Permission evaluation | literal token `permission`/role claims | `GAP — REIMPLEMENT` | `EffectivePermissionResolver` is a selective candidate requiring key/cardinality tests |
-| Login/token issuance | no current endpoint/service | `CURRENT ABSENCE / OWNER-BOUNDED` | local session implementation is a candidate only; not assumed required |
+| Login/token issuance | no current endpoint/service | `CODE-ONLY LIFECYCLE IMPLEMENTED; ACTIVATION REQUIRES DBP-003 ADAPTER` | state-machine intent reimplemented without copying PR persistence |
 | Refresh rotation/reuse | absent | `GAP IF LOCAL MODE SELECTED` | candidate needs independent concurrency, audit and recovery verification |
 | Logout/revoke | absent in application | `GAP` | self-revoke and family revoke are candidates if local mode is selected |
 | External IdP revocation | configuration/evidence unavailable | `VERIFY — EXTERNAL` | PR #69 does not prove Production IdP semantics |
@@ -48,13 +48,13 @@ Control Tower disposition: `DEP-006 = CONTROL TOWER REVALIDATED FOR AUTHORITY-NE
 | Logout | client credential deletion plus configured server/IdP revoke | revoke current/family then client deletion |
 | Failure | 401 for invalid/stale identity/session; 403 for valid identity lacking scope/permission | same |
 
-## Bounded owner decision AUTH-001
+## AUTH-001 resolution and bounded implementation
 
-The repository and sealed evidence do not establish whether Production must use an external OIDC authority or the PR69-style local issuer. Owner/Control Tower must select and register exactly one Production mode with recovery, secret/key custody, availability and revocation evidence.
+The owner selected local application authority for the Production target. W2-B2B therefore implements the storage-neutral lifecycle contract: login authority adapter, narrow JWT issuance without role/permission grants, short access lifetime, one-time refresh rotation, family revoke on reuse/race, logout/current/family revoke, security-version and current-membership checks, client `ClearAndSuspendOffline`, and Offline mutation denial after revoke.
 
-`OWNER DECISION REQUIRED — BOUNDED ITEM AUTH-001`
+The API intentionally does not register a test/in-memory session store or expose local endpoints. Production activation requires a durable `ILocalSessionStore`, approved password-hash/current-identity adapter, atomic audit path and DBP-003 migration. Until then the existing authentication configuration remains preserved and local issuance fails closed by absence of registration.
 
-This blocks local session schema/endpoints and Production IdP integration, but does not block code-only server membership binding, DB-backed permission evaluation, fail-closed error behavior, or negative tests on the current isolated execution branch.
+The DBP-003 design, rehearsal and recovery proposal is `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` and is `READY FOR DB-GOV REVIEW — NOT AUTHORIZED FOR EXECUTION`.
 
 ## Negative tests
 

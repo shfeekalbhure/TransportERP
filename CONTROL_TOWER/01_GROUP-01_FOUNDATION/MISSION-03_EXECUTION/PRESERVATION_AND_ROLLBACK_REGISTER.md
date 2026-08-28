@@ -23,6 +23,9 @@
 | `PRES-W2-004` | Waybill/Finance/Shipping routes and application contracts retained; duplicated claim-only checks replaced by one fail-closed request resolver | `SATISFIED FOR W2-A2/B2A` |
 | `PRES-W2-005` | failed run 33184771338 stopped at compile before migration/test/API; disposable PostgreSQL was discarded; corrective head d740740 passed the full matrix | `RECOVERED — NO PARTIAL DB/PRODUCT MUTATION` |
 | `PRES-W2-006` | Control Tower revalidated linear W1→W2 ancestry, exact 15-path diff, retained artifacts and normal-revert recovery; no merge/rebase/cherry-pick/force-push or candidate deletion | `SATISFIED FOR BOUNDED ADOPTION` |
+| `PRES-W2-007` | B2B was added linearly from `9c5b7a1...` as three new code/test files; existing auth configuration, entities, DbContext, migrations, schema, data, routes and client projects untouched | `SATISFIED FOR CODE-ONLY B2B` |
+| `PRES-W2-008` | raw passwords/tokens/signing keys/private keys are not logged or persisted; no test store is registered in API; local issuance remains fail-closed until durable DBP-003 adapters | `SATISFIED FOR CODE-ONLY B2B` |
+| `PRES-W2-009` | exact-head run `33191269475` passed 146/146, ten existing migrations/no drift, API 401 and Desktop/Mobile probes | `SATISFIED FOR CODE-ONLY B2B` |
 
 ## Recovery evidence
 
@@ -40,4 +43,5 @@ The entries below document recovery paths only. The candidate is adopted for bou
 - REM-100 rollback: revert `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`, restoring the mapper and test files to the W0 tree. No schema/data rollback is required because no DB/data mutation exists.
 - W2 A2/B2A rollback: revert `9c5b7a1...`, then `d740740...`, then `d1c0a2571bf3d240b9134e8614186acd70a6bd5d` to restore exact head `04a875a...`. The intermediate `d1c0a257...` is not a deployable rollback target because its core build failed.
 - W2 A1/B1/C1 rollback: from `04a875a...`, revert `04a875a...` only to remove manual dispatch capability if required, then revert `a157c34d6767deeb5544adf456a2a36946a599a9` to restore the W1 code tree. No schema/data rollback exists. Stop and preserve evidence if rollback would re-open a security exposure in an environment where this branch has been deployed.
+- W2-B2B code-only rollback: normally revert `cc67ad2bd491ed3ab23c3144f11dff955353c3a4`, restoring exact adopted baseline `9c5b7a1...`. The API never registered the new lifecycle or a temporary store, so rollback has no token/session/data cleanup. If later DBP-003 work activates local sessions, use its feature-disable/family-revoke/forward-recovery path instead of destructive schema rollback.
 - Recovery source remains authoritative master plus the verified preservation bundle. No merge, deletion, force-push or history rewrite was performed.

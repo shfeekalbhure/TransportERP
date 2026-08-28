@@ -1,10 +1,10 @@
 # MISSION-03 Execution Output Manifest
 
-- Package: `MISSION-03-W2-CONTROL-TOWER-REVALIDATED-CHECKPOINT-v0.6`
-- State: `OPEN — NOT SEALED — W1 PRESERVED; SIX BOUNDED W2 PACKAGES ADOPTED`
+- Package: `MISSION-03-W2-B2B-CODE-ONLY-CHECKPOINT-v0.7`
+- State: `OPEN — NOT SEALED — B2B CODE-ONLY IMPLEMENTED; DBP-003 READY FOR REVIEW`
 - Product baseline: `2ec6cccf...` / tree `516247dd...`
-- Execution head: `9c5b7a12e59d2c42e682717b8e90c491f8699b96` / tree `452b37f1e2c68d9f3dae6e18f1cf1b67645105af`
-- Product state: `REM-100 accepted W1; W2-A1/A2/B1/B2A/C1/F1 adopted/rebound to sealed plan`; no DB/migration/data change
+- Execution head: `cc67ad2bd491ed3ab23c3144f11dff955353c3a4` / tree `ea940e592cb11f5fff736e68055ebf77d2eece88`
+- Product state: `prior W1/W2 packages preserved; W2-B2B code-only implemented and 146/146 verified`; no DB/migration/data change
 
 | Output | Function | State |
 |---|---|---|
@@ -26,11 +26,14 @@
 | `IDENTITY_RBAC_SESSION_ADR.md` | identity/RBAC/session decision | bounded implementation design |
 | `DEVICE_LIFECYCLE_POP_ADR.md` | device ownership/lifecycle/PoP policy | bounded implementation design |
 | `PR69_W2_ADOPTION_MATRIX.md` | selective comparative disposition | evidence-only matrix |
+| `DBP-003_SESSION_PERSISTENCE_PROPOSAL.md` | durable local-session/device persistence design, rehearsal and recovery | ready for DB-GOV review; not authorized |
+| `W2_C2_PREPARATION.md` | non-destructive device/PoP contract and negative-test preparation | prepared; persistence/runtime blocked |
+| `W2_F2_TEST_MATRIX.md` | exact B2B pass and remaining device/DB/client gaps | partial pass / bounded blockers |
 | `W2_PLAN_DEVIATION.md` | superseding directive, containment and completed revalidation trail | historical deviation resolved for six bounded packages |
 | `W2_CONTROL_TOWER_REVALIDATION_DECISION.md` | independent package-by-package disposition and new baseline | adopted bounded checkpoint |
 | `EVIDENCE/W0/*` | generated exact-baseline evidence | checkpoint |
 | `EXECUTION_OUTPUT_SHA256.txt` | detached checkpoint hashes | generated after content stabilization |
 | `MISSION-03_SEAL_REGISTER.md` | seal state | `NOT SEALED` |
-| `CONTROL_TOWER_HANDOFF.md` | W2 revalidated/adopted checkpoint; not final handoff | `NOT READY FOR M04` |
+| `CONTROL_TOWER_HANDOFF.md` | W2-B2B code-only checkpoint; not final handoff | `NOT READY FOR M04` |
 
 This manifest is provisional. Later mission work must issue a new manifest and detached hashes; it must not overwrite this checkpoint silently.

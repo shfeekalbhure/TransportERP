@@ -7,7 +7,7 @@ Control Tower disposition: `DEP-007 = CONTROL TOWER REVALIDATED FOR BOUNDED CODE
 - Governing dependency: `DEP-007`
 - Findings: `A-SEC-002`, `A-OFF-002`, `TB-F-004`, `D-SEC-SYNC-001`
 - Decision: `DEP-007 = RESOLVED FOR IMPLEMENTATION`
-- Governance acceptance: `PENDING CONTROL TOWER INDEPENDENT REVALIDATION/REBIND UNDER c274f9a HOLD`
+- Governance acceptance: `CONTROL TOWER REVALIDATED FOR BOUNDED CODE-ONLY IMPLEMENTATION`
 - DB execution: `NOT AUTHORIZED — DBP-003/006 remain gated`
 
 ## Current evidence
@@ -82,3 +82,7 @@ Control Tower disposition: `DEP-007 = CONTROL TOWER REVALIDATED FOR BOUNDED CODE
 | Production MDM/attestation and platform key capabilities | external evidence | attestation strength and client release, not owner checks |
 | Retention duration for nonce/replay/audit and legal hold | owner/legal policy | DBP-003/006 physical design |
 | Emergency non-owner override role | owner/security authority | override only; default deny remains executable |
+
+## C2 preparation checkpoint
+
+`W2_C2_PREPARATION.md` now defines the non-destructive enrollment/assignment/PoP envelope, fail-closed lifecycle, client revoke contract and negative matrix. No runtime registry endpoint or persistence was added. Registry/assignment, proof key, nonce/replay and session-device storage remain behind DBP-003/006.
