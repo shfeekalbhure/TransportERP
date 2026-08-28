@@ -1,6 +1,6 @@
 # CURRENT DIRECTIVE — MISSION-03
 
-`CONTINUE — DB REHEARSAL ENTRY HOLD; RESOLVE DBP-003B/C ↔ DBP-006 ORDER CONFLICT; KEEP MISSION-03 OPEN`
+`CONTINUE — CORRECTED DEPENDENCY PACKAGE EXISTS; FRESH INDEPENDENT DB-GOV REVIEW REQUIRED; KEEP MISSION-03 OPEN`
 
 ## Current execution basis
 
@@ -19,51 +19,52 @@
 - `CLIENT-001 = RESOLVED — DESKTOP + THREE ANDROID CLIENTS ARE RELEASE TARGETS; IOS DEFERRED`.
 - `DB-BASELINE-001 = RESOLVED — TARGET DATABASE IS GREENFIELD / NEW / EMPTY / NO LEGACY TABLES OR DATA`.
 
-## Post-resubmission DB-GOV revalidation
+## Post-resubmission DB-GOV state
 
-The exact v1.0 Greenfield physical design and acceptance specification now exist in repository evidence. A mission-local DB-GOV decision file nominally approves coordinated disposable/Greenfield non-Production rehearsal, but repository chronology proves that decision already existed at governance `fc2e28f86b297203be9f857f507d40629d9bbb35`, before the exact v1.0 resubmission was committed in `8b97d99e481ed2b6f4a7e90a5d4790ebdcac8219`.
+The repository contains the exact v1.0 Greenfield physical design and acceptance specification. Control Tower revalidation proved the earlier coordinated DB-GOV decision predated that exact resubmission and also contained an incompatible DBP-003B/C ↔ DBP-006 sequence.
 
-Control Tower therefore independently revalidated the current repository package and recorded the controlling result in:
+The MISSION-03 correction now exists in:
 
-`CONTROL_TOWER/03_DATABASE_GOVERNANCE/DB_GOV_POST_RESUBMISSION_REVALIDATION_2026-08-29.md`
+`CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/DBP-003BC_003A_006_PHYSICAL_DEPENDENCY_CORRECTION_v1.1.md`
 
-Result:
+Correction commit:
 
-`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — POST-RESUBMISSION DB-GOV REVALIDATION REQUIRED`
+`20608494998e671892ee35abd415158e399c9036`
 
-### Evidence-bound dependency conflict
+The correction also resolves a second physical FK-order issue discovered during dependency binding: `auth_sessions.RegisteredDeviceId` cannot create its composite FK before `registered_devices` exists.
 
-The exact physical design orders:
+The only candidate-unit order submitted for the next independent review is therefore:
 
-`DBP-002 → DBP-004 → DBP-003A → DBP-003B/C → DBP-006 → DBP-005`
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-and makes DBP-006 depend on DBP-003B/C device/proof persistence.
+Physical/activation boundary:
 
-The earlier review decision orders:
+- DBP-003B/C durable device/proof objects may physically precede session and Offline persistence.
+- Device lifecycle operations that require session-family revocation remain disabled until DBP-003A exists and passes.
+- Device lifecycle operations that require Offline quarantine remain disabled until DBP-006 exists and passes.
+- DBP-003A creates its device FK only after `registered_devices` exists.
+- DBP-006 remains after both session and device/proof persistence.
 
-`DBP-002 → DBP-004 → DBP-003A → DBP-006 → DBP-003B/C → DBP-005`
+## Controlling gate
 
-and conditions DBP-003B/C on a passed DBP-006 candidate baseline.
+`HOLD AT COORDINATED GREENFIELD REHEARSAL ENTRY — FRESH POST-CORRECTION INDEPENDENT DB-GOV REVIEW REQUIRED`
 
-Both orders cannot govern the same exact physical package. No candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring or candidate migration application is authorized while this contradiction remains unresolved.
+The correction is not a self-approval. No candidate Entity/DbContext/Migration/Schema/Seed/persistent-adapter authoring or candidate migration application is authorized until an independent DB-GOV decision is recorded after the correction package exists.
 
 ## Authorized next work
 
-MISSION-03 must continue automatically with non-destructive work and must **not** stop the analytical chain:
+MISSION-03 must continue automatically with non-destructive work and must not stop the analytical chain:
 
-1. Resolve the DBP-003B/C ↔ DBP-006 physical dependency by either:
-   - retaining DBP-003B/C before DBP-006 and correcting the coordinated decision; or
-   - splitting DBP-006 into a physically independent pre-device core plus a later device/proof-bound extension.
-2. Bind the corrected order to the exact current design revision, execution parent SHA/tree, proposed candidate-unit identities, FK/index dependencies, and the Greenfield acceptance matrix.
-3. Submit the corrected package for a fresh independent DB-GOV review **after** the corrected repository package exists.
-4. Do not author Entity/DbContext/Migration/Schema/Seed/persistent adapters and do not apply candidate migrations until that post-resubmission review opens bounded rehearsal authority.
-5. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
-6. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
-7. The next worker checkpoint must issue a new manifest and detached SHA-256 set; `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` is now historical because Control Tower governance changed after that checkpoint.
+1. Submit the v1.1 correction package plus v1.0 exact design and `GREENFIELD_DB_REHEARSAL_ACCEPTANCE_SPEC.md` to a fresh independent DB-GOV review.
+2. The independent review must bind the exact execution parent SHA/tree, corrected candidate identities/order, composite FKs/indexes, activation boundaries and acceptance matrix.
+3. Do not author Entity/DbContext/Migration/Schema/Seed/persistent adapters and do not apply candidate migrations until that review explicitly opens bounded rehearsal authority.
+4. Continue unrelated non-destructive W5/W6/W7 preparation where existing gates permit.
+5. Keep W8 last; no destructive/global cleanup before its preservation gate is satisfied.
+6. Issue a new manifest/checkpoint and detached SHA-256 set after this corrected package is stabilized; prior `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` hashes remain historical.
 
 ## Remaining non-DB / external gates
 
-The Greenfield decision does not remove:
+The Greenfield correction does not remove:
 
 - canonical programming authority for post-DEPART Shipping, Ticketing and governed screen routes;
 - real Windows/Android executable runtime and secure-store proof;
@@ -83,4 +84,4 @@ Do not change MISSION-04 to START until MISSION-03 is conclusively sealed and ha
 
 No merge to master, rebase, cherry-pick, force-push, history rewrite, Production mutation, signing-secret commit, Entity/DbContext/Migration/Schema/Seed/Data change or unauthorized database action.
 
-No `OWNER DECISION REQUIRED` is active. The current next action is delegated non-destructive DB-GOV correction/revalidation.
+No `OWNER DECISION REQUIRED` is active. The current next gate is a fresh independent DB-GOV review of the post-correction package.
