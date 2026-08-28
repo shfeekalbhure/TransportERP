@@ -1,6 +1,7 @@
 name: MISSION-03 W0 Disposable Baseline
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - codex/mission-03-execution-20260828
