@@ -1,5 +1,7 @@
 # ADR-W2-001 — Tenant hierarchy and cardinality
 
+Control Tower disposition: `DEP-005 = CONTROL TOWER REVALIDATED` at execution baseline `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. Live rows/roles/RLS and physical tenant defenses remain bounded to DBP-002 and do not block the code-only controls.
+
 - Decision date: `2026-08-28`
 - Execution baseline: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`
 - Governing dependency: `DEP-005`

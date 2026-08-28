@@ -5,9 +5,9 @@
 | `REM-000` | W0 | `CLOSED FOR ISOLATED EXECUTION / GLOBAL UNKNOWN` | repository-visible refs preserved and recovery-tested; external workspace ownership remains access-blocked but no external asset is touched |
 | `REM-001` | W0 | `VERIFIED LOCALLY/DISPOSABLE` | exact-lineage run 33181045881 covers restore/build/PostgreSQL migrations/124 tests/API boot/Desktop/Mobile probes with retained artifacts |
 | `REM-100` | W1 | `IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION` | mapper fixed at 069a311; 125/125 pass including focused persist/reload Volume and shipping allocation tests; no DB/data change |
-| `REM-200` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | B1/B2A technical evidence exists, but superseding Control Tower hold prevents adoption; AUTH-001/DBP-003 remain |
-| `REM-210` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | A1/A2 technical evidence exists, but superseding Control Tower hold requires independent ADR verification/rebinding; DBP-002 remains |
-| `REM-220` | W2 | `PRESERVED CANDIDATE — REVALIDATION REQUIRED` | C1 technical evidence exists; registry/PoP/override/DBP-003/006 remain blocked and candidate adoption is held |
+| `REM-200` | W2 | `PARTIAL — B1/B2A ADOPTED/IMPLEMENTED; B2B BLOCKED` | persistent RBAC/API exact-head evidence independently revalidated; AUTH-001/DBP-003 remain |
+| `REM-210` | W2 | `PARTIAL — A1/A2 ADOPTED/IMPLEMENTED; DB DEFENSE BLOCKED` | server stored-scope controls independently revalidated; DBP-002 remains |
+| `REM-220` | W2 | `PARTIAL — C1 ADOPTED/IMPLEMENTED; C2 BLOCKED` | existing Sync lifecycle owner controls independently revalidated; registry/PoP/override/DBP-003/006 remain blocked |
 | `REM-300` | W3 | `BLOCKED` | UoW/module-ownership ADR absent |
 | `REM-310` | W3 | `BLOCKED` | canonical accounting authority and DBP-005 absent |
 | `REM-320` | W3 | `BLOCKED` | UoW ADR, legacy samples and DBP-004 absent |

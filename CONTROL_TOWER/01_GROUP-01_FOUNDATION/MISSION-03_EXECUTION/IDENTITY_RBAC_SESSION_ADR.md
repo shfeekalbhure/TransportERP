@@ -1,5 +1,7 @@
 # ADR-W2-002 — Identity, RBAC and session authority
 
+Control Tower disposition: `DEP-006 = CONTROL TOWER REVALIDATED FOR AUTHORITY-NEUTRAL CODE-ONLY IMPLEMENTATION` at execution baseline `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. `AUTH-001 = OWNER DECISION REQUIRED — BOUNDED ITEM` remains limited to Production issuer/session authority and issuer-specific lifecycle work.
+
 - Decision date: `2026-08-28`
 - Execution baseline: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`
 - Governing dependency: `DEP-006`

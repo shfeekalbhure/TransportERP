@@ -39,5 +39,9 @@
 | `M03-EV-035` | W2 final exact-head run | run `33185419917`; head/tree `9c5b7a1...` / `452b37f1...` | both jobs success; 128/128; ten migrations/no model drift; API/Desktop/Mobile pass |
 | `M03-EV-036` | final retained artifacts | Linux `9691527827`; Desktop `9691490016` | SHA-256 `d2410979...`; `4010eeee...` |
 | `M03-EV-037` | superseding governance fetch | worker base `b3c5787...`; newly observed Control Tower `c274f9a...` | newer CURRENT_DIRECTIVE imposes W2 STOP/REPLAN; Product work stopped and candidate lineage preserved |
+| `M03-EV-038` | Control Tower exact diff/source revalidation | `069a311...9c5b7a1`; 15 paths; linear ancestry | 14 source/test paths plus one workflow line; no Entity/DbContext/Migration/Schema/Seed/data/Production config; `diff --check` PASS |
+| `M03-EV-039` | Control Tower GitHub run/log/artifact revalidation | run `33185419917`; jobs `98897056951`/`98897057221`; artifacts `9691527827`/`9691490016` | exact head/tree, 128/128, PostgreSQL 18.6, 10 migrations/no drift, API 401, Desktop/Mobile pass and artifact digests independently confirmed |
+| `M03-EV-040` | historical failed-run revalidation | run `33184771338`; head `d1c0a257...`; core job `98894801318` | failure and CS0246 independently confirmed; later steps did not run; recovery commit and passing head retained |
+| `M03-EV-041` | package-by-package Control Tower decision | `W2_CONTROL_TOWER_REVALIDATION_DECISION.md` | DEP-005/006/007 revalidated; A1/A2/B1/B2A/C1/F1 each ADOPT/REBOUND; B2B/C2/D/E/F2 remain bounded blockers |
 
 The generated W0 evidence sidecar is `EVIDENCE/W0/W0_EVIDENCE_SHA256.txt`.

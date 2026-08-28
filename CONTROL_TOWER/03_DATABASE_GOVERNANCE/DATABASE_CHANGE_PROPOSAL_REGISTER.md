@@ -21,4 +21,14 @@
 - `DBP-001` must remain split: the mapper code defect can be corrected as a code-only change after W0 exit; affected-row assessment is read-only; any data repair remains a separate DB-GOV-controlled action.
 - All database/data mutations remain prohibited until their exact execution gates are satisfied.
 
+## MISSION-03 W2 Control Tower revalidation note — 2026-08-28
+
+Control Tower adopted W2-A1/A2/B1/B2A/C1/F1 only as code-only/test packages at execution SHA `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. The exact W1→W2 diff contains no Entity, DbContext model, Migration, schema, seed, data repair, or Production configuration mutation. This adoption does not activate a database proposal.
+
+- `DBP-002` remains `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` for tenant-consistent physical keys/FKs/checks/indexes/RLS-equivalent changes and live data impact.
+- `DBP-003` remains `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` for membership/session/device/PoP persistence.
+- `DBP-006` remains `BLOCKED — DB-GOV ENTRY GATE NOT SATISFIED` for offline nonce/replay/queue persistence.
+
+The code-only controls do not authorize database/schema/persistence/data work and must not be used as evidence that those material gates are satisfied.
+
 كل حذف يبقى `CANDIDATE FOR REMOVAL` حتى يثبت ويعتمد ضمن المسار الحاكم.

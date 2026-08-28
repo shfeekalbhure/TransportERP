@@ -22,6 +22,7 @@
 | `PRES-W2-003` | Sync IDs, statuses, retry/conflict history and audit appends retained; only unauthorized ownership paths are denied | `SATISFIED` |
 | `PRES-W2-004` | Waybill/Finance/Shipping routes and application contracts retained; duplicated claim-only checks replaced by one fail-closed request resolver | `SATISFIED FOR W2-A2/B2A` |
 | `PRES-W2-005` | failed run 33184771338 stopped at compile before migration/test/API; disposable PostgreSQL was discarded; corrective head d740740 passed the full matrix | `RECOVERED — NO PARTIAL DB/PRODUCT MUTATION` |
+| `PRES-W2-006` | Control Tower revalidated linear W1→W2 ancestry, exact 15-path diff, retained artifacts and normal-revert recovery; no merge/rebase/cherry-pick/force-push or candidate deletion | `SATISFIED FOR BOUNDED ADOPTION` |
 
 ## Recovery evidence
 
@@ -33,7 +34,7 @@
 
 ## Rollback status
 
-The entries below document recovery paths only. The superseding hold requires preservation; no candidate rollback, deletion or history rewrite is authorized or performed now.
+The entries below document recovery paths only. The candidate is adopted for bounded execution, but no rollback, deletion or history rewrite is currently requested or performed.
 
 - W0 evidence harness rollback: revert `a48b68023072122c3f71941b861d8b9eeca82d34`; authoritative master is unchanged.
 - REM-100 rollback: revert `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`, restoring the mapper and test files to the W0 tree. No schema/data rollback is required because no DB/data mutation exists.

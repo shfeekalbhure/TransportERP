@@ -2,9 +2,9 @@
 
 - Mission: `MISSION-03 — EXECUTION AND REMEDIATION`
 - Directive: `START — EXECUTION UNDER SEALED MISSION-02 PLAN`
-- Status: `IN PROGRESS — W1 PRESERVED; W2 CANDIDATE PRESERVED; CONTROL TOWER HOLD — REVALIDATION REQUIRED`
-- Checkpoint: `MISSION-03-W2-REVALIDATION-HOLD-CHECKPOINT-v0.5`
-- Last evidence time: `2026-08-28T15:31:53Z` / `2026-08-28T18:31:53+03:00`
+- Status: `IN PROGRESS — W1 PRESERVED; W2-A1/A2/B1/B2A/C1/F1 ADOPTED — BOUNDED EXECUTION CONTINUES`
+- Checkpoint: `MISSION-03-W2-CONTROL-TOWER-REVALIDATED-CHECKPOINT-v0.6`
+- Last evidence time: `2026-08-28T16:11:03Z` / `2026-08-28T19:11:03+03:00`
 - Authoritative product: `refs/heads/master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - Authoritative tree: `516247dd320cfc0ef71607cd3d8e7946fe9375ab`
 - Execution branch: `codex/mission-03-execution-20260828`
@@ -18,9 +18,9 @@
 - Database changes: `NONE`
 - Production access/change: `NONE`
 
-## Superseding Control Tower hold
+## Control Tower revalidation decision
 
-Governance advanced during execution from the worker's fetched base `b3c5787...` to `c274f9a...`. The newer `CURRENT_DIRECTIVE.md` orders `HOLD — NO FURTHER W2 PRODUCT MODIFICATION — STOP/REPLAN`. Product work stopped immediately when the new head was observed. All post-W1 commits are preserved, exact-head technical evidence is retained, and their current governance disposition is `PRESERVED CANDIDATE — NOT ADOPTED/NOT AUTHORIZED PENDING CONTROL TOWER REVALIDATION`. See `W2_PLAN_DEVIATION.md`.
+The plan-deviation hold was honored and the candidate preserved. Control Tower then independently revalidated ADR-W2-001/002/003, the exact diff/source, package dependencies, DB-GOV boundary, rollback, GitHub logs and artifacts. `W2-A1/A2/B1/B2A/C1/F1` are now `ADOPT — REBOUND TO SEALED PLAN`; `9c5b7a1...` is the bounded execution baseline. See `W2_CONTROL_TOWER_REVALIDATION_DECISION.md`.
 
 ## Current gate
 
@@ -34,4 +34,4 @@ DEP-005, DEP-006 and DEP-007 are now resolved for bounded execution design in AD
 
 Code-only packages W2-A1/B1/C1 first bound Sync to stored Company/Branch and persistent RBAC and applied owner checks to transition, retry, conflict and replacement paths. W2-A2/B2A then replaced duplicated claim-only authorization in all three Product API modules with one request-time resolver that reconciles active User/Company/Branch and persistent RBAC; token permission claims can only narrow the result. Issuer-specific login/refresh/session work remains the bounded W2-B2B item behind AUTH-001/DBP-003.
 
-The first A2/B2A exact-head attempt `d1c0a257...` failed build in run `33184771338` because the new resolver imported the wrong `OperationContext` namespace. No migration, test, API or Product mutation ran; the disposable DB/container was discarded. Commit `d740740...` corrected the import, and `9c5b7a1...` added an explicit API cross-company denial assertion. Exact-head run `33185419917` passed 128/128 tests, all ten existing migrations with no model drift, API boot, Desktop and three Mobile probes. These are technical candidate facts, not Control Tower acceptance. No Entity, DbContext, Migration, Seed, Schema or data change exists. W2 is held for revalidation; MISSION-03 is not sealed.
+The first A2/B2A exact-head attempt `d1c0a257...` failed build in run `33184771338` because the new resolver imported the wrong `OperationContext` namespace. No migration, test, API or Product mutation ran; the disposable DB/container was discarded. Commit `d740740...` corrected the import, and `9c5b7a1...` added an explicit API cross-company denial assertion. Exact-head run `33185419917` passed 128/128 tests, all ten existing migrations with no model drift, API boot, Desktop and three Mobile probes. Control Tower independently revalidated those facts and adopted the six bounded code-only packages. No Entity, DbContext, Migration, Seed, Schema or data change exists. W2-B2B/C2/D/E/F2 remain separately blocked; MISSION-03 is not sealed.

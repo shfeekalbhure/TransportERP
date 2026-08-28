@@ -1,5 +1,7 @@
 # ADR-W2-003 — Device lifecycle, ownership and proof of possession
 
+Control Tower disposition: `DEP-007 = CONTROL TOWER REVALIDATED FOR BOUNDED CODE-ONLY IMPLEMENTATION` at execution baseline `9c5b7a12e59d2c42e682717b8e90c491f8699b96`. Registry/PoP/nonce/replay/session-device persistence remains behind DBP-003/006 and is not claimed as implemented.
+
 - Decision date: `2026-08-28`
 - Execution baseline: `069a311b8f0e66f5d1ee3fdcffed13ec13d0a91a`
 - Governing dependency: `DEP-007`

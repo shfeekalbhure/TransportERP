@@ -127,4 +127,14 @@ The run emitted existing analyzer/runner warnings (xUnit2031, Desktop nullable a
 - EF: all ten existing migrations applied to disposable PostgreSQL 18.6; `No changes have been made to the model since the last migration`.
 - API: protected boot probe returned expected HTTP 401. Desktop and Mobile Admin/Customer/Driver builds/probes passed.
 
+## Control Tower independent W2 revalidation
+
+- Revalidation time: `2026-08-28T16:11:03Z`.
+- GitHub run API independently returned run `33185419917`, exact head `9c5b7a12e59d2c42e682717b8e90c491f8699b96`, branch `codex/mission-03-execution-20260828`, `completed/success`.
+- Core job `98897056951` and Desktop job `98897057221` independently returned `completed/success`; all named restore/build/migration/test/API/client steps succeeded.
+- Decoded core log independently records tree `452b37f1...`, PostgreSQL 18.6, no model changes since the last migration, ten committed migrations applied, `Passed: 128, Failed: 0, Skipped: 0`, and `http_code=401`.
+- Artifact API independently returned Linux `9691527827` and Desktop `9691490016` with the recorded SHA-256 digests and `expired=false`.
+- Failed run `33184771338` independently returned `completed/failure` at `d1c0a257...`; decoded job `98894801318` records `CS0246` for `OperationContext` during build. No later migration/test/API step ran.
+- Disposition: exact-head evidence supports adoption of bounded W2-A1/A2/B1/B2A/C1/F1 only. It does not cover W2-B2B/C2/D/E/F2 or complete T-200/T-210/T-220.
+
 This is the current exact-head W2 evidence. Earlier successful and failed runs remain historical evidence and are not substituted for it.

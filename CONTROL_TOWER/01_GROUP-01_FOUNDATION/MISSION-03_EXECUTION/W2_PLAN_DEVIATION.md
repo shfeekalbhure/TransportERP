@@ -5,7 +5,7 @@
 - Superseding Control Tower head: `c274f9ab66a507e59eaf31cd850d88d9e1ff17d2`
 - Superseding directive: `CONTINUE — PRESERVE VERIFIED W1; W2 HOLD — STOP/REPLAN REQUIRED`
 - Preserved candidate execution head: `9c5b7a12e59d2c42e682717b8e90c491f8699b96`
-- State: `PLAN DEVIATION — REVALIDATION REQUIRED`
+- State: `REVALIDATED — BOUNDED CANDIDATE ADOPTED; HISTORICAL DEVIATION RETAINED`
 
 ## Timeline and scope
 
@@ -28,7 +28,7 @@ While preparing the Control Tower checkpoint, a fresh fetch showed that governan
 | DEP-005 | ADR-W2-001 plus current model/migration/PR69 comparison | Control Tower independently verify and rebind or reject |
 | DEP-006 | ADR-W2-002 plus persistent-RBAC/API/Sync evidence | Control Tower independently verify; decide bounded AUTH-001 |
 | DEP-007 | ADR-W2-003 plus lifecycle-owner negative tests | Control Tower independently verify; keep registry/PoP behind DB-GOV |
-| W2-A1/A2/B1/B2A/C1/F1 | candidate commits through `9c5b7a1...`; exact run `33185419917` PASS | `PRESERVED CANDIDATE — NOT ADOPTED/NOT AUTHORIZED PENDING REVALIDATION` |
+| W2-A1/A2/B1/B2A/C1/F1 | candidate commits through `9c5b7a1...`; exact run `33185419917` PASS | historical hold disposition; superseded by Control Tower `ADOPT — REBOUND TO SEALED PLAN` decision below |
 | DBP-002/003 | no mutation performed | remain blocked under DB-GOV-001 |
 
 ## Required Control Tower decision
@@ -38,4 +38,14 @@ While preparing the Control Tower checkpoint, a fresh fetch showed that governan
 3. State whether `9c5b7a1...` may become the execution baseline, must be selectively reimplemented, or must remain evidence only.
 4. Preserve the failed run `33184771338` and successful exact-head run `33185419917` as evidence regardless of adoption.
 
-MISSION-03 remains open. This record is not a MISSION-04 handoff and does not self-release the W2 hold.
+## Control Tower closure of the deviation gate
+
+Control Tower completed the required independent review in `W2_CONTROL_TOWER_REVALIDATION_DECISION.md`:
+
+- DEP-005/006/007 were revalidated for their bounded code-only scopes;
+- W2-A1/A2/B1/B2A/C1/F1 were each `ADOPT — REBOUND TO SEALED PLAN`;
+- the W2-wide hold was lifted only for those packages;
+- `9c5b7a1...` became the bounded execution baseline;
+- W2-B2B/C2/D/E/F2 and DBP-002/003/006 remain separately blocked.
+
+MISSION-03 remains open. This historical deviation record is not a MISSION-04 handoff.
