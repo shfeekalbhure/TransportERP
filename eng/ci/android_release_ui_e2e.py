@@ -174,7 +174,7 @@ class Driver:
     def set_text(self, automation_id: str, value: str, verify_plaintext: bool = True) -> None:
         if not value or not SAFE_INPUT.fullmatch(value):
             raise UiE2EFailure("INPUT_CHARACTER_SET_UNSUPPORTED")
-        self.click(automation_id)
+        self.focus_input(automation_id)
         # CI credentials are generated from hexadecimal/base64 alphabets. Reject rather than guess
         # when an input cannot be typed deterministically by Android's standard input command.
         self.run("shell", "input", "text", value, timeout=30)
@@ -192,6 +192,24 @@ class Driver:
                 text_state = "EXACT" if observed == value else "EMPTY" if not observed else "MISMATCH"
                 focus_state = "FOCUSED" if node.attrib.get("focused") == "true" else "NOT_FOCUSED"
                 raise UiE2EFailure(f"UI_TEXT_VERIFY_{text_state}_{focus_state}") from error
+
+    def focus_input(self, automation_id: str) -> None:
+        for attempt in range(5):
+            self.click(automation_id)
+            try:
+                self.wait_for(
+                    automation_id,
+                    lambda node: node.attrib.get("focused") == "true",
+                    2,
+                )
+                return
+            except UiE2EFailure as error:
+                if str(error) != "UI_WAIT_TIMEOUT":
+                    raise
+                if attempt == 4:
+                    raise UiE2EFailure("UI_INPUT_FOCUS_FAILED") from error
+                self._scroll(toward_bottom=True)
+        raise UiE2EFailure("UI_INPUT_FOCUS_FAILED")
 
     def hide_keyboard(self) -> None:
         self.run("shell", "input", "keyevent", "KEYCODE_BACK")
