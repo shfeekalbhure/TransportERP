@@ -1,25 +1,27 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-08-28T03:10:00Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T06:10:00+03:00`
-- `NEXT PLANNED CHECK`: `ON CONTROL TOWER RESUME AFTER OWNER/REPOSITORY AUTHORITY INPUT`
-- `MONITORING STATE`: `MONITORING PAUSED — REQUIRES RESUME`
+- `LAST VERIFIED CHECK` UTC: `2026-08-28T12:51:43Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-08-28T15:51:43+03:00`
+- `NEXT PLANNED CHECK`: `MASTER/GATE REVALIDATION; THEN HOURLY SUPERVISION + 10-MINUTE ACTIVE-SESSION CHECKS`
+- `MONITORING STATE`: `ACTIVE GOVERNANCE SUPERVISION`
 - Governing directive: `CONTROL_TOWER/00_GOVERNANCE/OWNER_DELEGATION_AND_OPERATING_DIRECTIVE.md`
-- Monitoring rule: inspect every `10 minutes` while the Control Tower session is active; unchanged state produces no cosmetic update or invented decision.
+- Authoritative product line: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5 — OWNER APPROVED`
 
-| Team / Mission | Current State | Current Expected Output | Last Verified Check | Next Planned Check | Prerequisite Status | Blocker | Continue / Wait / Stop Decision | Seal State | Handoff State |
-|---|---|---|---|---|---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | OWNER DECISION REQUIRED | Resume after authoritative product ref/full SHA designation and required evidence | `2026-08-28T03:10:00Z` | On authorized resume | MISSION-01 negative gate sealed | Owner/repository authority must designate authoritative ref/full SHA; no destructive/Production/data action authorized | HOLD | N/A | MISSION-02 NOT STARTED |
-| TEAM-A / MISSION-01 | SEALED | `01_TEAM-A/TEAM-A_INDEPENDENT_DEEP_AUDIT_REPORT.md` | `2026-08-28T01:27:46Z` — all 13 manifest outputs and sidecar reverified | No check unless new evidence causes `REOPEN REQUIRED` | Complete | No open condition inside the sealed TEAM-A output scope | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| TEAM-B / MISSION-01 | SEALED | `02_TEAM-B/TEAM-B_INDEPENDENT_DEEP_AUDIT_REPORT.md` | `2026-08-28T01:27:46Z` — all 13 detached hashes reverified; report SHA-256 `51b924968bbb685c3767eb624fcb1a2603bcffaed89a6ff2b5e8b2cb58dd39ec` | No check unless new evidence causes `REOPEN REQUIRED` | Complete | `SINGLE-SESSION TEAM-B — MULTI-REVIEWER ASSURANCE LIMITATION RECORDED` carries forward; it does not reopen the sealed package | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| TEAM-C1 / MISSION-01 | SEALED | Corrected v1.1 package under `03_TEAM-C1/v1.1/` | `2026-08-28T02:31:30Z` — all 14 hashes and source correction verified | No check unless new evidence causes `REOPEN REQUIRED` | Complete; v1.0 preserved and superseded | None inside corrected package scope | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| TEAM-D / MISSION-01 | SEALED | Corrected v1.1 reconciliation under `04_TEAM-D/v1.1/` | `2026-08-28T02:40:21Z` — 14 hashes, 64 complete rows, chronology, seal, and handoff verified | No check unless new evidence causes `REOPEN REQUIRED` | Complete | No open condition inside corrected reconciliation scope | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| TEAM-C2 / MISSION-01 | SEALED | Corrected/reassessed v1.1 package under `05_TEAM-C2/v1.1/` | `2026-08-28T02:50:28Z` — 16 hashes, 27 targets, chronology, seal, and handoff verified | No check unless new evidence causes `REOPEN REQUIRED` | Complete | No open condition inside corrected target-proposal scope | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| TEAM-E / MISSION-01 | SEALED | Corrected v1.1 advisory package under `06_TEAM-E/v1.1/` | `2026-08-28T03:01:31Z` — 16 hashes, all review rows, chronology, seal, and handoff verified | No check unless new evidence causes `REOPEN REQUIRED` | Complete | No open condition inside corrected advisory scope | STOP | `SEALED — DELIVERED TO CONTROL TOWER — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| MASTER REPORT + RECONCILIATION GATE / MISSION-01 | SEALED | Master audit report and `AUDIT_RECONCILIATION_GATE_2026-08-28.md` | `2026-08-28T03:10:00Z` — all 12 hashes and negative gate verified | No check unless evidence causes `REOPEN` | Complete as negative gate | Authoritative line and critical evidence gaps prevent READY | STOP | `SEALED — NOT READY — STOP` | `HANDOFF COMPLETE — HASH VERIFIED` |
-| MISSION-02 / GROUP-01 | OWNER DECISION REQUIRED | Sealed remediation plan | `2026-08-28T03:10:00Z` — MISSION-01 gate `NOT READY` | After authoritative-line decision and revalidated sealed READY gate | Prerequisite incomplete | Owner/repository authority must designate ref/full SHA; additional gate evidence required | HOLD | NOT SEALED | NOT STARTED |
-| MISSION-03 / GROUP-01 | WAITING | Authorized implementation and evidence | `2026-08-28T01:27:46Z` — MISSION-02 not sealed | After MISSION-02 handoff | Prerequisite incomplete | MISSION-02 open | WAIT | NOT SEALED | NOT STARTED |
-| MISSION-04 / GROUP-01 | WAITING | Independent verification package | `2026-08-28T01:27:46Z` — MISSION-03 not sealed | After MISSION-03 handoff | Prerequisite incomplete | MISSION-03 open | WAIT | NOT SEALED | NOT STARTED |
-| MISSION-05 / GROUP-01 | WAITING | Final closure and delivery package | `2026-08-28T01:27:46Z` — MISSION-04 not sealed | After MISSION-04 handoff | Prerequisite incomplete | MISSION-04 open | WAIT | NOT SEALED | NOT STARTED |
+| Team / Mission | Current State | Current Expected Output | Prerequisite Status | Blocker | Continue / Wait / Stop Decision | Seal State | Handoff State |
+|---|---|---|---|---|---|---|---|
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | Supervise revalidation and next gate | Owner line decision recorded | None requiring owner action at this moment | CONTINUE | N/A | N/A |
+| TEAM-A / MISSION-01 | SEALED | Preserved sealed package | Complete | None inside scope | STOP | SEALED | COMPLETE |
+| TEAM-B / MISSION-01 | SEALED | Preserved sealed package | Complete | `BLK-B-001` assurance limitation retained | STOP | SEALED | COMPLETE |
+| TEAM-C1 / MISSION-01 | SEALED | v1.1 preserved | Complete | None inside scope | STOP | SEALED | COMPLETE |
+| TEAM-D / MISSION-01 | SEALED | v1.1 preserved | Complete | Historical authority unknown now resolved externally by owner decision | STOP | SEALED | COMPLETE |
+| TEAM-C2 / MISSION-01 | SEALED | v1.1 preserved | Complete | None inside scope | STOP | SEALED | COMPLETE |
+| TEAM-E / MISSION-01 | SEALED | v1.1 preserved | Complete | Assurance limitations retained | STOP | SEALED | COMPLETE |
+| MASTER/GATE / MISSION-01 | REOPENED / IN PROGRESS | New revalidated Master/Gate package + hashes + seal + handoff | Owner authoritative line supplied | Remaining critical evidence gaps must be re-evaluated, not assumed resolved | CONTINUE REVALIDATION | v1.0 preserved; new version NOT SEALED | REVALIDATION OPEN |
+| MISSION-02 / GROUP-01 | WAITING | Remediation plan | Requires new sealed gate = `READY FOR REMEDIATION PLANNING` | Revalidated gate not yet sealed | WAIT | NOT SEALED | NOT STARTED |
+| MISSION-03 / GROUP-01 | WAITING | Execution/remediation | MISSION-02 not sealed | Prerequisite incomplete | WAIT | NOT SEALED | NOT STARTED |
+| MISSION-04 / GROUP-01 | WAITING | Independent verification | MISSION-03 not sealed | Prerequisite incomplete | WAIT | NOT SEALED | NOT STARTED |
+| MISSION-05 / GROUP-01 | WAITING | Final closure/delivery | MISSION-04 not sealed | Prerequisite incomplete | WAIT | NOT SEALED | NOT STARTED |
 
-Any unsupported fact is `UNKNOWN — REQUIRES VERIFICATION`. Any inaccessible source is `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION`. A prior report is input only: `REPORT SAYS SO = FACT` is prohibited.
+PR #69 `601f2d1cad61d62e590a6714ad84e307eb84fe5f` is `UNMERGED REMEDIATION / FINAL CANDIDATE`; no merge is authorized.
+
+Any unsupported fact is `UNKNOWN — REQUIRES VERIFICATION`. Any inaccessible source is `ACCESS BLOCKED — UNKNOWN — REQUIRES VERIFICATION`.
