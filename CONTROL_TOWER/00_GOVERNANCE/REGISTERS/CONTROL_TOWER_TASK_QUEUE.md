@@ -8,7 +8,7 @@
 | 4 | MISSION-01 | TEAM-E | TEAM-C2 sealed | Multidisciplinary advisory package | SEALED | E v1.1 accepted; `BLK-B-001` retained in assurance narrative |
 | 5 | MISSION-01 | MASTER/GATE REVALIDATION | Owner-authorized authoritative line | Revalidated Master/Gate package on exact authoritative SHA | SEALED — STOP | v2.0 complete; all 14 hashes verified; gate `READY FOR REMEDIATION PLANNING`; v1.0 preserved |
 | 6 | MISSION-02 | Planning Team | Revalidated MISSION-01 gate = `READY FOR REMEDIATION PLANNING` | Remediation plan | SEALED — DELIVERED — STOP | v1.2 remotely delivered; 64/64 findings; 8/8 workstreams PLANNED; 20 packages; W0–W8; DB-GOV paths retained |
-| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED — DBP-002 CORRECTION CYCLE ACTIVE — EXACT-HEAD PASS NOT YET EVIDENCED | Current worker head is `f128d24dce7baf76a6ac8af4e62a331b80447311` / tree `7eb7970c...`, 19 commits ahead of the prior `4cb8a388...` checkpoint. The latest fixture correction has landed in two regression test files, but there are currently no completed check runs bound to `f128d24d...`. Predecessor exact-head evidence remains red: v2 rehearsal `33222202212` fails baseline backup/restore catalog reconciliation and W0 `33222202131` fails the Linux full test-suite step. Run mandatory gates on the final exact head and obtain independent DBP-002 acceptance before DBP-004. Production, master/PR69 merge and destructive Git remain prohibited. |
+| 7 | MISSION-03 | Execution Team | MISSION-02 sealed | Implemented changes/evidence | IN PROGRESS — OPEN — NOT SEALED — DBP-002 TECHNICAL EXACT-HEAD PASS CANDIDATE — POST-REHEARSAL DB-GOV REVIEW START AUTHORIZED | Current exact head `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce` / tree `e8289418...`. Corrected Full Rehearsal v3 `33222541097`, W0 `33222541108`, and W7 backup/restore `33222541109` are SUCCESS on that exact head. Legacy v2 `33222541073` remains red at baseline catalog reconciliation and must be explicitly dispositioned by independent DB-GOV as superseded/non-governing or unresolved. DBP-002 remains NOT ACCEPTED until independent post-rehearsal review validates exact-head report/evidence/manifest/SHA-256 integrity and issues PASS. DBP-004 remains HOLD. |
 | 8 | MISSION-04 | Verification Team | MISSION-03 sealed | Independent verification | WAITING | MISSION-03 remains open/not sealed; no final exact-head report/evidence/manifest/detached SHA-256/seal/handoff exists |
 | 9 | MISSION-05 | Closure Team | MISSION-04 sealed | Final closure package | WAITING | MISSION-04 not sealed |
 
@@ -24,30 +24,38 @@ MISSION-03 reviewed pre-authoring baseline:
 
 Current evidenced worker head:
 
-`codex/mission-03-execution-20260828@f128d24dce7baf76a6ac8af4e62a331b80447311`, tree `7eb7970cdb2349aaefabfa7b8e2d4bdfa5e50501`, parent `99d2880165c393edf90cfdc833c035ee4b7b552a`.
+`codex/mission-03-execution-20260828@ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`, tree `e828941817432bdc73f3e6fc31e74219e74fcf33`, parent `f128d24dce7baf76a6ac8af4e62a331b80447311`.
 
 PR #69 at `601f2d1cad61d62e590a6714ad84e307eb84fe5f` remains `UNMERGED REMEDIATION / FINAL CANDIDATE`; no merge is authorized by Control Tower.
 
 ## Current MISSION-03 priority
 
-The governing post-correction DB-GOV PASS remains valid and the only approved physical order remains:
+The governing pre-authoring DB-GOV PASS remains valid and the only approved physical order remains:
 
 `DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-DBP-002 remains `IN PROGRESS — NOT ACCEPTED`.
+DBP-002 is now:
 
-Material progress since the previous Control Tower checkpoint is verified: the worker branch advanced from `4cb8a388...` to `f128d24d...`; DBP-002 rehearsal/correction tooling was extended; targeted DBP-002 physical-SQL/permission-resolver corrections and additional authorization coverage were added; and the latest bot commit updated the two failing Sync/API authority fixtures to seed the authoritative membership/grant model.
+`TECHNICAL EXACT-HEAD CANDIDATE PASSED V3 + W0 — AWAITING INDEPENDENT POST-REHEARSAL DB-GOV ACCEPTANCE — NOT ACCEPTED`.
 
-That correction does not close the gate. At the current `f128d24d...` head, no completed exact-head check run is yet available. The most recent completed predecessor runs still show the mandatory rehearsal and Linux regression path red, and any in-flight run on a superseded predecessor SHA cannot establish acceptance of the final head.
+Material exact-head evidence on `ffdf1087...`:
+
+- Full Rehearsal v3 run `33222541097 = SUCCESS`.
+- W0 run `33222541108 = SUCCESS`; both Windows Desktop and Linux Core/PostgreSQL/API/Mobile jobs pass, including migration application, complete tests and API boundary probe.
+- W7 backup/restore run `33222541109 = SUCCESS`.
+- The v3 path binds SHA/tree/parent evidence, PostgreSQL 18.6, original-ten migration preservation, no-model-drift/generated SQL, structural backup/restore reconciliation, independent generated-SQL and EF candidate application, RLS/catalog/roles/ACL/FK checks, negative isolation/fail-closed behavior, full regression and recovery evidence.
+
+A remaining governance discrepancy must be resolved rather than ignored: Full Rehearsal v2 `33222541073` still fails on the same SHA at baseline catalog backup/restore reconciliation. Independent post-rehearsal DB-GOV must determine whether v3 formally supersedes that raw-text harness and whether the exact-head evidence package is complete and integrity-bound.
 
 Required next actions:
 
-1. Bind the next mandatory Full Rehearsal and W0/full-regression runs to `f128d24d...` or to a later final candidate SHA if the worker advances again.
-2. Require fresh disposable PostgreSQL 18.6 execution and successful semantic baseline backup/restore reconciliation.
-3. Require candidate application, RLS/catalog/ACL validation, cross-tenant/fail-closed negatives, full regression, no model drift, candidate backup/restore and final reconciliation to all pass on one exact final SHA.
-4. Retain exact SHA/tree/parent, changed files, migration/source/generated-SQL hashes and artifact digests.
-5. Submit the successful exact-head DBP-002 package to independent post-rehearsal DB-GOV before proceeding.
+1. `DBP-002 POST-REHEARSAL DB-GOV REVIEW = START AUTHORIZED — WAITING FOR WORKER SESSION`.
+2. Verify v3 as the corrected governing rehearsal path and disposition v2 explicitly.
+3. Verify exact SHA/tree/parent, original-migration preservation, candidate/source/generated-SQL hashes, RLS/ACL/catalog/negative evidence, W0/full regression and backup/restore evidence.
+4. Require a DBP-002 checkpoint package with report + evidence + manifest + SHA-256 before acceptance.
+5. Issue independent PASS or FAIL with precise blockers.
+6. Only after PASS may DBP-002 become accepted and DBP-004 be released.
 
 `DBP-004 = HOLD — DEPENDS ON DBP-002 ACCEPTANCE`.
 
-No `OWNER DECISION REQUIRED` is active for this correction cycle. MISSION-04 remains WAIT until MISSION-03 is conclusively sealed and handed off.
+No `OWNER DECISION REQUIRED` is active. MISSION-04 remains WAIT until MISSION-03 is conclusively sealed and handed off.
