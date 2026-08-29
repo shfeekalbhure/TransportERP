@@ -33,11 +33,11 @@ Target database authority:
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — DBP-002 WORKER EXECUTION EVIDENCED; EXACT-HEAD REHEARSAL/REGRESSION GATES FAILING; FIX AND RERUN; DO NOT ADVANCE TO DBP-004`.
+- `CURRENT DIRECTIVE`: `CONTINUE — DBP-002 CORRECTION HEAD ADVANCED; AUTHORITATIVE FIXTURE PATCH LANDED; RUN NEW EXACT-HEAD GATES; DO NOT ADVANCE TO DBP-004`.
 - MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`.
 - Product authority remains `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
 - Reviewed pre-authoring execution baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
-- Current evidenced worker head: `codex/mission-03-execution-20260828@4cb8a388d65f9bf621feec4fde8ba3ec06bebea1`, tree `948726dfdd61e541a3b36c6e4039d48f23da4cfe`, parent `8e4d6e81104172bab86bb1eb3666c44da20d4ded`.
+- Current evidenced worker head: `codex/mission-03-execution-20260828@f128d24dce7baf76a6ac8af4e62a331b80447311`, tree `7eb7970cdb2349aaefabfa7b8e2d4bdfa5e50501`, parent `99d2880165c393edf90cfdc833c035ee4b7b552a`.
 - PR #69 remains comparative unmerged evidence only; no merge is authorized.
 
 ### Binding owner decisions
@@ -58,21 +58,29 @@ The PASS authorizes work; it does not pre-accept any generated candidate.
 
 ### DBP-002 current exact-head result
 
-Worker execution is now proven. The current head contains candidate `GreenfieldTenantMembershipIsolation`, an additive Migration 11, model-snapshot/physical-SQL changes, permission-resolver wiring and regression tests. Evidence on exact head `4cb8a388...` proves the original ten migration source/designer files remain unchanged, PostgreSQL 18.6 is used, build succeeds, no pending model changes are reported, and an empty baseline can receive exactly the existing ten migrations.
+Worker correction has materially advanced beyond the prior Control Tower checkpoint. `f128d24d...` is 19 commits ahead of `4cb8a388...`. The intervening chain adds/updates DBP-002 rehearsal and semantic-reconciliation tooling, targeted DBP-002 physical-SQL and permission-resolver corrections, authorization coverage, and finally the authoritative membership/grant fixture correction in:
 
-DBP-002 is **not accepted** because mandatory exact-head gates fail:
+- `TransportERP.Tests/ApiAuthenticationAndAuditTests.cs`;
+- `TransportERP.Tests/SyncOperationPersistenceTests.cs`.
 
-1. Full Rehearsal v2 run `33219905514` fails at baseline backup/restore catalog reconciliation before candidate application. The observed differences are textual PostgreSQL canonicalization of semantically equivalent CHECK expressions after `pg_dump/pg_restore`; later candidate/RLS/regression/restore steps are therefore skipped.
-2. W0 exact-head run `33219905526` successfully applies all 11 migrations but full regression is `149 passed / 5 failed / 154 total`. Four SyncOperation persistence tests fail with `PERMISSION_DENIED: sync.operations.execute`; the API sync test expects `QUEUED` but receives `REJECTED`. The worker must prove whether this is an intended membership-authority fixture transition or a product integration regression and restore the required regression gate without weakening authorization.
-3. Harness-fix run `33219905547` creates a local workflow-only correction commit but cannot push it because the GitHub App lacks permission to update `.github/workflows/*`. This is an execution-mechanism blocker, not owner-reserved authority. Do not broaden permissions or ask for merge/Production authority; land any harness-only correction through an already-authorized worker path and rerun exact-head gates.
+The latest fixture patch replaces the affected legacy authority assumptions with `UserMembership`, `UserRoleGrant`, and `UserPermissionGrant` setup while preserving an explicit DENY path.
+
+DBP-002 is **not accepted**. There is not yet a successful mandatory gate set bound to the current exact head `f128d24d...`; at the latest verification GitHub reports no completed check runs on that SHA.
+
+The latest completed predecessor evidence is still red:
+
+1. Full Rehearsal v2 run `33222202212` on `9df4e944...` fails at baseline backup/restore catalog reconciliation after successfully applying the original ten migrations. Candidate application, RLS/negative/full-regression/candidate-restore stages are skipped.
+2. W0 run `33222202131` on `9df4e944...` succeeds through disposable PostgreSQL migration application but fails at the Linux complete-test-suite step; Desktop succeeds.
+3. Runs started on predecessor `99d2880165...` cannot establish exact-head acceptance after `f128d24d...` landed.
 
 ### Required continuation
 
 - Keep DBP-002 `IN PROGRESS — NOT ACCEPTED`.
-- Fix the catalog reconciliation harness so backup/restore comparison is semantic/deterministic without masking real schema drift.
-- Reconcile the five W0 authorization regressions under the accepted DBP-002 membership model without weakening deny/fail-closed behavior.
-- Rerun exact-head Full Rehearsal and W0/full regression on a fresh disposable PostgreSQL 18.6 environment.
-- Require all mandatory DBP-002 steps to complete, retain exact artifacts/digests, and submit the resulting exact-head package for independent post-rehearsal DB-GOV.
+- Trigger/rerun the mandatory Full Rehearsal and W0/full regression on `f128d24d...` or on a later final exact head if the branch advances again.
+- Use fresh disposable PostgreSQL 18.6 and require semantic/deterministic baseline backup/restore reconciliation to pass without masking real schema drift.
+- Require candidate apply, RLS/catalog/ACL checks, cross-tenant and fail-closed negatives, full regression, model-drift check, candidate backup/restore and final reconciliation to all pass on the same final SHA.
+- Preserve exact SHA/tree/parent, changed files, migration/source/generated-SQL hashes, evidence and artifact digests.
+- Submit the successful exact-head package to independent post-rehearsal DB-GOV.
 - `DBP-004 = HOLD — DEPENDS ON DBP-002 ACCEPTANCE`; no later DBP may be advanced by reordering.
 - Continue unrelated W5/W6/W7 work only where its own gates remain independent.
 - W8 stays last; no destructive/global cleanup before preservation gates.
@@ -81,7 +89,7 @@ DBP-002 is **not accepted** because mandatory exact-head gates fail:
 
 No Production database/data/configuration/credentials. No Production secrets. Do not edit/delete/squash the existing ten migrations. No destructive migration/down-migration reliance. No merge to master, PR #69 merge, rebase, cherry-pick, force-push or history rewrite.
 
-No `OWNER DECISION REQUIRED` is active for this exact-head failure set; the next permitted actions are ordinary isolated-branch harness/test/candidate correction and rerun.
+No `OWNER DECISION REQUIRED` is active for this exact-head correction cycle; the next permitted actions remain ordinary isolated-branch correction/rerun and independent DB-GOV verification.
 
 ## MISSION-04
 
