@@ -33,11 +33,12 @@ Target database authority:
 
 ## MISSION-03
 
-- `CURRENT DIRECTIVE`: `CONTINUE — DBP-002 EXACT-HEAD TECHNICAL PASS EVIDENCED; START INDEPENDENT POST-REHEARSAL DB-GOV REVIEW; DO NOT ADVANCE TO DBP-004`.
+- `CURRENT DIRECTIVE`: `CONTINUE — DBP-002 INDEPENDENT POST-REHEARSAL DB-GOV REVIEW ONLY; DBP-004 EARLY EXECUTION DETECTED — STOP/HOLD DBP-004 — NO FURTHER DBP-004 PRODUCT MODIFICATION`.
 - MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`.
 - Product authority remains `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`.
 - Reviewed pre-authoring execution baseline: `codex/mission-03-execution-20260828@5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`.
-- Current evidenced worker head: `codex/mission-03-execution-20260828@ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`, tree `e828941817432bdc73f3e6fc31e74219e74fcf33`, parent `f128d24dce7baf76a6ac8af4e62a331b80447311`.
+- Frozen DBP-002 post-rehearsal review target: `codex/mission-03-execution-20260828@ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`, tree `e828941817432bdc73f3e6fc31e74219e74fcf33`, parent `f128d24dce7baf76a6ac8af4e62a331b80447311`.
+- Current observed execution-branch head: `codex/mission-03-execution-20260828@c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, tree `74caed5d25a99efd13ceb86a79adc71f938f5bda`, parent `1750fe82e39107de36129cb0420adc622829dc9e`.
 - PR #69 remains comparative unmerged evidence only; no merge is authorized.
 
 ### Binding owner decisions
@@ -54,46 +55,45 @@ The fresh post-correction pre-authoring decision remains `DB-GOV VERDICT = PASS`
 
 `DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-The PASS authorizes work; it does not pre-accept any generated candidate.
+The PASS authorizes work; it does not pre-accept any generated candidate. The immediately preceding Control Tower directive required DBP-002 independent post-rehearsal acceptance before DBP-004 could start.
 
-### DBP-002 current exact-head result
+### DBP-002 frozen review target
 
-The current exact head `ffdf1087...` now has successful corrected technical evidence:
+The immutable `ffdf1087...` checkpoint has the previously verified successful technical evidence:
 
 - `MISSION-03 DBP-002 Full Rehearsal v3` run `33222541097 = SUCCESS`.
-- W0 run `33222541108 = SUCCESS`; Windows Desktop and Linux Core/PostgreSQL/API/Mobile both pass, including complete tests and API boundary verification.
+- W0 run `33222541108 = SUCCESS`.
 - W7 PostgreSQL backup/restore run `33222541109 = SUCCESS`.
-- v3 binds SHA/tree/parent, uses PostgreSQL 18.6, proves original-ten migration preservation, verifies no model drift and generated SQL, performs structural baseline backup/restore reconciliation, independently applies the candidate through generated SQL and EF, validates RLS/catalog/roles/ACL/FK and negative isolation/fail-closed behavior, runs full regression and captures recovery evidence.
+- Legacy Full Rehearsal v2 run `33222541073 = FAIL` at baseline catalog backup/restore reconciliation and still requires explicit independent disposition.
 
-The authoritative fixture correction immediately preceding this head updates the affected Sync/API regression fixtures to `UserMembership` / `UserRoleGrant` / `UserPermissionGrant` semantics while preserving an explicit DENY test path.
+DBP-002 remains **not independently accepted**.
 
-DBP-002 is still **not independently accepted**. Full Rehearsal v2 run `33222541073` remains `FAIL` at baseline catalog backup/restore reconciliation and skips the candidate stages. Control Tower will not silently ignore that red result even though v3 was introduced as the structural/semantic corrected rehearsal path.
+`DBP-002 POST-REHEARSAL DB-GOV REVIEW = START AUTHORIZED — WAITING FOR INDEPENDENT REVIEW EVIDENCE`.
 
-### Required independent post-rehearsal DB-GOV review
+The independent reviewer must verify the frozen `ffdf1087...` report + evidence + manifest + SHA-256 package, exact SHA/tree/parent, original-ten migration preservation, generated SQL/hashes, PostgreSQL 18.6 apply, RLS/catalog/roles/ACL/FK, negative isolation/fail-closed behavior, W0/full regression and recovery evidence, and then issue a fresh independent `PASS` or `FAIL`.
 
-`DBP-002 POST-REHEARSAL DB-GOV REVIEW = START AUTHORIZED — WAITING FOR WORKER SESSION`.
+### DBP-004 gate violation and stop
 
-The independent reviewer must:
+Before any independent DBP-002 acceptance was recorded, the execution branch advanced through two explicit DBP-004 commits:
 
-- confirm whether v3 formally supersedes the raw-text v2 harness and document the disposition of the red v2 result;
-- verify exact SHA/tree/parent and the final changed-file scope;
-- verify preservation of the original ten migrations;
-- verify migration/source/generated-SQL hashes and evidence digests;
-- verify PostgreSQL 18.6 candidate apply, RLS/catalog/roles/ACL/FK controls, cross-tenant/fail-closed negatives, W0/full regression and backup/restore evidence;
-- verify a DBP-002 report + evidence + manifest + SHA-256 integrity package;
-- issue an independent `PASS` or `FAIL` with exact blockers.
+- `1750fe82e39107de36129cb0420adc622829dc9e`, parent `ffdf1087...`: DBP-004 Audit V2 product-source authoring, 556 additions.
+- `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, parent `1750fe82...`: adds the DBP-004 PostgreSQL 18.6 EF candidate-generator workflow.
 
-Only a fresh independent PASS may change DBP-002 to accepted and release DBP-004.
+The generator run `33223141635 = FAILURE`: the authoring-head build failed and migration generation was skipped. Automatic gates on the new branch head are also red: DBP-002 Full Rehearsal v3 `33223141626 = FAILURE`, W0 `33223141611 = FAILURE`, and W7 `33223141566 = FAILURE`.
 
-`DBP-004 = HOLD — DEPENDS ON DBP-002 ACCEPTANCE`.
+`DBP-004 = HOLD/STOP — UNAUTHORIZED EARLY EXECUTION DETECTED — PRESERVE COMMITS AS UNACCEPTED CANDIDATE EVIDENCE — NO FURTHER PRODUCT MODIFICATION`.
 
-Continue unrelated W5/W6/W7 work only where its own gates remain independent. W8 stays last; no destructive/global cleanup before preservation gates.
+Do not delete, revert, squash, rebase, cherry-pick, force-push or rewrite the early DBP-004 commits. They are preserved evidence only, not accepted baselines. Only after a fresh independent DBP-002 PASS is recorded may Control Tower explicitly release DBP-004 and determine whether the preserved early candidate can be inspected under the newly authorized boundary.
+
+Continue unrelated W5/W6/W7 work only where its own gates remain independent and it does not modify or rely on the unauthorized DBP-004 state. W8 stays last; no destructive/global cleanup before preservation gates.
 
 ### Prohibitions
 
+No further DBP-004 Product Source, Tests, Entities, DbContext, Migrations, schema, seed, persistent-adapter or production-configuration changes until explicit Control Tower release after DBP-002 independent acceptance.
+
 No Production database/data/configuration/credentials. No Production secrets. Do not edit/delete/squash the existing ten migrations. No destructive migration/down-migration reliance. No merge to master, PR #69 merge, rebase, cherry-pick, force-push or history rewrite.
 
-No `OWNER DECISION REQUIRED` is active; the next action is an ordinary independent governance review on the isolated exact-head evidence.
+No `OWNER DECISION REQUIRED` is active; the next action is the already-authorized independent DBP-002 governance review on the isolated frozen checkpoint.
 
 ## MISSION-04
 
