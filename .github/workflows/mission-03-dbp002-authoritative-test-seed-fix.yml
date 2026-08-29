@@ -1,0 +1,167 @@
+name: MISSION-03 DBP-002 Authoritative Test Seed Fix
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+    paths:
+      - .github/workflows/mission-03-dbp002-authoritative-test-seed-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-authority-seeds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Move failing PostgreSQL fixtures to authoritative membership grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          sync = Path('TransportERP.Tests/SyncOperationPersistenceTests.cs')
+          s = sync.read_text()
+
+          old = '''        db.RolePermissions.Add(grant);
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            UserId = scope.Security.UserId, PermissionId = scope.PermissionId, IsAllowed = false,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Reason = "revoked during test",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();
+        var revoked = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            service.EnqueueSyncOperationAsync(command with { ClientOperationId = $"revoked-{Guid.NewGuid():N}" }, scope.Security));
+        Assert.Equal("PERMISSION_DENIED", revoked.Code);
+        db.UserPermissionOverrides.Remove(await db.UserPermissionOverrides.SingleAsync(x =>
+            x.UserId == scope.Security.UserId && x.PermissionId == scope.PermissionId));'''
+          new = '''        db.RolePermissions.Add(grant);
+        var membershipId = await db.Set<UserMembership>()
+            .Where(x => x.UserId == scope.Security.UserId && x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId)
+            .Select(x => x.Id)
+            .SingleAsync();
+        db.Set<UserPermissionGrant>().Add(new UserPermissionGrant
+        {
+            Id = Guid.NewGuid(), MembershipId = membershipId, UserId = scope.Security.UserId,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, PermissionId = scope.PermissionId,
+            Effect = "DENY", Status = "ACTIVE", ValidFrom = DateTimeOffset.UtcNow,
+            GrantedBy = scope.Security.UserId, CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow, ConcurrencyVersion = 1
+        });
+        await db.SaveChangesAsync();
+        var revoked = await Assert.ThrowsAsync<SyncRuleException>(() =>
+            service.EnqueueSyncOperationAsync(command with { ClientOperationId = $"revoked-{Guid.NewGuid():N}" }, scope.Security));
+        Assert.Equal("PERMISSION_DENIED", revoked.Code);
+        db.Set<UserPermissionGrant>().Remove(await db.Set<UserPermissionGrant>().SingleAsync(x =>
+            x.MembershipId == membershipId && x.PermissionId == scope.PermissionId && x.Effect == "DENY"));'''
+          if old not in s:
+              raise SystemExit('sync legacy deny block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        db.RolePermissions.Add(new RolePermission'''
+          new = '''        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        var membership = new UserMembership
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id,
+            ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+            CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+        };
+        db.Set<UserMembership>().Add(membership);
+        db.Set<UserRoleGrant>().Add(new UserRoleGrant
+        {
+            Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+            CompanyId = company.Id, BranchId = branch.Id, RoleId = role.Id,
+            Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+            CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
+        });
+        db.RolePermissions.Add(new RolePermission'''
+          if old not in s:
+              raise SystemExit('sync primary seed block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = scope.RoleId, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        await db.SaveChangesAsync();'''
+          new = '''        db.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id, RoleId = scope.RoleId, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        var membership = new UserMembership
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+            CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+        };
+        db.Set<UserMembership>().Add(membership);
+        db.Set<UserRoleGrant>().Add(new UserRoleGrant
+        {
+            Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, RoleId = scope.RoleId,
+            Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+            CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
+        });
+        await db.SaveChangesAsync();'''
+          if old not in s:
+              raise SystemExit('sync secondary user seed block not found')
+          s = s.replace(old, new, 1)
+          sync.write_text(s)
+
+          api = Path('TransportERP.Tests/ApiAuthenticationAndAuditTests.cs')
+          s = api.read_text()
+          old = '''            db.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+                CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            });
+            db.RolePermissions.Add(new RolePermission'''
+          new = '''            db.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
+                CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+            });
+            var membership = new UserMembership
+            {
+                Id = Guid.NewGuid(), UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id,
+                ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+                CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+            };
+            db.Set<UserMembership>().Add(membership);
+            db.Set<UserRoleGrant>().Add(new UserRoleGrant
+            {
+                Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+                CompanyId = company.Id, BranchId = branch.Id, RoleId = role.Id,
+                Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+                CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
+            });
+            db.RolePermissions.Add(new RolePermission'''
+          if old not in s:
+              raise SystemExit('HTTP authority seed block not found')
+          s = s.replace(old, new, 1)
+          api.write_text(s)
+          PY
+          git diff --check
+          git diff -- TransportERP.Tests/SyncOperationPersistenceTests.cs TransportERP.Tests/ApiAuthenticationAndAuditTests.cs
+          git add TransportERP.Tests/SyncOperationPersistenceTests.cs TransportERP.Tests/ApiAuthenticationAndAuditTests.cs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'MISSION-03 DBP-002: seed authoritative memberships in regression fixtures'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
