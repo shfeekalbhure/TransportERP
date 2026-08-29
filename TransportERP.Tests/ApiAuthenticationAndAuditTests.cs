@@ -335,6 +335,20 @@ public sealed class ApiAuthenticationAndAuditTests
                 UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
                 CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
             });
+            var membership = new UserMembership
+            {
+                Id = Guid.NewGuid(), UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id,
+                ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+                CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+            };
+            db.Set<UserMembership>().Add(membership);
+            db.Set<UserRoleGrant>().Add(new UserRoleGrant
+            {
+                Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+                CompanyId = company.Id, BranchId = branch.Id, RoleId = role.Id,
+                Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+                CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
+            });
             db.RolePermissions.Add(new RolePermission
             {
                 RoleId = role.Id, PermissionId = permission.Id, ScopeType = "BRANCH",

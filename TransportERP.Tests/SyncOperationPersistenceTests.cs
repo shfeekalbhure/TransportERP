@@ -76,19 +76,24 @@ public sealed class SyncOperationPersistenceTests
         Assert.Equal("PERMISSION_DENIED", claimOnly.Code);
 
         db.RolePermissions.Add(grant);
-        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        var membershipId = await db.Set<UserMembership>()
+            .Where(x => x.UserId == scope.Security.UserId && x.CompanyId == scope.CompanyId && x.BranchId == scope.BranchId)
+            .Select(x => x.Id)
+            .SingleAsync();
+        db.Set<UserPermissionGrant>().Add(new UserPermissionGrant
         {
-            UserId = scope.Security.UserId, PermissionId = scope.PermissionId, IsAllowed = false,
-            CompanyId = scope.CompanyId, BranchId = scope.BranchId, Reason = "revoked during test",
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-            RowVersion = Guid.NewGuid().ToByteArray()
+            Id = Guid.NewGuid(), MembershipId = membershipId, UserId = scope.Security.UserId,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, PermissionId = scope.PermissionId,
+            Effect = "DENY", Status = "ACTIVE", ValidFrom = DateTimeOffset.UtcNow,
+            GrantedBy = scope.Security.UserId, CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow, ConcurrencyVersion = 1
         });
         await db.SaveChangesAsync();
         var revoked = await Assert.ThrowsAsync<SyncRuleException>(() =>
             service.EnqueueSyncOperationAsync(command with { ClientOperationId = $"revoked-{Guid.NewGuid():N}" }, scope.Security));
         Assert.Equal("PERMISSION_DENIED", revoked.Code);
-        db.UserPermissionOverrides.Remove(await db.UserPermissionOverrides.SingleAsync(x =>
-            x.UserId == scope.Security.UserId && x.PermissionId == scope.PermissionId));
+        db.Set<UserPermissionGrant>().Remove(await db.Set<UserPermissionGrant>().SingleAsync(x =>
+            x.MembershipId == membershipId && x.PermissionId == scope.PermissionId && x.Effect == "DENY"));
 
         var otherBranch = new Branch
         {
@@ -309,6 +314,20 @@ public sealed class SyncOperationPersistenceTests
             UserId = user.Id, RoleId = role.Id, CompanyId = company.Id, BranchId = branch.Id,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
         });
+        var membership = new UserMembership
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, CompanyId = company.Id, BranchId = branch.Id,
+            ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+            CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+        };
+        db.Set<UserMembership>().Add(membership);
+        db.Set<UserRoleGrant>().Add(new UserRoleGrant
+        {
+            Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+            CompanyId = company.Id, BranchId = branch.Id, RoleId = role.Id,
+            Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+            CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
+        });
         db.RolePermissions.Add(new RolePermission
         {
             RoleId = role.Id, PermissionId = permission.Id, ScopeType = "BRANCH",
@@ -336,6 +355,20 @@ public sealed class SyncOperationPersistenceTests
         {
             UserId = user.Id, RoleId = scope.RoleId, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
             CreatedAt = now, UpdatedAt = now, RowVersion = Guid.NewGuid().ToByteArray()
+        });
+        var membership = new UserMembership
+        {
+            Id = Guid.NewGuid(), UserId = user.Id, CompanyId = scope.CompanyId, BranchId = scope.BranchId,
+            ScopeType = "BRANCH", Status = "ACTIVE", SecurityVersion = 1, ValidFrom = now,
+            CreatedAt = now, UpdatedAt = now, CreatedBy = user.Id, ConcurrencyVersion = 1
+        };
+        db.Set<UserMembership>().Add(membership);
+        db.Set<UserRoleGrant>().Add(new UserRoleGrant
+        {
+            Id = Guid.NewGuid(), MembershipId = membership.Id, UserId = user.Id,
+            CompanyId = scope.CompanyId, BranchId = scope.BranchId, RoleId = scope.RoleId,
+            Status = "ACTIVE", ValidFrom = now, GrantedBy = user.Id,
+            CreatedAt = now, UpdatedAt = now, ConcurrencyVersion = 1
         });
         await db.SaveChangesAsync();
         return user;
