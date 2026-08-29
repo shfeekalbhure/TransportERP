@@ -1,0 +1,75 @@
+name: MISSION-03 DBP-004 Candidate Generator
+
+on:
+  push:
+    branches:
+      - codex/mission-03-execution-20260828
+    paths:
+      - .github/workflows/mission-03-dbp004-generator.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate-dbp004:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transport_mission03_design
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transport_mission03_design"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transport_mission03_design;Username=postgres;Password=postgres;Include Error Detail=true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore migration project
+        run: dotnet restore TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+      - name: Build authoring head
+        run: dotnet build TransportERP.Infrastructure/TransportERP.Infrastructure.csproj -c Release --no-restore
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+      - name: Generate candidate migration 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mission-03-dbp004-generator
+          dotnet ef migrations has-pending-model-changes \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            > mission-03-dbp004-generator/pre-add-model-status.txt 2>&1 || true
+          if find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_GreenfieldAuditV2AndAtomicOutbox.cs' | grep -q .; then
+            echo 'candidate already present in branch' | tee mission-03-dbp004-generator/status.txt
+            exit 0
+          fi
+          dotnet ef migrations add GreenfieldAuditV2AndAtomicOutbox \
+            --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
+            --output-dir Persistence/Migrations \
+            | tee mission-03-dbp004-generator/ef-add.txt
+          git status --short | tee mission-03-dbp004-generator/status.txt
+          git diff -- TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs > mission-03-dbp004-generator/snapshot.diff
+          cp TransportERP.Infrastructure/Persistence/Migrations/*GreenfieldAuditV2AndAtomicOutbox*.cs mission-03-dbp004-generator/
+          cp TransportERP.Infrastructure/Persistence/Migrations/TransportErpDbContextModelSnapshot.cs mission-03-dbp004-generator/
+          sha256sum mission-03-dbp004-generator/* > mission-03-dbp004-generator/SHA256SUMS.txt
+      - name: Upload generated candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mission-03-dbp004-generator-${{ github.sha }}
+          path: mission-03-dbp004-generator
+          if-no-files-found: error
