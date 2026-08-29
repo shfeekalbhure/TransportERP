@@ -18,5 +18,6 @@ public sealed class TransportErpP2CombinedModelCustomizer(ModelCustomizerDepende
         TransportErpP2FinanceModel.Configure(modelBuilder);
         TransportErpP2ShippingModel.Configure(modelBuilder);
         TransportErpGreenfieldDbp002Model.Configure(modelBuilder);
+        TransportErpGreenfieldDbp004Model.Configure(modelBuilder);
     }
 }
