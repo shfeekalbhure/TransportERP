@@ -82,7 +82,7 @@ Verified with `git diff --stat origin/master..HEAD`. No deletion of governing do
 | Non-database regression | `dotnet test TransportERP.Tests --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"` | **117/117 passed** |
 | P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** (7 PostgreSQL tests skipped without connection string) |
 | P2-C01-D PostgreSQL integration tests | `TRANSPORTERP_TEST_CONNSTR=... dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01DArrivalPostgreSqlIntegrationTests"` | **14/14 passed** on local PostgreSQL 18.4 |
-| Exact-head CI — all gates | GitHub Actions run 33316798466 on `71d0470` | **SUCCESS** ✅ |
+| Exact-head CI — all gates | GitHub Actions run 33319460767 on `a22bdd3` | **SUCCESS** ✅ |
 | Exact-head CI — PostgreSQL/HTTP gate | GitHub Actions step `Run P2-C01-D PostgreSQL and HTTP gates` | **success** ✅ |
 | Exact-head CI — Desktop RTL | GitHub Actions job `Arrival Desktop RTL` | **success** ✅ |
 | EF model consistency | `dotnet ef migrations has-pending-model-changes` | **No pending changes** |
@@ -186,14 +186,14 @@ Changes made:
 
 ## 10. Recommendation
 
-The F1–F4 remediation, follow-up test-defect fixes, and authority-requested D closure coverage have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `a22bdd3`. Exact-head CI is green (run 33316798466), all locally-runnable gates are green, and the branch is now **ready for independent review and PR opening**.
+The F1–F4 remediation, follow-up test-defect fixes, and authority-requested D closure coverage have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `a22bdd3`. Exact-head CI is green (run 33319460767), all locally-runnable gates are green, and the branch is now **ready for independent review and PR opening**.
 
 **Next steps:**
 1. Supersede/close old PR #49.
 2. Open a new Pull Request from `kimi/p2-c01-d-remediation-20260830` to `master`.
 3. Ensure the PR description references:
    - Head SHA `a22bdd3`
-   - CI run `https://github.com/shfeekalbhure/TransportERP/actions/runs/33316798466`
+   - CI run `https://github.com/shfeekalbhure/TransportERP/actions/runs/33319460767`
    - The four original blockers (B1–B4) and the CI filter finding that were remediated
    - The D closure coverage added in `a22bdd3`
 4. Route the PR through owner/independent review per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`.
