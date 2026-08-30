@@ -1,0 +1,161 @@
+name: P2 C01 D arrival transit warehouse
+
+on:
+  push:
+    branches:
+      - feature/p2-c01-d-arrival-transit-warehouse-20260822
+      - kimi/p2-c01-d-remediation-20260830
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arrival-postgresql:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822' || github.head_ref == 'kimi/p2-c01-d-remediation-20260830'
+    name: Arrival + PostgreSQL + HTTP
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: transporterptest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d transporterptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout governed D head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact D head
+        shell: bash
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then expected="${{ github.event.pull_request.head.sha }}"; else expected="${{ github.sha }}"; fi
+          echo "actual=$actual"; echo "expected=$expected"
+          test "$actual" = "$expected" || { echo 'Not running on exact governed D head.'; exit 1; }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate closed P2-C01 contracts
+        run: python documentation/closeout/P2/validate_p2_c01_contracts.py
+
+      - name: Validate D phase boundary
+        shell: bash
+        run: |
+          git fetch origin master --depth=1
+          git diff --name-only origin/master...HEAD > /tmp/d_changed.txt
+          cat /tmp/d_changed.txt
+          if grep -Ev '^documentation/closeout/P2/' /tmp/d_changed.txt | grep -E '/(Delivery|ProofOfDelivery|POD|COD|Customs|Commission|Settlement|Fleet|GPS|Notification|ExceptionResolution)|(^|/)(Delivery|Customs|Commission|Settlement|Fleet|GPS|Notification)' ; then
+            echo 'P2-C01-D contains later-phase runtime.'
+            exit 1
+          fi
+
+      - name: Restore core tests
+        run: dotnet restore TransportERP.Tests/TransportERP.Tests.csproj
+
+      - name: Build core runtime and tests
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Run non-database regression
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+
+      - name: Require P2-C01-D migration to be committed
+        shell: bash
+        run: |
+          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01DArrivalTransitWarehouse.cs' ! -name '*.Designer.cs' | head -n 1)
+          test -n "$migration" || { echo 'P2-C01-D migration is missing from the branch.'; exit 1; }
+          echo "D migration: $migration"
+
+      - name: Verify EF model matches committed migration
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Rebuild after migration verification
+        run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
+
+      - name: Apply P1 A B C and D migrations to PostgreSQL 18
+        env:
+          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet ef database update --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
+
+      - name: Run P2-C01-D PostgreSQL and HTTP gates
+        env:
+          TRANSPORTERP_TEST_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+        run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01D"
+
+  arrival-desktop-rtl:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822' || github.head_ref == 'kimi/p2-c01-d-remediation-20260830'
+    name: Arrival Desktop RTL
+    runs-on: windows-latest
+    steps:
+      - name: Checkout governed D head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Verify exact D head
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          if ('${{ github.event_name }}' -eq 'pull_request') { $expected = '${{ github.event.pull_request.head.sha }}' } else { $expected = '${{ github.sha }}' }
+          Write-Host "actual=$actual"; Write-Host "expected=$expected"
+          if ($actual -ne $expected) { throw 'Desktop job is not running on exact governed D head.' }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore Desktop
+        run: dotnet restore TransportERP.Desktop/TransportERP.Desktop.csproj
+
+      - name: Build Desktop contract surface
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Debug --no-restore -p:OutputType=Library
+
+      - name: Confirm D RTL W3 architecture and phase boundary
+        shell: pwsh
+        run: |
+          $forms = 'TransportERP.Desktop/Waybills/ArrivalExecutionForms.cs'
+          $project = 'TransportERP.Desktop/TransportERP.Desktop.csproj'
+          foreach ($path in @($forms,$project)) { if (-not (Test-Path $path)) { throw "Required D Desktop file missing: $path" } }
+          $text = Get-Content $forms -Raw
+          $projectText = Get-Content $project -Raw
+          foreach ($id in @('SHP-017','SHP-018','SHP-031','SHP-032','SHP-033','SHP-034')) {
+            if ($text -notmatch [regex]::Escape($id)) { throw "Missing governed D screen id $id" }
+          }
+          $screenIds = [regex]::Matches($text, 'SHP-(\d{3})') | ForEach-Object { [int]$_.Groups[1].Value }
+          if ($screenIds | Where-Object { $_ -ge 35 }) { throw 'Later-phase SHP-035+ screen leaked into P2-C01-D.' }
+          if ($text -notmatch 'RightToLeft') { throw 'D forms do not inherit/use RTL architecture.' }
+          foreach ($token in @('DbContext','Npgsql','UseNpgsql','ExecuteSql','TransportERP.Infrastructure','Microsoft.Data.SqlClient')) {
+            if ($text -match [regex]::Escape($token)) { throw "Direct Desktop persistence token detected: $token" }
+          }
+          if ($projectText -match 'TransportERP.Application|TransportERP.Infrastructure') { throw 'Desktop must not reference Application/Infrastructure.' }
+          foreach ($required in @('ItemMovementResponse','WaybillMovementResponse','CloseTripRequest','RecordArrivalRequest','ReallocateTransitRequest','RecordUnloadRequest','FinalizeArrivalRequest','UNVALIDATED','CustodyBalance','OpenExceptions')) {
+            if ($text -notmatch [regex]::Escape($required)) { throw "Missing governed D W3 token: $required" }
+          }

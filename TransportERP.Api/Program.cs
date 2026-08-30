@@ -26,6 +26,7 @@ builder.Services.AddScoped<SyncOperationService>(services =>
 builder.Services.AddP2C01AWaybillFoundation();
 builder.Services.AddP2C01BWaybillFinance();
 builder.Services.AddP2C01CShippingExecution();
+builder.Services.AddP2C01DArrivalExecution();
 
 var jwtAuthority = builder.Configuration["Auth:Authority"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_AUTHORITY");
 var jwtIssuer = builder.Configuration["Auth:Issuer"] ?? Environment.GetEnvironmentVariable("TRANSPORTERP_JWT_ISSUER");
@@ -74,6 +75,7 @@ app.UseAuthorization();
 app.MapP2C01AWaybillFoundation();
 app.MapP2C01BWaybillFinance();
 app.MapP2C01CShippingExecution();
+app.MapP2C01DArrivalExecution();
 
 app.MapPost("/api/v1/sync/operations:batch", async (
     SyncBatchRequest request,

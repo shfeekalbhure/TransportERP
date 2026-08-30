@@ -140,7 +140,7 @@ public sealed class P2C01CShippingApiContractTests
     }
 
     [Fact]
-    public async Task C_does_not_expose_next_phase_runtime_endpoints()
+    public async Task C_does_not_expose_later_phase_runtime_endpoints()
     {
         var store = new RecordingShippingExecutionStore();
         using var factory = CreateFactory(store);
@@ -148,10 +148,9 @@ public sealed class P2C01CShippingApiContractTests
         var token = CreateToken(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "phase.next");
         var id = Guid.NewGuid();
 
-        var forbiddenLaterRoutes = new[]
+        // Routes for phases beyond P2-C01-D must not exist in the C contract surface.
+        var notFoundLaterRoutes = new[]
         {
-            $"/api/v1/arrivals/{id}:finalize",
-            $"/api/v1/trips/{id}:close",
             $"/api/v1/waybills/{id}/notifications",
             $"/api/v1/exceptions/{id}:resolve",
             $"/api/v1/trips/{id}/accruals:approve",
@@ -160,7 +159,7 @@ public sealed class P2C01CShippingApiContractTests
             $"/api/v1/deliveries/{id}:confirm"
         };
 
-        foreach (var path in forbiddenLaterRoutes)
+        foreach (var path in notFoundLaterRoutes)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, path)
             {
@@ -169,6 +168,34 @@ public sealed class P2C01CShippingApiContractTests
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var response = await client.SendAsync(request);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task C_does_not_allow_phase_next_token_to_access_D_endpoints()
+    {
+        var store = new RecordingShippingExecutionStore();
+        using var factory = CreateFactory(store);
+        using var client = factory.CreateClient();
+        var token = CreateToken(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "phase.next");
+        var id = Guid.NewGuid();
+
+        // P2-C01-D endpoints exist but must reject a token that only has the C phase.next permission.
+        var dRoutesRequiringOwnPermission = new[]
+        {
+            $"/api/v1/arrivals/{id}:finalize",
+            $"/api/v1/trips/{id}:close"
+        };
+
+        foreach (var path in dRoutesRequiringOwnPermission)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path)
+            {
+                Content = JsonContent.Create(new { })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
     }
 

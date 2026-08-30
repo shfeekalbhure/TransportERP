@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TransportERP.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using TransportERP.Infrastructure.Persistence;
 namespace TransportERP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransportErpDbContext))]
-    partial class TransportErpDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260830011249_P2C01DArrivalTransitWarehouse")]
+    partial class P2C01DArrivalTransitWarehouse
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2128,70 +2131,6 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("role_permissions", "transport_erp");
-                });
-
-            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ShipmentExceptionEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BranchId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamptz");
-
-                    b.Property<string>("ExceptionType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("ResolutionNotes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("TripId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamptz");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid?>("WaybillId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("WaybillItemId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TripId", "Status");
-
-                    b.HasIndex("CompanyId", "BranchId", "TripId", "Status");
-
-                    b.ToTable("shipment_exceptions", "transport_erp", t =>
-                        {
-                            t.HasCheckConstraint("ck_shipment_exception_severity", "\"Severity\" IN ('BLOCKING','WARNING','INFO')");
-
-                            t.HasCheckConstraint("ck_shipment_exception_status", "\"Status\" IN ('OPEN','RESOLVED')");
-                        });
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.SyncOperation", b =>
