@@ -452,7 +452,9 @@ public sealed class EfArrivalExecutionStore(TransportErpDbContext db, IWaybillAu
                     x.CompanyId == context.CompanyId && x.TripId == tripId && x.EventType == "UNLOAD")
                 .SumAsync(x => x.Quantity ?? 0m, ct);
             var custodyOpen = departed - accounted > 0.0001m;
-            ArrivalExecutionRules.EnsureTripClose(trip.Status, departed, accounted, custodyOpen, exceptionBlocked: false);
+            var exceptionBlocked = await db.Set<ShipmentExceptionEntity>().AsNoTracking().AnyAsync(x =>
+                x.CompanyId == context.CompanyId && x.TripId == tripId && x.Status == "OPEN" && x.Severity == "BLOCKING", ct);
+            ArrivalExecutionRules.EnsureTripClose(trip.Status, departed, accounted, custodyOpen, exceptionBlocked);
 
             var manifests = await Manifests.Where(x => x.TripId == tripId && x.CompanyId == context.CompanyId).ToListAsync(ct);
             foreach (var manifest in manifests)

@@ -46,3 +46,19 @@ public sealed class WarehouseHoldingEntity : P2Entity
     public string SourceClientOperationId { get; set; } = string.Empty;
     public WaybillItemEntity? WaybillItem { get; set; }
 }
+
+public sealed class ShipmentExceptionEntity : P2Entity
+{
+    public Guid CompanyId { get; set; }
+    public Guid BranchId { get; set; }
+    public Guid TripId { get; set; }
+    public Guid? WaybillId { get; set; }
+    public Guid? WaybillItemId { get; set; }
+    public string ExceptionType { get; set; } = string.Empty;
+    public string Severity { get; set; } = "BLOCKING";
+    public string Status { get; set; } = "OPEN";
+    public string? ResolutionNotes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public long Version { get; set; } = 1;
+}

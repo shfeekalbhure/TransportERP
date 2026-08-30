@@ -8,6 +8,7 @@ public static class TransportErpP2ArrivalModel
     {
         ConfigureReceipt(mb);
         ConfigureHolding(mb);
+        ConfigureException(mb);
         ExtendMovementScope(mb);
     }
 
@@ -71,6 +72,26 @@ public static class TransportErpP2ArrivalModel
         holding.HasIndex(x => x.WaybillItemId);
         holding.HasIndex(x => new { x.CompanyId, x.BranchId, x.WaybillItemId, x.LocationId, x.Status });
         holding.HasOne(x => x.WaybillItem).WithMany().HasForeignKey(x => x.WaybillItemId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureException(ModelBuilder mb)
+    {
+        var exception = mb.Entity<ShipmentExceptionEntity>();
+        exception.ToTable("shipment_exceptions", "transport_erp", t =>
+        {
+            t.HasCheckConstraint("ck_shipment_exception_severity", "\"Severity\" IN ('BLOCKING','WARNING','INFO')");
+            t.HasCheckConstraint("ck_shipment_exception_status", "\"Status\" IN ('OPEN','RESOLVED')");
+        });
+        exception.HasKey(x => x.Id);
+        exception.Property(x => x.ExceptionType).HasMaxLength(40).IsRequired();
+        exception.Property(x => x.Severity).HasMaxLength(20).IsRequired();
+        exception.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        exception.Property(x => x.ResolutionNotes).HasMaxLength(1000);
+        exception.Property(x => x.CreatedAt).HasColumnType("timestamptz");
+        exception.Property(x => x.UpdatedAt).HasColumnType("timestamptz");
+        exception.Property(x => x.Version).IsConcurrencyToken();
+        exception.HasIndex(x => new { x.CompanyId, x.BranchId, x.TripId, x.Status });
+        exception.HasIndex(x => new { x.TripId, x.Status });
     }
 
     private static void ExtendMovementScope(ModelBuilder mb)
