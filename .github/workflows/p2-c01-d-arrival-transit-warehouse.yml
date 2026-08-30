@@ -4,17 +4,18 @@ on:
   push:
     branches:
       - feature/p2-c01-d-arrival-transit-warehouse-20260822
+      - kimi/p2-c01-d-remediation-20260830
   pull_request:
     branches:
       - master
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   arrival-postgresql:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822'
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822' || github.head_ref == 'kimi/p2-c01-d-remediation-20260830'
     name: Arrival + PostgreSQL + HTTP
     runs-on: ubuntu-latest
     services:
@@ -82,40 +83,19 @@ jobs:
       - name: Install EF CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.0
 
-      - name: Generate governed D migration when needed
-        env:
-          TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
+      - name: Require P2-C01-D migration to be committed
         shell: bash
         run: |
           migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01DArrivalTransitWarehouse.cs' ! -name '*.Designer.cs' | head -n 1)
-          if [ -z "$migration" ]; then
-            dotnet ef migrations add P2C01DArrivalTransitWarehouse \
-              --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
-              --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj \
-              --output-dir Persistence/Migrations
-          fi
-          migration=$(find TransportERP.Infrastructure/Persistence/Migrations -maxdepth 1 -type f -name '*_P2C01DArrivalTransitWarehouse.cs' ! -name '*.Designer.cs' | head -n 1)
-          test -n "$migration" || { echo 'P2-C01-D migration is missing.'; exit 1; }
+          test -n "$migration" || { echo 'P2-C01-D migration is missing from the branch.'; exit 1; }
           echo "D migration: $migration"
 
-      - name: Verify EF model matches migration
+      - name: Verify EF model matches committed migration
         env:
           TRANSPORTERP_DESIGN_CONNSTR: Host=localhost;Port=5432;Database=transporterptest;Username=postgres;Password=postgres
         run: dotnet ef migrations has-pending-model-changes --project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj --startup-project TransportERP.Infrastructure/TransportERP.Infrastructure.csproj
 
-      - name: Persist EF-generated D migration to branch
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add TransportERP.Infrastructure/Persistence/Migrations
-          if ! git diff --cached --quiet; then
-            git commit -m 'db: generate P2-C01-D arrival transit warehouse migration'
-            git push origin HEAD:${{ github.head_ref }}
-          fi
-
-      - name: Rebuild after migration generation
+      - name: Rebuild after migration verification
         run: dotnet build TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-restore
 
       - name: Apply P1 A B C and D migrations to PostgreSQL 18
@@ -129,7 +109,7 @@ jobs:
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01D"
 
   arrival-desktop-rtl:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822'
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-d-arrival-transit-warehouse-20260822' || github.head_ref == 'kimi/p2-c01-d-remediation-20260830'
     name: Arrival Desktop RTL
     runs-on: windows-latest
     steps:
