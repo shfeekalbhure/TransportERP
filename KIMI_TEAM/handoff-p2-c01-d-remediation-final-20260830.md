@@ -9,7 +9,7 @@
 **Original Head SHA:** `0922d54452f04f27ffc6b5f604cbc17fbf1f0840 fix(p2-c01-d): add missing migration and secure workflow`  
 **Date:** 2026-08-30  
 **Team:** KIMI-01 / KIMI-02 / KIMI-03 / KIMI-04 / KIMI-05 / KIMI-06  
-**Status:** `REMEDIATION_PUSHED_AWAITING_CI`
+**Status:** `READY_FOR_REVIEW`
 
 ---
 
@@ -20,7 +20,7 @@ The P2-C01-D remediation branch has been updated to address the four material bl
 **CI history:**
 - `d51e690` CI reached the PostgreSQL gate but the new D PostgreSQL tests returned 1 PASS / 6 FAIL. Root cause analysis showed the failures were caused by test-data/test-expectation defects, not product runtime bugs.
 - `e062922` applied those fixes plus a `CS0108` cleanup and a `CloseTrip` exception-mapping fix. CI still failed because the reallocate test had two remaining defects: the next trip was not route-compatible with the transit holding, and the assertion counted REALLOCATE events against the wrong trip.
-- `71d0470` fixes the reallocate test route setup and assertion. Local PostgreSQL verification shows all 7 D PostgreSQL integration tests now PASS. The branch is now awaiting fresh exact-head CI evidence on `71d0470`.
+- `71d0470` fixes the reallocate test route setup and assertion. GitHub Actions on `71d0470` completed successfully: all CI gates green, including `Run P2-C01-D PostgreSQL and HTTP gates` and `Arrival Desktop RTL`.
 
 ---
 
@@ -80,6 +80,9 @@ Verified with `git diff --stat origin/master..HEAD`. No deletion of governing do
 | Non-database regression | `dotnet test TransportERP.Tests --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"` | **117/117 passed** |
 | P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** (7 PostgreSQL tests skipped without connection string) |
 | P2-C01-D PostgreSQL integration tests | `TRANSPORTERP_TEST_CONNSTR=... dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01DArrivalPostgreSqlIntegrationTests"` | **7/7 passed** on local PostgreSQL 18.4 |
+| Exact-head CI — all gates | GitHub Actions run 33316798466 on `71d0470` | **SUCCESS** ✅ |
+| Exact-head CI — PostgreSQL/HTTP gate | GitHub Actions step `Run P2-C01-D PostgreSQL and HTTP gates` | **success** ✅ |
+| Exact-head CI — Desktop RTL | GitHub Actions job `Arrival Desktop RTL` | **success** ✅ |
 | EF model consistency | `dotnet ef migrations has-pending-model-changes` | **No pending changes** |
 | D migration exists | `find TransportERP.Infrastructure/Persistence/Migrations -name '*P2C01DArrivalTransitWarehouse.cs'` | **Found** |
 | Exception migration exists | `find TransportERP.Infrastructure/Persistence/Migrations -name '*P2C01DShipmentException.cs'` | **Found** |
@@ -157,9 +160,7 @@ Changes made:
 
 | Risk | Status | Notes |
 |---|---|---|
-| Exact-head CI — PostgreSQL gates | **Pending / locally green** | All 7 D PostgreSQL integration tests PASS on local PostgreSQL 18.4. GitHub Actions on `71d0470` is the authoritative verifier. |
-| Exact-head CI — EF/migration gates | **Pending** | `Require P2-C01-D migration`, `Verify EF model matches committed migration`, and `Apply migrations to PostgreSQL 18` must run and pass on the new head `71d0470`. |
-| Exact-head CI — Desktop RTL | **Pending / historically green** | `Arrival Desktop RTL` job was green on `d51e690` and `e062922`; must remain green on `71d0470`. |
+| Exact-head CI — all gates | **CLOSED ✅** | GitHub Actions run 33316798466 on `71d0470` concluded `success`; all steps including PostgreSQL/HTTP and Desktop RTL passed. |
 | Independent review | **Pending** | Per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`, owner/reviewer review required before merge. |
 | PR #49 | **Pending** | Old PR #49 (`OPEN / DRAFT / UNMERGED`) must be superseded/closed and a new PR opened from `kimi/p2-c01-d-remediation-20260830`. |
 | D closure coverage | **Incomplete** | F3 provides a starter PostgreSQL suite. Full D closure per authority requires additional tests: true concurrent unload race, holding-allocation race, same-company cross-branch negative, cross-company negative, raw PostgreSQL UPDATE/DELETE append-only rejection, atomic movement + holding proof, and movement reconstruction across C+D. |
@@ -182,18 +183,16 @@ Changes made:
 
 ## 10. Recommendation
 
-The F1–F4 remediation and the follow-up test-defect fixes have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `71d0470`. All locally-runnable gates are green, including the 7 D PostgreSQL integration tests on a local PostgreSQL 18.4 instance, but the branch is **not yet independently PR-ready** because exact-head CI has not run on the new commit.
+The F1–F4 remediation and the follow-up test-defect fixes have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `71d0470`. Exact-head CI is green (run 33316798466), all locally-runnable gates are green, and the branch is now **ready for independent review and PR opening**.
 
 **Next steps:**
-1. Allow GitHub Actions to complete on `71d0470`.
-2. Verify all CI gates pass:
-   - `Require P2-C01-D migration to be committed`
-   - `Verify EF model matches committed migration`
-   - `Apply P1 A B C and D migrations to PostgreSQL 18`
-   - `Run P2-C01-D PostgreSQL and HTTP gates` (must show new 7 PostgreSQL tests passing)
-   - `Arrival Desktop RTL`
-3. If the PostgreSQL gate is green, evaluate whether the current 7-test suite is sufficient for D closure or whether the authority-required coverage (concurrency, cross-branch, cross-company, append-only raw DB, atomicity, movement reconstruction) must be added before PR.
-4. Supersede/close old PR #49.
-5. Open a new Pull Request from `kimi/p2-c01-d-remediation-20260830` to `master`.
+1. Supersede/close old PR #49.
+2. Open a new Pull Request from `kimi/p2-c01-d-remediation-20260830` to `master`.
+3. Ensure the PR description references:
+   - Head SHA `71d0470`
+   - CI run `https://github.com/shfeekalbhure/TransportERP/actions/runs/33316798466`
+   - The four original blockers (B1–B4) and the CI filter finding that were remediated
+   - The remaining D closure coverage gap if the owner wants full authority coverage before merge
+4. Route the PR through owner/independent review per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`.
 
 **Do not merge the old `origin/feature/p2-c01-d-arrival-transit-warehouse-20260822` branch** — it is superseded by this remediation branch.
