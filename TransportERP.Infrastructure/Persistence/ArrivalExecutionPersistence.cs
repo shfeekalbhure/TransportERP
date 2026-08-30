@@ -46,6 +46,8 @@ public sealed class EfArrivalExecutionStore(TransportErpDbContext db, IWaybillAu
             await EnsureActiveBranch(context, ct);
             var trip = await Trips.SingleOrDefaultAsync(x => x.Id == tripId && x.CompanyId == context.CompanyId, ct)
                 ?? throw new WaybillPersistenceException("NOT_FOUND");
+            if (trip.BranchId != context.BranchId)
+                throw new WaybillPersistenceException("SCOPE_DENIED");
             var stop = await Stops.SingleOrDefaultAsync(x => x.TripId == tripId && x.LocationId == request.LocationId, ct);
             ArrivalExecutionRules.EnsureRecordArrival(trip.Status, trip.DestinationId, request.LocationId, stop is not null);
             if (stop is not null && stop.Status is not "PLANNED" and not "DEPARTED")

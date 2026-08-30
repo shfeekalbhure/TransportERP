@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using TransportERP.Application.Waybills;
 using TransportERP.Contracts.Core;
 using TransportERP.Contracts.Waybills;
@@ -437,6 +438,317 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         db.Set<WaybillEntity>().Add(waybill); db.Set<WaybillItemEntity>().Add(item);
         await db.SaveChangesAsync();
         return new ShippingScope(company.Id, branch.Id, user.Id, currency.Id, waybill.Id, item.Id, origin, destination, Guid.Empty, Guid.Empty, Guid.Empty);
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Concurrent_unload_on_same_line_is_serialized()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D7", quantity: 10m);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+
+        ArrivalReceiptResponse receipt;
+        await using (var db = CreateP2Db(connection))
+        {
+            receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+        }
+
+        var line = receipt.Lines[0];
+        var input = new ArrivalUnloadLineInput(line.ManifestLineId, 5m, 0m, null, null, null);
+        var occurredAt = DateTimeOffset.UtcNow;
+
+        var t1 = Task.Run(async () =>
+        {
+            try
+            {
+                await using var db = CreateP2Db(connection);
+                return await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+                    new RecordUnloadRequest([input], occurredAt, $"unload-a-{Guid.NewGuid():N}"));
+            }
+            catch
+            {
+                return null;
+            }
+        });
+
+        var t2 = Task.Run(async () =>
+        {
+            try
+            {
+                await using var db = CreateP2Db(connection);
+                return await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+                    new RecordUnloadRequest([input], occurredAt, $"unload-b-{Guid.NewGuid():N}"));
+            }
+            catch
+            {
+                return null;
+            }
+        });
+
+        var results = await Task.WhenAll(t1, t2);
+        var successCount = results.Count(r => r is not null);
+
+        await using var verify = CreateP2Db(connection);
+        var actualTotal = await verify.Set<MovementEventEntity>()
+            .Where(x => x.TripId == scope.TripId && x.EventType == "UNLOAD")
+            .SumAsync(x => x.Quantity ?? 0m);
+
+        Assert.True(successCount >= 1, "At least one concurrent unload should succeed.");
+        Assert.True(actualTotal <= 10m, "Concurrent unload must not over-account cargo.");
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Concurrent_reallocate_on_same_holding_is_serialized()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D8", quantity: 10m);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var transitLocationId = Guid.NewGuid();
+
+        await using (var seed = CreateP2Db(connection))
+        {
+            seed.Set<TripStopEntity>().Add(new TripStopEntity
+            {
+                Id = Guid.NewGuid(), TripId = scope.TripId, StopNo = 1,
+                LocationId = transitLocationId, Status = "PLANNED"
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        ArrivalReceiptResponse receipt;
+        await using (var db = CreateP2Db(connection))
+        {
+            receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
+                new RecordArrivalRequest(scope.ManifestId, transitLocationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var line = receipt.Lines[0];
+            receipt = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+                new RecordUnloadRequest(
+                    [new ArrivalUnloadLineInput(line.ManifestLineId, 10m, 0m, "NONE", null, null)],
+                    DateTimeOffset.UtcNow, $"unload-{Guid.NewGuid():N}"));
+        }
+
+        var nextTrip = await CreateNextTripAsync(connection, context, transitLocationId);
+        WarehouseHoldingEntity holding;
+        await using (var db = CreateP2Db(connection))
+        {
+            holding = await db.Set<WarehouseHoldingEntity>().AsNoTracking().SingleAsync(x => x.WaybillItemId == scope.ItemId);
+        }
+
+        var t1 = Task.Run(async () =>
+        {
+            try
+            {
+                await using var db = CreateP2Db(connection);
+                return await CreateService(db).ReallocateTransitAsync(context, holding.Id,
+                    new ReallocateTransitRequest(nextTrip.Id, 10m, $"realloc-a-{Guid.NewGuid():N}"));
+            }
+            catch
+            {
+                return null;
+            }
+        });
+
+        var t2 = Task.Run(async () =>
+        {
+            try
+            {
+                await using var db = CreateP2Db(connection);
+                return await CreateService(db).ReallocateTransitAsync(context, holding.Id,
+                    new ReallocateTransitRequest(nextTrip.Id, 10m, $"realloc-b-{Guid.NewGuid():N}"));
+            }
+            catch
+            {
+                return null;
+            }
+        });
+
+        var results = await Task.WhenAll(t1, t2);
+        var successCount = results.Count(r => r is not null);
+
+        await using var verify = CreateP2Db(connection);
+        var reallocatedTotal = await verify.Set<MovementEventEntity>()
+            .Where(x => x.TripId == nextTrip.Id && x.EventType == "REALLOCATE")
+            .SumAsync(x => x.Quantity ?? 0m);
+
+        Assert.True(successCount >= 1, "At least one concurrent reallocate should succeed.");
+        Assert.True(reallocatedTotal <= 10m, "Concurrent reallocate must not over-allocate holding.");
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Cross_company_access_is_rejected()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D9", quantity: 10m);
+
+        var otherScope = await SeedApprovedWaybillAsync(CreateP2Db(connection), "D9-OTHER", 1m);
+        var otherContext = new OperationContext(otherScope.UserId, otherScope.CompanyId, otherScope.BranchId, Guid.NewGuid());
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).RecordArrivalAsync(otherContext, scope.TripId,
+                    new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}")));
+            Assert.Equal("NOT_FOUND", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Same_company_cross_branch_access_is_rejected()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D10", quantity: 10m);
+
+        Guid otherBranchId;
+        await using (var db = CreateP2Db(connection))
+        {
+            var otherBranch = new Branch
+            {
+                Id = Guid.NewGuid(), CompanyId = scope.CompanyId, Code = "BR02",
+                NameAr = "فرع ثانٍ", Timezone = "Asia/Aden", Status = "ACTIVE",
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            db.Branches.Add(otherBranch);
+            await db.SaveChangesAsync();
+            otherBranchId = otherBranch.Id;
+        }
+
+        var otherBranchContext = new OperationContext(scope.UserId, scope.CompanyId, otherBranchId, Guid.NewGuid());
+        await using (var db = CreateP2Db(connection))
+        {
+            var ex = await Assert.ThrowsAsync<WaybillPersistenceException>(() =>
+                CreateService(db).RecordArrivalAsync(otherBranchContext, scope.TripId,
+                    new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}")));
+            Assert.Equal("SCOPE_DENIED", ex.Code);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Movement_events_reject_raw_update_and_delete()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D11", quantity: 10m);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+
+        ArrivalReceiptResponse receipt;
+        await using (var db = CreateP2Db(connection))
+        {
+            receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+        }
+
+        Guid movementId;
+        await using (var db = CreateP2Db(connection))
+        {
+            movementId = await db.Set<MovementEventEntity>()
+                .Where(x => x.TripId == scope.TripId && x.EventType == "ARRIVE")
+                .Select(x => x.Id)
+                .SingleAsync();
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var updateEx = await Assert.ThrowsAsync<PostgresException>(() =>
+                db.Database.ExecuteSqlRawAsync(
+                    "UPDATE transport_erp.movement_events SET \"Quantity\" = 999 WHERE \"Id\" = {0}",
+                    movementId));
+            Assert.Equal("55000", updateEx.SqlState);
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var deleteEx = await Assert.ThrowsAsync<PostgresException>(() =>
+                db.Database.ExecuteSqlRawAsync(
+                    "DELETE FROM transport_erp.movement_events WHERE \"Id\" = {0}",
+                    movementId));
+            Assert.Equal("55000", deleteEx.SqlState);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Unload_creates_movement_and_holding_atomically()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D12", quantity: 10m);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+
+        ArrivalReceiptResponse receipt;
+        await using (var db = CreateP2Db(connection))
+        {
+            receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var line = receipt.Lines[0];
+            _ = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+                new RecordUnloadRequest(
+                    [new ArrivalUnloadLineInput(line.ManifestLineId, 10m, 0m, "NONE", null, null)],
+                    DateTimeOffset.UtcNow, $"unload-{Guid.NewGuid():N}"));
+        }
+
+        await using var verify = CreateP2Db(connection);
+        Assert.Equal(1, await verify.Set<MovementEventEntity>().CountAsync(x =>
+            x.TripId == scope.TripId && x.EventType == "UNLOAD"));
+        Assert.Equal(1, await verify.Set<WarehouseHoldingEntity>().CountAsync(x =>
+            x.WaybillItemId == scope.ItemId && x.HoldingType == "DESTINATION" && x.Status == "AVAILABLE"));
+    }
+
+    [Fact]
+    [Trait("Category", "P2PostgreSQL")]
+    public async Task Item_movement_reconstructs_across_C_and_D()
+    {
+        var connection = RequireConnection();
+        await EnsureMigratedAsync(connection);
+        var scope = await SeedDepartedTripAsync(connection, "D13", quantity: 10m);
+        var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+
+        ArrivalReceiptResponse receipt;
+        await using (var db = CreateP2Db(connection))
+        {
+            receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var line = receipt.Lines[0];
+            _ = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+                new RecordUnloadRequest(
+                    [new ArrivalUnloadLineInput(line.ManifestLineId, 10m, 0m, "NONE", null, null)],
+                    DateTimeOffset.UtcNow, $"unload-{Guid.NewGuid():N}"));
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var movement = await db.Set<MovementEventEntity>()
+                .Where(x => x.WaybillItemId == scope.ItemId && x.CompanyId == scope.CompanyId)
+                .OrderBy(x => x.OccurredAt)
+                .ToListAsync();
+
+            var eventTypes = movement.Select(x => x.EventType).ToList();
+            Assert.Contains("DEPART", eventTypes);
+            Assert.Contains("ARRIVE", eventTypes);
+            Assert.Contains("UNLOAD", eventTypes);
+        }
     }
 
     private sealed record ShippingScope(
