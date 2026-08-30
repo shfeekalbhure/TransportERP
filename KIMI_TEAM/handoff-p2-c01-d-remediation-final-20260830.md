@@ -80,7 +80,7 @@ Verified with `git diff --stat origin/master..HEAD`. No deletion of governing do
 |---|---|---|
 | Build | `dotnet build TransportERP.Tests/TransportERP.Tests.csproj --no-restore` | **Succeeded, 0 errors** |
 | Non-database regression | `dotnet test TransportERP.Tests --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"` | **117/117 passed** |
-| P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** (7 PostgreSQL tests skipped without connection string) |
+| P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** locally (14 PostgreSQL integration tests skipped without connection string); CI with `TRANSPORTERP_TEST_CONNSTR` ran **40/40 PASS** |
 | P2-C01-D PostgreSQL integration tests | `TRANSPORTERP_TEST_CONNSTR=... dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01DArrivalPostgreSqlIntegrationTests"` | **14/14 passed** on local PostgreSQL 18.4 |
 | Exact-head CI — all gates | GitHub Actions run 33319460767 on `a22bdd3` | **SUCCESS** ✅ |
 | Exact-head CI — PostgreSQL/HTTP gate | GitHub Actions step `Run P2-C01-D PostgreSQL and HTTP gates` | **success** ✅ |
@@ -163,10 +163,10 @@ Changes made:
 
 | Risk | Status | Notes |
 |---|---|---|
-| Exact-head CI — all gates | **CLOSED ✅** | GitHub Actions run 33316798466 on `71d0470` concluded `success`; all steps including PostgreSQL/HTTP and Desktop RTL passed. |
+| Exact-head CI — all gates | **CLOSED ✅** | GitHub Actions run 33319460767 on `a22bdd3` concluded `success`; all steps including PostgreSQL/HTTP and Desktop RTL passed. |
 | Independent review | **Pending** | Per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`, owner/reviewer review required before merge. |
 | PR #49 | **Pending** | Old PR #49 (`OPEN / DRAFT / UNMERGED`) must be superseded/closed and a new PR opened from `kimi/p2-c01-d-remediation-20260830`. |
-| D closure coverage | **CLOSED ✅** | All authority-requested closure tests added in `a22bdd3` and verified locally: concurrent unload race, holding-allocation race, same-company cross-branch negative, cross-company negative, raw PostgreSQL UPDATE/DELETE append-only rejection, atomic movement + holding proof, and movement reconstruction across C+D. |
+| D closure coverage | **CLOSED ✅** | All authority-requested closure tests added in `a22bdd3` and verified locally: concurrent unload race, holding-allocation race, same-company cross-branch negative, cross-company negative, raw PostgreSQL UPDATE/DELETE append-only rejection, atomic movement + holding persistence, and movement reconstruction across C+D. Note: the atomicity test verifies positive co-creation inside one Serializable transaction; independent failure-path rollback injection is not covered. |
 
 ---
 
