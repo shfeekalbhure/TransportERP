@@ -58,7 +58,4 @@ public sealed class ShipmentExceptionEntity : P2Entity
     public string Severity { get; set; } = "BLOCKING";
     public string Status { get; set; } = "OPEN";
     public string? ResolutionNotes { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public long Version { get; set; } = 1;
 }

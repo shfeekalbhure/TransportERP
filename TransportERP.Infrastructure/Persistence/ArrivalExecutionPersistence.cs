@@ -454,7 +454,14 @@ public sealed class EfArrivalExecutionStore(TransportErpDbContext db, IWaybillAu
             var custodyOpen = departed - accounted > 0.0001m;
             var exceptionBlocked = await db.Set<ShipmentExceptionEntity>().AsNoTracking().AnyAsync(x =>
                 x.CompanyId == context.CompanyId && x.TripId == tripId && x.Status == "OPEN" && x.Severity == "BLOCKING", ct);
-            ArrivalExecutionRules.EnsureTripClose(trip.Status, departed, accounted, custodyOpen, exceptionBlocked);
+            try
+            {
+                ArrivalExecutionRules.EnsureTripClose(trip.Status, departed, accounted, custodyOpen, exceptionBlocked);
+            }
+            catch (ArrivalExecutionRuleException ex)
+            {
+                throw new WaybillPersistenceException(ex.Code, ex);
+            }
 
             var manifests = await Manifests.Where(x => x.TripId == tripId && x.CompanyId == context.CompanyId).ToListAsync(ct);
             foreach (var manifest in manifests)

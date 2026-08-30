@@ -67,9 +67,10 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         await using (var db = CreateP2Db(connection))
         {
             var line = receipt.Lines[0];
+            var evidenceId = Guid.NewGuid();
             _ = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
                 new RecordUnloadRequest(
-                    [new ArrivalUnloadLineInput(line.ManifestLineId, 8m, 1m, "SHORT_AND_DAMAGE", null, "notes")],
+                    [new ArrivalUnloadLineInput(line.ManifestLineId, 8m, 1m, "SHORT_AND_DAMAGE", evidenceId, "notes")],
                     DateTimeOffset.UtcNow,
                     $"unload-{Guid.NewGuid():N}"));
         }
@@ -91,12 +92,26 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         await EnsureMigratedAsync(connection);
         var scope = await SeedDepartedTripAsync(connection, "D3", quantity: 10m);
         var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
+        var transitLocationId = Guid.NewGuid();
+
+        await using (var seed = CreateP2Db(connection))
+        {
+            seed.Set<TripStopEntity>().Add(new TripStopEntity
+            {
+                Id = Guid.NewGuid(),
+                TripId = scope.TripId,
+                StopNo = 1,
+                LocationId = transitLocationId,
+                Status = "PLANNED"
+            });
+            await seed.SaveChangesAsync();
+        }
 
         ArrivalReceiptResponse receipt;
         await using (var db = CreateP2Db(connection))
         {
             receipt = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
-                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
+                new RecordArrivalRequest(scope.ManifestId, transitLocationId, DateTimeOffset.UtcNow, $"arrival-{Guid.NewGuid():N}"));
         }
 
         await using (var db = CreateP2Db(connection))
@@ -113,6 +128,7 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         await using (var db = CreateP2Db(connection))
         {
             var holding = await db.Set<WarehouseHoldingEntity>().AsNoTracking().SingleAsync(x => x.WaybillItemId == scope.ItemId);
+            Assert.Equal("TRANSIT", holding.HoldingType);
             _ = await CreateService(db).ReallocateTransitAsync(context, holding.Id,
                 new ReallocateTransitRequest(nextTrip.Id, 10m, $"reallocate-{Guid.NewGuid():N}"));
         }
@@ -141,7 +157,7 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         await using (var db = CreateP2Db(connection))
         {
             var line = receipt.Lines[0];
-            _ = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
+            receipt = await CreateService(db).RecordUnloadAsync(context, receipt.Id,
                 new RecordUnloadRequest(
                     [new ArrivalUnloadLineInput(line.ManifestLineId, 10m, 0m, "NONE", null, null)],
                     DateTimeOffset.UtcNow,
@@ -216,19 +232,20 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         var scope = await SeedDepartedTripAsync(connection, "D6", quantity: 10m);
         var context = new OperationContext(scope.UserId, scope.CompanyId, scope.BranchId, Guid.NewGuid());
         var opId = $"arrival-{Guid.NewGuid():N}";
+        var receivedAt = DateTimeOffset.UtcNow;
 
         ArrivalReceiptResponse first;
         await using (var db = CreateP2Db(connection))
         {
             first = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
-                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, opId));
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, receivedAt, opId));
         }
 
         ArrivalReceiptResponse replay;
         await using (var db = CreateP2Db(connection))
         {
             replay = await CreateService(db).RecordArrivalAsync(context, scope.TripId,
-                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, DateTimeOffset.UtcNow, opId));
+                new RecordArrivalRequest(scope.ManifestId, scope.DestinationId, receivedAt, opId));
         }
 
         Assert.Equal(first.Id, replay.Id);
@@ -263,7 +280,7 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
             CreateToken(scope.UserId, scope.CompanyId, Guid.NewGuid(), ArrivalExecutionPermissionCodes.RecordArrival));
         var scoped = await client.PostAsJsonAsync($"/api/v1/trips/{scope.TripId}/arrivals",
             body with { ClientOperationId = $"wrong-branch-{Guid.NewGuid():N}" });
-        Assert.Equal(HttpStatusCode.NotFound, scoped.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, scoped.StatusCode);
     }
 
     private static ArrivalExecutionApplicationService CreateService(TransportErpDbContext db)
