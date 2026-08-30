@@ -124,7 +124,7 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
                     $"unload-{Guid.NewGuid():N}"));
         }
 
-        var nextTrip = await CreateNextTripAsync(connection, context);
+        var nextTrip = await CreateNextTripAsync(connection, context, transitLocationId);
         await using (var db = CreateP2Db(connection))
         {
             var holding = await db.Set<WarehouseHoldingEntity>().AsNoTracking().SingleAsync(x => x.WaybillItemId == scope.ItemId);
@@ -135,7 +135,7 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
 
         await using var verify = CreateP2Db(connection);
         Assert.Equal(1, await verify.Set<MovementEventEntity>().CountAsync(x =>
-            x.TripId == scope.TripId && x.EventType == "REALLOCATE"));
+            x.TripId == nextTrip.Id && x.EventType == "REALLOCATE"));
     }
 
     [Fact]
@@ -377,14 +377,13 @@ public sealed class P2C01DArrivalPostgreSqlIntegrationTests
         return scope with { TripId = trip.Id, ManifestId = accepted.Id, ManifestLineId = manifest.Lines[0].Id };
     }
 
-    private static async Task<TripResponse> CreateNextTripAsync(string connection, OperationContext context)
+    private static async Task<TripResponse> CreateNextTripAsync(string connection, OperationContext context, Guid originLocationId)
     {
         await using var db = CreateP2Db(connection);
-        var origin = Guid.NewGuid();
         var destination = Guid.NewGuid();
         return await CreateShippingService(db).CreateTripAsync(context,
             new CreateTripRequest($"TR-NEXT-{Guid.NewGuid():N}"[..20], Guid.NewGuid(), context.UserId,
-                origin, destination, DateTimeOffset.UtcNow.AddHours(1), [],
+                originLocationId, destination, DateTimeOffset.UtcNow.AddHours(1), [],
                 $"next-trip-{Guid.NewGuid():N}"));
     }
 
