@@ -4,8 +4,8 @@
 **Branch Name:** `kimi/p2-c01-d-remediation-20260830`  
 **Source Branch:** `origin/feature/p2-c01-d-arrival-transit-warehouse-20260822`  
 **Base:** `origin/master` (`2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`)  
-**Head SHA:** `e062922 P2-C01-D remediation: fix PostgreSQL test defects and CS0108 warnings`  
-**Previous Head SHA:** `d51e690c6803570d536d7a3f67c20db5416d15e1 P2-C01-D remediation: close F1-F4 blockers`  
+**Head SHA:** `71d0470 P2-C01-D remediation: fix reallocate test route assertion`  
+**Previous Head SHA:** `e06292288ca3fa1077e29428afc153f755c0d446 P2-C01-D remediation: fix PostgreSQL test defects and CS0108 warnings`  
 **Original Head SHA:** `0922d54452f04f27ffc6b5f604cbc17fbf1f0840 fix(p2-c01-d): add missing migration and secure workflow`  
 **Date:** 2026-08-30  
 **Team:** KIMI-01 / KIMI-02 / KIMI-03 / KIMI-04 / KIMI-05 / KIMI-06  
@@ -15,11 +15,12 @@
 
 ## 1. Summary
 
-The P2-C01-D remediation branch has been updated to address the four material blockers identified in the independent review (`p2-c01-d-independent-review-response-20260830.md`), plus the additional test defects and source warnings discovered when exact-head CI executed on `d51e690`. The branch builds successfully, contains the required EF migrations, has a hardened workflow without auto-push permissions, and all locally-runnable tests pass. The final verdict now depends on exact-head CI execution on the new head `e062922`.
+The P2-C01-D remediation branch has been updated to address the four material blockers identified in the independent review (`p2-c01-d-independent-review-response-20260830.md`), plus the additional test defects and source warnings discovered when exact-head CI executed on `d51e690`. The branch builds successfully, contains the required EF migrations, has a hardened workflow without auto-push permissions, and all locally-runnable tests pass.
 
 **CI history:**
 - `d51e690` CI reached the PostgreSQL gate but the new D PostgreSQL tests returned 1 PASS / 6 FAIL. Root cause analysis showed the failures were caused by test-data/test-expectation defects, not product runtime bugs.
-- `e062922` applies those fixes plus a `CS0108` cleanup and a `CloseTrip` exception-mapping fix, and is now awaiting fresh CI evidence.
+- `e062922` applied those fixes plus a `CS0108` cleanup and a `CloseTrip` exception-mapping fix. CI still failed because the reallocate test had two remaining defects: the next trip was not route-compatible with the transit holding, and the assertion counted REALLOCATE events against the wrong trip.
+- `71d0470` fixes the reallocate test route setup and assertion. Local PostgreSQL verification shows all 7 D PostgreSQL integration tests now PASS. The branch is now awaiting fresh exact-head CI evidence on `71d0470`.
 
 ---
 
@@ -27,6 +28,7 @@ The P2-C01-D remediation branch has been updated to address the four material bl
 
 | SHA | Message | Notes |
 |---|---|---|
+| `71d0470` | P2-C01-D remediation: fix reallocate test route assertion | KIMI final local-verified remediation commit |
 | `e062922` | P2-C01-D remediation: fix PostgreSQL test defects and CS0108 warnings | KIMI follow-up remediation commit |
 | `d51e690` | P2-C01-D remediation: close F1-F4 blockers | KIMI remediation commit |
 | `0922d54` | fix(p2-c01-d): add missing migration and secure workflow | Previous KIMI remediation commit |
@@ -76,7 +78,8 @@ Verified with `git diff --stat origin/master..HEAD`. No deletion of governing do
 |---|---|---|
 | Build | `dotnet build TransportERP.Tests/TransportERP.Tests.csproj --no-restore` | **Succeeded, 0 errors** |
 | Non-database regression | `dotnet test TransportERP.Tests --no-build --filter "Category!=P2PostgreSQL&Category!=PostgreSQL&Category!=HTTP"` | **117/117 passed** |
-| P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** (7 PostgreSQL tests skipped locally due to missing `TRANSPORTERP_TEST_CONNSTR`) |
+| P2-C01-D unit + contract tests | `dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01D"` | **26/26 passed** (7 PostgreSQL tests skipped without connection string) |
+| P2-C01-D PostgreSQL integration tests | `TRANSPORTERP_TEST_CONNSTR=... dotnet test TransportERP.Tests --no-build --filter "FullyQualifiedName~P2C01DArrivalPostgreSqlIntegrationTests"` | **7/7 passed** on local PostgreSQL 18.4 |
 | EF model consistency | `dotnet ef migrations has-pending-model-changes` | **No pending changes** |
 | D migration exists | `find TransportERP.Infrastructure/Persistence/Migrations -name '*P2C01DArrivalTransitWarehouse.cs'` | **Found** |
 | Exception migration exists | `find TransportERP.Infrastructure/Persistence/Migrations -name '*P2C01DShipmentException.cs'` | **Found** |
@@ -154,9 +157,9 @@ Changes made:
 
 | Risk | Status | Notes |
 |---|---|---|
-| Exact-head CI — PostgreSQL gates | **Pending** | New D PostgreSQL tests require CI environment with `TRANSPORTERP_TEST_CONNSTR`. Local run skips them. GitHub Actions on `e062922` is the authoritative verifier. |
-| Exact-head CI — EF/migration gates | **Pending** | `Require P2-C01-D migration`, `Verify EF model matches committed migration`, and `Apply migrations to PostgreSQL 18` must run and pass on the new head `e062922`. |
-| Exact-head CI — Desktop RTL | **Pending** | `Arrival Desktop RTL` job must remain green on `e062922`. |
+| Exact-head CI — PostgreSQL gates | **Pending / locally green** | All 7 D PostgreSQL integration tests PASS on local PostgreSQL 18.4. GitHub Actions on `71d0470` is the authoritative verifier. |
+| Exact-head CI — EF/migration gates | **Pending** | `Require P2-C01-D migration`, `Verify EF model matches committed migration`, and `Apply migrations to PostgreSQL 18` must run and pass on the new head `71d0470`. |
+| Exact-head CI — Desktop RTL | **Pending / historically green** | `Arrival Desktop RTL` job was green on `d51e690` and `e062922`; must remain green on `71d0470`. |
 | Independent review | **Pending** | Per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`, owner/reviewer review required before merge. |
 | PR #49 | **Pending** | Old PR #49 (`OPEN / DRAFT / UNMERGED`) must be superseded/closed and a new PR opened from `kimi/p2-c01-d-remediation-20260830`. |
 | D closure coverage | **Incomplete** | F3 provides a starter PostgreSQL suite. Full D closure per authority requires additional tests: true concurrent unload race, holding-allocation race, same-company cross-branch negative, cross-company negative, raw PostgreSQL UPDATE/DELETE append-only rejection, atomic movement + holding proof, and movement reconstruction across C+D. |
@@ -179,10 +182,10 @@ Changes made:
 
 ## 10. Recommendation
 
-The F1–F4 remediation and the follow-up test-defect fixes have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `e062922`. The branch is structurally and locally-testably improved, but it is **not yet independently PR-ready** because exact-head CI has not run on the new commit.
+The F1–F4 remediation and the follow-up test-defect fixes have been pushed to `origin/kimi/p2-c01-d-remediation-20260830` at `71d0470`. All locally-runnable gates are green, including the 7 D PostgreSQL integration tests on a local PostgreSQL 18.4 instance, but the branch is **not yet independently PR-ready** because exact-head CI has not run on the new commit.
 
 **Next steps:**
-1. Allow GitHub Actions to complete on `e062922`.
+1. Allow GitHub Actions to complete on `71d0470`.
 2. Verify all CI gates pass:
    - `Require P2-C01-D migration to be committed`
    - `Verify EF model matches committed migration`
