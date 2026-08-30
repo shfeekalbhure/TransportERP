@@ -199,3 +199,56 @@ The F1–F4 remediation, follow-up test-defect fixes, and authority-requested D 
 4. Route the PR through owner/independent review per `P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md`.
 
 **Do not merge the old `origin/feature/p2-c01-d-arrival-transit-warehouse-20260822` branch** — it is superseded by this remediation branch.
+
+---
+
+## 11. PR Execution Blocker
+
+Automated GitHub PR actions were attempted but blocked because the available `GITHUB_TOKEN` credential returned `401 Bad credentials`. `gh` CLI is not installed in the workspace.
+
+**Status:** PR #49 not yet closed; new PR not yet opened. Manual owner action required.
+
+### Manual steps for owner
+
+1. **Close PR #49** (`https://github.com/shfeekalbhure/TransportERP/pull/49`) with this comment:
+   ```text
+   Superseded by the remediated branch `kimi/p2-c01-d-remediation-20260830` at `a22bdd3058e1efde4d2b53e9a6d7c8566fa9ab2d`.
+
+   A new PR will be opened from the remediation branch for independent exact-head review. Do not merge this draft.
+   ```
+
+2. **Open a new PR:**
+   - **Base:** `master`
+   - **Compare:** `kimi/p2-c01-d-remediation-20260830`
+   - **Title:** `P2-C01-D Arrival Transit Warehouse — Remediation Review (a22bdd3)`
+   - **Body:**
+     ```markdown
+     ## Summary
+     Remediated implementation of P2-C01-D Arrival Transit Warehouse, ready for independent review.
+
+     ## Head
+     `a22bdd3058e1efde4d2b53e9a6d7c8566fa9ab2d`
+
+     ## CI Evidence
+     - Run: https://github.com/shfeekalbhure/TransportERP/actions/runs/33319460767
+     - Status: success
+     - Non-database regression: 117/117 PASS
+     - P2C01D suite: 40/40 PASS
+     - PostgreSQL 18.6 + migrations + HTTP + Desktop RTL: PASS
+
+     ## What changed vs. original feature branch
+     - Added missing EF migrations (arrival receipts, lines, warehouse holdings, shipment exceptions).
+     - Hardened CI workflow: removed auto-push, reduced permissions to `contents: read`.
+     - Fixed C→D phase boundary test regression.
+     - CloseTrip now checks open blocking ShipmentException.
+     - Added 14 PostgreSQL integration tests including concurrency, cross-tenant isolation, append-only enforcement, atomic persistence, and C+D movement reconstruction.
+     - Enforced same-company cross-branch scope in RecordArrival.
+
+     ## Supersedes
+     - Closes #49 (old draft PR from original feature branch).
+
+     ## Review required
+     Per P2_C01_D_INDEPENDENT_REVIEW_ASSIGNMENT_2026-08-22.md, independent exact-head review is required before merge.
+     ```
+
+3. **Route for independent review** before merge.
