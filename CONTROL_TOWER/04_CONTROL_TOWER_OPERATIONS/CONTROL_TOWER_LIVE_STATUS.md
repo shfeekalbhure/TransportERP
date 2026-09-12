@@ -1,9 +1,9 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-09-07T14:18:00Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-09-07T17:18:00+03:00`
-- `NEXT PLANNED CHECK`: `ON NEXT ACTIVE CONTROL TOWER SESSION OR NEW MISSION-03 EVIDENCE`
-- `MONITORING STATE`: `ACTIVE — CONTINUOUS MISSION DISPATCH`
+- `LAST VERIFIED CHECK` UTC: `2026-09-12T07:45:22Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-09-12T10:45:22+03:00`
+- `NEXT PLANNED CHECK`: `NEXT HOURLY SUPERVISION PASS OR NEW MISSION-03 EVIDENCE`
+- `MONITORING STATE`: `SCHEDULED HOURLY SUPERVISION — NO CONTINUOUS SESSION CLAIM`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
 - MISSION-03 current observed execution head: `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, tree `74caed5d25a99efd13ceb86a79adc71f938f5bda`, parent `1750fe82e39107de36129cb0420adc622829dc9e`
@@ -20,11 +20,17 @@
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
-## Material transition this check
+## Material governance correction this check
 
-The independent DBP-002 post-rehearsal intake reached a concrete governance blocker.
+Repository reality is unchanged for the product/execution lines: `master` remains exactly `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`, the MISSION-03 execution branch remains `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, and PR #69 remains open/draft/unmerged at `601f2d1cad61d62e590a6714ad84e307eb84fe5f`.
 
-### Frozen technical evidence reverified
+The central `CONTROL_TOWER/00_GOVERNANCE/REGISTERS/MISSION_HANDOFF_AND_SEAL_REGISTER.md` was found to stop at the older DBP-003 v0.8 checkpoint even though the current mission-local directive and seal register already carried the later DBP-002 post-rehearsal intake blocker. This was a traceability gap in an authoritative operating register, not a new Product or mission-execution transition.
+
+Control Tower synchronized the central register by appending `CT-M03-DBP002-INTAKE-20260907-v1`, explicitly recording the frozen `ffdf1087...` execution identity, missing acceptance detached SHA-256/package blocker, `RETURN FOR EVIDENCE PACKAGING — START AUTHORIZED — WAITING FOR WORKER SESSION`, DBP-004 HOLD/STOP, and MISSION-04 WAIT. No seal or successor handoff was asserted.
+
+MISSION-03 state therefore remains unchanged: `IN PROGRESS — OPEN — NOT SEALED`.
+
+## Current DBP-002 governing basis
 
 At exact head `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce` / tree `e828941817432bdc73f3e6fc31e74219e74fcf33`:
 
