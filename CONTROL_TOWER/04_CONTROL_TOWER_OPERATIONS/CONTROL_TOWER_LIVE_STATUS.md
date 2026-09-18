@@ -1,78 +1,72 @@
 # CONTROL TOWER LIVE STATUS
 
-- `LAST VERIFIED CHECK` UTC: `2026-09-12T07:45:22Z`
-- `LAST VERIFIED CHECK` Asia/Aden: `2026-09-12T10:45:22+03:00`
+- `LAST VERIFIED CHECK` UTC: `2026-09-18T04:00:47Z`
+- `LAST VERIFIED CHECK` Asia/Aden: `2026-09-18T07:00:47+03:00`
 - `NEXT PLANNED CHECK`: `NEXT HOURLY SUPERVISION PASS OR NEW MISSION-03 EVIDENCE`
 - `MONITORING STATE`: `SCHEDULED HOURLY SUPERVISION — NO CONTINUOUS SESSION CLAIM`
 - Governing directive: `CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/CURRENT_DIRECTIVE.md`
 - Authoritative product: `master@2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`
-- MISSION-03 current observed execution head: `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, tree `74caed5d25a99efd13ceb86a79adc71f938f5bda`, parent `1750fe82e39107de36129cb0420adc622829dc9e`
-- Frozen DBP-002 post-rehearsal target: `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`, tree `e828941817432bdc73f3e6fc31e74219e74fcf33`, parent `f128d24dce7baf76a6ac8af4e62a331b80447311`
-- Reviewed pre-authoring baseline: `5d1352b4fb6d56261dff8b8a622bacb2786f56d9`, tree `00512125311306a43474638195d2cad97b76118e`
+- Accepted DBP-002 exact head: `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`, tree `e828941817432bdc73f3e6fc31e74219e74fcf33`, parent `f128d24dce7baf76a6ac8af4e62a331b80447311`
+- Current observed execution branch: `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, tree `74caed5d25a99efd13ceb86a79adc71f938f5bda`, parent `1750fe82e39107de36129cb0420adc622829dc9e`
 - PR #69: `601f2d1cad61d62e590a6714ad84e307eb84fe5f — OPEN / DRAFT / UNMERGED`
 
 | Team / Mission | Current state | Evidence/gate | Decision | Seal / handoff |
 |---|---|---|---|---|
-| CONTROL TOWER / GROUP-01 | IN PROGRESS | frozen DBP-002 technical runs independently reverified; exact-head governance acceptance package absent | `DBP-002 INTAKE = FAIL / RETURN FOR EVIDENCE PACKAGING`; packaging START authorized; DBP-004 remains HOLD/STOP | N/A |
+| CONTROL TOWER / GROUP-01 | IN PROGRESS | DBP-002 v1.2 package present and independently revalidated | `DBP-002 PASS`; DBP-004 START authorized | N/A |
 | MISSION-01 | SEALED | complete | STOP | COMPLETE |
 | MISSION-02 | SEALED v1.2 | complete | STOP | COMPLETE |
-| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | `ffdf1087...` has v3/W0/W7 success and retained v2 failure, but current report/manifest/hash/test package is still bound to `5d1352b4...`; no DBP-002 post-rehearsal evidence package exists | `DBP-002 EVIDENCE PACKAGING = START AUTHORIZED — WAITING FOR WORKER SESSION`; `DBP-004 = HOLD/STOP — NO FURTHER PRODUCT MODIFICATION` | NOT SEALED; no final handoff |
+| MISSION-03 | IN PROGRESS — OPEN — NOT SEALED | accepted DBP-002 exact head; DBP-004 not yet evidenced under fresh authorization | `DBP-004 START AUTHORIZED — WAITING FOR WORKER SESSION` | NOT SEALED; no final handoff |
 | MISSION-04 | WAITING | MISSION-03 not sealed | WAIT | NOT STARTED |
 | MISSION-05 | WAITING | MISSION-04 not sealed | WAIT | NOT STARTED |
 
-## Material governance correction this check
+## Material transition this check
 
-Repository reality is unchanged for the product/execution lines: `master` remains exactly `2ec6cccf42624ec0d0e9aaf2332f5dc2273969a5`, the MISSION-03 execution branch remains `c3f2b7b4e8e32dd22920d08ce33870f51ece96f0`, and PR #69 remains open/draft/unmerged at `601f2d1cad61d62e590a6714ad84e307eb84fe5f`.
+The previously missing DBP-002 post-rehearsal acceptance package was published in the MISSION-03 directory through two worker commits directly based on the prior Control Tower head:
 
-The central `CONTROL_TOWER/00_GOVERNANCE/REGISTERS/MISSION_HANDOFF_AND_SEAL_REGISTER.md` was found to stop at the older DBP-003 v0.8 checkpoint even though the current mission-local directive and seal register already carried the later DBP-002 post-rehearsal intake blocker. This was a traceability gap in an authoritative operating register, not a new Product or mission-execution transition.
+- `dc5ac50c199283eb2a3a8860b12cb32768ee65c2` — stabilized exact-head report/evidence/manifest/test-register package v1.2.
+- `7df63e059721a9b925a55cad6596a0c54ea193bc` — detached SHA-256 register added after stabilization.
 
-Control Tower synchronized the central register by appending `CT-M03-DBP002-INTAKE-20260907-v1`, explicitly recording the frozen `ffdf1087...` execution identity, missing acceptance detached SHA-256/package blocker, `RETURN FOR EVIDENCE PACKAGING — START AUTHORIZED — WAITING FOR WORKER SESSION`, DBP-004 HOLD/STOP, and MISSION-04 WAIT. No seal or successor handoff was asserted.
+Control Tower fast-forwarded the authoritative governance branch to include those governance-only worker outputs; no Product Source, Tests, Migrations, production configuration or database changes were introduced by that promotion.
 
-MISSION-03 state therefore remains unchanged: `IN PROGRESS — OPEN — NOT SEALED`.
+Package `MISSION-03-DBP002-POST-REHEARSAL-v1.2` is bound to:
 
-## Current DBP-002 governing basis
+`ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce / e828941817432bdc73f3e6fc31e74219e74fcf33 / f128d24dce7baf76a6ac8af4e62a331b80447311`.
 
-At exact head `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce` / tree `e828941817432bdc73f3e6fc31e74219e74fcf33`:
+The package now contains the required report + repository-local evidence/index + explicit v2/v3 disposition + manifest + test-register entry + detached SHA-256 sidecar.
 
-- Full Rehearsal v3 run `33222541097 = SUCCESS`.
-- W0 run `33222541108 = SUCCESS`.
-- W7 disposable recovery run `33222541109 = SUCCESS`.
-- Full Rehearsal v2 run `33222541073 = FAILURE`; it fails at `Baseline catalog backup restore reconciliation`, after which the candidate/RLS/regression/recovery stages are skipped in that workflow.
+## Independent technical revalidation
 
-The v3 job itself completed its exact-head end-to-end rehearsal and evidence-upload steps successfully. These results are immutable technical evidence and remain retained.
+Control Tower independently re-read GitHub Actions metadata and logs for the frozen exact head:
 
-### Package-integrity failure
+- Full Rehearsal v3 `33222541097 = SUCCESS`; exact SHA/tree/parent verified, PostgreSQL 18.6, original ten migrations unchanged, no EF model drift, Migration 11 generated/applied, structural/semantic reconciliation completed, RLS/scope/fail-closed negatives completed, full regression `155/155`, and final candidate backup/restore completed.
+- W0 `33222541108 = SUCCESS`; exact SHA/tree/parent verified, all 11 migrations applied, no EF model drift, `155/155`, API HTTP 401 expected, and client build/probe matrix completed.
+- W7 `33222541109 = SUCCESS`; exact SHA/tree/parent verified, source migrations 11, restored migrations 11, `restore_result=PASS`.
+- Full Rehearsal v2 `33222541073 = FAILURE — RETAINED`; it fails at raw textual baseline catalog backup/restore reconciliation before candidate SQL, Migration 11, RLS checks, full regression, or candidate recovery.
 
-The user-mandated acceptance chain requires report + evidence + manifest + detached SHA-256 + exact SHA/tree/parent before changing DBP-002 state to accepted. That chain cannot presently be verified from authoritative `CONTROL_TOWER/` files:
-
-1. `EXECUTION_OUTPUT_MANIFEST.md` is still package `MISSION-03-GREENFIELD-DBP-RESUBMISSION-v1.1` bound to execution head/tree `5d1352b4...` / `005121...`; it explicitly says later mission work must issue a new version and detached hashes.
-2. `EXECUTION_OUTPUT_SHA256_v1.1.txt` is the detached hash list for that older v1.1 exact-design checkpoint, not for the `ffdf1087...` post-rehearsal state.
-3. `TEST_EXECUTION_REGISTER.md` contains no DBP-002 post-rehearsal entry for `ffdf1087...` or the four relevant runs.
-4. `TRANSPORTERP_MASTER_REMEDIATION_EXECUTION_REPORT.md` remains bound to `5d1352b4...` and describes DBP material work as not implemented at that checkpoint.
-5. `EVIDENCE/` contains only `W0`; no repository-local DBP-002 post-rehearsal evidence package exists.
-
-Formal decision recorded at:
-
-`CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/DBP-002_POST_REHEARSAL_DB_GOV_INTAKE_DECISION_2026-09-07.md`
+The corrected v3 harness uses structural/semantic catalog reconciliation and completes the entire candidate path on the same frozen exact head. Therefore v2 remains a historically true harness-specific false negative and is not converted to PASS.
 
 ## Governing disposition
 
-`DBP-002 POST-REHEARSAL DB-GOV INTAKE = FAIL / RETURN FOR EVIDENCE PACKAGING`
+`DBP-002 POST-REHEARSAL DB-GOV = PASS`
 
-`DBP-002 = FROZEN TECHNICAL CANDIDATE AT ffdf1087... — TECHNICAL RUNS RETAINED — GOVERNANCE ACCEPTANCE BLOCKED — NOT ACCEPTED`
+`DBP-002 = ACCEPTED — EXACT-HEAD ACCEPTANCE ONLY`
 
-`DBP-002 EVIDENCE PACKAGING = START AUTHORIZED — WAITING FOR WORKER SESSION`
+Decision record:
 
-`DBP-004 = HOLD/STOP — UNAUTHORIZED EARLY EXECUTION DETECTED — PRESERVE COMMITS AS UNACCEPTED CANDIDATE EVIDENCE — NO FURTHER PRODUCT MODIFICATION`
+`CONTROL_TOWER/01_GROUP-01_FOUNDATION/MISSION-03_EXECUTION/DBP-002_POST_REHEARSAL_DB_GOV_ACCEPTANCE_DECISION_2026-09-18.md`
 
-`MISSION-03 = IN PROGRESS — OPEN — NOT SEALED`
+The previous intake `FAIL / RETURN FOR EVIDENCE PACKAGING` remains retained historical evidence and is superseded for current operation.
 
-`MISSION-04 = WAIT — NOT STARTED`
+## Next dispatch
 
-MISSION-03 must now produce, inside its own mission directory, a new exact-head DBP-002 post-rehearsal report, repository-local evidence/index entries including v3/W0/W7 and the retained v2 failure, an explicit v2-versus-v3 disposition, a new versioned manifest bound to `ffdf1087...`, and a new detached SHA-256 list generated only after stabilization. Do not ask the owner to copy reports between missions.
+The governing DB order remains:
 
-Writing START does not make this packaging work IN PROGRESS. It becomes in progress only when repository evidence shows a worker actually began producing the required outputs.
+`DBP-002 → DBP-004 → DBP-003B/C → DBP-003A → DBP-006 → DBP-005`
 
-The preserved early DBP-004 commits remain unaccepted evidence and receive no retroactive acceptance. No final MISSION-03 report + evidence + manifest + detached SHA-256 + seal + handoff exists, so successor dispatch remains prohibited.
+DBP-002 acceptance clears the sequence gate for DBP-004.
 
-No `OWNER DECISION REQUIRED` is active; the next permitted action is non-destructive evidence packaging followed by fresh independent DB-GOV re-review.
+`DBP-004 START AUTHORIZED — WAITING FOR WORKER SESSION`
+
+DBP-004 is not IN PROGRESS yet. Fresh authorized work must begin from accepted DBP-002 boundary `ffdf1087...` on a non-destructive worker line. Historical early DBP-004 commits `1750fe82...` and `c3f2b7b4...` remain preserved unaccepted evidence only; they gain no retroactive acceptance and must not be merged, cherry-picked, rebased, squashed, reverted, force-pushed or rewritten by supervision.
+
+MISSION-03 remains `IN PROGRESS — OPEN — NOT SEALED`. MISSION-04 remains `WAIT — NOT STARTED`; no final seal or successor handoff exists. No `OWNER DECISION REQUIRED` is active.
