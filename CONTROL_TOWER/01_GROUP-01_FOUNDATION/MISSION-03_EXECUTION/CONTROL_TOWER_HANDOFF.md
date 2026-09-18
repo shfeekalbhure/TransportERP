@@ -118,3 +118,45 @@ W6 durable-source revalidation additionally proves that the currently located
 Ticketing/Shipping/screen material preserves future requirements but explicitly
 does not promote programming authority. W5/W7/W8 external gates remain
 unchanged. No MISSION-04 work is authorized.
+
+## v1.2 DBP-002 post-rehearsal acceptance checkpoint
+
+This section supersedes the earlier DBP-002 intake/packaging HOLD for current operation while preserving all earlier checkpoint text as historical evidence.
+
+Control Tower independently revalidated `MISSION-03-DBP002-POST-REHEARSAL-v1.2` and issued:
+
+`DBP-002 POST-REHEARSAL DB-GOV = PASS`
+
+`DBP-002 = ACCEPTED — EXACT-HEAD ACCEPTANCE ONLY`
+
+Accepted identity:
+
+- execution SHA `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce`;
+- tree `e828941817432bdc73f3e6fc31e74219e74fcf33`;
+- parent `f128d24dce7baf76a6ac8af4e62a331b80447311`.
+
+Verified package chain:
+
+1. `DBP-002_POST_REHEARSAL_EXECUTION_REPORT_2026-09-18.md`;
+2. `EVIDENCE/DBP-002/POST_REHEARSAL_GITHUB_ACTIONS_RUN_EVIDENCE.md`;
+3. `EVIDENCE/DBP-002/POST_REHEARSAL_EVIDENCE_INDEX.md`;
+4. `DBP-002_V2_V3_TECHNICAL_DISPOSITION_2026-09-18.md`;
+5. `TEST_EXECUTION_REGISTER.md`;
+6. `EXECUTION_OUTPUT_MANIFEST.md` version `MISSION-03-DBP002-POST-REHEARSAL-v1.2`;
+7. detached `EXECUTION_OUTPUT_SHA256_v1.2.txt` published after package stabilization;
+8. independent decision `DBP-002_POST_REHEARSAL_DB_GOV_ACCEPTANCE_DECISION_2026-09-18.md`.
+
+Technical evidence retained on the accepted exact head:
+
+- Full Rehearsal v3 `33222541097 = SUCCESS`;
+- W0 `33222541108 = SUCCESS`;
+- W7 `33222541109 = SUCCESS`;
+- Full Rehearsal v2 `33222541073 = FAILURE — RETAINED / HARNESS-SPECIFIC FALSE NEGATIVE`; it is not rewritten to PASS.
+
+This is an intra-MISSION-03 DB-GOV checkpoint, **not** a final mission handoff or seal. `MISSION-03 = IN PROGRESS — OPEN — NOT SEALED` and `MISSION-04 = WAIT — NOT STARTED` remain binding.
+
+DBP-002 acceptance releases only the next physical-order gate:
+
+`DBP-004 START AUTHORIZED — WAITING FOR WORKER SESSION`
+
+Fresh DBP-004 work must begin from the accepted `ffdf1087...` boundary on a non-destructive worker line and must generate its own report/evidence/manifest/detached-SHA chain. The earlier DBP-004 commits `1750fe82...` and `c3f2b7b4...` remain preserved unaccepted evidence and receive no retroactive acceptance.
