@@ -222,3 +222,18 @@ those gates remain explicitly blocked rather than receiving a transferred PASS.
 
 No prior run is transferred to candidate persistence. Runs `33201720896` and
 `33201720878` remain evidence only for the unchanged ten-migration baseline.
+
+## DBP-002 post-rehearsal exact-head evidence — package v1.2
+
+Frozen identity: `ffdf1087ab4a6435cd1f2b19c5ab9ff58ce206ce` / `e828941817432bdc73f3e6fc31e74219e74fcf33` / `f128d24dce7baf76a6ac8af4e62a331b80447311`.
+
+| Run | Exact-head result | Key evidence |
+|---:|---|---|
+| `33222541097` | `PASS — Full Rehearsal v3` | PostgreSQL 18.6; no model drift; generated SQL + EF structural reconciliation; RLS negatives; 155/155; candidate backup/restore; artifact 9705722045 digest `232fd712...` |
+| `33222541108` | `PASS — W0` | no model drift; 155/155; API 401; Linux/Desktop artifacts 9705724131 / 9705704277 |
+| `33222541109` | `PASS — W7` | source/restored migrations 11/11; `restore_result=PASS`; artifact 9705704957 |
+| `33222541073` | `FAIL — v2 RETAINED` | fails at baseline catalog backup/restore raw-text reconciliation before candidate application; later candidate/RLS/regression/recovery steps skipped; artifact 9705708441 |
+
+The retained v2 failure is not rewritten as PASS. The v3 corrected path uses structural/semantic catalog reconciliation and completes the same frozen exact head. Detailed evidence and disposition are in `EVIDENCE/DBP-002/POST_REHEARSAL_GITHUB_ACTIONS_RUN_EVIDENCE.md` and `DBP-002_V2_V3_TECHNICAL_DISPOSITION_2026-09-18.md`.
+
+This entry prepares evidence for independent DB-GOV re-review only; it does not itself accept DBP-002, DBP-004, seal MISSION-03, or authorize Production/successor work.
