@@ -2,6 +2,23 @@ using TransportERP.Contracts.Core;
 
 namespace TransportERP.Contracts.Waybills;
 
+
+public static class WaybillPayerRoleCodes
+{
+    public const string Sender = "SENDER";
+    public const string Receiver = "RECEIVER";
+    public const string OtherParty = "OTHER_PARTY";
+}
+
+public static class WaybillCollectorTypeCodes
+{
+    public const string Branch = "BRANCH";
+    public const string Driver = "DRIVER";
+    public const string Agent = "AGENT";
+    public const string Bank = "BANK";
+    public const string Other = "OTHER";
+}
+
 public sealed record PaymentPlanLineInput(
     int LineNo,
     string PayerRole,
