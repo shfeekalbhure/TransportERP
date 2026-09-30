@@ -78,7 +78,7 @@ public static class TransportErpP2ShippingModel
         segment.ToTable("trip_segments", "transport_erp", t =>
         {
             t.HasCheckConstraint("ck_trip_segment_number", "\"SegmentNo\" > 0");
-            t.HasCheckConstraint("ck_trip_segment_stops", "\"FromStopId\" <> \"ToStopId\"");
+            t.HasCheckConstraint("ck_trip_segment_locations", "\"FromLocationId\" <> \"ToLocationId\"");
             t.HasCheckConstraint("ck_trip_segment_status", "\"CustodyStatus\" IN ('PLANNED','IN_CUSTODY','ARRIVED','CLOSED','CANCELLED')");
             t.HasCheckConstraint("ck_trip_segment_dates", "\"PlannedArriveAt\" IS NULL OR \"PlannedDepartAt\" IS NULL OR \"PlannedArriveAt\" >= \"PlannedDepartAt\"");
         });
@@ -95,6 +95,7 @@ public static class TransportErpP2ShippingModel
         segment.HasIndex(x => new { x.DriverId, x.CustodyStatus });
         segment.HasIndex(x => new { x.VehicleId, x.CustodyStatus });
         segment.HasOne(x => x.Trip).WithMany(x => x.Segments).HasForeignKey(x => x.TripId).OnDelete(DeleteBehavior.Cascade);
+        segment.HasIndex(x => new { x.TripId, x.FromLocationId, x.ToLocationId });
         segment.HasOne(x => x.FromStop).WithMany().HasForeignKey(x => x.FromStopId).OnDelete(DeleteBehavior.Restrict);
         segment.HasOne(x => x.ToStop).WithMany().HasForeignKey(x => x.ToStopId).OnDelete(DeleteBehavior.Restrict);
     }
