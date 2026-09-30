@@ -33,6 +33,7 @@ public sealed class TripEntity : P2Entity
     public string CreateClientOperationId { get; set; } = string.Empty;
     public string LastClientOperationId { get; set; } = string.Empty;
     public ICollection<TripStopEntity> Stops { get; set; } = new List<TripStopEntity>();
+    public ICollection<TripSegmentEntity> Segments { get; set; } = new List<TripSegmentEntity>();
     public ICollection<TripAllocationEntity> Allocations { get; set; } = new List<TripAllocationEntity>();
     public ICollection<ManifestEntity> Manifests { get; set; } = new List<ManifestEntity>();
 }
@@ -49,6 +50,24 @@ public sealed class TripStopEntity
     public DateTimeOffset? DepartedAt { get; set; }
     public string Status { get; set; } = "PLANNED";
     public TripEntity? Trip { get; set; }
+}
+
+public sealed class TripSegmentEntity : P2Entity
+{
+    public Guid TripId { get; set; }
+    public int SegmentNo { get; set; }
+    public Guid FromStopId { get; set; }
+    public Guid ToStopId { get; set; }
+    public Guid DriverId { get; set; }
+    public Guid VehicleId { get; set; }
+    public DateTimeOffset? PlannedDepartAt { get; set; }
+    public DateTimeOffset? PlannedArriveAt { get; set; }
+    public DateTimeOffset? ActualDepartAt { get; set; }
+    public DateTimeOffset? ActualArriveAt { get; set; }
+    public string CustodyStatus { get; set; } = "PLANNED";
+    public TripEntity? Trip { get; set; }
+    public TripStopEntity? FromStop { get; set; }
+    public TripStopEntity? ToStop { get; set; }
 }
 
 public sealed class TripAllocationEntity
