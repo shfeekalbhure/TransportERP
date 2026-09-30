@@ -60,19 +60,28 @@ public sealed record TripResponse(
 /// </summary>
 public sealed record TripSegmentInput(
     int SegmentNo,
-    Guid FromStopId,
-    Guid ToStopId,
+    Guid FromLocationId,
+    Guid ToLocationId,
+    Guid? FromStopId,
+    Guid? ToStopId,
     Guid DriverId,
     Guid VehicleId,
     DateTimeOffset? PlannedDepartAt,
     DateTimeOffset? PlannedArriveAt);
 
+public sealed record SetTripSegmentsRequest(
+    long ExpectedVersion,
+    IReadOnlyList<TripSegmentInput> Segments,
+    string ClientOperationId);
+
 public sealed record TripSegmentResponse(
     Guid Id,
     Guid TripId,
     int SegmentNo,
-    Guid FromStopId,
-    Guid ToStopId,
+    Guid FromLocationId,
+    Guid ToLocationId,
+    Guid? FromStopId,
+    Guid? ToStopId,
     Guid DriverId,
     Guid VehicleId,
     DateTimeOffset? PlannedDepartAt,
@@ -81,6 +90,12 @@ public sealed record TripSegmentResponse(
     DateTimeOffset? ActualArriveAt,
     string CustodyStatus,
     long Version,
+    Guid CorrelationId);
+
+public sealed record TripSegmentsResponse(
+    Guid TripId,
+    long TripVersion,
+    IReadOnlyList<TripSegmentResponse> Segments,
     Guid CorrelationId);
 
 public sealed record AllocateItemRequest(
