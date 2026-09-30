@@ -56,8 +56,10 @@ public sealed class TripSegmentEntity : P2Entity
 {
     public Guid TripId { get; set; }
     public int SegmentNo { get; set; }
-    public Guid FromStopId { get; set; }
-    public Guid ToStopId { get; set; }
+    public Guid FromLocationId { get; set; }
+    public Guid ToLocationId { get; set; }
+    public Guid? FromStopId { get; set; }
+    public Guid? ToStopId { get; set; }
     public Guid DriverId { get; set; }
     public Guid VehicleId { get; set; }
     public DateTimeOffset? PlannedDepartAt { get; set; }
