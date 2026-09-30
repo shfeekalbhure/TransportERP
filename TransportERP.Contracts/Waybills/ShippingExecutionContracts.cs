@@ -53,6 +53,36 @@ public sealed record TripResponse(
     IReadOnlyList<TripStopResponse> Stops,
     Guid CorrelationId);
 
+/// <summary>
+/// Execution-level trip segment. This is deliberately separate from the route template:
+/// a route describes the planned corridor, while a segment owns the actual driver/vehicle
+/// custody between two consecutive operational stops.
+/// </summary>
+public sealed record TripSegmentInput(
+    int SegmentNo,
+    Guid FromStopId,
+    Guid ToStopId,
+    Guid DriverId,
+    Guid VehicleId,
+    DateTimeOffset? PlannedDepartAt,
+    DateTimeOffset? PlannedArriveAt);
+
+public sealed record TripSegmentResponse(
+    Guid Id,
+    Guid TripId,
+    int SegmentNo,
+    Guid FromStopId,
+    Guid ToStopId,
+    Guid DriverId,
+    Guid VehicleId,
+    DateTimeOffset? PlannedDepartAt,
+    DateTimeOffset? PlannedArriveAt,
+    DateTimeOffset? ActualDepartAt,
+    DateTimeOffset? ActualArriveAt,
+    string CustodyStatus,
+    long Version,
+    Guid CorrelationId);
+
 public sealed record AllocateItemRequest(
     Guid WaybillItemId,
     Guid ReleaseId,
