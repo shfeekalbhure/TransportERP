@@ -331,6 +331,28 @@ public sealed class P2C01CShippingApiContractTests
                 request.PlannedDepartAt, null, "DRAFT", 1, [], context.CorrelationId));
         }
 
+        public Task<TripSegmentsResponse> GetTripSegmentsAsync(
+            OperationContext context, Guid tripId, CancellationToken cancellationToken)
+        {
+            Capture("GetTripSegments", context);
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, 1, [], context.CorrelationId));
+        }
+
+        public Task<TripSegmentsResponse> SetTripSegmentsAsync(
+            OperationContext context, Guid tripId, SetTripSegmentsRequest request,
+            CancellationToken cancellationToken)
+        {
+            Capture("SetTripSegments", context);
+            var segments = request.Segments.Select(x => new TripSegmentResponse(
+                Guid.NewGuid(), tripId, x.SegmentNo, x.FromLocationId, x.ToLocationId,
+                x.FromStopId, x.ToStopId, x.DriverId, x.VehicleId,
+                x.PlannedDepartAt, x.PlannedArriveAt, null, null,
+                "PLANNED", 1, context.CorrelationId)).ToList();
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, request.ExpectedVersion + 1, segments, context.CorrelationId));
+        }
+
         public Task<AllocationResponse> AllocateAsync(
             OperationContext context, Guid tripId, AllocateItemRequest request, CancellationToken cancellationToken)
         {
