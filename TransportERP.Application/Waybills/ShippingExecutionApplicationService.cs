@@ -17,6 +17,7 @@ public interface IShippingExecutionStore
     Task<ManifestResponse> FinalizeManifestAsync(OperationContext context, Guid manifestId, FinalizeManifestRequest request, CancellationToken cancellationToken);
     Task<ManifestResponse> HandoverManifestAsync(OperationContext context, Guid manifestId, HandoverManifestRequest request, CancellationToken cancellationToken);
     Task<TripResponse> StartTripAsync(OperationContext context, Guid tripId, StartTripRequest request, CancellationToken cancellationToken);
+    Task<TripSegmentsResponse> AdvanceTripSegmentAsync(OperationContext context, Guid tripId, Guid segmentId, AdvanceTripSegmentRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class ShippingExecutionApplicationService(IShippingExecutionStore store)
@@ -177,6 +178,24 @@ public sealed class ShippingExecutionApplicationService(IShippingExecutionStore 
         if (request.ActualDepartAt == default)
             throw new ShippingExecutionApplicationException("VALIDATION_ERROR");
         return store.StartTripAsync(context, tripId, request, cancellationToken);
+    }
+
+    public Task<TripSegmentsResponse> AdvanceTripSegmentAsync(
+        OperationContext context,
+        Guid tripId,
+        Guid segmentId,
+        AdvanceTripSegmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureContext(context);
+        EnsureId(tripId);
+        EnsureId(segmentId);
+        EnsureOperation(request.ClientOperationId);
+        EnsureVersion(request.ExpectedTripVersion);
+        EnsureVersion(request.ExpectedSegmentVersion);
+        if (request.ArrivedAt == default)
+            throw new ShippingExecutionApplicationException("VALIDATION_ERROR");
+        return store.AdvanceTripSegmentAsync(context, tripId, segmentId, request, cancellationToken);
     }
 
     private static void EnsureSegments(IReadOnlyList<TripSegmentInput>? segments)

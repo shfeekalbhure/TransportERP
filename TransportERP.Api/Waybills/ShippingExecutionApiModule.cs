@@ -81,6 +81,12 @@ public static class ShippingExecutionApiModule
             await Authorized(http, ShippingExecutionPermissionCodes.TripStart,
                 context => service.StartTripAsync(context, tripId, request, ct)));
 
+        group.MapPost("/trips/{tripId:guid}/segments/{segmentId:guid}:arrive", async Task<IResult> (
+            Guid tripId, Guid segmentId, AdvanceTripSegmentRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, ShippingExecutionPermissionCodes.TripAdvance,
+                context => service.AdvanceTripSegmentAsync(context, tripId, segmentId, request, ct)));
+
         return app;
     }
 

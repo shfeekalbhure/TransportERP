@@ -167,6 +167,12 @@ public sealed record StartTripRequest(
     long ExpectedVersion,
     string ClientOperationId);
 
+public sealed record AdvanceTripSegmentRequest(
+    DateTimeOffset ArrivedAt,
+    long ExpectedTripVersion,
+    long ExpectedSegmentVersion,
+    string ClientOperationId);
+
 public static class ShippingExecutionPermissionCodes
 {
     public const string Release = "waybill.release";
@@ -178,4 +184,5 @@ public static class ShippingExecutionPermissionCodes
     public const string ManifestFinalize = "manifest.finalize";
     public const string ManifestHandover = "manifest.handover";
     public const string TripStart = "trip.start";
+    public const string TripAdvance = "trip.advance";
 }

@@ -57,6 +57,25 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         }
         Assert.Equal("DRAFT", trip.Status);
 
+        var middleLocationId = Guid.NewGuid();
+        TripSegmentsResponse configuredSegments;
+        await using (var db = CreateP2Db(connection))
+        {
+            configuredSegments = await CreateService(db).SetTripSegmentsAsync(context, trip.Id,
+                new SetTripSegmentsRequest(
+                    trip.Version,
+                    [
+                        new TripSegmentInput(
+                            1, scope.OriginId, middleLocationId, null, null,
+                            scope.UserId, trip.VehicleId, DateTimeOffset.UtcNow.AddHours(1), DateTimeOffset.UtcNow.AddHours(2)),
+                        new TripSegmentInput(
+                            2, middleLocationId, scope.DestinationId, null, null,
+                            scope.UserId, trip.VehicleId, DateTimeOffset.UtcNow.AddHours(2), DateTimeOffset.UtcNow.AddHours(3))
+                    ],
+                    $"segments-{Guid.NewGuid():N}"));
+        }
+        Assert.Equal(2, configuredSegments.Segments.Count);
+
         AllocationResponse allocation;
         await using (var db = CreateP2Db(connection))
         {
@@ -106,9 +125,36 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
             Assert.Equal("DEPARTED", departed.Status);
         }
 
+        await using (var db = CreateP2Db(connection))
+        {
+            var currentTrip = await db.Set<TripEntity>().AsNoTracking().SingleAsync(x => x.Id == trip.Id);
+            var first = await db.Set<TripSegmentEntity>().AsNoTracking()
+                .SingleAsync(x => x.TripId == trip.Id && x.SegmentNo == 1);
+            Assert.Equal("IN_CUSTODY", first.CustodyStatus);
+            var advanced = await CreateService(db).AdvanceTripSegmentAsync(context, trip.Id, first.Id,
+                new AdvanceTripSegmentRequest(
+                    DateTimeOffset.UtcNow.AddMinutes(10), currentTrip.Version, first.Version,
+                    $"advance-1-{Guid.NewGuid():N}"));
+            Assert.Contains(advanced.Segments, x => x.SegmentNo == 1 && x.CustodyStatus == "CLOSED");
+            Assert.Contains(advanced.Segments, x => x.SegmentNo == 2 && x.CustodyStatus == "IN_CUSTODY");
+        }
+
+        await using (var db = CreateP2Db(connection))
+        {
+            var currentTrip = await db.Set<TripEntity>().AsNoTracking().SingleAsync(x => x.Id == trip.Id);
+            var second = await db.Set<TripSegmentEntity>().AsNoTracking()
+                .SingleAsync(x => x.TripId == trip.Id && x.SegmentNo == 2);
+            var completed = await CreateService(db).AdvanceTripSegmentAsync(context, trip.Id, second.Id,
+                new AdvanceTripSegmentRequest(
+                    DateTimeOffset.UtcNow.AddMinutes(20), currentTrip.Version, second.Version,
+                    $"advance-2-{Guid.NewGuid():N}"));
+            Assert.All(completed.Segments, x => Assert.Equal("CLOSED", x.CustodyStatus));
+        }
+
         await using var verify = CreateP2Db(connection);
+        Assert.Equal("ARRIVED", await verify.Set<TripEntity>().Where(x => x.Id == trip.Id).Select(x => x.Status).SingleAsync());
         Assert.Equal(1, await verify.Set<MovementEventEntity>().CountAsync(x => x.ManifestId == manifest.Id && x.EventType == "LOAD"));
-        Assert.Equal(1, await verify.Set<MovementEventEntity>().CountAsync(x => x.ManifestId == manifest.Id && x.EventType == "DEPART"));
+        Assert.Equal(2, await verify.Set<MovementEventEntity>().CountAsync(x => x.ManifestId == manifest.Id && x.EventType == "DEPART"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemRelease"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "WaybillItemAllocate"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestGenerate"));
@@ -116,6 +162,7 @@ public sealed class P2C01CShippingPostgreSqlIntegrationTests
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestFinalize"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "ManifestHandover"));
         Assert.True(await verify.AuditEvents.AsNoTracking().AnyAsync(x => x.Action == "TripStart"));
+        Assert.Equal(2, await verify.AuditEvents.AsNoTracking().CountAsync(x => x.Action == "TripSegmentAdvance"));
     }
 
     [Fact]

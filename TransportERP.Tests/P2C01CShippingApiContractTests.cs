@@ -244,6 +244,7 @@ public sealed class P2C01CShippingApiContractTests
         var driverId = Guid.NewGuid();
         var originId = Guid.NewGuid();
         var destinationId = Guid.NewGuid();
+        var segmentId = Guid.NewGuid();
 
         return new[]
         {
@@ -292,7 +293,12 @@ public sealed class P2C01CShippingApiContractTests
                 "StartTrip", ShippingExecutionPermissionCodes.TripStart,
                 $"/api/v1/trips/{tripId}:start",
                 () => Post($"/api/v1/trips/{tripId}:start",
-                    new StartTripRequest(now, 1, "api-start")))
+                    new StartTripRequest(now, 1, "api-start"))),
+            new RouteCase(
+                "AdvanceTripSegment", ShippingExecutionPermissionCodes.TripAdvance,
+                $"/api/v1/trips/{tripId}/segments/{segmentId}:arrive",
+                () => Post($"/api/v1/trips/{tripId}/segments/{segmentId}:arrive",
+                    new AdvanceTripSegmentRequest(now, 2, 1, "api-segment-arrive")))
         };
     }
 
@@ -480,6 +486,15 @@ public sealed class P2C01CShippingApiContractTests
                 tripId, context.CompanyId, context.BranchId, "TR-API", Guid.NewGuid(), Guid.NewGuid(),
                 Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1), request.ActualDepartAt,
                 "DEPARTED", request.ExpectedVersion + 1, [], context.CorrelationId));
+        }
+
+        public Task<TripSegmentsResponse> AdvanceTripSegmentAsync(
+            OperationContext context, Guid tripId, Guid segmentId, AdvanceTripSegmentRequest request,
+            CancellationToken cancellationToken)
+        {
+            Capture("AdvanceTripSegment", context);
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, request.ExpectedTripVersion + 1, [], context.CorrelationId));
         }
     }
 }

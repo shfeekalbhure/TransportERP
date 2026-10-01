@@ -946,17 +946,24 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             var firstSegment = await Segments
                 .Where(x => x.TripId == tripId)
                 .OrderBy(x => x.SegmentNo)
-                .FirstOrDefaultAsync(cancellationToken)
-                ?? throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
-            if (firstSegment.CustodyStatus != "PLANNED" ||
-                firstSegment.FromLocationId != trip.OriginId)
-                throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+                .FirstOrDefaultAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
-            firstSegment.ActualDepartAt = request.ActualDepartAt;
-            firstSegment.CustodyStatus = "IN_CUSTODY";
-            firstSegment.Version++;
-            firstSegment.UpdatedAt = now;
+            var departFromLocationId = trip.OriginId;
+            var departToLocationId = trip.DestinationId;
+            if (firstSegment is not null)
+            {
+                if (firstSegment.CustodyStatus != "PLANNED" ||
+                    firstSegment.FromLocationId != trip.OriginId)
+                    throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+
+                firstSegment.ActualDepartAt = request.ActualDepartAt;
+                firstSegment.CustodyStatus = "IN_CUSTODY";
+                firstSegment.Version++;
+                firstSegment.UpdatedAt = now;
+                departFromLocationId = firstSegment.FromLocationId;
+                departToLocationId = firstSegment.ToLocationId;
+            }
 
             trip.Status = ShippingExecutionStatuses.Trip.Departed;
             trip.ActualDepartAt = request.ActualDepartAt;
@@ -974,7 +981,7 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                     AllocationId = line.AllocationId, ManifestLineId = line.Id,
                     EventType = "DEPART", Quantity = line.LoadedQuantity,
                     TripId = trip.Id, ManifestId = manifest.Id,
-                    FromLocationId = firstSegment.FromLocationId, ToLocationId = firstSegment.ToLocationId,
+                    FromLocationId = departFromLocationId, ToLocationId = departToLocationId,
                     OccurredAt = request.ActualDepartAt, RecordedAt = now,
                     RecordedBy = context.UserId,
                     ClientOperationId = ScopedMovementOperationId(
@@ -991,10 +998,10 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 {
                     trip.TripNo,
                     trip.ActualDepartAt,
-                    firstSegment.Id,
-                    firstSegment.SegmentNo,
-                    CurrentLocationId = firstSegment.FromLocationId,
-                    NextLocationId = firstSegment.ToLocationId,
+                    SegmentId = firstSegment?.Id,
+                    SegmentNo = firstSegment?.SegmentNo,
+                    CurrentLocationId = departFromLocationId,
+                    NextLocationId = departToLocationId,
                     DepartLineCount = lines.Count
                 }),
                 null, cancellationToken);
@@ -1022,6 +1029,187 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
         }
     }
+
+    public async Task<TripSegmentsResponse> AdvanceTripSegmentAsync(
+        OperationContext context,
+        Guid tripId,
+        Guid segmentId,
+        AdvanceTripSegmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        const string action = "TRIP_SEGMENT_ADVANCE";
+        var operationId = request.ClientOperationId.Trim();
+        var fingerprint = CommandFingerprint(action, new
+        {
+            tripId,
+            segmentId,
+            request.ArrivedAt,
+            request.ExpectedTripVersion,
+            request.ExpectedSegmentVersion
+        });
+        var replay = await TryReplayCommandAsync<TripSegmentsResponse>(
+            context, action, operationId, "TripSegment", segmentId, fingerprint, cancellationToken);
+        if (replay is not null) return replay;
+
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            replay = await TryReplayCommandAsync<TripSegmentsResponse>(
+                context, action, operationId, "TripSegment", segmentId, fingerprint, cancellationToken);
+            if (replay is not null)
+            {
+                await tx.CommitAsync(cancellationToken);
+                return replay;
+            }
+
+            var trip = await RequireTrip(context, tripId, cancellationToken);
+            if (trip.Version != request.ExpectedTripVersion)
+                throw new WaybillPersistenceException("CONCURRENCY_CONFLICT");
+            if (trip.Status != ShippingExecutionStatuses.Trip.Departed)
+                throw new WaybillPersistenceException("INVALID_STATE");
+
+            var segment = await Segments.SingleOrDefaultAsync(x =>
+                    x.Id == segmentId &&
+                    x.TripId == tripId &&
+                    x.Trip!.CompanyId == context.CompanyId &&
+                    x.Trip.BranchId == context.BranchId,
+                    cancellationToken)
+                ?? throw new WaybillPersistenceException("NOT_FOUND");
+            if (segment.Version != request.ExpectedSegmentVersion)
+                throw new WaybillPersistenceException("CONCURRENCY_CONFLICT");
+            if (segment.CustodyStatus != "IN_CUSTODY" || !segment.ActualDepartAt.HasValue)
+                throw new WaybillPersistenceException("INVALID_STATE");
+            if (request.ArrivedAt < segment.ActualDepartAt.Value)
+                throw new WaybillPersistenceException("VALIDATION_ERROR");
+
+            var next = await Segments
+                .Where(x => x.TripId == tripId && x.SegmentNo > segment.SegmentNo)
+                .OrderBy(x => x.SegmentNo)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (next is not null &&
+                (next.SegmentNo != segment.SegmentNo + 1 ||
+                 next.FromLocationId != segment.ToLocationId ||
+                 next.CustodyStatus != "PLANNED"))
+                throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+
+            var now = DateTimeOffset.UtcNow;
+            segment.ActualArriveAt = request.ArrivedAt;
+            segment.CustodyStatus = "CLOSED";
+            segment.Version++;
+            segment.UpdatedAt = now;
+
+            if (segment.ToStopId.HasValue)
+            {
+                var arrivedStop = await Stops.SingleOrDefaultAsync(
+                    x => x.Id == segment.ToStopId.Value && x.TripId == tripId, cancellationToken);
+                if (arrivedStop is not null)
+                {
+                    arrivedStop.ArrivedAt = request.ArrivedAt;
+                    arrivedStop.Status = next is null ? "ARRIVED" : "DEPARTED";
+                    if (next is not null)
+                        arrivedStop.DepartedAt = request.ArrivedAt;
+                }
+            }
+
+            if (next is null)
+            {
+                if (segment.ToLocationId != trip.DestinationId)
+                    throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+                trip.Status = ShippingExecutionStatuses.Trip.Arrived;
+                trip.ActualArriveAt = request.ArrivedAt;
+            }
+            else
+            {
+                next.ActualDepartAt = request.ArrivedAt;
+                next.CustodyStatus = "IN_CUSTODY";
+                next.Version++;
+                next.UpdatedAt = now;
+
+                var manifests = await Manifests.AsNoTracking()
+                    .Where(x => x.TripId == tripId &&
+                                x.CompanyId == context.CompanyId &&
+                                x.BranchId == context.BranchId)
+                    .ToListAsync(cancellationToken);
+                var manifestIds = manifests.Select(x => x.Id).ToList();
+                var lines = await ManifestLines.AsNoTracking()
+                    .Where(x => manifestIds.Contains(x.ManifestId) && x.LoadedQuantity > 0m)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var line in lines)
+                {
+                    var manifest = manifests.Single(x => x.Id == line.ManifestId);
+                    Movements.Add(new MovementEventEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = context.CompanyId,
+                        BranchId = context.BranchId,
+                        WaybillId = line.WaybillId,
+                        WaybillItemId = line.WaybillItemId,
+                        AllocationId = line.AllocationId,
+                        ManifestLineId = line.Id,
+                        EventType = "DEPART",
+                        Quantity = line.LoadedQuantity,
+                        TripId = trip.Id,
+                        ManifestId = manifest.Id,
+                        FromLocationId = next.FromLocationId,
+                        ToLocationId = next.ToLocationId,
+                        OccurredAt = request.ArrivedAt,
+                        RecordedAt = now,
+                        RecordedBy = context.UserId,
+                        ClientOperationId = ScopedMovementOperationId(
+                            context.BranchId, DerivedMovementOperationId(operationId, line.Id))
+                    });
+                }
+            }
+
+            trip.LastClientOperationId = operationId;
+            trip.Version++;
+            trip.UpdatedAt = now;
+
+            await Save(cancellationToken);
+            var response = await TripSegmentsResponseOf(context, tripId, cancellationToken);
+            await PersistCommandOutcomeAsync(
+                context, action, operationId, "TripSegment", segmentId, fingerprint, response, cancellationToken);
+            await audit.WriteAsync(context, "TripSegmentAdvance", "SUCCESS", "TripSegment", segmentId,
+                null, JsonSerializer.Serialize(new
+                {
+                    tripId,
+                    ClosedSegmentId = segment.Id,
+                    ClosedSegmentNo = segment.SegmentNo,
+                    CurrentLocationId = segment.ToLocationId,
+                    NextSegmentId = next?.Id,
+                    NextSegmentNo = next?.SegmentNo,
+                    NextLocationId = next?.ToLocationId,
+                    TripStatus = trip.Status,
+                    request.ArrivedAt
+                }),
+                null, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+            return response;
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            replay = await TryReplayCommandAsync<TripSegmentsResponse>(
+                context, action, operationId, "TripSegment", segmentId, fingerprint, cancellationToken);
+            if (replay is not null) return replay;
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
+        }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+        {
+            db.ChangeTracker.Clear();
+            replay = await TryReplayCommandAsync<TripSegmentsResponse>(
+                context, action, operationId, "TripSegment", segmentId, fingerprint, cancellationToken);
+            if (replay is not null) return replay;
+            throw new WaybillPersistenceException("IDEMPOTENCY_CONFLICT", ex);
+        }
+        catch (Exception ex) when (IsSerializationFailure(ex))
+        {
+            throw new WaybillPersistenceException("CONCURRENCY_CONFLICT", ex);
+        }
+    }
+
 
     private async Task<(WaybillEntity Waybill, WaybillItemEntity Item)> RequireItem(
         OperationContext context,
