@@ -1,6 +1,7 @@
 using System;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using TransportERP.Infrastructure.Persistence;
 
 #nullable disable
 
