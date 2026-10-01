@@ -8,6 +8,8 @@ public interface IShippingExecutionStore
 {
     Task<ItemQuantityStateResponse> ReleaseItemAsync(OperationContext context, Guid waybillId, Guid itemId, ReleaseItemRequest request, CancellationToken cancellationToken);
     Task<TripResponse> CreateTripAsync(OperationContext context, CreateTripRequest request, CancellationToken cancellationToken);
+    Task<TripSegmentsResponse> GetTripSegmentsAsync(OperationContext context, Guid tripId, CancellationToken cancellationToken);
+    Task<TripSegmentsResponse> SetTripSegmentsAsync(OperationContext context, Guid tripId, SetTripSegmentsRequest request, CancellationToken cancellationToken);
     Task<AllocationResponse> AllocateAsync(OperationContext context, Guid tripId, AllocateItemRequest request, CancellationToken cancellationToken);
     Task<AllocationResponse> UnallocateAsync(OperationContext context, Guid allocationId, UnallocateRequest request, CancellationToken cancellationToken);
     Task<ManifestResponse> GenerateManifestAsync(OperationContext context, Guid tripId, GenerateManifestRequest request, CancellationToken cancellationToken);
@@ -47,6 +49,30 @@ public sealed class ShippingExecutionApplicationService(IShippingExecutionStore 
             request.TripNo, request.VehicleId, request.DriverId, request.OriginId,
             request.DestinationId, request.PlannedDepartAt, stops);
         return store.CreateTripAsync(context, request, cancellationToken);
+    }
+
+    public Task<TripSegmentsResponse> GetTripSegmentsAsync(
+        OperationContext context,
+        Guid tripId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureContext(context);
+        EnsureId(tripId);
+        return store.GetTripSegmentsAsync(context, tripId, cancellationToken);
+    }
+
+    public Task<TripSegmentsResponse> SetTripSegmentsAsync(
+        OperationContext context,
+        Guid tripId,
+        SetTripSegmentsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureContext(context);
+        EnsureId(tripId);
+        EnsureOperation(request.ClientOperationId);
+        EnsureVersion(request.ExpectedVersion);
+        EnsureSegments(request.Segments);
+        return store.SetTripSegmentsAsync(context, tripId, request, cancellationToken);
     }
 
     public Task<AllocationResponse> AllocateAsync(
@@ -151,6 +177,32 @@ public sealed class ShippingExecutionApplicationService(IShippingExecutionStore 
         if (request.ActualDepartAt == default)
             throw new ShippingExecutionApplicationException("VALIDATION_ERROR");
         return store.StartTripAsync(context, tripId, request, cancellationToken);
+    }
+
+    private static void EnsureSegments(IReadOnlyList<TripSegmentInput>? segments)
+    {
+        if (segments is null || segments.Count == 0)
+            throw new ShippingExecutionApplicationException("VALIDATION_ERROR");
+
+        var ordered = segments.OrderBy(x => x.SegmentNo).ToList();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var segment = ordered[i];
+            if (segment.SegmentNo != i + 1 ||
+                segment.FromLocationId == Guid.Empty ||
+                segment.ToLocationId == Guid.Empty ||
+                segment.FromLocationId == segment.ToLocationId ||
+                segment.DriverId == Guid.Empty ||
+                segment.VehicleId == Guid.Empty ||
+                segment.FromStopId == Guid.Empty ||
+                segment.ToStopId == Guid.Empty ||
+                (segment.PlannedDepartAt.HasValue && segment.PlannedArriveAt.HasValue &&
+                 segment.PlannedArriveAt.Value < segment.PlannedDepartAt.Value))
+                throw new ShippingExecutionApplicationException("VALIDATION_ERROR");
+
+            if (i > 0 && ordered[i - 1].ToLocationId != segment.FromLocationId)
+                throw new ShippingExecutionApplicationException("ROUTE_INCOMPATIBLE");
+        }
     }
 
     private static void EnsureContext(OperationContext context)
