@@ -943,11 +943,26 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                 throw new WaybillPersistenceException("MANIFEST_NOT_ACCEPTED", ex);
             }
 
+            var firstSegment = await Segments
+                .Where(x => x.TripId == tripId)
+                .OrderBy(x => x.SegmentNo)
+                .FirstOrDefaultAsync(cancellationToken)
+                ?? throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+            if (firstSegment.CustodyStatus != "PLANNED" ||
+                firstSegment.FromLocationId != trip.OriginId)
+                throw new WaybillPersistenceException("ROUTE_INCOMPATIBLE");
+
+            var now = DateTimeOffset.UtcNow;
+            firstSegment.ActualDepartAt = request.ActualDepartAt;
+            firstSegment.CustodyStatus = "IN_CUSTODY";
+            firstSegment.Version++;
+            firstSegment.UpdatedAt = now;
+
             trip.Status = ShippingExecutionStatuses.Trip.Departed;
             trip.ActualDepartAt = request.ActualDepartAt;
             trip.LastClientOperationId = operationId;
             trip.Version++;
-            trip.UpdatedAt = DateTimeOffset.UtcNow;
+            trip.UpdatedAt = now;
 
             foreach (var line in lines)
             {
@@ -959,8 +974,8 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
                     AllocationId = line.AllocationId, ManifestLineId = line.Id,
                     EventType = "DEPART", Quantity = line.LoadedQuantity,
                     TripId = trip.Id, ManifestId = manifest.Id,
-                    FromLocationId = trip.OriginId, ToLocationId = trip.DestinationId,
-                    OccurredAt = request.ActualDepartAt, RecordedAt = DateTimeOffset.UtcNow,
+                    FromLocationId = firstSegment.FromLocationId, ToLocationId = firstSegment.ToLocationId,
+                    OccurredAt = request.ActualDepartAt, RecordedAt = now,
                     RecordedBy = context.UserId,
                     ClientOperationId = ScopedMovementOperationId(
                         context.BranchId, DerivedMovementOperationId(operationId, line.Id))
@@ -972,7 +987,16 @@ public sealed class EfShippingExecutionStore(TransportErpDbContext db, IWaybillA
             await PersistCommandOutcomeAsync(
                 context, action, operationId, "Trip", trip.Id, fingerprint, response, cancellationToken);
             await audit.WriteAsync(context, "TripStart", "SUCCESS", "Trip", trip.Id,
-                null, JsonSerializer.Serialize(new { trip.TripNo, trip.ActualDepartAt, DepartLineCount = lines.Count }),
+                null, JsonSerializer.Serialize(new
+                {
+                    trip.TripNo,
+                    trip.ActualDepartAt,
+                    firstSegment.Id,
+                    firstSegment.SegmentNo,
+                    CurrentLocationId = firstSegment.FromLocationId,
+                    NextLocationId = firstSegment.ToLocationId,
+                    DepartLineCount = lines.Count
+                }),
                 null, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return response;
