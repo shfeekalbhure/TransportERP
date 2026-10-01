@@ -2265,6 +2265,90 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripSegmentEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualArriveAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTimeOffset?>("ActualDepartAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<string>("CustodyStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FromLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FromStopId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PlannedArriveAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateTimeOffset?>("PlannedDepartAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<int>("SegmentNo")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ToLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ToStopId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId", "CustodyStatus");
+
+                    b.HasIndex("FromStopId");
+
+                    b.HasIndex("ToStopId");
+
+                    b.HasIndex("TripId", "FromLocationId", "ToLocationId");
+
+                    b.HasIndex("TripId", "SegmentNo")
+                        .IsUnique();
+
+                    b.HasIndex("VehicleId", "CustodyStatus");
+
+                    b.ToTable("trip_segments", "transport_erp", t =>
+                        {
+                            t.HasCheckConstraint("ck_trip_segment_dates", "\"PlannedArriveAt\" IS NULL OR \"PlannedDepartAt\" IS NULL OR \"PlannedArriveAt\" >= \"PlannedDepartAt\"");
+
+                            t.HasCheckConstraint("ck_trip_segment_locations", "\"FromLocationId\" <> \"ToLocationId\"");
+
+                            t.HasCheckConstraint("ck_trip_segment_number", "\"SegmentNo\" > 0");
+
+                            t.HasCheckConstraint("ck_trip_segment_status", "\"CustodyStatus\" IN ('PLANNED','IN_CUSTODY','ARRIVED','CLOSED','CANCELLED')");
+                        });
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripStopEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3348,6 +3432,31 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Navigation("WaybillItem");
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripSegmentEntity", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.TripStopEntity", "FromStop")
+                        .WithMany()
+                        .HasForeignKey("FromStopId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.TripStopEntity", "ToStop")
+                        .WithMany()
+                        .HasForeignKey("ToStopId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.TripEntity", "Trip")
+                        .WithMany("Segments")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromStop");
+
+                    b.Navigation("ToStop");
+
+                    b.Navigation("Trip");
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.TripStopEntity", b =>
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.TripEntity", "Trip")
@@ -3484,6 +3593,8 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Navigation("Allocations");
 
                     b.Navigation("Manifests");
+
+                    b.Navigation("Segments");
 
                     b.Navigation("Stops");
                 });
