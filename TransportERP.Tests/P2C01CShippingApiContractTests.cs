@@ -74,6 +74,64 @@ public sealed class P2C01CShippingApiContractTests
     }
 
     [Fact]
+    public async Task Trip_segment_routes_are_permission_protected_and_forward_authenticated_scope()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var branchId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var fromLocationId = Guid.NewGuid();
+        var toLocationId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var store = new RecordingShippingExecutionStore();
+
+        using var factory = CreateFactory(store);
+        using var client = factory.CreateClient();
+
+        var cases = new[]
+        {
+            new RouteCase(
+                "GetTripSegments", ShippingExecutionPermissionCodes.TripCreate,
+                $"/api/v1/trips/{tripId}/segments",
+                () => new HttpRequestMessage(HttpMethod.Get, $"/api/v1/trips/{tripId}/segments")),
+            new RouteCase(
+                "SetTripSegments", ShippingExecutionPermissionCodes.TripCreate,
+                $"/api/v1/trips/{tripId}/segments",
+                () => Put($"/api/v1/trips/{tripId}/segments",
+                    new SetTripSegmentsRequest(
+                        1,
+                        [new TripSegmentInput(
+                            1, fromLocationId, toLocationId, null, null,
+                            driverId, vehicleId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1))],
+                        "api-segments")))
+        };
+
+        foreach (var route in cases)
+        {
+            using (var deniedRequest = route.CreateRequest())
+            {
+                deniedRequest.Headers.Authorization = new AuthenticationHeaderValue(
+                    "Bearer", CreateToken(userId, companyId, branchId, "other.permission"));
+                var denied = await client.SendAsync(deniedRequest);
+                Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+            }
+
+            store.Reset();
+            var correlationId = Guid.NewGuid();
+            using var allowedRequest = route.CreateRequest();
+            allowedRequest.Headers.Authorization = new AuthenticationHeaderValue(
+                "Bearer", CreateToken(userId, companyId, branchId, route.Permission));
+            allowedRequest.Headers.TryAddWithoutValidation("X-Correlation-Id", correlationId.ToString());
+
+            var allowed = await client.SendAsync(allowedRequest);
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+            Assert.Equal(route.CallName, store.LastCall);
+            Assert.Equal(correlationId, store.LastContext?.CorrelationId);
+        }
+    }
+
+    [Fact]
     public async Task C_group_requires_authentication_and_complete_company_branch_context()
     {
         var store = new RecordingShippingExecutionStore();
@@ -186,6 +244,7 @@ public sealed class P2C01CShippingApiContractTests
         var driverId = Guid.NewGuid();
         var originId = Guid.NewGuid();
         var destinationId = Guid.NewGuid();
+        var segmentId = Guid.NewGuid();
 
         return new[]
         {
@@ -234,12 +293,20 @@ public sealed class P2C01CShippingApiContractTests
                 "StartTrip", ShippingExecutionPermissionCodes.TripStart,
                 $"/api/v1/trips/{tripId}:start",
                 () => Post($"/api/v1/trips/{tripId}:start",
-                    new StartTripRequest(now, 1, "api-start")))
+                    new StartTripRequest(now, 1, "api-start"))),
+            new RouteCase(
+                "AdvanceTripSegment", ShippingExecutionPermissionCodes.TripAdvance,
+                $"/api/v1/trips/{tripId}/segments/{segmentId}:arrive",
+                () => Post($"/api/v1/trips/{tripId}/segments/{segmentId}:arrive",
+                    new AdvanceTripSegmentRequest(now, 2, 1, "api-segment-arrive")))
         };
     }
 
     private static HttpRequestMessage Post<T>(string path, T body)
         => new(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
+
+    private static HttpRequestMessage Put<T>(string path, T body)
+        => new(HttpMethod.Put, path) { Content = JsonContent.Create(body) };
 
     private static WebApplicationFactory<Program> CreateFactory(IShippingExecutionStore store)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -331,6 +398,28 @@ public sealed class P2C01CShippingApiContractTests
                 request.PlannedDepartAt, null, "DRAFT", 1, [], context.CorrelationId));
         }
 
+        public Task<TripSegmentsResponse> GetTripSegmentsAsync(
+            OperationContext context, Guid tripId, CancellationToken cancellationToken)
+        {
+            Capture("GetTripSegments", context);
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, 1, [], context.CorrelationId));
+        }
+
+        public Task<TripSegmentsResponse> SetTripSegmentsAsync(
+            OperationContext context, Guid tripId, SetTripSegmentsRequest request,
+            CancellationToken cancellationToken)
+        {
+            Capture("SetTripSegments", context);
+            var segments = request.Segments.Select(x => new TripSegmentResponse(
+                Guid.NewGuid(), tripId, x.SegmentNo, x.FromLocationId, x.ToLocationId,
+                x.FromStopId, x.ToStopId, x.DriverId, x.VehicleId,
+                x.PlannedDepartAt, x.PlannedArriveAt, null, null,
+                "PLANNED", 1, context.CorrelationId)).ToList();
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, request.ExpectedVersion + 1, segments, context.CorrelationId));
+        }
+
         public Task<AllocationResponse> AllocateAsync(
             OperationContext context, Guid tripId, AllocateItemRequest request, CancellationToken cancellationToken)
         {
@@ -397,6 +486,15 @@ public sealed class P2C01CShippingApiContractTests
                 tripId, context.CompanyId, context.BranchId, "TR-API", Guid.NewGuid(), Guid.NewGuid(),
                 Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1), request.ActualDepartAt,
                 "DEPARTED", request.ExpectedVersion + 1, [], context.CorrelationId));
+        }
+
+        public Task<TripSegmentsResponse> AdvanceTripSegmentAsync(
+            OperationContext context, Guid tripId, Guid segmentId, AdvanceTripSegmentRequest request,
+            CancellationToken cancellationToken)
+        {
+            Capture("AdvanceTripSegment", context);
+            return Task.FromResult(new TripSegmentsResponse(
+                tripId, request.ExpectedTripVersion + 1, [], context.CorrelationId));
         }
     }
 }

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   shipping-postgresql:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821' || github.head_ref == 'feature/waybill-reference-alignment'
     name: Shipping + PostgreSQL + HTTP
     runs-on: ubuntu-latest
     services:
@@ -113,7 +113,7 @@ jobs:
         run: dotnet test TransportERP.Tests/TransportERP.Tests.csproj --configuration Debug --no-build --filter "FullyQualifiedName~P2C01CShippingPostgreSqlIntegrationTests|FullyQualifiedName~P2C01CConcurrencyPostgreSqlTests|FullyQualifiedName~P2C01CPhysicalMeasurePostgreSqlTests|FullyQualifiedName~P2C01CTeam03PostgreSqlHardeningTests"
 
   shipping-desktop-rtl:
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821'
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/p2-c01-c-release-trip-manifest-20260821' || github.head_ref == 'feature/waybill-reference-alignment'
     name: Shipping Desktop RTL
     runs-on: windows-latest
     steps:

@@ -31,6 +31,17 @@ public static class ShippingExecutionApiModule
             await Authorized(http, ShippingExecutionPermissionCodes.TripCreate,
                 context => service.CreateTripAsync(context, request, ct)));
 
+        group.MapGet("/trips/{tripId:guid}/segments", async Task<IResult> (
+            Guid tripId, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, ShippingExecutionPermissionCodes.TripCreate,
+                context => service.GetTripSegmentsAsync(context, tripId, ct)));
+
+        group.MapPut("/trips/{tripId:guid}/segments", async Task<IResult> (
+            Guid tripId, SetTripSegmentsRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, ShippingExecutionPermissionCodes.TripCreate,
+                context => service.SetTripSegmentsAsync(context, tripId, request, ct)));
+
         group.MapPost("/trips/{tripId:guid}/allocations", async Task<IResult> (
             Guid tripId, AllocateItemRequest request, HttpContext http, ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.Allocate,
@@ -69,6 +80,12 @@ public static class ShippingExecutionApiModule
             ShippingExecutionApplicationService service, CancellationToken ct) =>
             await Authorized(http, ShippingExecutionPermissionCodes.TripStart,
                 context => service.StartTripAsync(context, tripId, request, ct)));
+
+        group.MapPost("/trips/{tripId:guid}/segments/{segmentId:guid}:arrive", async Task<IResult> (
+            Guid tripId, Guid segmentId, AdvanceTripSegmentRequest request, HttpContext http,
+            ShippingExecutionApplicationService service, CancellationToken ct) =>
+            await Authorized(http, ShippingExecutionPermissionCodes.TripAdvance,
+                context => service.AdvanceTripSegmentAsync(context, tripId, segmentId, request, ct)));
 
         return app;
     }

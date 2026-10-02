@@ -53,6 +53,51 @@ public sealed record TripResponse(
     IReadOnlyList<TripStopResponse> Stops,
     Guid CorrelationId);
 
+/// <summary>
+/// Execution-level trip segment. This is deliberately separate from the route template:
+/// a route describes the planned corridor, while a segment owns the actual driver/vehicle
+/// custody between two consecutive operational stops.
+/// </summary>
+public sealed record TripSegmentInput(
+    int SegmentNo,
+    Guid FromLocationId,
+    Guid ToLocationId,
+    Guid? FromStopId,
+    Guid? ToStopId,
+    Guid DriverId,
+    Guid VehicleId,
+    DateTimeOffset? PlannedDepartAt,
+    DateTimeOffset? PlannedArriveAt);
+
+public sealed record SetTripSegmentsRequest(
+    long ExpectedVersion,
+    IReadOnlyList<TripSegmentInput> Segments,
+    string ClientOperationId);
+
+public sealed record TripSegmentResponse(
+    Guid Id,
+    Guid TripId,
+    int SegmentNo,
+    Guid FromLocationId,
+    Guid ToLocationId,
+    Guid? FromStopId,
+    Guid? ToStopId,
+    Guid DriverId,
+    Guid VehicleId,
+    DateTimeOffset? PlannedDepartAt,
+    DateTimeOffset? PlannedArriveAt,
+    DateTimeOffset? ActualDepartAt,
+    DateTimeOffset? ActualArriveAt,
+    string CustodyStatus,
+    long Version,
+    Guid CorrelationId);
+
+public sealed record TripSegmentsResponse(
+    Guid TripId,
+    long TripVersion,
+    IReadOnlyList<TripSegmentResponse> Segments,
+    Guid CorrelationId);
+
 public sealed record AllocateItemRequest(
     Guid WaybillItemId,
     Guid ReleaseId,
@@ -122,6 +167,12 @@ public sealed record StartTripRequest(
     long ExpectedVersion,
     string ClientOperationId);
 
+public sealed record AdvanceTripSegmentRequest(
+    DateTimeOffset ArrivedAt,
+    long ExpectedTripVersion,
+    long ExpectedSegmentVersion,
+    string ClientOperationId);
+
 public static class ShippingExecutionPermissionCodes
 {
     public const string Release = "waybill.release";
@@ -133,4 +184,5 @@ public static class ShippingExecutionPermissionCodes
     public const string ManifestFinalize = "manifest.finalize";
     public const string ManifestHandover = "manifest.handover";
     public const string TripStart = "trip.start";
+    public const string TripAdvance = "trip.advance";
 }
