@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="TransportERP.Desktop/TransportERP.Desktop.csproj" />
+  <Project Path="TransportERP.EmptyForms/TransportERP.EmptyForms.csproj" />
+  <Project Path="TransportERP.SharedVisuals/TransportERP.SharedVisuals.csproj" />
+  <Project Path="TransportERP.Contracts/TransportERP.Contracts.csproj" />
+  <Project Path="components/src/TransportERP.SharedUI.csproj" />
+  <Project Path="components/toolbar-preparation/DesignerDraft.csproj" />
+</Solution>

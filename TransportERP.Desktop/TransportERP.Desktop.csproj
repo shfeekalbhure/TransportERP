@@ -17,4 +17,49 @@
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="CoreUI/*.cs;Forms/Templates/**/*.cs" />
+    <EmbeddedResource Remove="CoreUI/*.resx;Forms/Templates/**/*.resx" />
+    <ProjectReference Include="../TransportERP.EmptyForms/TransportERP.EmptyForms.csproj" />
+    <ProjectReference Include="../TransportERP.SharedVisuals/TransportERP.SharedVisuals.csproj" />
+    <ProjectReference Include="../components/toolbar-preparation/DesignerDraft.csproj" />
+    <ProjectReference Include="../components/src/TransportERP.SharedUI.csproj" Aliases="SharedCommands" />
+    <Compile Update="FrmDashboard.Designer.cs"><DependentUpon>FrmDashboard.cs</DependentUpon></Compile>
+    <Compile Update="Properties/Resources.Designer.cs"><DesignTime>True</DesignTime><AutoGen>True</AutoGen><DependentUpon>Resources.resx</DependentUpon></Compile>
+    <EmbeddedResource Update="Properties/Resources.resx"><Generator>ResXFileCodeGenerator</Generator><LastGenOutput>Resources.Designer.cs</LastGenOutput></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Ensure FrmMain.PhaseOneNavigation.resx has a unique manifest resource name to avoid collision with FrmMain.resx -->
+    <EmbeddedResource Update="FrmMain.PhaseOneNavigation.resx">
+      <ManifestResourceName>TransportERP.Desktop.FrmMain.PhaseOneNavigation</ManifestResourceName>
+      <LogicalName>TransportERP.Desktop.FrmMain.PhaseOneNavigation</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="البوالص_والشحن\الاعدادات\الشركة\" />
+    <Folder Include="البوالص_والشحن\الاعدادات\الفروع\" />
+    <Folder Include="البوالص_والشحن\العمليات\التذاكر\" />
+    <Folder Include="البوالص_والشحن\التهيئة\" />
+    <Folder Include="البوالص_والشحن\المدخلات\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmCurrencyManagement.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmCurrencyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmCurrencyManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmExchangeRates.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmExchangeRates.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmExchangeRates.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencyManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>UcCurrencyManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcExchangeRates.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcExchangeRates.Designer.cs"><SubType>Code</SubType><DependentUpon>UcExchangeRates.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmBranchManagement.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmBranchManagement.Designer.cs"><DependentUpon>FrmBranchManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/الفروع/UcBranchManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/الفروع/UcBranchManagement.Designer.cs"><DependentUpon>UcBranchManagement.cs</DependentUpon></Compile>
+  </ItemGroup>
 </Project>
+
