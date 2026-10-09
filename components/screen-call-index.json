@@ -1,0 +1,3746 @@
+{
+  "source": "evidence/shared-ui-center-screen-matrix.json",
+  "sourceCount": 68,
+  "rows": [
+    {
+      "sourceRow": 0,
+      "booklet": "K01",
+      "sourceScreenCode": "01.01",
+      "title": "شاشة تسجيل الدخول",
+      "formCandidate": "FrmLogin",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmLogin",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmLogin",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmLogin",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "CONDITIONAL",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmLogin",
+          "reason": "Observed controls edit/select scope; their preservation is required, but a current-session display component is not proved. Define scope/visibility without duplication.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "CONDITIONAL",
+            "session.branch": "CONDITIONAL",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmLogin",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 1,
+      "booklet": "K02",
+      "sourceScreenCode": "01.02",
+      "title": "الشاشة الرئيسية",
+      "formCandidate": "FrmMain",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmMain",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmMain",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmMain",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmMain",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "REQUIRED",
+            "session.branch": "REQUIRED",
+            "session.user": "REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmMain",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 2,
+      "booklet": "K03",
+      "sourceScreenCode": "02.01.01",
+      "title": "إدارة الشركات",
+      "formCandidate": "FrmCompanyManagement",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCompanyManagement",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCompanyManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCompanyManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCompanyManagement",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCompanyManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 3,
+      "booklet": "K04",
+      "sourceScreenCode": "02.02.01",
+      "title": "إدارة الفروع",
+      "formCandidate": "FrmBranchManagement",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmBranchManagement",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmBranchManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmBranchManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmBranchManagement",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmBranchManagement",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 4,
+      "booklet": "K05",
+      "sourceScreenCode": "02.03.01",
+      "title": "المستخدمون",
+      "formCandidate": "FrmUsersPermissions",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "Candidate: one Designer-placed AuditCountersControl supplies all six audit fields and both counters. SetDisplayValues updates only its eight existing text fields. Preserve screen-specific toolbar; no context/status added.",
+      "newerEvidence": "CTX-06/CTX-07 and current FrmUsersPermissions.Designer.cs prove an existing 6+2 footer. Historical matrix remains copied unchanged; this observation does not approve live binding or other screens.",
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 5,
+      "booklet": "K06",
+      "sourceScreenCode": "02.03.02",
+      "title": "الأدوار",
+      "formCandidate": "FrmUsersPermissions",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "Candidate: one Designer-placed AuditCountersControl supplies all six audit fields and both counters. SetDisplayValues updates only its eight existing text fields. Preserve screen-specific toolbar; no context/status added.",
+      "newerEvidence": "CTX-06/CTX-07 and current FrmUsersPermissions.Designer.cs prove an existing 6+2 footer. Historical matrix remains copied unchanged; this observation does not approve live binding or other screens.",
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 6,
+      "booklet": "K07",
+      "sourceScreenCode": "02.03.03",
+      "title": "الصلاحيات",
+      "formCandidate": "FrmUsersPermissions",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmUsersPermissions",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "Candidate: one Designer-placed AuditCountersControl supplies all six audit fields and both counters. SetDisplayValues updates only its eight existing text fields. Preserve screen-specific toolbar; no context/status added.",
+      "newerEvidence": "CTX-06/CTX-07 and current FrmUsersPermissions.Designer.cs prove an existing 6+2 footer. Historical matrix remains copied unchanged; this observation does not approve live binding or other screens.",
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 7,
+      "booklet": "K08",
+      "sourceScreenCode": "02.03.06",
+      "title": "تغيير كلمة السر",
+      "formCandidate": "FrmChangePassword",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmChangePassword",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmChangePassword",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmChangePassword",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmChangePassword",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmChangePassword",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 8,
+      "booklet": "K09",
+      "sourceScreenCode": "02.04.01",
+      "title": "إعدادات الترقيم",
+      "formCandidate": "FrmDocumentNumbering",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmDocumentNumbering",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmDocumentNumbering",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmDocumentNumbering",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "CONDITIONAL",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmDocumentNumbering",
+          "reason": "Observed controls edit/select scope; their preservation is required, but a current-session display component is not proved. Define scope/visibility without duplication.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "CONDITIONAL",
+            "session.branch": "CONDITIONAL",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmDocumentNumbering",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 9,
+      "booklet": "K10",
+      "sourceScreenCode": "02.04.02",
+      "title": "العملات",
+      "formCandidate": "FrmCurrencyExchangeSettings",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 10,
+      "booklet": "K11",
+      "sourceScreenCode": "02.04.03",
+      "title": "أسعار الصرف",
+      "formCandidate": "FrmCurrencyExchangeSettings",
+      "identityReconciliation": "Existing source-backed screen or tab. Preserve existing functionality; field/action reconciliation remains separate.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "Preserve currently proven component and its existing function; not a universal/shared design mandate.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmCurrencyExchangeSettings",
+          "reason": "No current component established; absence does not prove non-applicability.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 11,
+      "booklet": "K12",
+      "sourceScreenCode": "02.05.21",
+      "title": "ترميز اللغات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 12,
+      "booklet": "K13",
+      "sourceScreenCode": "03.01.01",
+      "title": "إدارة العملاء",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 13,
+      "booklet": "K14",
+      "sourceScreenCode": "03.02.01",
+      "title": "إدارة الموردين",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 14,
+      "booklet": "K15",
+      "sourceScreenCode": "03.03.01",
+      "title": "إدارة الوكلاء",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 15,
+      "booklet": "K16",
+      "sourceScreenCode": "04.01.01",
+      "title": "دليل الحسابات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 16,
+      "booklet": "K17",
+      "sourceScreenCode": "04.02.01",
+      "title": "إدارة مراكز التكلفة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 17,
+      "booklet": "K18",
+      "sourceScreenCode": "04.03.01",
+      "title": "إدارة الصناديق",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 18,
+      "booklet": "K19",
+      "sourceScreenCode": "04.03.02",
+      "title": "إدارة البنوك",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 19,
+      "booklet": "K20",
+      "sourceScreenCode": "04.04.01",
+      "title": "سند القبض",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 20,
+      "booklet": "K21",
+      "sourceScreenCode": "04.04.02",
+      "title": "سند الصرف",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 21,
+      "booklet": "K22",
+      "sourceScreenCode": "04.05.01",
+      "title": "قيد اليومية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 22,
+      "booklet": "K23",
+      "sourceScreenCode": "04.07.16",
+      "title": "الأرصدة الافتتاحية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 23,
+      "booklet": "K24",
+      "sourceScreenCode": "04.08.01",
+      "title": "إشعارات مدينة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 24,
+      "booklet": "K25",
+      "sourceScreenCode": "04.08.02",
+      "title": "إشعارات دائنة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 25,
+      "booklet": "K26",
+      "sourceScreenCode": "04.08.05",
+      "title": "طلبات قيود اليومية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 26,
+      "booklet": "K27",
+      "sourceScreenCode": "04.09.06",
+      "title": "تسوية البنوك",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 27,
+      "booklet": "K28",
+      "sourceScreenCode": "04.10.03",
+      "title": "تسوية المصروفات المقدمة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 28,
+      "booklet": "K29",
+      "sourceScreenCode": "04.10.04",
+      "title": "تسوية الإيرادات المقدمة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 29,
+      "booklet": "K30",
+      "sourceScreenCode": "04.10.05",
+      "title": "جرد النقدية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 30,
+      "booklet": "K31",
+      "sourceScreenCode": "05.01.01",
+      "title": "الفحص والمعاينة الأولية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 31,
+      "booklet": "K32",
+      "sourceScreenCode": "05.02.01",
+      "title": "شاشة البوليصة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 32,
+      "booklet": "K33",
+      "sourceScreenCode": "05.03.01",
+      "title": "توريد المنقولات للمخزن",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 33,
+      "booklet": "K34",
+      "sourceScreenCode": "05.03.03",
+      "title": "طلبات التوريد",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 34,
+      "booklet": "K35",
+      "sourceScreenCode": "05.04.01",
+      "title": "كشف الترحيل",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 35,
+      "booklet": "K36",
+      "sourceScreenCode": "05.04.02",
+      "title": "استلام المنقولات في نقطة/مخزن الوصول",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 36,
+      "booklet": "K37",
+      "sourceScreenCode": "05.05.01",
+      "title": "تسليم البوليصة/المنقولات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 37,
+      "booklet": "K38",
+      "sourceScreenCode": "05.05.02",
+      "title": "تحصيل مستحقات البوليصة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 38,
+      "booklet": "K39",
+      "sourceScreenCode": "05.06.01",
+      "title": "المطالبات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 39,
+      "booklet": "K40",
+      "sourceScreenCode": "05.06.02",
+      "title": "المرتجعات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 40,
+      "booklet": "K41",
+      "sourceScreenCode": "06.01.01",
+      "title": "الحجز/إصدار التذكرة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 41,
+      "booklet": "K42",
+      "sourceScreenCode": "06.02.01",
+      "title": "إدارة الرحلات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 42,
+      "booklet": "K43",
+      "sourceScreenCode": "09.01.01",
+      "title": "إدارة المركبات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 43,
+      "booklet": "K44",
+      "sourceScreenCode": "09.02.01",
+      "title": "إدارة السائقين",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 44,
+      "booklet": "K45",
+      "sourceScreenCode": "10.01.01",
+      "title": "إدارة المخازن",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 45,
+      "booklet": "K46",
+      "sourceScreenCode": "10.01.02",
+      "title": "مواقع ورفوف التخزين",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 46,
+      "booklet": "K47",
+      "sourceScreenCode": "10.02.01",
+      "title": "عهدة دفاتر البوالص",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 47,
+      "booklet": "K48",
+      "sourceScreenCode": "02.02.04",
+      "title": "الدول",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 48,
+      "booklet": "K49",
+      "sourceScreenCode": "02.02.05",
+      "title": "المحافظات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 49,
+      "booklet": "K50",
+      "sourceScreenCode": "02.02.06",
+      "title": "المديريات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 50,
+      "booklet": "K51",
+      "sourceScreenCode": "02.02.07",
+      "title": "المدن",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 51,
+      "booklet": "K52",
+      "sourceScreenCode": "02.02.08",
+      "title": "المناطق",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 52,
+      "booklet": "K53",
+      "sourceScreenCode": "02.04.06",
+      "title": "السنوات المالية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 53,
+      "booklet": "K54",
+      "sourceScreenCode": "02.04.07",
+      "title": "إعدادات التشغيل العامة والمتغيرات المشتركة",
+      "formCandidate": "FrmGeneralSettings",
+      "identityReconciliation": "K54 B5=02.04.07 and D6=ADR-599-057-001 / GEN-015 identify a governing screen, but do not map it to FrmGeneralSettings. Candidate only; per-element governing mapping required. Source-reference-reconciliation.md records V20 SETTINGS SCREEN CATALOG row36 and FIELD DESIGN MATRIX row19 versus current Designer tabs.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmGeneralSettings",
+          "reason": "الحاوية والإجراءات قائمة فعلًا؛ المحافظة على الوظائف الحالية لازمة. مطابقة الإجراءات الثمانية مع SCR-SET-030 قرينة وليست إغلاق هويةForm.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmGeneralSettings",
+          "reason": "ViewAudit/version history مثبت لعقدSCR-SET-030 لكن لا يثبتFooter دائمًا أوحقوله. الصورة0001 تثبت الشكل فقط ولا تنقل إلزامه.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmGeneralSettings",
+          "reason": "لا جرد عدادات مثبت لهذه الشاشة في الأدلة المفحوصة. هذا لا يثبت عدم الانطباق.",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "CONDITIONAL",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmGeneralSettings",
+          "reason": "DS-001 يثبت حاجة سياقCompany/Branch؛ وجود حاوية مستقلة داخلForm مشروط بمدى تغطيةShell والسياق الوظيفي. اختيارات الشركة/الفرع داخلForm هي مدخلات وليست تلقائيًاContext للقراءة.؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "CONDITIONAL",
+            "session.branch": "CONDITIONAL",
+            "session.user": "CONDITIONAL"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "CONDITIONAL",
+          "evidenceStatus": "CURRENT PRESERVATION ONLY",
+          "source": "shared-component-applicability-matrix.json / FrmGeneralSettings",
+          "reason": "عرض حالات Online / Offline / Sync وحالة اعتماد الإعدادات مدعوم بنظام التصميم وبأفعال Validate / Publish؛ ظهور المكون يتبع الحالة والعقد. لا يثبت ذلك Status دائمًا لسجل مجهول الهوية.",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 54,
+      "booklet": "K55",
+      "sourceScreenCode": "04.01.02",
+      "title": "مجموعات وأنواع الحسابات",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 55,
+      "booklet": "K56",
+      "sourceScreenCode": "04.03.03",
+      "title": "الحسابات البنكية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 56,
+      "booklet": "K57",
+      "sourceScreenCode": "04.03.04",
+      "title": "طرق الدفع",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 57,
+      "booklet": "K58",
+      "sourceScreenCode": "04.11.01",
+      "title": "الفترات المحاسبية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 58,
+      "booklet": "K59",
+      "sourceScreenCode": "04.04.03",
+      "title": "سند التحويل بين الصناديق والبنوك",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 59,
+      "booklet": "K60",
+      "sourceScreenCode": "04.11.02",
+      "title": "إغلاق وفتح الفترات المحاسبية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 60,
+      "booklet": "K61",
+      "sourceScreenCode": "04.11.03",
+      "title": "قيود التسوية والإقفال السنوي",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 61,
+      "booklet": "K62",
+      "sourceScreenCode": "04.11.04",
+      "title": "القيود العكسية وربط القيد الأصلي بالقيد العاكس",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 62,
+      "booklet": "K63",
+      "sourceScreenCode": "04.11.05",
+      "title": "طلبات الاعتماد المحاسبية",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 63,
+      "booklet": "K64",
+      "sourceScreenCode": "04.04.04",
+      "title": "تحويل نقدي بين الصناديق",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 64,
+      "booklet": "K65",
+      "sourceScreenCode": "04.04.05",
+      "title": "إيداع نقدي في البنك",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 65,
+      "booklet": "K66",
+      "sourceScreenCode": "04.04.06",
+      "title": "سحب من البنك إلى الصندوق",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 66,
+      "booklet": "K67",
+      "sourceScreenCode": "04.11.06",
+      "title": "إقفال وردية الصندوق",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    },
+    {
+      "sourceRow": 67,
+      "booklet": "K68",
+      "sourceScreenCode": "04.11.07",
+      "title": "تخصيص الدفعات وتسوية الأرصدة",
+      "formCandidate": null,
+      "identityReconciliation": "No implemented counterpart among current Forms or their tabs. A tree caption, a related lookup or a field within another screen does not implement this management screen. Classification is limited to the inspected Desktop source, not deleted history or external assemblies.",
+      "components": {
+        "SHARED-ACTION-BAR": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-AUDIT-FOOTER": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-COUNTERS-PANEL": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        },
+        "SHARED-SESSION-CONTEXT": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق؛ حالة المستخدم مستقلة في fieldApplicability ولا تستنتج من حالة الشركة.",
+          "fit": "NOT MEASURED",
+          "fieldApplicability": {
+            "session.company": "EVIDENCE REQUIRED",
+            "session.branch": "EVIDENCE REQUIRED",
+            "session.user": "EVIDENCE REQUIRED"
+          }
+        },
+        "SHARED-CONNECTION-STATUS": {
+          "applicability": "EVIDENCE REQUIRED",
+          "evidenceStatus": "SCREEN-SPECIFIC CONTENT REVIEW OPEN",
+          "source": "لم يحسم الانطباق العنصري لهذا الصف",
+          "reason": "التصميم الموحد معتمد؛ قائمة الحاويات والحقول الخاصة بالشاشة تحتاج مرجعها قبل الإغلاق",
+          "fit": "NOT MEASURED"
+        }
+      },
+      "invocation": "No automatic shared-control insertion. Retain source-specific components until applicability, parent, order, visibility and Designer variant are established.",
+      "newerEvidence": null,
+      "integrated": false,
+      "designerVerified": false,
+      "fit120Verified": false
+    }
+  ]
+}

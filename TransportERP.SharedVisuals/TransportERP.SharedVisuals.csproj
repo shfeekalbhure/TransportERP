@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TransportERP.Desktop</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../TransportERP.Desktop/CoreUI/*.cs" Link="CoreUI/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../TransportERP.Desktop/Forms/Templates/**/*.cs" Link="Forms/Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../TransportERP.Desktop/CoreUI/*.resx" Link="CoreUI/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../TransportERP.Desktop/Forms/Templates/**/*.resx" Link="Forms/Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Update="../TransportERP.Desktop/CoreUI/AuditMetadataControl.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="../TransportERP.Desktop/CoreUI/AuditMetadataControl.Designer.cs"><DependentUpon>AuditMetadataControl.cs</DependentUpon><SubType>Code</SubType></Compile>
+  </ItemGroup>
+</Project>
+

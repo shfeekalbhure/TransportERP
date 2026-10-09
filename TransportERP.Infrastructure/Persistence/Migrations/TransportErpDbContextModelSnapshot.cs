@@ -23,6 +23,37 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AccountingWorkflowSnapshot", b =>
+                {
+                    b.Property<string>("DocumentType")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PolicyJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("DocumentType", "DocumentId");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("accounting_workflow_snapshots", "transport_erp");
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1808,6 +1839,49 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ReceiptAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AddedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("ReceiptId");
+
+                    b.ToTable("receipt_attachments", "transport_erp");
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ReceiptVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1836,6 +1910,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CurrencyId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("DocumentJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("ExternalReference")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -1854,6 +1931,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<Guid?>("PostingJournalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PostingPolicyJson")
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("ReferenceId")
                         .HasColumnType("uuid");
 
@@ -1861,6 +1944,9 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("ReversalJournalId")
+                        .HasColumnType("uuid");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1889,6 +1975,12 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CurrencyId");
 
+                    b.HasIndex("PostingJournalId")
+                        .IsUnique();
+
+                    b.HasIndex("ReversalJournalId")
+                        .IsUnique();
+
                     b.HasIndex("CompanyId", "VoucherNo")
                         .IsUnique();
 
@@ -1900,7 +1992,7 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_receipt_vouchers_amount", "\"Amount\" > 0");
 
-                            t.HasCheckConstraint("ck_receipts_status", "\"Status\" IN ('DRAFT','APPROVED','POSTED','CANCELLED')");
+                            t.HasCheckConstraint("ck_receipts_status", "\"Status\" IN ('DRAFT','REVIEWED','APPROVED','POSTED','CANCELLED')");
                         });
                 });
 
@@ -2799,6 +2891,21 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AccountingWorkflowSnapshot", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.AuditEvent", b =>
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
@@ -3252,6 +3359,21 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ReceiptAttachment", b =>
+                {
+                    b.HasOne("TransportERP.Infrastructure.Persistence.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.ReceiptVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.ReceiptVoucher", b =>
                 {
                     b.HasOne("TransportERP.Infrastructure.Persistence.Branch", null)
@@ -3277,6 +3399,16 @@ namespace TransportERP.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("PostingJournalId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TransportERP.Infrastructure.Persistence.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("ReversalJournalId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("TransportERP.Infrastructure.Persistence.RolePermission", b =>

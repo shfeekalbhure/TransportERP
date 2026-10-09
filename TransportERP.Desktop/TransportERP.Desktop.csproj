@@ -15,6 +15,229 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TransportERP.Contracts\TransportERP.Contracts.csproj" />
+    <None Update="Resources/GoldenIcons/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Resources/GoldenIcons/ATTRIBUTION.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="CoreUI/*.cs;Forms/Templates/**/*.cs" />
+    <EmbeddedResource Remove="CoreUI/*.resx;Forms/Templates/**/*.resx" />
+    <ProjectReference Include="../TransportERP.EmptyForms/TransportERP.EmptyForms.csproj" />
+    <ProjectReference Include="../TransportERP.SharedVisuals/TransportERP.SharedVisuals.csproj" />
+    <ProjectReference Include="../components/toolbar-preparation/DesignerDraft.csproj" />
+    <ProjectReference Include="../components/src/TransportERP.SharedUI.csproj" Aliases="SharedCommands" />
+    <Compile Update="FrmDashboard.Designer.cs"><DependentUpon>FrmDashboard.cs</DependentUpon></Compile>
+    <Compile Update="Properties/Resources.Designer.cs"><DesignTime>True</DesignTime><AutoGen>True</AutoGen><DependentUpon>Resources.resx</DependentUpon></Compile>
+    <EmbeddedResource Update="Properties/Resources.resx"><Generator>ResXFileCodeGenerator</Generator><LastGenOutput>Resources.Designer.cs</LastGenOutput></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Ensure FrmMain.PhaseOneNavigation.resx has a unique manifest resource name to avoid collision with FrmMain.resx -->
+    <EmbeddedResource Update="FrmMain.PhaseOneNavigation.resx">
+      <ManifestResourceName>TransportERP.Desktop.FrmMain.PhaseOneNavigation</ManifestResourceName>
+      <LogicalName>TransportERP.Desktop.FrmMain.PhaseOneNavigation</LogicalName>
+    </EmbeddedResource>
+    <!-- This partial FrmMain file needs its own output resource name as well. -->
+    <EmbeddedResource Update="FrmMain.AuthenticatedSession.resx">
+      <ManifestResourceName>TransportERP.Desktop.FrmMain.AuthenticatedSession</ManifestResourceName>
+      <LogicalName>TransportERP.Desktop.FrmMain.AuthenticatedSession</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="البوالص_والشحن\الاعدادات\الشركة\" />
+    <Folder Include="البوالص_والشحن\الاعدادات\الفروع\" />
+    <Folder Include="البوالص_والشحن\العمليات\التذاكر\" />
+    <Folder Include="البوالص_والشحن\التهيئة\" />
+    <Folder Include="البوالص_والشحن\المدخلات\" />
+  </ItemGroup>
+<ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmCurrencyManagement.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencySetup.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencySetup.Designer.cs"><SubType>Code</SubType><DependentUpon>UcCurrencySetup.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/SystemSettings/General/UcCurrencySetup.resx"><DependentUpon>UcCurrencySetup.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Forms/SystemSettings/General/FrmCurrencyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmCurrencyManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmExchangeRates.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmExchangeRates.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmExchangeRates.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencyManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCurrencyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>UcCurrencyManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcExchangeRates.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcExchangeRates.Designer.cs"><SubType>Code</SubType><DependentUpon>UcExchangeRates.cs</DependentUpon></Compile>
+  </ItemGroup>
+  
+<ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmBranchManagement.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcBranchData.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcBranchData.Designer.cs"><SubType>Code</SubType><DependentUpon>UcBranchData.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/SystemSettings/General/UcBranchData.resx"><DependentUpon>UcBranchData.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Forms/SystemSettings/General/FrmBranchManagement.Designer.cs"><DependentUpon>FrmBranchManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/الفروع/UcBranchManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/الفروع/UcBranchManagement.Designer.cs"><DependentUpon>UcBranchManagement.cs</DependentUpon></Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/DocumentControl/FrmDocumentNumbering.cs;Forms/SystemSettings/General/FrmGeneralSettings.cs;Forms/SystemSettings/General/FrmPrintSettings.cs;Forms/Setup/Security/FrmUsersPermissions.cs;Forms/Setup/Security/FrmChangePassword.cs"><SubType>UserControl</SubType></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="FrmLogin.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="FrmLogin.Designer.cs"><DependentUpon>FrmLogin.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="FrmWorkScope.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="FrmWorkScope.Designer.cs"><DependentUpon>FrmWorkScope.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Designer-backed business surfaces: keep code, designer and resources associated. -->
+    <Compile Update="Waybills/UcWaybillDraft.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillDraft.Designer.cs"><DependentUpon>UcWaybillDraft.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillDraft.resx"><DependentUpon>UcWaybillDraft.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcWaybillApproval.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillApproval.Designer.cs"><DependentUpon>UcWaybillApproval.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillApproval.resx"><DependentUpon>UcWaybillApproval.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcWaybillPricing.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillPricing.Designer.cs"><DependentUpon>UcWaybillPricing.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillPricing.resx"><DependentUpon>UcWaybillPricing.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcWaybillPaymentPlan.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillPaymentPlan.Designer.cs"><DependentUpon>UcWaybillPaymentPlan.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillPaymentPlan.resx"><DependentUpon>UcWaybillPaymentPlan.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcWaybillCollections.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillCollections.Designer.cs"><DependentUpon>UcWaybillCollections.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillCollections.resx"><DependentUpon>UcWaybillCollections.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcWaybillFinancialStatus.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcWaybillFinancialStatus.Designer.cs"><DependentUpon>UcWaybillFinancialStatus.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcWaybillFinancialStatus.resx"><DependentUpon>UcWaybillFinancialStatus.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcItemRelease.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcItemRelease.Designer.cs"><DependentUpon>UcItemRelease.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcItemRelease.resx"><DependentUpon>UcItemRelease.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcTripAllocation.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcTripAllocation.Designer.cs"><DependentUpon>UcTripAllocation.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcTripAllocation.resx"><DependentUpon>UcTripAllocation.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcRemainingShippingQuantity.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcRemainingShippingQuantity.Designer.cs"><DependentUpon>UcRemainingShippingQuantity.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcRemainingShippingQuantity.resx"><DependentUpon>UcRemainingShippingQuantity.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcReadyToLoadWaybills.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcReadyToLoadWaybills.Designer.cs"><DependentUpon>UcReadyToLoadWaybills.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcReadyToLoadWaybills.resx"><DependentUpon>UcReadyToLoadWaybills.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcLoadPlanning.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcLoadPlanning.Designer.cs"><DependentUpon>UcLoadPlanning.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcLoadPlanning.resx"><DependentUpon>UcLoadPlanning.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcTrip.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcTrip.Designer.cs"><DependentUpon>UcTrip.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcTrip.resx"><DependentUpon>UcTrip.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcManifestLoading.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcManifestLoading.Designer.cs"><DependentUpon>UcManifestLoading.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcManifestLoading.resx"><DependentUpon>UcManifestLoading.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcManifest.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcManifest.Designer.cs"><DependentUpon>UcManifest.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcManifest.resx"><DependentUpon>UcManifest.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcManifestHandover.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcManifestHandover.Designer.cs"><DependentUpon>UcManifestHandover.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcManifestHandover.resx"><DependentUpon>UcManifestHandover.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Waybills/UcTripDeparture.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Waybills/UcTripDeparture.Designer.cs"><DependentUpon>UcTripDeparture.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Waybills/UcTripDeparture.resx"><DependentUpon>UcTripDeparture.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/Setup/Security/FrmChangePassword.Designer.cs"><DependentUpon>FrmChangePassword.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <EmbeddedResource Update="Forms/Setup/Security/FrmChangePassword.resx"><DependentUpon>FrmChangePassword.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/UcScreenBackgrounds.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcScreenBackgrounds.Designer.cs"><DependentUpon>UcScreenBackgrounds.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcGovernorateData.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcGovernorateData.Designer.cs"><DependentUpon>UcGovernorateData.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcChartSetup.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcChartSetup.Designer.cs"><DependentUpon>UcChartSetup.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCostCenterSetup.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCostCenterSetup.Designer.cs"><DependentUpon>UcCostCenterSetup.cs</DependentUpon></Compile>
+    <Compile Update="ReceiptConfigurationDialog.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="ReceiptConfigurationDialog.Designer.cs"><DependentUpon>ReceiptConfigurationDialog.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcInternationalRegions.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcInternationalRegions.Designer.cs"><DependentUpon>UcInternationalRegions.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcSystemPeriods.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcSystemPeriods.Designer.cs"><DependentUpon>UcSystemPeriods.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup Label="Root host Designer metadata">
+    <Compile Update="RootHosts/FrmChangePassword.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmChangePassword.Designer.cs"><DependentUpon>FrmChangePassword.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmUsersPermissions.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmUsersPermissions.Designer.cs"><DependentUpon>FrmUsersPermissions.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmDocumentNumbering.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmDocumentNumbering.Designer.cs"><DependentUpon>FrmDocumentNumbering.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmGeneralSettings.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmGeneralSettings.Designer.cs"><DependentUpon>FrmGeneralSettings.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmGeneralVariables.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmGeneralVariables.Designer.cs"><DependentUpon>FrmGeneralVariables.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmPrintSettings.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmPrintSettings.Designer.cs"><DependentUpon>FrmPrintSettings.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmTextSetup.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmTextSetup.Designer.cs"><DependentUpon>FrmTextSetup.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ItemReleaseForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/ItemReleaseForm.Designer.cs"><DependentUpon>ItemReleaseForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/LoadPlanningForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/LoadPlanningForm.Designer.cs"><DependentUpon>LoadPlanningForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ManifestForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/ManifestForm.Designer.cs"><DependentUpon>ManifestForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ManifestHandoverForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/ManifestHandoverForm.Designer.cs"><DependentUpon>ManifestHandoverForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ManifestLoadingForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/ManifestLoadingForm.Designer.cs"><DependentUpon>ManifestLoadingForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ReadyToLoadWaybillsForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/ReadyToLoadWaybillsForm.Designer.cs"><DependentUpon>ReadyToLoadWaybillsForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/RemainingShippingQuantityForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/RemainingShippingQuantityForm.Designer.cs"><DependentUpon>RemainingShippingQuantityForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/ShippingRtlControl.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="RootHosts/ShippingRtlControl.Designer.cs"><DependentUpon>ShippingRtlControl.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/TripAllocationForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/TripAllocationForm.Designer.cs"><DependentUpon>TripAllocationForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/TripDepartureForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/TripDepartureForm.Designer.cs"><DependentUpon>TripDepartureForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/TripForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/TripForm.Designer.cs"><DependentUpon>TripForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillApprovalForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillApprovalForm.Designer.cs"><DependentUpon>WaybillApprovalForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillCollectionsForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillCollectionsForm.Designer.cs"><DependentUpon>WaybillCollectionsForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillDraftForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillDraftForm.Designer.cs"><DependentUpon>WaybillDraftForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillFinancialStatusForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillFinancialStatusForm.Designer.cs"><DependentUpon>WaybillFinancialStatusForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillPaymentPlanForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillPaymentPlanForm.Designer.cs"><DependentUpon>WaybillPaymentPlanForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/WaybillPricingForm.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/WaybillPricingForm.Designer.cs"><DependentUpon>WaybillPricingForm.cs</DependentUpon><SubType>Code</SubType></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The audit helper partial shares its screen type; give its resource a distinct manifest name. -->
+    <Compile Update="Forms/SystemSettings/General/UcTaxBracketCodes.AuditMetadata.cs"><SubType>Code</SubType><DependentUpon>UcTaxBracketCodes.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/SystemSettings/General/UcTaxBracketCodes.AuditMetadata.resx">
+      <ManifestResourceName>TransportERP.Desktop.Forms.SystemSettings.General.UcTaxBracketCodes.AuditMetadata</ManifestResourceName>
+      <LogicalName>TransportERP.Desktop.Forms.SystemSettings.General.UcTaxBracketCodes.AuditMetadata</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmAccountingImportShortcuts.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmAccountingImportShortcuts.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmAccountingImportShortcuts.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmAccountingImportPreview.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmAccountingImportPreview.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmAccountingImportPreview.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/FrmAvailableCurrencies.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmAvailableCurrencies.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmAvailableCurrencies.cs</DependentUpon></Compile>
+  </ItemGroup>
+  <ItemGroup Label="Shipment dispatch Designer metadata">
+    <Compile Update="البوالص_والشحن/العمليات/الشحن_والترحيل/UcShipmentDispatch.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="البوالص_والشحن/العمليات/الشحن_والترحيل/UcShipmentDispatch.Designer.cs"><DependentUpon>UcShipmentDispatch.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <EmbeddedResource Update="البوالص_والشحن/العمليات/الشحن_والترحيل/UcShipmentDispatch.resx"><DependentUpon>UcShipmentDispatch.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="البوالص_والشحن/العمليات/ترحيل_الشحنات/منسدلة_الجدول/UcDispatchWaybillRow.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="البوالص_والشحن/العمليات/ترحيل_الشحنات/منسدلة_الجدول/UcDispatchWaybillRow.Designer.cs"><DependentUpon>UcDispatchWaybillRow.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <EmbeddedResource Update="البوالص_والشحن/العمليات/ترحيل_الشحنات/منسدلة_الجدول/UcDispatchWaybillRow.resx"><DependentUpon>UcDispatchWaybillRow.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
 </Project>
+
+
+
+
+
+

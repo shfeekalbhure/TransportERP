@@ -1,0 +1,98 @@
+[
+  {
+    "control": "textBox4",
+    "label": "label3",
+    "caption": "مدخل السجل",
+    "property": "CreatedBy",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "CreatedByText"
+  },
+  {
+    "control": "textBox3",
+    "label": "label4",
+    "caption": "معدل السجل",
+    "property": "ModifiedBy",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "ModifiedByText"
+  },
+  {
+    "control": "textBox6",
+    "label": "label5",
+    "caption": "تاريخ الإدخال",
+    "property": "CreatedAt",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "CreatedAtText"
+  },
+  {
+    "control": "textBox5",
+    "label": "label6",
+    "caption": "تاريخ آخر تعديل",
+    "property": "ModifiedAt",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "ModifiedAtText"
+  },
+  {
+    "control": "textBox8",
+    "label": "label7",
+    "caption": "الجهاز المدخل",
+    "property": "CreatedDevice",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "CreatedDeviceText"
+  },
+  {
+    "control": "textBox7",
+    "label": "label8",
+    "caption": "الجهاز المعدل",
+    "property": "ModifiedDevice",
+    "sourceRow": "CTX-06",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "ModifiedDeviceText"
+  },
+  {
+    "control": "textBox1",
+    "label": "label1",
+    "caption": "مرات الطباعة",
+    "property": "PrintCount",
+    "sourceRow": "CTX-07",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "PrintCountText"
+  },
+  {
+    "control": "textBox2",
+    "label": "label2",
+    "caption": "مرات التعديل",
+    "property": "ModificationCount",
+    "sourceRow": "CTX-07",
+    "liveProvider": null,
+    "source": "shared-context-source-review.json",
+    "layout": "Copied without changes from existing Designer",
+    "unavailableValue": "null clears text; no zero, clock or session identity inferred",
+    "bindableValueProperty": "ModificationCountText"
+  }
+]

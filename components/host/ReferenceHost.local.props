@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <UsersResourcesDirectory>$(MSBuildThisFileDirectory)../../TransportERP.Desktop/Properties</UsersResourcesDirectory>
+  </PropertyGroup>
+</Project>

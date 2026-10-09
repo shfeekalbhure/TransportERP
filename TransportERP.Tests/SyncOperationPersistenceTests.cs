@@ -131,6 +131,48 @@ public sealed class SyncOperationPersistenceTests
         Assert.Contains(await db.AuditEvents.ToListAsync(), x => x.Action == "SyncOperationRetryRejected" && x.EntityId == operation.Id);
     }
 
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Enqueue_preserves_base_version_and_normalizes_replay_keys()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "CANON");
+        var service = CreateService(db);
+        var canonical = CreateCommand(scope, "{\"version\":7}") with { BaseVersion = 7 };
+        var padded = canonical with
+        {
+            DeviceId = " " + canonical.DeviceId + " ",
+            ClientOperationId = " " + canonical.ClientOperationId + " ",
+            PayloadHash = " " + canonical.PayloadHash.ToUpperInvariant() + " "
+        };
+        var first = await service.EnqueueSyncOperationAsync(padded, scope.Security);
+        db.ChangeTracker.Clear();
+        var replay = await service.EnqueueSyncOperationAsync(canonical, scope.Security);
+        Assert.Equal(first.Id, replay.Id);
+        Assert.Equal(7L, replay.BaseVersion);
+    }
+
+    [Fact]
+    [Trait("Category", "PostgreSQL")]
+    public async Task Invalid_failed_transition_does_not_mutate_tracked_status()
+    {
+        var connection = PostgreSqlTestEnvironment.RequireConnection();
+        await using var db = CreateDb(connection);
+        await db.Database.MigrateAsync();
+        var scope = await SeedScopeAsync(db, "REJECT");
+        var service = CreateService(db);
+        var operation = await service.EnqueueSyncOperationAsync(CreateCommand(scope, "{}"), scope.Security);
+        await service.TransitionSyncOperationAsync(new(operation.Id, "SENDING"), scope.Security);
+        await Assert.ThrowsAsync<SyncRuleException>(() => service.TransitionSyncOperationAsync(
+            new(operation.Id, "FAILED"), scope.Security));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        Assert.Equal("SENDING", await db.SyncOperations.Where(x => x.Id == operation.Id)
+            .Select(x => x.Status).SingleAsync());
+    }
+
     private static SyncOperationService CreateService(
         TransportErpDbContext db,
         SyncRetryPolicy? retryPolicy = null)

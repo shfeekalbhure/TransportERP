@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TransportERP.Desktop</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup><UsersResourcesDirectory Condition="'$(UsersResourcesDirectory)' == ''">$(MSBuildThisFileDirectory)../../TransportERP.Desktop/Properties</UsersResourcesDirectory></PropertyGroup>
+  <Import Project="ReferenceHost.local.props" Condition="Exists('ReferenceHost.local.props')" />
+  <ItemGroup>
+    <ProjectReference Include="../src/TransportERP.SharedUI.csproj" />
+    <!-- Read-only reference host: reuse the owner's existing four image resources, without duplicating PNG files. -->
+    <Compile Include="$(UsersResourcesDirectory)/Resources.Designer.cs" Link="Properties/Resources.Designer.cs" Condition="'$(UsersResourcesDirectory)' != ''" />
+    <EmbeddedResource Include="$(UsersResourcesDirectory)/Resources.resx" Link="Properties/Resources.resx" LogicalName="TransportERP.Desktop.Properties.Resources.resources" Condition="'$(UsersResourcesDirectory)' != ''" />
+    <Compile Include="../src/CoreUI/**/*.cs" Link="CoreUI/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../src/CoreUI/**/*.resx" Link="CoreUI/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Update="FrmUsersPermissions.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="FrmUsersPermissions.Designer.cs"><DependentUpon>FrmUsersPermissions.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="FrmUsersPermissions.resx"><DependentUpon>FrmUsersPermissions.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <Target Name="CheckReferenceHostResources" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(UsersResourcesDirectory)' == '' Or !Exists('$(UsersResourcesDirectory)/Resources.Designer.cs') Or !Exists('$(UsersResourcesDirectory)/Resources.resx')" Text="This optional reference host needs UsersResourcesDirectory pointing to the existing users project's Properties folder. The shared library builds independently; do not duplicate its image assets." />
+  </Target>
+</Project>

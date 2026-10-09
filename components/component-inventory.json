@@ -1,0 +1,45 @@
+{
+  "scope": "Independent reusable-component preparation; no original application changes",
+  "inventory": [
+    {
+      "id": "SHARED-ACTION-BAR",
+      "name": "شريط الأزرار",
+      "implementation": "NOT IMPLEMENTED AS REUSABLE CONTROL",
+      "existing": "CoreUI/SettingsFormStyle.cs: ApplyPrimaryButtonStyle, ApplySecondaryButtonStyle; private per-form action panels",
+      "reuse": "Style helpers archived unchanged; no reusable action host found in CoreUI. Creating the host requires Designer.",
+      "difference": "Button definitions, icon mapping, order, permissions and applicability remain screen-specific. The 26 action proposals are not approved actions; the 17 text-verified commands are not a universal toolbar."
+    },
+    {
+      "id": "SHARED-AUDIT-FOOTER",
+      "name": "بيانات الإنشاء والتعديل",
+      "implementation": "EXISTING DESIGNER CONTROL COPIED; DISPLAY API ADDED",
+      "existing": "Forms/Setup/Security/AuditCountersControl.cs + .Designer.cs + .resx",
+      "reuse": "TransportERP.Desktop.Forms.Setup.Security.AuditCountersControl",
+      "difference": "Six audit fields are coupled to two counters. No generic per-field visibility contract, approved English labels, or live data provider. Reuse the whole existing control only where all eight fields are source-supported; other variants require Designer and applicability evidence."
+    },
+    {
+      "id": "SHARED-COUNTERS-PANEL",
+      "name": "العدادات",
+      "implementation": "TWO EXISTING FIELDS REUSED INSIDE AUDIT CONTROL; NO GENERIC COUNTER HOST",
+      "existing": "AuditCountersControl: label1/textBox1 (print); label2/textBox2 (modification)",
+      "reuse": "Same AuditCountersControl instance, not a second copy.",
+      "difference": "Counter event definitions, scope and initial zero remain unresolved. SetDisplayValues accepts caller-formatted display strings and performs no counting."
+    },
+    {
+      "id": "SHARED-SESSION-CONTEXT",
+      "name": "الشركة والفرع والمستخدم",
+      "implementation": "NOT IMPLEMENTED AS REUSABLE CONTROL",
+      "existing": "FrmMain.Designer.cs: tlpCompanyInfo/lblCompanyName/lblBranch/lblCurrentUser; per-form scope selectors are distinct.",
+      "reuse": "Preserve existing shell coverage; no repeated session header is generated.",
+      "difference": "Shell visibility during modal forms, authoritative value sources and scope distinction must be resolved per screen before Designer extraction."
+    },
+    {
+      "id": "SHARED-CONNECTION-STATUS",
+      "name": "الاتصال",
+      "implementation": "NOT IMPLEMENTED AS REUSABLE CONTROL",
+      "existing": "Existing status observations in shared-component-evidence.json; CTX-09 has no live indicator confirmed in the examined ONYX screenshots.",
+      "reuse": "No fabricated connection status, green icon, timestamp or offline-policy substitution.",
+      "difference": "Define monitored service, observation freshness, visibility and shell coverage before Designer implementation."
+    }
+  ]
+}

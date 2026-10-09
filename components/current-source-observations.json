@@ -1,0 +1,534 @@
+[
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\CoreUI\\FrmBase.cs",
+    "sha256": "31da5f371d67e8a831c542ae498f474259af1f1f243771d387ae4e1b8cc8a0bd",
+    "matches": [
+      {
+        "line": 8,
+        "text": "InitializeComponent();"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\CoreUI\\FrmBase.Designer.cs",
+    "sha256": "d7b545761504965514c583efedae833d99d27cc4c395b70f04452c6c0328287a",
+    "matches": [
+      {
+        "line": 19,
+        "text": "private void InitializeComponent()"
+      },
+      {
+        "line": 25,
+        "text": "AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\CoreUI\\SettingsFormStyle.cs",
+    "sha256": "da69ddb66e287a1fa4ea6168b6674a90df386ab5ebe0ed5d4aba1dc5f0468ec0",
+    "matches": [
+      {
+        "line": 14,
+        "text": "form.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 15,
+        "text": "form.RightToLeftLayout = true;"
+      },
+      {
+        "line": 51,
+        "text": "input.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 54,
+        "text": "public static void ApplyPrimaryButtonStyle(Button button) => ApplyButtonStyle(button, UiDesignTokens.Primary, Color.White);"
+      },
+      {
+        "line": 56,
+        "text": "public static void ApplySecondaryButtonStyle(Button button) => ApplyButtonStyle(button, Color.White, UiDesignTokens.Primary);"
+      },
+      {
+        "line": 58,
+        "text": "public static void ApplyDangerButtonStyle(Button button) => ApplyButtonStyle(button, UiDesignTokens.Danger, Color.White);"
+      },
+      {
+        "line": 60,
+        "text": "public static void ApplyNeutralButtonStyle(Button button) => ApplyButtonStyle(button, UiDesignTokens.ReadOnly, UiDesignTokens.TextPrimary);"
+      },
+      {
+        "line": 74,
+        "text": "grid.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 118,
+        "text": "private static void ApplyButtonStyle(Button button, Color backColor, Color foreColor)"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\CoreUI\\UiDesignTokens.cs",
+    "sha256": "ab01e7a0ae6a2c75b5d36a6777fd85f2712ff1fc9c42831934d2c0abb98c2152",
+    "matches": []
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\CoreUI\\FormLayoutMetrics.cs",
+    "sha256": "88ec3fcf0c8c2315a744c6999ff2e94a7d9f3fca2dab11786b33a4903a5388b4",
+    "matches": []
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\Forms\\Setup\\Security\\AuditCountersControl.cs",
+    "sha256": "b0e407816f1cec72af7d8ff1ac9a721fbf57ccbb1d2ceeafa95bbaf6794ee9a1",
+    "matches": [
+      {
+        "line": 11,
+        "text": "public partial class AuditCountersControl : UserControl"
+      },
+      {
+        "line": 13,
+        "text": "public AuditCountersControl()"
+      },
+      {
+        "line": 15,
+        "text": "InitializeComponent();"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\Forms\\Setup\\Security\\AuditCountersControl.Designer.cs",
+    "sha256": "e6aaf6e6484451a8723d29c31f52c7fdc668162ff889a053a4d11bd24a356665",
+    "matches": [
+      {
+        "line": 3,
+        "text": "partial class AuditCountersControl"
+      },
+      {
+        "line": 29,
+        "text": "private void InitializeComponent()"
+      },
+      {
+        "line": 308,
+        "text": "// AuditCountersControl"
+      },
+      {
+        "line": 311,
+        "text": "AutoScaleMode = AutoScaleMode.Font;"
+      },
+      {
+        "line": 317,
+        "text": "Name = \"AuditCountersControl\";"
+      },
+      {
+        "line": 318,
+        "text": "RightToLeft = RightToLeft.Yes;"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\Forms\\Setup\\Security\\FrmUsersPermissions.Designer.cs",
+    "sha256": "4cf6256204ec8c330fca78a36318a2087055165003181bc87278439366f94b3a",
+    "matches": [
+      {
+        "line": 16,
+        "text": "private void InitializeComponent()"
+      },
+      {
+        "line": 18,
+        "text": "auditFooter = new AuditCountersControl();"
+      },
+      {
+        "line": 94,
+        "text": "lblBranch = new Label();"
+      },
+      {
+        "line": 142,
+        "text": "// auditFooter"
+      },
+      {
+        "line": 144,
+        "text": "auditFooter.AutoSize = true;"
+      },
+      {
+        "line": 145,
+        "text": "auditFooter.AutoSizeMode = AutoSizeMode.GrowAndShrink;"
+      },
+      {
+        "line": 146,
+        "text": "auditFooter.BackColor = Color.FromArgb(50, 182, 255);"
+      },
+      {
+        "line": 147,
+        "text": "auditFooter.Dock = DockStyle.Bottom;"
+      },
+      {
+        "line": 148,
+        "text": "auditFooter.Font = new Font(\"Segoe UI\", 10F);"
+      },
+      {
+        "line": 149,
+        "text": "auditFooter.Location = new Point(0, 893);"
+      },
+      {
+        "line": 150,
+        "text": "auditFooter.Name = \"auditFooter\";"
+      },
+      {
+        "line": 151,
+        "text": "auditFooter.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 152,
+        "text": "auditFooter.Size = new Size(1509, 78);"
+      },
+      {
+        "line": 153,
+        "text": "auditFooter.TabIndex = 3;"
+      },
+      {
+        "line": 167,
+        "text": "splitMain.Panel1.RightToLeft = RightToLeft.No;"
+      },
+      {
+        "line": 175,
+        "text": "splitMain.Panel2.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 177,
+        "text": "splitMain.RightToLeft = RightToLeft.No;"
+      },
+      {
+        "line": 235,
+        "text": "tabUserDetails.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 236,
+        "text": "tabUserDetails.RightToLeftLayout = true;"
+      },
+      {
+        "line": 631,
+        "text": "txtBarcodePath.RightToLeft = RightToLeft.No;"
+      },
+      {
+        "line": 776,
+        "text": "tvPermissions.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 777,
+        "text": "tvPermissions.RightToLeftLayout = true;"
+      },
+      {
+        "line": 892,
+        "text": "tlpUserData.Controls.Add(lblBranch, 2, 2);"
+      },
+      {
+        "line": 910,
+        "text": "tlpUserData.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 1024,
+        "text": "// lblBranch"
+      },
+      {
+        "line": 1026,
+        "text": "lblBranch.AutoSize = true;"
+      },
+      {
+        "line": 1027,
+        "text": "lblBranch.Dock = DockStyle.Fill;"
+      },
+      {
+        "line": 1028,
+        "text": "lblBranch.Location = new Point(487, 74);"
+      },
+      {
+        "line": 1029,
+        "text": "lblBranch.Name = \"lblBranch\";"
+      },
+      {
+        "line": 1030,
+        "text": "lblBranch.Size = new Size(143, 39);"
+      },
+      {
+        "line": 1031,
+        "text": "lblBranch.TabIndex = 3;"
+      },
+      {
+        "line": 1032,
+        "text": "lblBranch.Text = \"الفرع *\";"
+      },
+      {
+        "line": 1236,
+        "text": "AutoScaleMode = AutoScaleMode.Font;"
+      },
+      {
+        "line": 1239,
+        "text": "Controls.Add(auditFooter);"
+      },
+      {
+        "line": 1286,
+        "text": "private AuditCountersControl auditFooter = null!;"
+      },
+      {
+        "line": 1307,
+        "text": "private Label lblBranch = null!;"
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\shfee\\Documents\\Codex\\2026-09-08\\plugin-computer-use-openai-bundled-x20\\work\\vs-existing\\TransportERP.Desktop\\FrmMain.Designer.cs",
+    "sha256": "4bef23dd6eec3d2b4c1cd03628d53c8a3f8f86ee705d137cfa895f65d1549b47",
+    "matches": [
+      {
+        "line": 18,
+        "text": "private void InitializeComponent()"
+      },
+      {
+        "line": 47,
+        "text": "lblCompanyName = new Label();"
+      },
+      {
+        "line": 48,
+        "text": "lblBranch = new Label();"
+      },
+      {
+        "line": 51,
+        "text": "lblCurrentUser = new Label();"
+      },
+      {
+        "line": 86,
+        "text": "tlpCompanyInfo.Controls.Add(lblCompanyName, 1, 0);"
+      },
+      {
+        "line": 87,
+        "text": "tlpCompanyInfo.Controls.Add(lblBranch, 2, 0);"
+      },
+      {
+        "line": 90,
+        "text": "tlpCompanyInfo.Controls.Add(lblCurrentUser, 5, 0);"
+      },
+      {
+        "line": 96,
+        "text": "tlpCompanyInfo.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 112,
+        "text": "lblCompanyInfoTitle.RightToLeft = RightToLeft.No;"
+      },
+      {
+        "line": 118,
+        "text": "// lblCompanyName"
+      },
+      {
+        "line": 120,
+        "text": "lblCompanyName.AutoEllipsis = true;"
+      },
+      {
+        "line": 121,
+        "text": "lblCompanyName.Dock = DockStyle.Fill;"
+      },
+      {
+        "line": 122,
+        "text": "lblCompanyName.ForeColor = Color.White;"
+      },
+      {
+        "line": 123,
+        "text": "lblCompanyName.Location = new Point(790, 0);"
+      },
+      {
+        "line": 124,
+        "text": "lblCompanyName.Margin = new Padding(0);"
+      },
+      {
+        "line": 125,
+        "text": "lblCompanyName.Name = \"lblCompanyName\";"
+      },
+      {
+        "line": 126,
+        "text": "lblCompanyName.Padding = new Padding(0, 0, 11, 0);"
+      },
+      {
+        "line": 127,
+        "text": "lblCompanyName.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 128,
+        "text": "lblCompanyName.Size = new Size(153, 34);"
+      },
+      {
+        "line": 129,
+        "text": "lblCompanyName.TabIndex = 1;"
+      },
+      {
+        "line": 130,
+        "text": "lblCompanyName.Text = \"الشركة: —\";"
+      },
+      {
+        "line": 131,
+        "text": "lblCompanyName.TextAlign = ContentAlignment.MiddleRight;"
+      },
+      {
+        "line": 133,
+        "text": "// lblBranch"
+      },
+      {
+        "line": 135,
+        "text": "lblBranch.AutoEllipsis = true;"
+      },
+      {
+        "line": 136,
+        "text": "lblBranch.Dock = DockStyle.Fill;"
+      },
+      {
+        "line": 137,
+        "text": "lblBranch.ForeColor = Color.White;"
+      },
+      {
+        "line": 138,
+        "text": "lblBranch.Location = new Point(659, 0);"
+      },
+      {
+        "line": 139,
+        "text": "lblBranch.Margin = new Padding(0);"
+      },
+      {
+        "line": 140,
+        "text": "lblBranch.Name = \"lblBranch\";"
+      },
+      {
+        "line": 141,
+        "text": "lblBranch.Padding = new Padding(0, 0, 11, 0);"
+      },
+      {
+        "line": 142,
+        "text": "lblBranch.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 143,
+        "text": "lblBranch.Size = new Size(131, 34);"
+      },
+      {
+        "line": 144,
+        "text": "lblBranch.TabIndex = 2;"
+      },
+      {
+        "line": 145,
+        "text": "lblBranch.Text = \"الفرع: —\";"
+      },
+      {
+        "line": 146,
+        "text": "lblBranch.TextAlign = ContentAlignment.MiddleRight;"
+      },
+      {
+        "line": 157,
+        "text": "lblContact.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 172,
+        "text": "lblFinancialYear.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 178,
+        "text": "// lblCurrentUser"
+      },
+      {
+        "line": 180,
+        "text": "lblCurrentUser.AutoEllipsis = true;"
+      },
+      {
+        "line": 181,
+        "text": "lblCurrentUser.Dock = DockStyle.Fill;"
+      },
+      {
+        "line": 182,
+        "text": "lblCurrentUser.ForeColor = Color.White;"
+      },
+      {
+        "line": 183,
+        "text": "lblCurrentUser.Location = new Point(244, 0);"
+      },
+      {
+        "line": 184,
+        "text": "lblCurrentUser.Margin = new Padding(0);"
+      },
+      {
+        "line": 185,
+        "text": "lblCurrentUser.Name = \"lblCurrentUser\";"
+      },
+      {
+        "line": 186,
+        "text": "lblCurrentUser.Padding = new Padding(0, 0, 11, 0);"
+      },
+      {
+        "line": 187,
+        "text": "lblCurrentUser.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 188,
+        "text": "lblCurrentUser.Size = new Size(131, 34);"
+      },
+      {
+        "line": 189,
+        "text": "lblCurrentUser.TabIndex = 5;"
+      },
+      {
+        "line": 190,
+        "text": "lblCurrentUser.Text = \"المستخدم: —\";"
+      },
+      {
+        "line": 191,
+        "text": "lblCurrentUser.TextAlign = ContentAlignment.MiddleRight;"
+      },
+      {
+        "line": 202,
+        "text": "lblCurrentDate.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 217,
+        "text": "lblCurrentTime.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 296,
+        "text": "tvSystemTree.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 297,
+        "text": "tvSystemTree.RightToLeftLayout = true;"
+      },
+      {
+        "line": 358,
+        "text": "btnIncomingMessages.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 372,
+        "text": "btnOutgoingMessages.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 386,
+        "text": "btnUndeliveredMessages.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 400,
+        "text": "btnRejectedMessages.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 414,
+        "text": "btnHeldMessages.RightToLeft = RightToLeft.Yes;"
+      },
+      {
+        "line": 458,
+        "text": "AutoScaleMode = AutoScaleMode.Font;"
+      },
+      {
+        "line": 482,
+        "text": "private Label lblCompanyName;"
+      },
+      {
+        "line": 483,
+        "text": "private Label lblBranch;"
+      },
+      {
+        "line": 486,
+        "text": "private Label lblCurrentUser;"
+      }
+    ]
+  }
+]

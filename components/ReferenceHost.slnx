@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/TransportERP.SharedUI.csproj" />
+  <Project Path="host/SharedComponents.Host.csproj" />
+</Solution>

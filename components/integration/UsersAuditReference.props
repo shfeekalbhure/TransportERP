@@ -1,0 +1,14 @@
+<Project>
+  <!-- Opt-in import for the screen owner. Does not delete any local source files. -->
+  <PropertyGroup>
+    <SharedAuditProject Condition="'$(SharedAuditProject)' == ''">$(MSBuildThisFileDirectory)..\src\TransportERP.SharedUI.csproj</SharedAuditProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Forms/Setup/Security/AuditCountersControl*.cs" />
+    <EmbeddedResource Remove="Forms/Setup/Security/AuditCountersControl*.resx" />
+    <ProjectReference Include="$(SharedAuditProject)" />
+  </ItemGroup>
+  <Target Name="CheckSharedAuditProject" BeforeTargets="ResolveProjectReferences">
+    <Error Condition="!Exists('$(SharedAuditProject)')" Text="The shared audit component project path does not exist." />
+  </Target>
+</Project>

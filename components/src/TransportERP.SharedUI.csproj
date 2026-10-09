@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TransportERP.Desktop</RootNamespace>
+    <AssemblyName>TransportERP.SharedUI</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Saved Designer draft: incomplete images, RTL, dimensions and command adapter. -->
+    <Compile Remove="UserControl1*.cs" />
+    <EmbeddedResource Remove="UserControl1.resx" />
+    <!-- Historical host styling is not part of the reusable audit component API. -->
+    <Compile Remove="CoreUI/**/*.cs" />
+    <EmbeddedResource Remove="CoreUI/**/*.resx" />
+    <Compile Update="Forms/Setup/Security/AuditCountersControl.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/Setup/Security/AuditCountersControl.Designer.cs"><DependentUpon>AuditCountersControl.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/Setup/Security/AuditCountersControl.resx"><DependentUpon>AuditCountersControl.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="CoreUI/FrmBase.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="CoreUI/FrmBase.Designer.cs"><DependentUpon>FrmBase.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="CoreUI/FrmBase.resx"><DependentUpon>FrmBase.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+</Project>

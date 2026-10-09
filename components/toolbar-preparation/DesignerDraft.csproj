@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AssemblyName>TransportERP.UsersToolbar.DesignerDraft</AssemblyName>
+    <RootNamespace>TransportERP.Desktop</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup><UsersResourcesDirectory Condition="'$(UsersResourcesDirectory)' == ''">$(MSBuildThisFileDirectory)../../TransportERP.Desktop/Properties</UsersResourcesDirectory></PropertyGroup>
+  <Import Project="../host/ReferenceHost.local.props" Condition="Exists('../host/ReferenceHost.local.props')" />
+  <ItemGroup>
+    <Compile Include="$(UsersResourcesDirectory)/Resources.Designer.cs" Link="Properties/Resources.Designer.cs" Condition="'$(UsersResourcesDirectory)' != ''" />
+    <Compile Include="Form1.cs" />
+    <Compile Include="Form1.Designer.cs" />
+    <EmbeddedResource Include="$(UsersResourcesDirectory)/Resources.resx" Link="Properties/Resources.resx" LogicalName="TransportERP.Desktop.Properties.Resources.resources" Condition="'$(UsersResourcesDirectory)' != ''" />
+    <EmbeddedResource Include="Form1.resx" />
+    <ProjectReference Include="../src/TransportERP.SharedUI.csproj" />
+    <Compile Include="../src/UserControl1.Commands.cs" Link="UserControl1.Commands.cs"><DependentUpon>UserControl1.cs</DependentUpon></Compile>
+    <Compile Include="../src/UserControl1.cs" Link="UserControl1.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Include="../src/UserControl1.Designer.cs" Link="UserControl1.Designer.cs"><DependentUpon>UserControl1.cs</DependentUpon></Compile>
+    <EmbeddedResource Include="../src/UserControl1.resx" Link="UserControl1.resx"><DependentUpon>UserControl1.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <Target Name="RequireExistingUserResources" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(UsersResourcesDirectory)/Resources.resx')" Text="Set UsersResourcesDirectory to the existing users Properties directory, retaining its adjacent Resources folder. See POST-BATCH-20260914.md." />
+  </Target>
+</Project>
+

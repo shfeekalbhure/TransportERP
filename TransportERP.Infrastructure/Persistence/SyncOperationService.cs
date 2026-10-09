@@ -71,6 +71,13 @@ public sealed class SyncOperationService(
         CancellationToken cancellationToken = default)
     {
         ValidateCommand(command);
+        // Use the same canonical values for replay lookup and persisted keys.
+        command = command with
+        {
+            DeviceId = command.DeviceId.Trim(),
+            ClientOperationId = command.ClientOperationId.Trim(),
+            PayloadHash = command.PayloadHash.Trim().ToLowerInvariant()
+        };
         await EnsureSecurityAsync(security, command.CompanyId, command.BranchId, cancellationToken, command.UserId, command.DeviceId);
         if (!PayloadHashMatches(command.PayloadJson, command.PayloadHash))
             throw new SyncRuleException("HASH_MISMATCH", command.ClientOperationId);
@@ -100,6 +107,7 @@ public sealed class SyncOperationService(
             EntityType = command.EntityType.Trim(),
             EntityId = command.EntityId,
             ClientOperationId = command.ClientOperationId.Trim(),
+            BaseVersion = command.BaseVersion,
             PayloadJson = command.PayloadJson,
             PayloadHash = command.PayloadHash.Trim().ToLowerInvariant(),
             ClientOccurredAt = NormalizePostgreSqlTimestamp(command.ClientOccurredAt),
@@ -147,6 +155,8 @@ public sealed class SyncOperationService(
         EnsureTenantScope(operation, security);
         await EnsureSecurityAsync(security, operation.CompanyId, operation.BranchId, cancellationToken);
 
+        if (string.IsNullOrWhiteSpace(command.NewStatus))
+            throw new SyncRuleException("INVALID_STATE_TRANSITION", operation.Status);
         var newStatus = command.NewStatus.Trim().ToUpperInvariant();
         if (operation.Status == newStatus) return operation;
         if (!IsAllowedTransition(operation.Status, newStatus))
@@ -155,12 +165,13 @@ public sealed class SyncOperationService(
             operation.NextRetryAt is not null && operation.NextRetryAt > DateTimeOffset.UtcNow)
             throw new SyncRuleException("RETRY_BACKOFF_ACTIVE", operation.ClientOperationId);
 
+        // Validate before changing tracked state; another SaveChanges must not persist a rejected transition.
+        if (newStatus == "FAILED" && string.IsNullOrWhiteSpace(command.ErrorCode))
+            throw new SyncRuleException("ERROR_CODE_REQUIRED", operation.ClientOperationId);
         operation.Status = newStatus;
         if (newStatus == "FAILED")
         {
-            if (string.IsNullOrWhiteSpace(command.ErrorCode))
-                throw new SyncRuleException("ERROR_CODE_REQUIRED", operation.ClientOperationId);
-            operation.ErrorCode = command.ErrorCode.Trim().ToUpperInvariant();
+            operation.ErrorCode = command.ErrorCode!.Trim().ToUpperInvariant();
             if (!IsRetryableErrorCode(operation.ErrorCode))
                 operation.NextRetryAt = null;
         }

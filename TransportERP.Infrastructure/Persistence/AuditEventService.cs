@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace TransportERP.Infrastructure.Persistence;
@@ -45,6 +46,30 @@ public sealed record AuditChainVerificationResult(
 
 public sealed class AuditEventService(TransportErpDbContext db)
 {
+    // Receipt commands own a serializable transaction so their audit and accounting effects are atomic.
+    public async Task AppendReceiptInTransactionAsync(AuditEventDraft draft, CancellationToken ct = default)
+    {
+        if (draft.EntityType != "ReceiptVoucher") throw new InvalidOperationException("Expected receipt audit.");
+        await AppendAccountingInTransactionAsync(draft, ct);
+    }
+    public async Task AppendAccountingInTransactionAsync(AuditEventDraft draft, CancellationToken ct = default)
+    {
+        ValidateDraft(draft);
+        if (draft.EntityType is not ("ReceiptVoucher" or "GeneralLedgerSettings") || (db.Database.IsRelational() &&
+            (db.Database.CurrentTransaction == null || db.Database.CurrentTransaction.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)))
+            throw new InvalidOperationException("Receipt audit requires the receipt's serializable transaction.");
+        var device = NullIfWhiteSpace(draft.DeviceId);
+        var previous = await db.AuditEvents.AsNoTracking().Where(x => x.CompanyId == draft.CompanyId && x.BranchId == draft.BranchId && x.DeviceId == device)
+            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+        var now = NormalizePostgreSqlTimestamp(DateTimeOffset.UtcNow);
+        if (previous != null && now <= previous.OccurredAt) now = previous.OccurredAt.AddTicks(10);
+        var audit = new AuditEvent { Id = Guid.NewGuid(), OccurredAt = now, ActorUserId = draft.ActorUserId,
+            CompanyId = draft.CompanyId, BranchId = draft.BranchId, Action = draft.Action, Outcome = draft.Outcome,
+            EntityType = draft.EntityType, EntityId = draft.EntityId, CorrelationId = draft.CorrelationId ?? Guid.NewGuid(),
+            DeviceId = device, BeforeJson = draft.BeforeJson, AfterJson = draft.AfterJson, Reason = draft.Reason,
+            PreviousHash = previous?.Hash };
+        audit.Hash = ComputeHash(audit); db.AuditEvents.Add(audit);
+    }
     public async Task<AuditEvent> AppendAuditEventAsync(
         AuditEventDraft draft,
         CancellationToken cancellationToken = default)

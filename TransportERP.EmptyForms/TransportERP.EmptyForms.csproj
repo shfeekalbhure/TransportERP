@@ -1,0 +1,196 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ForceDesignerDPIUnaware>true</ForceDesignerDPIUnaware>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../TransportERP.Contracts/TransportERP.Contracts.csproj" /></ItemGroup>
+  <ItemGroup>
+    <Compile Update="Forms\*.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms\FrmOnyxSCREEN0078.cs;Forms\FrmOnyxSCREEN0086.cs;Forms\FrmOnyxSCREEN0093.cs;Forms\FrmOnyxSCREEN0094.cs;Forms\FrmScreen_04_01_01.cs;Forms\FrmScreen_04_01_02.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms\*.Designer.cs"><SubType>Code</SubType><DependentUpon>$([System.String]::Copy('%(Filename)').Replace('.Designer', '')).cs</DependentUpon></Compile>
+  </ItemGroup>
+<ItemGroup><ProjectReference Include="../TransportERP.SharedVisuals/TransportERP.SharedVisuals.csproj" /></ItemGroup><ItemGroup>
+    <Compile Update="Forms/Uc*.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/Uc*.Designer.cs"><SubType>Code</SubType></Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Forms/FrmScreen_02_05_21.resx"><DependentUpon>FrmScreen_02_05_21.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_02_02_04.resx"><DependentUpon>FrmScreen_02_02_04.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_02_02_05.resx"><DependentUpon>FrmScreen_02_02_05.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_02_02_06.resx"><DependentUpon>FrmScreen_02_02_06.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_02_02_07.resx"><DependentUpon>FrmScreen_02_02_07.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_02_02_08.resx"><DependentUpon>FrmScreen_02_02_08.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_03_01.resx"><DependentUpon>FrmScreen_04_03_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_03_02.resx"><DependentUpon>FrmScreen_04_03_02.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Forms/FrmScreen_04_07_16.resx"><DependentUpon>FrmScreen_04_07_16.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_02_01.resx"><DependentUpon>FrmScreen_04_02_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/UcAccountGroupsAndTypes.resx"><DependentUpon>UcAccountGroupsAndTypes.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_03_03.resx"><DependentUpon>FrmScreen_04_03_03.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_03_04.resx"><DependentUpon>FrmScreen_04_03_04.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_11_01.resx"><DependentUpon>FrmScreen_04_11_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0079.resx"><DependentUpon>FrmOnyxSCREEN0079.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0080.resx"><DependentUpon>FrmOnyxSCREEN0080.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0081.resx"><DependentUpon>FrmOnyxSCREEN0081.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0082.resx"><DependentUpon>FrmOnyxSCREEN0082.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0083.resx"><DependentUpon>FrmOnyxSCREEN0083.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0084.resx"><DependentUpon>FrmOnyxSCREEN0084.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0085.resx"><DependentUpon>FrmOnyxSCREEN0085.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0089.resx"><DependentUpon>FrmOnyxSCREEN0089.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0090.resx"><DependentUpon>FrmOnyxSCREEN0090.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0091.resx"><DependentUpon>FrmOnyxSCREEN0091.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/UcAccountOpeningRequest.resx"><DependentUpon>UcAccountOpeningRequest.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/UcAccountCostCenterLinking.resx"><DependentUpon>UcAccountCostCenterLinking.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/UcAccountProjectLinking.resx"><DependentUpon>UcAccountProjectLinking.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Forms/FrmScreen_04_05_01.resx"><DependentUpon>FrmScreen_04_05_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0100.resx"><DependentUpon>FrmOnyxSCREEN0100.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_02.resx"><DependentUpon>FrmScreen_04_04_02.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_01.resx"><DependentUpon>FrmScreen_04_04_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmOnyxSCREEN0103.resx"><DependentUpon>FrmOnyxSCREEN0103.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_11_02.resx"><DependentUpon>FrmScreen_04_11_02.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_11_03.resx"><DependentUpon>FrmScreen_04_11_03.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_08_01.resx"><DependentUpon>FrmScreen_04_08_01.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_08_02.resx"><DependentUpon>FrmScreen_04_08_02.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_08_05.resx"><DependentUpon>FrmScreen_04_08_05.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Forms/FrmScreen_04_09_06.resx"><DependentUpon>FrmScreen_04_09_06.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_10_03.resx"><DependentUpon>FrmScreen_04_10_03.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_10_04.resx"><DependentUpon>FrmScreen_04_10_04.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_10_05.resx"><DependentUpon>FrmScreen_04_10_05.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_03.resx"><DependentUpon>FrmScreen_04_04_03.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_11_04.resx"><DependentUpon>FrmScreen_04_11_04.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_11_05.resx"><DependentUpon>FrmScreen_04_11_05.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_04.resx"><DependentUpon>FrmScreen_04_04_04.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_05.resx"><DependentUpon>FrmScreen_04_04_05.cs</DependentUpon></EmbeddedResource>
+    <EmbeddedResource Update="Forms/FrmScreen_04_04_06.resx"><DependentUpon>FrmScreen_04_04_06.cs</DependentUpon></EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup Label="Root host Designer metadata">
+    <Compile Update="RootHosts/FrmOnyxSCREEN0079.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0079.Designer.cs"><DependentUpon>FrmOnyxSCREEN0079.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0080.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0080.Designer.cs"><DependentUpon>FrmOnyxSCREEN0080.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0081.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0081.Designer.cs"><DependentUpon>FrmOnyxSCREEN0081.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0082.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0082.Designer.cs"><DependentUpon>FrmOnyxSCREEN0082.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0083.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0083.Designer.cs"><DependentUpon>FrmOnyxSCREEN0083.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0084.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0084.Designer.cs"><DependentUpon>FrmOnyxSCREEN0084.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0085.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0085.Designer.cs"><DependentUpon>FrmOnyxSCREEN0085.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0089.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0089.Designer.cs"><DependentUpon>FrmOnyxSCREEN0089.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0090.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0090.Designer.cs"><DependentUpon>FrmOnyxSCREEN0090.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0091.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0091.Designer.cs"><DependentUpon>FrmOnyxSCREEN0091.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0092.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0092.Designer.cs"><DependentUpon>FrmOnyxSCREEN0092.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0098.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0098.Designer.cs"><DependentUpon>FrmOnyxSCREEN0098.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0100.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0100.Designer.cs"><DependentUpon>FrmOnyxSCREEN0100.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0102.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0102.Designer.cs"><DependentUpon>FrmOnyxSCREEN0102.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0103.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0103.Designer.cs"><DependentUpon>FrmOnyxSCREEN0103.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0104.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0104.Designer.cs"><DependentUpon>FrmOnyxSCREEN0104.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0105.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0105.Designer.cs"><DependentUpon>FrmOnyxSCREEN0105.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0106.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0106.Designer.cs"><DependentUpon>FrmOnyxSCREEN0106.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0110.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0110.Designer.cs"><DependentUpon>FrmOnyxSCREEN0110.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0111.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmOnyxSCREEN0111.Designer.cs"><DependentUpon>FrmOnyxSCREEN0111.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_04.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_04.Designer.cs"><DependentUpon>FrmScreen_02_02_04.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_05.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_05.Designer.cs"><DependentUpon>FrmScreen_02_02_05.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_06.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_06.Designer.cs"><DependentUpon>FrmScreen_02_02_06.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_07.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_07.Designer.cs"><DependentUpon>FrmScreen_02_02_07.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_08.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_02_08.Designer.cs"><DependentUpon>FrmScreen_02_02_08.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_04_06.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_04_06.Designer.cs"><DependentUpon>FrmScreen_02_04_06.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_05_21.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_02_05_21.Designer.cs"><DependentUpon>FrmScreen_02_05_21.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_01_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_01_01.Designer.cs"><DependentUpon>FrmScreen_03_01_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_02_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_02_01.Designer.cs"><DependentUpon>FrmScreen_03_02_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_03_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_03_03_01.Designer.cs"><DependentUpon>FrmScreen_03_03_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_02_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_02_01.Designer.cs"><DependentUpon>FrmScreen_04_02_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_01.Designer.cs"><DependentUpon>FrmScreen_04_03_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_02.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_02.Designer.cs"><DependentUpon>FrmScreen_04_03_02.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_03.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_03.Designer.cs"><DependentUpon>FrmScreen_04_03_03.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_04.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_03_04.Designer.cs"><DependentUpon>FrmScreen_04_03_04.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_01.Designer.cs"><DependentUpon>FrmScreen_04_04_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_02.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_02.Designer.cs"><DependentUpon>FrmScreen_04_04_02.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_03.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_03.Designer.cs"><DependentUpon>FrmScreen_04_04_03.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_04.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_04.Designer.cs"><DependentUpon>FrmScreen_04_04_04.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_05.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_05.Designer.cs"><DependentUpon>FrmScreen_04_04_05.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_06.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_04_06.Designer.cs"><DependentUpon>FrmScreen_04_04_06.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_05_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_05_01.Designer.cs"><DependentUpon>FrmScreen_04_05_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_07_16.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_07_16.Designer.cs"><DependentUpon>FrmScreen_04_07_16.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_01.Designer.cs"><DependentUpon>FrmScreen_04_08_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_02.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_02.Designer.cs"><DependentUpon>FrmScreen_04_08_02.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_05.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_08_05.Designer.cs"><DependentUpon>FrmScreen_04_08_05.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_09_06.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_09_06.Designer.cs"><DependentUpon>FrmScreen_04_09_06.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_03.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_03.Designer.cs"><DependentUpon>FrmScreen_04_10_03.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_04.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_04.Designer.cs"><DependentUpon>FrmScreen_04_10_04.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_05.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_10_05.Designer.cs"><DependentUpon>FrmScreen_04_10_05.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_01.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_01.Designer.cs"><DependentUpon>FrmScreen_04_11_01.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_02.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_02.Designer.cs"><DependentUpon>FrmScreen_04_11_02.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_03.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_03.Designer.cs"><DependentUpon>FrmScreen_04_11_03.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_04.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_04.Designer.cs"><DependentUpon>FrmScreen_04_11_04.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_05.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_05.Designer.cs"><DependentUpon>FrmScreen_04_11_05.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_06.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_06.Designer.cs"><DependentUpon>FrmScreen_04_11_06.cs</DependentUpon><SubType>Code</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_07.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="RootHosts/FrmScreen_04_11_07.Designer.cs"><DependentUpon>FrmScreen_04_11_07.cs</DependentUpon><SubType>Code</SubType></Compile>
+  </ItemGroup>
+</Project>
+

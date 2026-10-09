@@ -301,14 +301,34 @@ public sealed class TransportErpDbContext(DbContextOptions<TransportErpDbContext
         line.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
 
         ConfigureVoucher(mb.Entity<ReceiptVoucher>(), "receipt_vouchers", "PayerName", "CollectedBy", "ck_receipts_status");
+        mb.Entity<ReceiptVoucher>().HasOne<JournalEntry>().WithMany().HasForeignKey(v => v.PostingJournalId).OnDelete(DeleteBehavior.Restrict);
+        mb.Entity<ReceiptVoucher>().HasOne<JournalEntry>().WithMany().HasForeignKey(v => v.ReversalJournalId).OnDelete(DeleteBehavior.Restrict);
+        mb.Entity<ReceiptVoucher>().HasIndex(v => v.PostingJournalId).IsUnique();
+        mb.Entity<ReceiptVoucher>().HasIndex(v => v.ReversalJournalId).IsUnique();
+        var receiptAttachment = mb.Entity<ReceiptAttachment>();
+        receiptAttachment.ToTable("receipt_attachments");
+        receiptAttachment.HasKey(a => a.Id);
+        receiptAttachment.Property(a => a.FileName).HasMaxLength(200).IsRequired();
+        receiptAttachment.Property(a => a.MediaType).HasMaxLength(80).IsRequired();
+        receiptAttachment.Property(a => a.Hash).HasMaxLength(64).IsRequired();
+        receiptAttachment.Property(a => a.Content).HasColumnType("bytea").IsRequired();
+        receiptAttachment.HasOne<ReceiptVoucher>().WithMany().HasForeignKey(a => a.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+        receiptAttachment.HasOne<User>().WithMany().HasForeignKey(a => a.AddedBy).OnDelete(DeleteBehavior.Restrict);
         ConfigureVoucher(mb.Entity<PaymentVoucher>(), "payment_vouchers", "PayeeName", "PaidBy", "ck_payments_status");
+        var workflow = mb.Entity<AccountingWorkflowSnapshot>();
+        workflow.ToTable("accounting_workflow_snapshots");
+        workflow.HasKey(x => new { x.DocumentType, x.DocumentId });
+        workflow.Property(x => x.DocumentType).HasMaxLength(60);
+        workflow.Property(x => x.PolicyJson).HasColumnType("jsonb").IsRequired();
+        workflow.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        workflow.HasOne<Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureVoucher<TEntity>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity> entity, string table, string partyProperty, string actorProperty, string statusConstraint) where TEntity : P1Entity, IP1Voucher
     {
         entity.ToTable(table, t =>
         {
-            t.HasCheckConstraint(statusConstraint, "\"Status\" IN ('DRAFT','APPROVED','POSTED','CANCELLED')");
+            t.HasCheckConstraint(statusConstraint, table == "receipt_vouchers" ? "\"Status\" IN ('DRAFT','REVIEWED','APPROVED','POSTED','CANCELLED')" : "\"Status\" IN ('DRAFT','APPROVED','POSTED','CANCELLED')");
             t.HasCheckConstraint($"ck_{table}_amount", "\"Amount\" > 0");
         });
         entity.HasKey(x => x.Id);

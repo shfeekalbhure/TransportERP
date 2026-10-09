@@ -1,3 +1,5 @@
+using TransportERP.Api.Authentication;
+using TransportERP.Api.Accounting;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -68,7 +70,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
     options.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser()));
 
+builder.Services.AddDesktopLogin();
 var app = builder.Build();
+app.UseRouting();
+app.UseRateLimiter();
+app.MapDesktopLogin();
+app.MapReceiptWorkspace();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapP2C01AWaybillFoundation();

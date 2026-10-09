@@ -127,6 +127,8 @@ public sealed class VoucherLifecycleService(TransportErpDbContext db)
     {
         var voucher = await set.SingleOrDefaultAsync(x => x.Id == voucherId && x.CompanyId == companyId, cancellationToken)
             ?? throw new KeyNotFoundException($"Voucher {voucherId} was not found in company {companyId}.");
+        if (voucher is ReceiptVoucher receipt && receipt.DocumentJson != null)
+            throw new InvalidOperationException("استخدم خدمة سند القبض المالية التي تتحقق من السياسة والصلاحيات والمراحل.");
         if (!string.Equals(voucher.Status, expected, StringComparison.Ordinal))
             throw new InvalidOperationException($"Voucher transition {voucher.Status}->{next} is not allowed; expected {expected}.");
         voucher.Status = next;
@@ -141,6 +143,8 @@ public sealed class VoucherLifecycleService(TransportErpDbContext db)
     {
         var voucher = await set.SingleOrDefaultAsync(x => x.Id == voucherId && x.CompanyId == companyId, cancellationToken)
             ?? throw new KeyNotFoundException($"Voucher {voucherId} was not found in company {companyId}.");
+        if (voucher is ReceiptVoucher receipt && receipt.DocumentJson != null)
+            throw new InvalidOperationException("استخدم خدمة سند القبض المالية لإلغاء هذا السند.");
         if (string.Equals(voucher.Status, "POSTED", StringComparison.Ordinal))
             throw new InvalidOperationException("A posted voucher cannot be cancelled.");
         if (string.Equals(voucher.Status, "CANCELLED", StringComparison.Ordinal))

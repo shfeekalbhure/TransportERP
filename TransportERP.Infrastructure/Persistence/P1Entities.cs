@@ -233,6 +233,10 @@ public sealed class JournalEntryLine
 
 public sealed class ReceiptVoucher : P1Entity, IP1Voucher
 {
+    public string? DocumentJson { get; set; }
+    public string? PostingPolicyJson { get; set; }
+    public Guid? PostingJournalId { get; set; }
+    public Guid? ReversalJournalId { get; set; }
     public Guid CompanyId { get; set; }
     public Guid BranchId { get; set; }
     public string VoucherNo { get; set; } = string.Empty;

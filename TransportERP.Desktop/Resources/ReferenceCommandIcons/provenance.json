@@ -1,0 +1,158 @@
+{
+  "pdf_page": 6,
+  "source_image": "source-0-fzImg0.jpg",
+  "source_sha256": "f31f3e6bfae49eaf6ae91d8f3a7b697b317ddff0e6c2394be46b1a1b40f4b322",
+  "method": "Exact pixel crops; no drawing, recolouring, or resampling of UI assets",
+  "icons": [
+    {
+      "name": "referenceTool108",
+      "rectangle": [
+        444,
+        60,
+        466,
+        82
+      ],
+      "sha256": "a7f6606505a6c82acb747f12e31a6b0139c4ea9e211f804473eb0a67b8f9930d"
+    },
+    {
+      "name": "btnClose",
+      "rectangle": [
+        588,
+        60,
+        610,
+        82
+      ],
+      "sha256": "dd49f95bdce1f94f14a8f0f5ad427c6a0bbe2e65936d5ca36ebc915a077c31ba"
+    },
+    {
+      "name": "referenceTool390",
+      "rectangle": [
+        784,
+        60,
+        806,
+        82
+      ],
+      "sha256": "85ffd11692cb93763675f3a744882f98277b9a760fbf3c09b7b5e3987af0c1c3"
+    },
+    {
+      "name": "btnPrint",
+      "rectangle": [
+        813,
+        60,
+        835,
+        82
+      ],
+      "sha256": "0232dbea1aa24d89b3f0bc13729ffd252b84e080ae13b0c6a3f18cc278724560"
+    },
+    {
+      "name": "btnSave",
+      "rectangle": [
+        846,
+        60,
+        868,
+        82
+      ],
+      "sha256": "e5be6212f58f03ccc35d6cb6a1438385f135aa6c3b04cac078dc6c10d0340e34"
+    },
+    {
+      "name": "btnFirst",
+      "rectangle": [
+        880,
+        60,
+        902,
+        82
+      ],
+      "sha256": "6481c680f500d87462f3d87f5893263cf35d0c396e4ecdb93fa341db1d3064ac"
+    },
+    {
+      "name": "btnPrevious",
+      "rectangle": [
+        907,
+        60,
+        929,
+        82
+      ],
+      "sha256": "8be04d1e945adeb8ececf90313346364b8a4a2e66a7aca70b7cd52e3850a0984"
+    },
+    {
+      "name": "btnNext",
+      "rectangle": [
+        933,
+        60,
+        955,
+        82
+      ],
+      "sha256": "291bfb88703e5b880bd921b2f416321f4f4a53317b96d407e44423cc62332128"
+    },
+    {
+      "name": "btnLast",
+      "rectangle": [
+        960,
+        60,
+        982,
+        82
+      ],
+      "sha256": "93a11ad75faef355599c17f5b8c192df1ca1a0e95b380b2ef9fd335857795670"
+    },
+    {
+      "name": "btnView",
+      "rectangle": [
+        988,
+        60,
+        1010,
+        82
+      ],
+      "sha256": "002b8ad759ad2663a0ca84195167331b2e1f4acc31fa65800959866ba1470ee1"
+    },
+    {
+      "name": "btnCancel",
+      "rectangle": [
+        1025,
+        60,
+        1047,
+        82
+      ],
+      "sha256": "d9e5f480b12db2c4ebf8156a3dd89d6d8acb724455cf7866f59f2bb5d3fcafc1"
+    },
+    {
+      "name": "btnDelete",
+      "rectangle": [
+        1061,
+        60,
+        1083,
+        82
+      ],
+      "sha256": "9af8ea411aa274ef8145f53b5dac35077cf78cdc81c0c7e1b7028580535cb176"
+    },
+    {
+      "name": "btnEdit",
+      "rectangle": [
+        1087,
+        60,
+        1109,
+        82
+      ],
+      "sha256": "2c466f0ac2f028c089025bdd0c4ecda31f8cea5222190b9b2b05dfd5200c0828"
+    },
+    {
+      "name": "btnAdd",
+      "rectangle": [
+        1114,
+        60,
+        1136,
+        82
+      ],
+      "sha256": "ee1c8f216b448f0f1720e566242d36646cde06d7153fcd842a84ece2757b7dab"
+    },
+    {
+      "name": "referenceTool710",
+      "rectangle": [
+        1142,
+        60,
+        1164,
+        82
+      ],
+      "sha256": "6ebbe13eb744c3bdad9f3140fbbdb65d048fed62817308e3639b1048ae71058c"
+    }
+  ]
+}

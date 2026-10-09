@@ -1,0 +1,26 @@
+{
+  "team": 2,
+  "date": "2026-10-08",
+  "count": 3,
+  "criterion": "Independent production WinForms content screen with its own Designer; host-only Forms excluded.",
+  "screens": [
+    "TransportERP.Desktop/Forms/SystemSettings/General/UcCompanyManagement.Designer.cs",
+    "TransportERP.Desktop/Forms/SystemSettings/General/الفروع/UcBranchManagement.Designer.cs",
+    "TransportERP.Desktop/Forms/SystemSettings/General/UcBranchData.Designer.cs"
+  ],
+  "excludedHosts": [
+    "TransportERP.Desktop/Forms/SystemSettings/General/FrmCompanyManagement.Designer.cs",
+    "TransportERP.Desktop/Forms/SystemSettings/General/FrmBranchManagement.Designer.cs"
+  ],
+  "excludedNoDesigner": [
+    "UcCompanyData",
+    "UcScreenBackgrounds",
+    "UcChartSetup",
+    "UcAccountingChartData"
+  ],
+  "notes": [
+    "Both branch UserControls are distinct production implementations and counted separately.",
+    "Five relevant production Designer files comprise three content screens and two host Forms.",
+    "Diagnostic copies, PDF pages, tabs, resources, helpers and screens outside team scope are not counted."
+  ]
+}

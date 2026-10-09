@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/TransportERP.SharedUI.csproj" />
+  <Project Path="toolbar-preparation/DesignerDraft.csproj" />
+</Solution>
