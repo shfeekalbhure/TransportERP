@@ -82,6 +82,7 @@ partial class UcScreen_04_04_02
     private TabPage tp4 = null!;
     private TableLayoutPanel layout4 = null!;
     private RichTextBox context4 = null!;
+    private ToolTip commandToolTip = null!;
     private System.ComponentModel.IContainer? components;
     private ErrorProvider validationErrors = null!;
     protected override void Dispose(bool disposing) { if (disposing) components?.Dispose(); base.Dispose(disposing); }
@@ -151,6 +152,9 @@ partial class UcScreen_04_04_02
 
         private void InitializeComponent()
     {
+        components = new System.ComponentModel.Container();
+        commandToolTip = new ToolTip(components);
+        commandToolTip.ShowAlways = true;
         rootWorkspaceViewport = new System.Windows.Forms.Panel();
         designerCommandBar = new TransportERP.Desktop.CoreUI.DesignerCommandBar();
         designerHiddenCommands = new FlowLayoutPanel();
@@ -1547,15 +1551,24 @@ partial class UcScreen_04_04_02
         // 
         // referencePrint
         // 
-        referencePrint.AutoSize = true;
+        referencePrint.AutoSize = false;
         referencePrint.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         referencePrint.Enabled = false;
         referencePrint.Location = new Point(34, 3);
-        referencePrint.MinimumSize = new Size(88, 36);
+        referencePrint.MinimumSize = Size.Empty;
         referencePrint.Name = "referencePrint";
-        referencePrint.Size = new Size(88, 36);
+        referencePrint.Size = new Size(26, 24);
         referencePrint.TabIndex = 10;
-        referencePrint.Text = "طباعة";
+        referencePrint.Text = "";
+        referencePrint.AccessibleName = "طباعة";
+        referencePrint.Font = new Font("Tahoma", 9F);
+        referencePrint.Margin = new Padding(1, 16, 1, 1);
+        referencePrint.FlatStyle = FlatStyle.Flat;
+        referencePrint.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        referencePrint.BackColor = Color.FromArgb(239, 239, 239);
+        referencePrint.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(referencePrint, "طباعة");
+        referencePrint.Image = TransportERP.Desktop.CoreUI.CommandBarImages.Print;
         // 
         // validationErrors
         // 
@@ -1629,126 +1642,201 @@ partial class UcScreen_04_04_02
         // btnView
         // 
         btnView.AccessibleName = "عرض / إعادة تحميل";
-        btnView.AutoSize = true;
+        btnView.AutoSize = false;
         btnView.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnView.Enabled = false;
         btnView.Location = new Point(974, 3);
-        btnView.MinimumSize = new Size(88, 36);
+        btnView.MinimumSize = Size.Empty;
         btnView.Name = "btnView";
-        btnView.Size = new Size(117, 36);
+        btnView.Size = new Size(26, 24);
         btnView.TabIndex = 0;
-        btnView.Text = "عرض / إعادة تحميل";
+        btnView.Text = "";
+        btnView.Font = new Font("Tahoma", 9F);
+        btnView.Margin = new Padding(1, 16, 1, 1);
+        btnView.FlatStyle = FlatStyle.Flat;
+        btnView.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnView.BackColor = Color.FromArgb(239, 239, 239);
+        btnView.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnView, "عرض / إعادة تحميل");
+        btnView.Image = TransportERP.Desktop.CoreUI.CommandBarImages.View;
         // 
         // btnCreate
         // 
         btnCreate.AccessibleName = "حفظ جديد";
-        btnCreate.AutoSize = true;
+        btnCreate.AutoSize = false;
         btnCreate.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnCreate.Enabled = false;
         btnCreate.Location = new Point(880, 3);
-        btnCreate.MinimumSize = new Size(88, 36);
+        btnCreate.MinimumSize = Size.Empty;
         btnCreate.Name = "btnCreate";
-        btnCreate.Size = new Size(88, 36);
+        btnCreate.Size = new Size(26, 24);
         btnCreate.TabIndex = 1;
-        btnCreate.Text = "حفظ جديد";
+        btnCreate.Text = "";
+        btnCreate.Font = new Font("Tahoma", 9F);
+        btnCreate.Margin = new Padding(1, 16, 1, 1);
+        btnCreate.FlatStyle = FlatStyle.Flat;
+        btnCreate.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnCreate.BackColor = Color.FromArgb(239, 239, 239);
+        btnCreate.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnCreate, "حفظ جديد");
+        btnCreate.Image = TransportERP.Desktop.CoreUI.CommandBarImages.Save;
         // 
         // btnEdit
         // 
         btnEdit.AccessibleName = "حفظ التعديل";
-        btnEdit.AutoSize = true;
+        btnEdit.AutoSize = false;
         btnEdit.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnEdit.Enabled = false;
         btnEdit.Location = new Point(786, 3);
-        btnEdit.MinimumSize = new Size(88, 36);
+        btnEdit.MinimumSize = Size.Empty;
         btnEdit.Name = "btnEdit";
-        btnEdit.Size = new Size(88, 36);
+        btnEdit.Size = new Size(26, 24);
         btnEdit.TabIndex = 2;
-        btnEdit.Text = "حفظ التعديل";
+        btnEdit.Text = "";
+        btnEdit.Font = new Font("Tahoma", 9F);
+        btnEdit.Margin = new Padding(1, 16, 1, 1);
+        btnEdit.FlatStyle = FlatStyle.Flat;
+        btnEdit.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnEdit.BackColor = Color.FromArgb(239, 239, 239);
+        btnEdit.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnEdit, "حفظ التعديل");
+        btnEdit.Image = TransportERP.Desktop.CoreUI.CommandBarImages.Edit;
         // 
         // btnCancel
         // 
         btnCancel.AccessibleName = "إلغاء المستند";
-        btnCancel.AutoSize = true;
+        btnCancel.AutoSize = false;
         btnCancel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnCancel.Enabled = false;
         btnCancel.Location = new Point(692, 3);
-        btnCancel.MinimumSize = new Size(88, 36);
+        btnCancel.MinimumSize = Size.Empty;
         btnCancel.Name = "btnCancel";
-        btnCancel.Size = new Size(88, 36);
+        btnCancel.Size = new Size(26, 24);
         btnCancel.TabIndex = 3;
-        btnCancel.Text = "إلغاء المستند";
+        btnCancel.Text = "";
+        btnCancel.Font = new Font("Tahoma", 9F);
+        btnCancel.Margin = new Padding(1, 16, 1, 1);
+        btnCancel.FlatStyle = FlatStyle.Flat;
+        btnCancel.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnCancel.BackColor = Color.FromArgb(239, 239, 239);
+        btnCancel.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnCancel, "إلغاء المستند");
+        btnCancel.Image = TransportERP.Desktop.CoreUI.CommandBarImages.Cancel;
         // 
         // btnPost
         // 
         btnPost.AccessibleName = "ترحيل";
-        btnPost.AutoSize = true;
+        btnPost.AutoSize = false;
         btnPost.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnPost.Enabled = false;
         btnPost.Location = new Point(598, 3);
-        btnPost.MinimumSize = new Size(88, 36);
+        btnPost.MinimumSize = Size.Empty;
         btnPost.Name = "btnPost";
-        btnPost.Size = new Size(88, 36);
+        btnPost.Size = new Size(88, 24);
         btnPost.TabIndex = 4;
         btnPost.Text = "ترحيل";
+        btnPost.Font = new Font("Tahoma", 9F);
+        btnPost.Margin = new Padding(1, 16, 1, 1);
+        btnPost.FlatStyle = FlatStyle.Flat;
+        btnPost.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnPost.BackColor = Color.FromArgb(239, 239, 239);
+        btnPost.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnPost, "ترحيل");
         // 
         // btnReverse
         // 
         btnReverse.AccessibleName = "عكس القيد";
-        btnReverse.AutoSize = true;
+        btnReverse.AutoSize = false;
         btnReverse.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnReverse.Enabled = false;
         btnReverse.Location = new Point(504, 3);
-        btnReverse.MinimumSize = new Size(88, 36);
+        btnReverse.MinimumSize = Size.Empty;
         btnReverse.Name = "btnReverse";
-        btnReverse.Size = new Size(88, 36);
+        btnReverse.Size = new Size(88, 24);
         btnReverse.TabIndex = 5;
         btnReverse.Text = "عكس القيد";
+        btnReverse.Font = new Font("Tahoma", 9F);
+        btnReverse.Margin = new Padding(1, 16, 1, 1);
+        btnReverse.FlatStyle = FlatStyle.Flat;
+        btnReverse.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnReverse.BackColor = Color.FromArgb(239, 239, 239);
+        btnReverse.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnReverse, "عكس القيد");
         // 
         // btnClear
         // 
         btnClear.AccessibleName = "تفريغ المسودة";
-        btnClear.AutoSize = true;
+        btnClear.AutoSize = false;
         btnClear.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnClear.Location = new Point(410, 3);
-        btnClear.MinimumSize = new Size(88, 36);
+        btnClear.MinimumSize = Size.Empty;
         btnClear.Name = "btnClear";
-        btnClear.Size = new Size(88, 36);
+        btnClear.Size = new Size(110, 24);
         btnClear.TabIndex = 6;
         btnClear.Text = "تفريغ المسودة";
+        btnClear.Font = new Font("Tahoma", 9F);
+        btnClear.Margin = new Padding(1, 16, 1, 1);
+        btnClear.FlatStyle = FlatStyle.Flat;
+        btnClear.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnClear.BackColor = Color.FromArgb(239, 239, 239);
+        btnClear.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnClear, "تفريغ المسودة");
         // 
         // btnClose
         // 
         btnClose.AccessibleName = "إغلاق";
-        btnClose.AutoSize = true;
+        btnClose.AutoSize = false;
         btnClose.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnClose.Location = new Point(316, 3);
-        btnClose.MinimumSize = new Size(88, 36);
+        btnClose.MinimumSize = Size.Empty;
         btnClose.Name = "btnClose";
-        btnClose.Size = new Size(88, 36);
+        btnClose.Size = new Size(26, 24);
         btnClose.TabIndex = 7;
-        btnClose.Text = "إغلاق";
+        btnClose.Text = "";
+        btnClose.Font = new Font("Tahoma", 9F);
+        btnClose.Margin = new Padding(1, 16, 1, 1);
+        btnClose.FlatStyle = FlatStyle.Flat;
+        btnClose.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnClose.BackColor = Color.FromArgb(239, 239, 239);
+        btnClose.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnClose, "إغلاق");
+        btnClose.Image = TransportERP.Desktop.CoreUI.CommandBarImages.Close;
         // 
         // btnAddRow
         // 
-        btnAddRow.AutoSize = true;
+        btnAddRow.AutoSize = false;
         btnAddRow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnAddRow.Location = new Point(222, 3);
-        btnAddRow.MinimumSize = new Size(88, 36);
+        btnAddRow.MinimumSize = Size.Empty;
         btnAddRow.Name = "btnAddRow";
-        btnAddRow.Size = new Size(88, 36);
+        btnAddRow.Size = new Size(88, 24);
         btnAddRow.TabIndex = 8;
         btnAddRow.Text = "إضافة سطر";
+        btnAddRow.Font = new Font("Tahoma", 9F);
+        btnAddRow.Margin = new Padding(1, 16, 1, 1);
+        btnAddRow.FlatStyle = FlatStyle.Flat;
+        btnAddRow.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnAddRow.BackColor = Color.FromArgb(239, 239, 239);
+        btnAddRow.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnAddRow, "إضافة سطر");
         // 
         // btnRemoveRow
         // 
-        btnRemoveRow.AutoSize = true;
+        btnRemoveRow.AutoSize = false;
         btnRemoveRow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnRemoveRow.Location = new Point(128, 3);
-        btnRemoveRow.MinimumSize = new Size(88, 36);
+        btnRemoveRow.MinimumSize = Size.Empty;
         btnRemoveRow.Name = "btnRemoveRow";
-        btnRemoveRow.Size = new Size(88, 36);
+        btnRemoveRow.Size = new Size(88, 24);
         btnRemoveRow.TabIndex = 9;
         btnRemoveRow.Text = "حذف سطر";
+        btnRemoveRow.Font = new Font("Tahoma", 9F);
+        btnRemoveRow.Margin = new Padding(1, 16, 1, 1);
+        btnRemoveRow.FlatStyle = FlatStyle.Flat;
+        btnRemoveRow.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
+        btnRemoveRow.BackColor = Color.FromArgb(239, 239, 239);
+        btnRemoveRow.UseVisualStyleBackColor = false;
+        commandToolTip.SetToolTip(btnRemoveRow, "حذف سطر");
         // 
         // tabs
         // 
