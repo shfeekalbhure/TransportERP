@@ -59,6 +59,15 @@ public sealed class P1InMemoryBaselineBehaviorTests
         Assert.Equal(P1JournalState.Posted, posted.State);
         var reversal = service.ReverseJournal(companyId, "J-001", "تصحيح القيد");
         Assert.Equal("J-001", reversal.ReversalOf);
+        Assert.Equal(posted.Lines.Count, reversal.Lines.Count);
+        foreach (var originalLine in posted.Lines)
+        {
+            var reversedLine = Assert.Single(reversal.Lines, line => line.AccountId == originalLine.AccountId);
+            Assert.Equal(originalLine.Dimension, reversedLine.Dimension);
+            Assert.Equal(0m, originalLine.Debit - originalLine.Credit + reversedLine.Debit - reversedLine.Credit);
+        }
+        Assert.Equal(100m, posted.Lines[0].Debit);
+        Assert.Equal(0m, posted.Lines[0].Credit);
         Assert.Contains(service.ReadAuditEvents(companyId), e => e.Action == "ReverseJournalEntry");
     }
 
