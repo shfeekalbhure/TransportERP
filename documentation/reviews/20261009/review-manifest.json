@@ -1,0 +1,12 @@
+{
+  "source_sha": "9d02ac8d19e39971ad233108faecc8154a1d5745",
+  "repair_sha": "f13ce501aad2ea6735c0a4bb92f4cd0184c4385c",
+  "ui_types": 328,
+  "business_surfaces": 163,
+  "empty_surfaces": 9,
+  "host_forms": 119,
+  "control_records": 11750,
+  "inventories_sha256": "5a19da20fca20263a2d96b1394ae6ec09603fe0c1bdd4427fd9c0837d4d5b59a",
+  "runtime_tests": "NOT RUN",
+  "contract_validators": "PASS"
+}

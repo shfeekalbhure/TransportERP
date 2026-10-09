@@ -51,7 +51,7 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
                     new WaybillPartyInput("SENDER", null, "مرسل اختبار", "777100001", null, null, address),
                     new WaybillPartyInput("RECEIVER", null, "مستلم اختبار", "777100002", null, null, address)
                 ],
-                [new WaybillItemInput(null, 1, "GENERAL", "طرود اختبار", 2m, 2, 12m, null, null, null, 500m, null, [], null)],
+                [new WaybillItemInput(null, 1, "GENERAL", "طرود اختبار", 2m, 2, 12m, null, null, null, 500m, null, [], null, Volume: 50m)],
                 $"update-{Guid.NewGuid():N}"));
 
         WaybillResponse submitted;
@@ -79,6 +79,10 @@ public sealed class P2C01AWaybillPostgreSqlIntegrationTests
         Assert.Equal("COMMITTED", reservation.State);
         Assert.Equal(approved.WaybillNo, reservation.RenderedNumber);
         Assert.Equal(context.CorrelationId, audit.CorrelationId);
+        var persistedItem = await verifyDb.Set<WaybillItemEntity>().AsNoTracking()
+            .SingleAsync(x => x.WaybillId == draft.Id);
+        Assert.Equal(50m, persistedItem.Volume);
+        Assert.Equal(50m, approved.Items.Single().Volume);
     }
 
     [Fact]

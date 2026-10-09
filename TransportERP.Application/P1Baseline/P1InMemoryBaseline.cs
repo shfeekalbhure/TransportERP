@@ -386,7 +386,15 @@ public sealed class P1InMemoryService
             throw new P1RuleException("ENTRY_NOT_FOUND", entryId);
         if (original.State != P1JournalState.Posted) throw new P1RuleException("NOT_POSTED", entryId);
         var reversalId = $"REV-{entryId}";
-        var reversal = original with { Id = reversalId, Reference = $"REVERSAL:{entryId}:{reason}", State = P1JournalState.Posted, ReversalOf = entryId, Version = 1 };
+        var reversal = original with
+        {
+            Id = reversalId,
+            Reference = $"REVERSAL:{entryId}:{reason}",
+            Lines = original.Lines.Select(line => line with { Debit = line.Credit, Credit = line.Debit }).ToArray(),
+            State = P1JournalState.Posted,
+            ReversalOf = entryId,
+            Version = 1
+        };
         _store.Journals[entryId] = original with { State = P1JournalState.Reversed, Version = original.Version + 1 };
         _store.Journals[reversalId] = reversal;
         Audit("ReverseJournalEntry", entryId, actorId, companyId, original.BranchId, "SUCCESS");
