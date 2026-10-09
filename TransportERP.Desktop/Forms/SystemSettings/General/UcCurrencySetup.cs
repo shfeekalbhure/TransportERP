@@ -11,6 +11,7 @@ public partial class UcCurrencySetup : UserControl, IFoundationScreen, IExplicit
 {
     private readonly FoundationUiSession foundation;
     private bool updatingCurrencyType;
+    private Action? restoreEntryState;
 
     public UcCurrencySetup()
     {
@@ -138,6 +139,38 @@ public partial class UcCurrencySetup : UserControl, IFoundationScreen, IExplicit
 
     private void btnAdd_Click(object? sender, EventArgs e)
     {
+        if (restoreEntryState != null || foundation.IsBusy) return;
+
+        // Capture the current view, rather than constructor defaults or saved data.
+        var textFields = new TextBoxBase[] { txtNumber, txtNameLocal, txtNameForeign,
+            txtFractionLocal, txtFractionForeign, txtDecimals }
+            .Select(control => (Control: control, Text: control.Text, Enabled: control.Enabled)).ToArray();
+        // Selecting local can also clear the retained foreign-currency binding key.
+        var checkFields = new[] { chkLocal, chkForeign, chkStock }
+            .Select(control => (Control: control, State: control.CheckState, Enabled: control.Enabled)).ToArray();
+        var selectedTab = tabsSetup.SelectedTab;
+        restoreEntryState = () =>
+        {
+            updatingCurrencyType = true;
+            try
+            {
+                foreach (var field in textFields)
+                {
+                    field.Control.Text = field.Text;
+                    field.Control.Enabled = field.Enabled;
+                }
+                foreach (var field in checkFields)
+                {
+                    field.Control.CheckState = field.State;
+                    field.Control.Enabled = field.Enabled;
+                }
+            }
+            finally { updatingCurrencyType = false; }
+            ApplyCurrencyTypePresentation();
+            if (selectedTab != null && tabsSetup.TabPages.Contains(selectedTab))
+                tabsSetup.SelectedTab = selectedTab;
+        };
+
         txtNumber.Enabled = true;
         txtNameLocal.Enabled = true;
         txtNameForeign.Enabled = true;
@@ -147,8 +180,32 @@ public partial class UcCurrencySetup : UserControl, IFoundationScreen, IExplicit
         chkLocal.Enabled = true;
         chkStock.Enabled = true;
         btnAdd.Enabled = false;
+        btnCancel.Enabled = true;
         txtNumber.Focus();
         // Save, lookup data, POS and foreign-currency prerequisites stay unconnected.
+    }
+
+    private void btnCancel_Click(object? sender, EventArgs e)
+    {
+        var restore = restoreEntryState;
+        if (restore == null || !foundation.ConfirmLeave()) return;
+
+        // Restore only this entry session. Keep the existing dirty baseline/version
+        // so cancellation never marks unrelated changes as saved.
+        restore();
+        restoreEntryState = null;
+        btnCancel.Enabled = false;
+        btnAdd.Enabled = true;
+        btnAdd.Focus();
+    }
+
+    private void btnClose_Click(object? sender, EventArgs e)
+    {
+        // FrmMain already routes btnClose through its workspace close guard.
+        // Standalone hosts use Foundation's FormClosing guard instead.
+        var host = FindForm();
+        if (host != null && host is not global::TransportERP.Desktop.FrmMain)
+            host.Close();
     }
 
     private void emptyGrid_Paint(object? sender, PaintEventArgs e)

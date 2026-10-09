@@ -964,7 +964,7 @@ partial class UcCurrencySetup
         // 
         btnClose.AccessibleName = "إغلاق";
         btnClose.BackColor = Color.FromArgb(239, 239, 239);
-        btnClose.Enabled = false;
+        btnClose.Enabled = true;
         btnClose.FlatAppearance.BorderColor = Color.FromArgb(163, 163, 163);
         btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(207, 220, 227);
         btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 235, 240);
@@ -981,6 +981,7 @@ partial class UcCurrencySetup
         btnClose.TabIndex = 11;
         commandToolTip.SetToolTip(btnClose, "إغلاق");
         btnClose.UseVisualStyleBackColor = false;
+        btnClose.Click += btnClose_Click;
         // 
         // pnlToolbar
         // 
@@ -1076,6 +1077,7 @@ partial class UcCurrencySetup
         btnCancel.TabIndex = 3;
         commandToolTip.SetToolTip(btnCancel, "إلغاء");
         btnCancel.UseVisualStyleBackColor = false;
+        btnCancel.Click += btnCancel_Click;
         // 
         // btnDelete
         // 
