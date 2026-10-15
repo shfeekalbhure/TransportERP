@@ -206,6 +206,22 @@ public sealed partial class ReceiptWorkspaceTests
             options.ConfigureTransportErpPostgreSql("Host=127.0.0.1;Port=54439;Username=receipt_test;Pooling=false;Database=receipt_test_" + Guid.NewGuid().ToString("N"));
             var db = new TransportErpDbContext(options.Options); db.Database.Migrate(); return db;
         }
+        // Isolated GitHub Actions PostgreSQL: every receipt test gets its own
+        // disposable database, never the shared migrations or production database.
+        if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" &&
+            Environment.GetEnvironmentVariable("TRANSPORTERP_TEST_CONNSTR") is { Length: > 0 } ciConnection)
+        {
+            var cs = new Npgsql.NpgsqlConnectionStringBuilder(ciConnection);
+            if (cs.Host is not ("localhost" or "127.0.0.1") ||
+                cs.Database != "transporterptest" || cs.Username != "postgres")
+                throw new InvalidOperationException("Receipt CI tests require disposable localhost transporterptest.");
+            cs.Database = "receipt_test_" + Guid.NewGuid().ToString("N");
+            cs.Pooling = false;
+            options.ConfigureTransportErpPostgreSql(cs.ConnectionString);
+            var db = new TransportErpDbContext(options.Options);
+            db.Database.Migrate();
+            return db;
+        }
         options.UseInMemoryDatabase("receipt-only-test-" + Guid.NewGuid()).ReplaceService<IModelCustomizer, TransportErpP2CombinedModelCustomizer>();
         return new(options.Options);
     }

@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - master
+      - design/setup-stage1-20261009
   workflow_dispatch:
 
 permissions:
@@ -96,3 +97,6 @@ jobs:
 
       - name: Build Desktop contract surface
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore -p:OutputType=Library
+
+      - name: Build desktop executable
+        run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore

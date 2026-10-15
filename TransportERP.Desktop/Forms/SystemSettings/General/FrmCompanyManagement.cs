@@ -10,9 +10,6 @@ public sealed partial class FrmCompanyManagement : FrmBase
     {
         InitializeComponent();
         CancelButton = companyManagement.CloseButton;
-    
-        // Screen-root properties only; child containers belong to their own designers.
-        global::TransportERP.ScreenRootProperties.Attach(this);
     }
 
     private void CompanyManagement_CloseRequested(object? sender, EventArgs e) => Close();

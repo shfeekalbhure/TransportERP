@@ -15,17 +15,11 @@ public partial class UcCompanyManagement : UserControl, TransportERP.Desktop.Cor
     public UcCompanyManagement()
     {
         InitializeComponent();
-        OnyxPhaseOneProperties.Apply(this);
+        // Visual Studio Designer owns the company screen layout.
         ConfigureUnavailableActions();
         Foundation = new TransportERP.Desktop.CoreUI.FoundationUiSession(this);
-        Foundation.RequireFields(new[] { "btnSave", "btnPublish", "btnValidate" }, txtCompanyNameAr.Name, cmbActivityType.Name, cmbBaseCurrency.Name, cmbCountry.Name);
-    
-        // Screen-root properties only; child containers belong to their own designers.
-        global::TransportERP.ScreenRootProperties.Attach(this);
-    
-        if (standardAuditMetadata.Parent == null) Controls.Add(standardAuditMetadata);
-        standardAuditMetadata.SendToBack();
-}
+        Foundation.RequireFields(new[] { "btnSave" }, txtCompanyNameAr.Name, cmbActivityType.Name, cmbBaseCurrency.Name, cmbCountry.Name);
+    }
 
 
 
@@ -34,17 +28,12 @@ public partial class UcCompanyManagement : UserControl, TransportERP.Desktop.Cor
         const string reason = "غير متاح حاليًا: لم يُنفَّذ هذا الإجراء ولم يُربط بخدمة تشغيلية.";
         components ??= new System.ComponentModel.Container();
         var availabilityTip = new ToolTip(components) { ShowAlways = true };
-        tabCompaniesSection.Text += " — الحفظ غير مرتبط";
         availabilityTip.SetToolTip(btnClose, "إغلاق الشاشة");
         foreach (var button in new[] { button1, btnSave, btnEdit, btnDelete, button2, btnFirst, btnPrevious, btnNext, btnLast, btnUndo, btnSearch, btnPrint, button4, btnAddLogo, btnRemoveLogo })
         {
             button.Enabled = false;
             button.AccessibleDescription = reason;
             availabilityTip.SetToolTip(button, reason);
-            // Disabled buttons do not reliably receive hover messages. Their host
-            // also explains the disabled state without changing the layout.
-            if (button.Parent is Control host)
-                availabilityTip.SetToolTip(host, reason);
         }
     }
 

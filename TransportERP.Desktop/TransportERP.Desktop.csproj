@@ -53,6 +53,13 @@
     <Folder Include="البوالص_والشحن\المدخلات\" />
   </ItemGroup>
 <ItemGroup>
+    <Compile Update="Forms/SystemSettings/General/UcCompanyManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCompanyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>UcCompanyManagement.cs</DependentUpon></Compile>
+    <Compile Update="Forms/SystemSettings/General/UcCompanyManagement.AuditMetadata.cs"><SubType>Code</SubType><DependentUpon>UcCompanyManagement.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/SystemSettings/General/UcCompanyManagement.resx"><DependentUpon>UcCompanyManagement.cs</DependentUpon></EmbeddedResource>
+    <Compile Update="Forms/SystemSettings/General/FrmCompanyManagement.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Forms/SystemSettings/General/FrmCompanyManagement.Designer.cs"><SubType>Code</SubType><DependentUpon>FrmCompanyManagement.cs</DependentUpon></Compile>
+    <EmbeddedResource Update="Forms/SystemSettings/General/FrmCompanyManagement.resx"><DependentUpon>FrmCompanyManagement.cs</DependentUpon></EmbeddedResource>
     <Compile Update="Forms/SystemSettings/General/FrmCurrencyManagement.cs"><SubType>Form</SubType></Compile>
     <Compile Update="Forms/SystemSettings/General/UcCurrencySetup.cs"><SubType>UserControl</SubType></Compile>
     <Compile Update="Forms/SystemSettings/General/UcCurrencySetup.Designer.cs"><SubType>Code</SubType><DependentUpon>UcCurrencySetup.cs</DependentUpon></Compile>

@@ -47,6 +47,14 @@ verify(disabled is not None and "btnClose" not in disabled.group(1),
        "Company Close must remain enabled independently of unavailable CRUD actions.")
 verify("ConfigureUnavailableActions();" in control and "button.Enabled = false" in control,
        "Unimplemented company actions must remain disabled.")
+for layout_override in ("OnyxPhaseOneProperties.Apply(this)", "ScreenRootProperties.Attach(this)",
+                        "tabCompaniesSection.Text +=", "Controls.Add(standardAuditMetadata)"):
+    verify(layout_override not in control,
+           "Company runtime must not override Designer layout: " + layout_override)
+verify("ScreenRootProperties.Attach(this)" not in host,
+       "Company compatibility Form must use its Designer, not runtime appearance overrides.")
+verify("new UcCompanyData()" not in nav,
+       "Legacy company data surface must not be routed as the active company screen.")
 for name in ("txtCompanyId", "txtCompanyCode", "txtCompanyNameAr", "txtCompanyNameEn",
              "txtTaxNumber", "cmbCompanyGroup", "cmbActivityType", "cmbCountry",
              "cmbBaseCurrency", "tabCompanies", "tabBasicData", "tabStatus"):
