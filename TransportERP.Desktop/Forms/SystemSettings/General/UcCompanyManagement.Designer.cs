@@ -664,7 +664,6 @@ partial class UcCompanyManagement
         txtAddress.RightToLeft = RightToLeft.Yes;
         txtAddress.Size = new Size(441, 32);
         txtAddress.TabIndex = 13;
-        txtAddress.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // label5
         // 
@@ -740,7 +739,6 @@ partial class UcCompanyManagement
         txtNotes.ScrollBars = ScrollBars.Vertical;
         txtNotes.Size = new Size(441, 66);
         txtNotes.TabIndex = 19;
-        txtNotes.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // txtPostalCode
         // 
@@ -754,7 +752,6 @@ partial class UcCompanyManagement
         txtPostalCode.RightToLeft = RightToLeft.No;
         txtPostalCode.Size = new Size(439, 32);
         txtPostalCode.TabIndex = 18;
-        txtPostalCode.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // txtWebsite
         // 
@@ -768,7 +765,6 @@ partial class UcCompanyManagement
         txtWebsite.RightToLeft = RightToLeft.No;
         txtWebsite.Size = new Size(441, 32);
         txtWebsite.TabIndex = 17;
-        txtWebsite.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // txtEmail
         // 
@@ -782,7 +778,6 @@ partial class UcCompanyManagement
         txtEmail.RightToLeft = RightToLeft.No;
         txtEmail.Size = new Size(439, 32);
         txtEmail.TabIndex = 16;
-        txtEmail.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // txtMobile
         // 
@@ -796,7 +791,6 @@ partial class UcCompanyManagement
         txtMobile.RightToLeft = RightToLeft.No;
         txtMobile.Size = new Size(441, 32);
         txtMobile.TabIndex = 15;
-        txtMobile.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // txtPhone
         // 
@@ -810,7 +804,6 @@ partial class UcCompanyManagement
         txtPhone.RightToLeft = RightToLeft.No;
         txtPhone.Size = new Size(439, 32);
         txtPhone.TabIndex = 14;
-        txtPhone.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // label24
         // 
@@ -936,7 +929,6 @@ partial class UcCompanyManagement
         txtCommercialRegistrationNo.RightToLeft = RightToLeft.No;
         txtCommercialRegistrationNo.Size = new Size(441, 32);
         txtCommercialRegistrationNo.TabIndex = 9;
-        txtCommercialRegistrationNo.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // cmbGovernorate
         // 
@@ -978,7 +970,6 @@ partial class UcCompanyManagement
         txtTaxNumber.RightToLeft = RightToLeft.No;
         txtTaxNumber.Size = new Size(439, 32);
         txtTaxNumber.TabIndex = 6;
-        txtTaxNumber.Tag = "FLD-COMPANY-NAME-EN";
         // 
         // cmbActivityType
         // 
@@ -1068,7 +1059,6 @@ partial class UcCompanyManagement
         txtCompanyId.Size = new Size(439, 32);
         txtCompanyId.TabIndex = 0;
         txtCompanyId.TabStop = false;
-        txtCompanyId.Tag = "FLD-COMPANY-NAME-AR";
         // 
         // label6
         // 
@@ -1180,7 +1170,6 @@ partial class UcCompanyManagement
         txtCompanyCode.Size = new Size(441, 32);
         txtCompanyCode.TabIndex = 1;
         txtCompanyCode.TabStop = false;
-        txtCompanyCode.Tag = "FLD-COMPANY-NAME-AR";
         // 
         // label1
         // 
