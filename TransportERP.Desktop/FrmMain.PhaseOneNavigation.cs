@@ -364,7 +364,7 @@ public partial class FrmMain
     {
             "01.01" => new FrmLogin(),
             "01.02" => null,
-            "02.01.01" => new FrmTextSetup(new UcCompanyData()),
+            "02.01.01" => new FrmCompanyManagement(),
             "02.02.01" => new FrmTextSetup(new UcBranchData()),
             "02.03.01" => new FrmUsersPermissions(),
             "02.03.02" => new FrmUsersPermissions("tabRolesV20"),
@@ -493,7 +493,7 @@ public partial class FrmMain
 
     internal static UserControl? CreatePhaseOneControl(string code) => NormalizeScreenCode(code) switch
     {
-        "02.01.01" => new UcCompanyData(),
+        "02.01.01" => new UcCompanyManagement(),
         "02.02.01" => new UcBranchData(),
         "02.03.01" => new UcUsersPermissions(),
         "02.03.02" => new UcUsersPermissions("tabRolesV20"),
