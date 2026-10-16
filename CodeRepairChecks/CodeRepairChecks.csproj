@@ -4,6 +4,7 @@
     <UseWindowsForms>true</UseWindowsForms><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="CompanyRuntimeChecks/**/*.cs" />
     <ProjectReference Include="../TransportERP.EmptyForms/TransportERP.EmptyForms.csproj" />
     <ProjectReference Include="../TransportERP.Desktop/TransportERP.Desktop.csproj" />
   </ItemGroup>
