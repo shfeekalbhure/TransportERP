@@ -100,3 +100,6 @@ jobs:
 
       - name: Build desktop executable
         run: dotnet build TransportERP.Desktop/TransportERP.Desktop.csproj --configuration Release --no-restore
+
+      - name: Exercise company runtime navigation and layout contracts
+        run: dotnet run --project CodeRepairChecks/CompanyRuntimeChecks/CompanyRuntimeChecks.csproj --configuration Release
