@@ -241,6 +241,11 @@
     <Compile Update="البوالص_والشحن/العمليات/ترحيل_الشحنات/منسدلة_الجدول/UcDispatchWaybillRow.Designer.cs"><DependentUpon>UcDispatchWaybillRow.cs</DependentUpon><SubType>Code</SubType></Compile>
     <EmbeddedResource Update="البوالص_والشحن/العمليات/ترحيل_الشحنات/منسدلة_الجدول/UcDispatchWaybillRow.resx"><DependentUpon>UcDispatchWaybillRow.cs</DependentUpon></EmbeddedResource>
   </ItemGroup>
+  <ItemGroup Label="Retired company layout retained for reference">
+    <Compile Remove="Forms/SystemSettings/General/UcCompanyData.Designer.cs;Forms/SystemSettings/General/UcCompanyData.AuditMetadata.cs" />
+    <None Include="Forms/SystemSettings/General/UcCompanyData.Designer.cs;Forms/SystemSettings/General/UcCompanyData.AuditMetadata.cs" />
+    <Compile Update="Forms/SystemSettings/General/UcCompanyData.cs"><SubType>Code</SubType></Compile>
+  </ItemGroup>
 </Project>
 
 
